@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "roles": {
+    "data": ["apps/api/", "apps/mock-bank/"],
+    "cashflow": [
+      "apps/mobile/src/features/connection/",
+      "apps/mobile/src/features/recurring/",
+      "apps/mobile/src/features/spending/"
+    ],
+    "allocation": ["apps/mobile/src/features/allocation/", "docs/demo/"],
+    "integration": [""]
+  },
+  "shared": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "package.json",
+    "package-lock.json",
+    "eslint.config.mjs",
+    "tsconfig.base.json",
+    ".prettierrc.json",
+    ".prettierignore",
+    ".editorconfig",
+    ".gitattributes",
+    ".gitignore",
+    ".npmrc",
+    ".nvmrc",
+    ".github/",
+    ".vscode/",
+    "scripts/",
+    "packages/",
+    "docs/harness/",
+    "docs/decisions/",
+    "apps/mobile/app/",
+    "apps/mobile/src/shared/"
+  ],
+  "mandatoryReferences": [
+    "docs/mvp-scope.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/ownership.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/EXTENSION_POINTS.md"
+  ],
+  "productGates": {
+    "mobile": {
+      "prefixes": ["apps/mobile/"],
+      "workspace": "apps/mobile",
+      "scripts": ["typecheck", "test"]
+    },
+    "api": {
+      "prefixes": ["apps/api/"],
+      "workspace": "apps/api",
+      "scripts": ["typecheck", "test"]
+    },
+    "mockBank": {
+      "prefixes": ["apps/mock-bank/"],
+      "workspace": "apps/mock-bank",
+      "scripts": ["typecheck", "test"]
+    },
+    "contracts": {
+      "prefixes": ["packages/contracts/"],
+      "workspace": "packages/contracts",
+      "scripts": ["typecheck", "test"]
+    },
+    "finance": {
+      "prefixes": ["packages/finance-core/"],
+      "workspace": "packages/finance-core",
+      "scripts": ["typecheck", "test"]
+    }
+  }
+}
