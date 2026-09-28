@@ -1,0 +1,16 @@
+# 공통 변경 리뷰 담당. merge 권한 통제는 GitHub Rulesets에서 별도로 설정한다.
+/AGENTS.md @enpl
+/CLAUDE.md @enpl
+/package.json @enpl
+/package-lock.json @enpl
+**/package.json @enpl
+/*.json @enpl
+/.* @enpl
+/.github/ @enpl
+/.vscode/ @enpl
+/scripts/ @enpl
+/packages/ @enpl
+/docs/harness/ @enpl
+/docs/tasks/ @enpl
+/apps/mobile/app/ @enpl
+/apps/mobile/src/shared/ @enpl
