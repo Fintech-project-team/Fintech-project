@@ -1,0 +1,12 @@
+node_modules
+.harness
+.flowcast
+.expo
+dist
+build
+coverage
+package-lock.json
+AGENTS.md
+CLAUDE.md
+apps/mobile/android
+apps/mobile/ios

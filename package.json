@@ -1,0 +1,31 @@
+{
+  "name": "flowcast",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": "24.21.0",
+    "npm": "11.19.0"
+  },
+  "packageManager": "npm@11.19.0",
+  "scripts": {
+    "check:structure": "node scripts/harness/check-structure.mjs",
+    "format:check": "prettier . --check",
+    "lint": "eslint . --max-warnings=0",
+    "test:harness": "node scripts/harness/run-tests.mjs",
+    "check": "npm run check:structure && npm run format:check && npm run lint && npm run test:harness",
+    "verify": "node scripts/harness/verify-change.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.11.0",
+    "globals": "17.12.0",
+    "prettier": "3.9.9",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.1"
+  }
+}

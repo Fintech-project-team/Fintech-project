@@ -1,0 +1,9 @@
+{
+  "id": "FC-000",
+  "role": "cashflow",
+  "baseCommit": "REPLACE_WITH_40_CHARACTER_BASE_SHA",
+  "branch": "feat/cashflow/FC-000-example",
+  "allowedPaths": ["apps/mobile/src/features/spending/"],
+  "acceptance": ["화면 동작과 실패 사례를 실제 작업으로 교체"],
+  "readBefore": ["docs/contracts.md", "apps/mobile/src/shared/README.md"]
+}

@@ -1,0 +1,16 @@
+# 공통 변경 리뷰 담당. merge 권한 통제는 GitHub Rulesets에서 별도로 설정한다.
+/AGENTS.md @sunghyun-dev
+/CLAUDE.md @sunghyun-dev
+/package.json @sunghyun-dev
+/package-lock.json @sunghyun-dev
+**/package.json @sunghyun-dev
+/*.json @sunghyun-dev
+/.* @sunghyun-dev
+/.github/ @sunghyun-dev
+/.vscode/ @sunghyun-dev
+/scripts/ @sunghyun-dev
+/packages/ @sunghyun-dev
+/docs/harness/ @sunghyun-dev
+/docs/tasks/ @sunghyun-dev
+/apps/mobile/app/ @sunghyun-dev
+/apps/mobile/src/shared/ @sunghyun-dev
