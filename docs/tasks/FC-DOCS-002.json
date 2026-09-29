@@ -1,0 +1,40 @@
+{
+  "id": "FC-DOCS-002",
+  "role": "integration",
+  "baseCommit": "2f1b3b9c9af9dd1e439d159a8570099ced62d270",
+  "branch": "docs/integration/git-guide",
+  "allowedPaths": [
+    "docs/ownership.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "docs/first-tasks.md",
+    "docs/harness/COMMIT_PR_POLICY.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/engineering-rules.md",
+    "docs/development-workflow.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/architecture.md",
+    "docs/calculation-rules.md",
+    "docs/contracts.md",
+    "docs/mvp-scope.md",
+    "docs/toolchain.md",
+    "docs/tasks/README.md",
+    "docs/decisions/README.md",
+    "docs/demo/README.md",
+    "README.md",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    "docs/tasks/FC-GIT-001.json"
+  ],
+  "acceptance": [
+    "개발 관리자 포함 총 4명의 기여자로 설명하고 개발 관리자를 프로젝트 소유자로 표현하지 않는다",
+    "기존 Git 안내와 개발 요구사항을 보존하며 표현과 중복을 정리한다",
+    "AGENTS.md와 CLAUDE.md는 동일한 30줄 이하, 나머지 Markdown은 파일별 80줄 이하로 정리한다",
+    "기존 변경·작업 명세를 보존하고 검사 코드·제품 코드·의존성·GitHub 설정을 바꾸지 않는다"
+  ],
+  "readBefore": [
+    "docs/harness/COMMIT_PR_POLICY.md",
+    "docs/development-workflow.md",
+    "docs/toolchain.md"
+  ]
+}
