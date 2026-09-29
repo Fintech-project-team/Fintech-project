@@ -1,0 +1,25 @@
+{
+  "id": "FC-GIT-001",
+  "role": "integration",
+  "baseCommit": "2f1b3b9c9af9dd1e439d159a8570099ced62d270",
+  "branch": "docs/integration/git-guide",
+  "allowedPaths": [
+    "docs/harness/COMMIT_PR_POLICY.md",
+    "README.md",
+    ".github/PULL_REQUEST_TEMPLATE.md"
+  ],
+  "acceptance": [
+    "COMMIT_PR_POLICY.md 맨 위에 제목 종류별 예시·현재 검사 조건·PR 방향·merge 방식·검사 실패 확인 방법을 담은 빠른 안내가 있다",
+    "README.md 협업 방식이 기능 브랜치 → 개인 전용 브랜치 → develop → main 흐름과 규칙 문서 링크를 포함한다",
+    "PR 템플릿 상단에 제목 예시와 base/compare 설명이 있고 기존 체크리스트가 보존된다",
+    "안내 내용이 check-message.mjs·message-policy.yml의 실제 검사와 일치하고 검사기·워크플로·GitHub 보호 규칙은 변경하지 않는다"
+  ],
+  "readBefore": [
+    "docs/harness/COMMIT_PR_POLICY.md",
+    "docs/development-workflow.md",
+    "docs/toolchain.md",
+    "scripts/harness/check-message.mjs",
+    ".github/workflows/message-policy.yml",
+    ".github/workflows/harness.yml"
+  ]
+}

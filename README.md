@@ -23,12 +23,31 @@
 - 실제 금융기관 연결과 자동이체는 구현 범위에 포함하지 않습니다.
 - 예측 결과는 입력 데이터와 설정한 가정에 따른 시뮬레이션입니다.
 
+## 팀 구성
+
+개발 관리자 1명을 포함해 총 4명의 기여자(contributors)가 개발합니다.
+개발 관리자는 공통 코드·개발 환경·리뷰·통합을 맡는 기여자이며 프로젝트 소유자를 뜻하지 않습니다.
+관리자는 integration을, 나머지 3명은 data·cashflow·allocation을 나누어 맡습니다.
+
 ## 협업 방식
 
-- 기능별 작업 브랜치에서 개발합니다.
-- 변경 사항은 Pull Request로 공유합니다.
-- 리뷰와 필요한 검증을 거쳐 main에 반영합니다.
+변경은 `기능 브랜치 → 본인 전용 브랜치 → develop → main` 순서로 Pull Request를 통해 반영합니다.
+
+1. 본인 전용 브랜치(`이름-dev`)에 develop 변경을 먼저 반영하고, 그 위에서 기능 브랜치를 만들어 개발합니다.
+2. 기능 브랜치 → 본인 전용 브랜치 PR은 Squash and merge로 합칩니다.
+3. 본인 전용 브랜치 → develop PR은 리뷰와 검증을 거쳐 개발 관리자 enpl(개인 브랜치 sunghyun-dev)이 Create a merge commit으로 합칩니다.
+4. develop → main 릴리스도 개발 관리자 enpl(개인 브랜치 sunghyun-dev)이 Create a merge commit으로 합칩니다.
+
+- 커밋 첫 줄과 PR 제목은 `type(scope): 한국어 설명` 형식을 따르며 PR에서 자동 검사합니다.
 - 데이터 형식과 금융 계산 규칙은 공통 문서로 관리합니다.
+
+규칙 문서:
+
+- [커밋·PR·merge 규칙과 빠른 안내](docs/harness/COMMIT_PR_POLICY.md)
+- [개발 시작과 통합 절차](docs/development-workflow.md)
+- [역할별 담당 범위](docs/ownership.md)
+- [작업 명세 작성법](docs/tasks/README.md)
+- [PR 템플릿](.github/PULL_REQUEST_TEMPLATE.md)
 
 ## 프로젝트 상태
 
