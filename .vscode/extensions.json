@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "expo.vscode-expo-tools",
+    "github.vscode-pull-request-github",
+    "usernamehw.errorlens",
+    "humao.rest-client"
+  ]
+}
