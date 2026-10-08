@@ -33,11 +33,13 @@ Flutter 공식 [agent-plugins](https://github.com/flutter/agent-plugins/tree/0ef
 | dart-run-static-analysis                  | 분석과 자동 수정 안내              | 원본에 dart fix --apply·dart format . 절차가 있음. 분석은 필수 검사로 두고 전체 자동 수정은 채택하지 않음 |
 | flutter-add-widget-preview                | 컴포넌트 상태를 빠르게 눈으로 확인 | SDK와 앱 테마가 준비된 뒤 추가. 미리보기는 위젯 테스트·기기 검증을 대체하지 않음                          |
 | 커뮤니티 디자인 시스템 묶음               | 구체적인 토큰·컴포넌트·검사 제공   | 서로 다른 테마 정책과 경로·의존성을 강제할 수 있어 현재 초기화 전 구조에 그대로 적용하지 않음             |
-| 네이티브 E2E 추가 도구                    | 권한창·외부 앱 같은 경계 검사      | 실제 시나리오가 정해지면 선택. 현재 표준 integration_test 준비가 먼저                                     |
+| 네이티브 E2E 추가 도구                    | 권한창·외부 앱 같은 경계 검사      | 실제 시나리오가 정해지면 선택. 실제 E2E 작업 요청 때 검토하며 현재 시스템 구축은 보류                     |
 
 대표 비교: [gabuldev의 디자인 시스템](https://github.com/gabuldev/flutter-skills/blob/99570628666c20503889fa8fd5608e14f31ff971/skills/flutter-design-system/SKILL.md)은 별도 패키지·정적 토큰·fromSeed 예시를 제공한다. [zakariaf의 디자인 시스템](https://github.com/zakariaf/Flutter-Skills/blob/e073e5ea10c963d2c52ab1e423bd314c28a56154/skills/design-system-structure/SKILL.md)은 정적 토큰/fromSeed를 금지하고 ThemeExtension·추가 셸 검사를 요구한다. 두 묶음을 함께 설치하는 대신 기존 토큰 재사용이라는 공통 원칙을 Flowcast에 맞춰 적용한다.
 
 ## 담당자가 설치하는 방법
+
+아래는 **최초 Flutter skills kit의 설치법**이다. 이미 적용한 팀은 최신 저장소 파일만 받는다. MVP v0.3 정정은 별도 MVP 문서 kit의 README를 따르며, 그 설치기는 `--skill`·`--list`를 제공하지 않는다. 예전 ZIP으로 현재 문서를 덮어쓰지 않는다.
 
 배포 ZIP을 저장소 밖에 압축 해제한다. 설치 폴더의 터미널에서 아래 명령을 사용한다. Node가 필요하며 실제 팀 저장소 경로로 바꾼다. 기본 권장은 전체 설치다.
 
@@ -66,6 +68,12 @@ macOS/Linux에서도 같은 Node 설치기를 쓰고 --repo 값만 실제 경로
 
 팀원은 통합된 파일을 자기 브랜치에 동기화하고 프로젝트를 열면 된다. 별도의 npx·플러그인 설치는 이 배포 방식에 필요 없다. Claude Code/Codex 설치와 로그인, 실제 Flutter 개발에 필요한 SDK는 각자 준비한다. [짧은 팀원 가이드](TEAM_SKILLS_QUICKSTART.md)를 전달한다.
 
-Claude 입력창 예시: `/flowcast-widget-test <실제 작업 명세 경로> 가용금액 카드의 오류 상태를 검사해.` Codex에서는 같은 스킬을 선택하거나 이름을 지정한다. 자동 선택도 지원하지만 처음에는 명시 호출로 출처와 적용 규칙을 확인한다.
+Claude 입력창 예시: `/flowcast-widget-test <실제 작업 명세 경로> 쓸 수 있는 돈 카드의 오류 상태를 검사해.` Codex에서는 같은 스킬을 선택하거나 이름을 지정한다. 자동 선택도 지원하지만 처음에는 명시 호출로 출처와 적용 규칙을 확인한다.
 
 파일 발견과 실제 호출, 앱 초기화, 제품 테스트, E2E·디자인 시스템 완성은 각각 다르다. 현재 제품 준비 상태는 [FLUTTER_TRANSITION.md](FLUTTER_TRANSITION.md)가 기준이다.
+
+## MVP v0.3 반영 후
+
+설치된 스킬 6개를 유지하고 현재 [수동 MVP](../mvp-scope.md)와 두 잔액 동작·직후 LLM 기준에 맞춰 관련 문구만 정정했다. E2E 스킬의 존재가 E2E 체계 구축을 지금 요구하지 않는다. 화면 용어는 MVP 문서를 따른다.
+
+위 설치 명령은 최초 Flutter skills kit의 사용법이다. MVP 문서 정정 이후 예전 ZIP으로 덮어쓰지 않는다. 현재 팀원은 저장소의 최신 파일을 기존 Git 절차로 받아 사용하며 새 스킬·MCP·플러그인을 추가 설치할 필요가 없다.

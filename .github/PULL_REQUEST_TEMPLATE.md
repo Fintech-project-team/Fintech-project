@@ -1,6 +1,6 @@
 <!--
 PR 제목: type(scope): 한국어 설명  (한 줄, 100자 이하, 설명에 한글 포함)
-  예) feat(spending): 소비 전후 가용금액 비교 추가
+  예) feat(spending): 쓸 수 있는 돈 계산 내역 추가
       fix(finance): 카드 청구액 중복 차감 수정
       docs(harness): Git 규칙 빠른 안내 추가
       chore(repo): develop 변경을 sunghyun-dev에 동기화

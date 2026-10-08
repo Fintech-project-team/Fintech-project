@@ -13,4 +13,4 @@ description: Flowcast 작업의 필수 검사 누락, 기존 PASS의 유효성, 
 4. Dart/Flutter가 포함되면 [전환 상태와 검사](../../../docs/harness/FLUTTER_TRANSITION.md)의 추가 근거를 대조한다. 현재 Node 하네스의 product NOT_APPLICABLE은 Dart 검사를 대신하지 않는다. pubspec·SDK·역할 경로·실행 명령이 준비되지 않았다면 필요한 항목을 BLOCKED로 남긴다.
 5. 결과·완료 범위를 먼저 보고하고, 재사용/신규 검사와 미검증을 구분한다. [네 지표](../../../docs/harness/AGENT_REVIEW.md)는 증거에 따라 0건·해당 없음·미확인으로 쓴다. 기록을 요청받거나 구현을 마무리할 때만 `.harness/reviews/<작업 ID>.md`를 보완하며 과거 사건은 삭제하지 않는다.
 
-설치 파일 정합성, 실제 에이전트 호출, Flutter 테스트, 앱→API→더미 서버 E2E, 실기기, GitHub 반영은 각각 판정한다. 최종 보고서를 쓰기 위해 동일 검사를 다시 실행하지 않는다.
+설치 파일 정합성, 실제 에이전트 호출, Flutter 테스트, 현재 앱→API 저장 연결, 후속 F07의 더미 서버 연결, 실기기, GitHub 반영은 각각 판정한다. 현재 MVP 범위와 두 잔액 동작은 [MVP 기준](../../../docs/mvp-scope.md)·[계산 규칙](../../../docs/calculation-rules.md)에 맞춰 확인한다. E2E 체계·디자인 시스템 구축 보류를 기능 검사 생략으로 해석하지 않는다. 최종 보고서를 쓰기 위해 동일 검사를 다시 실행하지 않는다.

@@ -49,3 +49,9 @@ AGENTS.md 또는 CLAUDE.md와 지정한 작업 명세의 미확인·변경 부�
 GitHub 권한·required checks는 개발 관리자가 설정한다. 문서나 CODEOWNERS만으로 권한이 적용되지는 않는다.
 
 스킬 사용과 팀원 준비는 [선정·설치 안내](harness/FLUTTER_SKILLS.md), [팀원용 빠른 시작](harness/TEAM_SKILLS_QUICKSTART.md)을 따른다. 저장소의 두 도구용 스킬은 같은 버전으로 관리한다.
+
+## 현재 제품 범위로 작업 나누기
+
+기능 명세의 완료 조건에 [MVP](mvp-scope.md)의 F 기능 ID·화면·현재/직후 LLM/후속 단계를 적는다. P 기능 목록과 과거 결정 기록은 현재 범위를 대신하지 않는다. [첫 작업](first-tasks.md) 순서로 Must 수동 입력을 먼저 연결하고 직후 LLM 입력·분류 보조를 별도 작업으로 이어간다.
+
+계산식과 03-1/02-3 상태 변경은 [계산 규칙](calculation-rules.md)을 따르고 미결정 항목만 해당 구현 전에 확인한다. 모든 작업에 정책 재승인·거래 수집·새 도구·E2E/디자인 시스템 구축을 요구하지 않는다.

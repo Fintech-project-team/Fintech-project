@@ -52,3 +52,9 @@ CODE_SPEC.md와 EXTENSION_POINTS.md도 공통 필수 문서다. Git 작업은 CO
 위 mobile typecheck/test 표는 현재 Node 하네스의 동작이다. 신규 모바일 목표는 Flutter이며 Dart 자동 게이트는 아직 연결되지 않았다. [FLUTTER_TRANSITION.md](FLUTTER_TRANSITION.md)의 초기화·역할 경로·추가 분석/테스트를 함께 확인한다. Dart 변경이 있는데 Node 하네스가 product NOT_APPLICABLE로 나왔다고 제품 검사를 생략하지 않는다.
 
 Flutter 기능 완료를 판단할 때는 실제 pubspec, 준비된 정책·명령, 관련 Dart 포맷·분석·테스트·필요한 기기 근거가 있어야 한다. 필요한 준비가 없으면 BLOCKED다. 스킬·문서만 수정한 이번 종류의 작업에는 앱 검사를 추가하지 않는다.
+
+## 현재 MVP에 맞는 검사 선택
+
+기능 범위는 [MVP v0.3](../mvp-scope.md)과 [계산 규칙](../calculation-rules.md)이다. 관련 작업에서 B−F−P, 03-1 지급 처리의 한 번 차감, 02-3 잔액 덮어쓰기의 중복 차감 방지, 저장 실패·버전 충돌을 확인한다. 순수 계산·상태 전이·화면 검사를 실제 구현 계층에 배정한다.
+
+현재 Must는 mock-bank·자동 수집·What-if·일/주 사용 현황을 포함하지 않는다. E2E 체계·디자인 시스템 구축은 보류하며, 문서 정합성 작업에 앱·기기 검사를 추가하지 않는다. LLM 입력·분류 보조는 후속 별도 작업에서 후보/확정 구분·사용자 확인·오류·중복 저장을 검사한다. 기존 하네스·필수 검사 선택 규칙을 이 문서 정정만으로 완화하지 않는다.

@@ -8,3 +8,5 @@
 
 작업 시작·종료 기록은 [AGENT_REVIEW.md](../harness/AGENT_REVIEW.md)를 따른다. 작업 명세 JSON은 수정 범위와 완료 조건을, PR 본문은 네 지표와 근거를 관리한다.
 PR 생성 전에는 .harness/reviews/<작업ID>.md에 기록한다. 기록을 남기기 위해 다른 담당자의 명세나 공통 문서를 수정하지 않는다.
+
+기능 작업은 acceptance에 [현재 MVP](../mvp-scope.md)의 F 기능 ID·화면과 단계(현재 Must/직후 LLM/선택 확장)를 연결한다. 기존 작업 JSON은 당시 기록으로 보존하고 새 MVP 작업의 명세로 재사용하지 않는다. 새 필드나 별도 중복 일지를 강제하지 않는다.

@@ -27,3 +27,9 @@
 Claude Code/Codex는 각자 설치·로그인한다. 스킬 파일과 승인된 공유 설정은 Git으로 받으며 개인 계정·비밀값·PC 경로는 공유하지 않는다. [팀원용 빠른 시작](harness/TEAM_SKILLS_QUICKSTART.md)을 따른다.
 
 설치 기준: [Flutter](https://docs.flutter.dev/install), [Dart pub get](https://dart.dev/tools/pub/cmd/pub-get), [Claude Code](https://code.claude.com/docs/en/setup), [Codex 스킬](https://learn.chatgpt.com/docs/build-skills).
+
+## MVP와 LLM의 설치 시점
+
+현재 Must에 필요한 것은 수동 입력 Flutter 앱과 API 저장 기반이다. mock-bank는 F07 선택 단계이며 별도 금융 수집 서버를 초기 필수 도구로 설치하지 않는다. LLM SDK·모델·키는 MVP 직후 입력·분류 보조 작업에서 선택한다. 여러 제공자·에이전트 프레임워크·벡터 DB·추가 MCP를 지금 설치하지 않는다.
+
+이 문서의 기존 Node 도구 숫자는 저장소 설정과의 일치를 위해 보존했다. 이번 MVP 문서 정정은 실제 배포 버전·실행 환경을 새로 검증하거나 의존성을 변경한 작업이 아니다. E2E와 디자인 시스템 구축도 현재 보류다.

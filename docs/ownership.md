@@ -44,4 +44,10 @@ cashflow 표의 recurring/와 spending/은 apps/mobile/src/features/ 아래 경�
 
 ## Flutter 전환 경로
 
-위 표는 현재 policy.json과 일치하는 이전 골격의 경로다. 신규 Flutter 앱은 [전환 기준](harness/FLUTTER_TRANSITION.md)에 따라 lib·test·integration_test 경로와 역할별 검사를 초기화 작업에서 함께 반영한다. 그 전에는 cashflow/allocation 명세를 임의로 integration으로 바꿔 Flutter 파일을 수정하지 않는다.
+위 표는 현재 policy.json과 일치하는 이전 골격의 경로다. 신규 Flutter 앱은 [전환 기준](harness/FLUTTER_TRANSITION.md)에 따라 필요한 lib·test 경로와 역할별 검사를 초기화 작업에서 함께 반영한다. integration_test 경로는 보류한 E2E 작업을 시작할 때 추가한다. 그 전에는 cashflow/allocation 명세를 임의로 integration으로 바꿔 Flutter 파일을 수정하지 않는다.
+
+## 현재 MVP에서 역할을 사용하는 방법
+
+[현재 MVP](mvp-scope.md)는 수동 입력 중심이다. data는 API의 확정 입력 저장·지급/잔액 보정 계약을 먼저 맡고 mock-bank·LLM을 처음부터 함께 만들지 않는다. cashflow는 온보딩·잔액 입력·예정 지출·홈/계산 내역, allocation은 모아둘 돈의 기능 범위를 작업별로 배정받는다. allocation이라는 역할명이 독립 배분 화면·계좌별 이체를 현재 요구로 만들지는 않는다.
+
+위 역할표와 policy.json의 경로는 이전 골격의 실제 제약으로 유지한다. 새 Flutter 경로 배정은 초기화 때 함께 정하고, 이 문서의 기능 설명만으로 경로 허용을 넓히지 않는다. 고정 개인 담당자·4번째 기여자·GitHub 권한 변경을 이번 MVP 정정에서 추가하지 않는다.
