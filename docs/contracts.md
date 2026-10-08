@@ -1,6 +1,6 @@
 # 공통 데이터와 API 초안
 
-상태: 구현 전 논의용 v0. 최종 타입과 입력 검사 코드는 packages/contracts에 둔다. 아래 API는 아직 구현되지 않았다.
+상태: 구현 전 논의용 v0. 공통 JSON 계약과 예시는 packages/contracts에서 관리하고 언어별 타입·입력 검증 연결은 [전환 기준](harness/FLUTTER_TRANSITION.md)에 따라 정한다. TypeScript 타입을 Flutter에서 직접 사용하지 않는다. 아래 API는 아직 구현되지 않았다.
 
 ## 공통 형식
 
@@ -25,7 +25,7 @@
 | GET /v1/allocation-plans/current        | 현재 계획 조회                            |
 | PUT /v1/allocation-plans/current        | 계획 저장, expectedVersion 필요           |
 
-계산은 앱에서 finance-core를 호출한다. 매 입력마다 서버 계산 API를 추가하지 않는다.
+앱 측 공통 순수 계산 원칙을 유지한다. finance-core의 Dart 연결·패키지 형태는 초기화 작업에서 정하고, 프레임워크 전환만으로 서버 계산 API나 중복 계산 구현을 추가하지 않는다.
 데모 사용자도 접근 범위를 서버에서 검사한다. 요청에 담긴 사용자 ID만 믿고 다른 사용자의 데이터를 허용하지 않는다.
 
 ## 더미 API 제안: 포트 3001

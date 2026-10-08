@@ -25,9 +25,9 @@
 
 ## 팀 구성
 
-개발 관리자 1명을 포함해 총 4명의 기여자(contributors)가 개발합니다.
+개발 관리자 1명을 포함해 총 3명의 기여자(contributors)가 개발합니다.
 개발 관리자는 공통 코드·개발 환경·리뷰·통합을 맡는 기여자이며 프로젝트 소유자를 뜻하지 않습니다.
-관리자는 integration을, 나머지 3명은 data·cashflow·allocation을 나누어 맡습니다.
+관리자는 integration을 조정합니다. integration·data·cashflow·allocation은 사람 수가 아닌 작업 역할이며 3명이 나누어 맡거나 겸임합니다. 활성 개인 브랜치와 작업별 담당 배정 기준은 [역할 문서](docs/ownership.md)를 따릅니다.
 
 ## 협업 방식
 
@@ -47,6 +47,8 @@
 - [개발 시작과 통합 절차](docs/development-workflow.md)
 - [역할별 담당 범위](docs/ownership.md)
 - [작업 명세 작성법](docs/tasks/README.md)
+- [Claude Code·Codex 공유 설정과 스킬](docs/harness/CLAUDE_SETUP.md)
+- [3인 운영·문서 정합성 수정 이유](docs/decisions/2026-10-08-agent-team-and-skills.md)
 - [PR 템플릿](.github/PULL_REQUEST_TEMPLATE.md)
 
 ## 프로젝트 상태
@@ -54,3 +56,10 @@
 기획 및 개발 환경 구성 단계입니다.
 
 기술 스택, 실행 방법, API 명세와 팀원별 역할은 개발 진행에 맞춰 추가합니다.
+
+## Flutter와 팀 스킬
+
+모바일 목표 기술은 Flutter/Dart입니다. 현재 저장소는 초기화 전 골격이며 기존 Node 서버·하네스와 함께 전환 준비 중입니다. 앱·검사·디자인 시스템 구축 완료 상태는 [전환 기준](docs/harness/FLUTTER_TRANSITION.md)을 확인합니다.
+
+- [스킬 선정과 설치](docs/harness/FLUTTER_SKILLS.md)
+- [팀원용 빠른 시작](docs/harness/TEAM_SKILLS_QUICKSTART.md)
