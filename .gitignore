@@ -12,5 +12,21 @@ coverage/
 *.tsbuildinfo
 .DS_Store
 Thumbs.db
-apps/mobile/android/
-apps/mobile/ios/
+
+# Claude Code personal project settings and local worktrees
+**/.claude/settings.local.json
+**/CLAUDE.local.md
+.claude/worktrees/
+
+# Flutter generated files and private platform configuration
+.dart_tool/
+.pub-cache/
+.gradle/
+Pods/
+DerivedData/
+.flutter-plugins
+.flutter-plugins-dependencies
+**/local.properties
+**/key.properties
+*.jks
+*.keystore
