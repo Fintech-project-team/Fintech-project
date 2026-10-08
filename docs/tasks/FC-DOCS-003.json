@@ -1,0 +1,30 @@
+{
+  "id": "FC-DOCS-003",
+  "role": "integration",
+  "baseCommit": "343eabc10888158bfccf3323efca7c928a432621",
+  "branch": "docs/integration/agent-review",
+  "allowedPaths": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "docs/harness/AGENT_REVIEW.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/development-workflow.md",
+    "docs/tasks/README.md",
+    ".github/PULL_REQUEST_TEMPLATE.md"
+  ],
+  "acceptance": [
+    "최초 목적과 허용 경로 안에서 수정과 자기검증을 반복하며 범위 밖 문제를 이유로 작업 범위를 임의로 넓히지 않는다",
+    "계산·계약 위반 재작업과 필수 검사 누락은 0건을 목표로 예방하며 실제 발생 횟수와 근거를 보존한다",
+    "유효한 통과 결과를 재사용하고 관련 변경·새 실패·근거 부족이 없으면 재검증하거나 같은 문서를 다시 읽지 않는다",
+    "네 지표의 정의와 짧은 PR 기록 양식을 연결하고 0건·해당 없음·미확인을 구분한다",
+    "참고한 GitHub 문서를 커밋에 고정하고 기존 검사기의 자동 수집·PASS 재사용 한계를 명시한다",
+    "AGENTS.md와 CLAUDE.md는 동일한 30줄 이하로 유지하고 검사기·제품 코드·의존성·GitHub 설정은 변경하지 않는다"
+  ],
+  "readBefore": [
+    "docs/development-workflow.md",
+    "docs/toolchain.md",
+    "docs/harness/engineering-rules.md",
+    "docs/tasks/README.md",
+    ".github/PULL_REQUEST_TEMPLATE.md"
+  ]
+}
