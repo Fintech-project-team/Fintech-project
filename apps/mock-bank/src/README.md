@@ -1,3 +1,3 @@
-# src
+# src — 후속 합성 제공자
 
-data 역할: 고정 fixture를 읽는 HTTP 서버.
+data 역할. F07 선택 구현 때 고정 합성 fixture를 제공하는 HTTP 경계를 준비한다. 현재 Must의 수동 입력 저장이나 LLM 후보 생성을 이 서버 안에 복사하지 않는다.

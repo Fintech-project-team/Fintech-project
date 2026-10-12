@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(git status --short --branch)",
+      "Bash(git branch --show-current)",
+      "Bash(git rev-parse HEAD)",
+      "Bash(git diff --stat)",
+      "Bash(git diff --name-only)",
+      "Bash(git diff --cached --stat)",
+      "Bash(node scripts/harness/verify-change.mjs --task *)",
+      "Bash(npm run check)",
+      "Bash(npm.cmd run check)"
+    ]
+  }
+}

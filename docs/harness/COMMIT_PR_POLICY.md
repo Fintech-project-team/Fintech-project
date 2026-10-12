@@ -9,7 +9,7 @@ AI는 커밋·PR 작업 전에 이 문서를 읽고 변경 내용에 맞는 제�
 
 | type     | 용도                      | 예시                                           |
 | -------- | ------------------------- | ---------------------------------------------- |
-| feat     | 기능 추가                 | feat(spending): 하루 가용금액 표시             |
+| feat     | 기능 추가                 | feat(spending): 쓸 수 있는 돈 표시             |
 | fix      | 오류 수정                 | fix(finance): 카드 청구액 중복 차감 수정       |
 | refactor | 동작을 유지하며 코드 정리 | refactor(api): 거래 조회 함수 분리             |
 | docs     | 문서 수정                 | docs(repo): 팀원 Git 안내 추가                 |
@@ -27,8 +27,8 @@ AI는 커밋·PR 작업 전에 이 문서를 읽고 변경 내용에 맞는 제�
 
 ## PR 방향과 담당자
 
-4명 모두 기여자이며 개발 관리자는 개발·통합을 맡는다. 프로젝트 소유자를 뜻하지 않는다.
-base는 받는 브랜치, compare는 가져올 브랜치다. 개인 브랜치는 sunghyun-dev, daesik-dev, hyeyeon-dev, seonghwan-dev다.
+3명 모두 기여자이며 개발 관리자는 개발·통합을 맡는다. 프로젝트 소유자를 뜻하지 않는다.
+base는 받는 브랜치, compare는 가져올 브랜치다. 활성 개인 브랜치는 sunghyun-dev, hyeyeon-dev, seonghwan-dev다. 팀 구성과 작업 역할은 docs/ownership.md를 따른다.
 
 | compare → base             | merge 방식            | 담당             |
 | -------------------------- | --------------------- | ---------------- |
@@ -37,7 +37,7 @@ base는 받는 브랜치, compare는 가져올 브랜치다. 개인 브랜치는
 | develop → 본인 전용 브랜치 | Create a merge commit | 해당 기여자      |
 | develop → main             | Create a merge commit | 개발 관리자 enpl |
 
-enpl의 개인 브랜치는 sunghyun-dev다. 기능 브랜치는 merge 후 재사용하지 않는다. main·develop·개인 브랜치는 삭제하지 않는다.
+enpl의 개인 브랜치는 sunghyun-dev다. 기능 브랜치는 merge 후 재사용하지 않는다. main·develop·활성 개인 브랜치는 삭제하지 않는다. 비활성 브랜치도 이 문서 수정만으로 삭제하지 않으며 인수인계 확인과 별도 삭제 요청 후 처리한다.
 최종 merge 제목은 PR 제목을 사용한다. 개인↔develop 및 develop→main에서 반복 squash를 하지 않는다.
 
 ## 에이전트의 작성·검사 순서
@@ -45,7 +45,7 @@ enpl의 개인 브랜치는 sunghyun-dev다. 기능 브랜치는 merge 후 재�
 1. 작업 범위와 diff를 확인하고 제목을 만든다. 제목과 커밋 메시지는 .harness/ 아래 UTF-8 파일에 저장한다.
 2. PR 제목: `node scripts/harness/check-message.mjs --title-file .harness/pr-title.txt`
 3. 커밋 첫 줄: `node scripts/harness/check-message.mjs --commit-file .harness/commit-message.txt`
-4. 본문에는 기존 PR 템플릿에 따라 변경·검증·미검증을 적는다. 변경 목적이 달라지면 제목도 갱신한다.
+4. 본문에는 기존 PR 템플릿에 따라 결과·완료 범위를 먼저 쓰고 변경·검증·미검증을 적는다. 변경 목적이 달라지면 제목도 갱신한다.
 5. 검사 통과 후 사용자가 요청한 Git 작업을 진행한다. 종료 코드 0은 통과, 1은 형식 위반, 2는 실행 오류다.
 
 ## GitHub 검사와 한계

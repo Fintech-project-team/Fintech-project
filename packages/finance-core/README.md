@@ -1,5 +1,5 @@
-# 금융 계산
+# 현재 MVP 순수 계산
 
-계산 구현 전. docs/calculation-rules.md의 정책 상태를 확인한다. network/DB/React/LLM 없는 순수 계산과 테스트만 둔다.
+현재 구현 전 Node 골격이다. [계산 규칙](../../docs/calculation-rules.md)의 B−F−P와 계산 내역을 앱 측 순수 계산 경계 하나로 구현한다. 미지급 지출과 모아둘 돈을 합산하고 입력을 수정하지 않는다.
 
-이 폴더만으로 서버나 앱이 실행되지는 않는다. 의존성과 실제 검증 명령은 초기화 PR에서 추가한다.
+Flutter에서 이 TypeScript 골격을 직접 import하지 않는다. 실제 Dart 위치·패키지는 [초기화](../../docs/harness/FLUTTER_TRANSITION.md)에서 정한다. API의 원자적 지급/잔액 보정과 순수 계산은 구분하며 화면 계산식을 서버에 중복 구현하지 않는다. LLM은 이 금액을 결정하지 않는다.
