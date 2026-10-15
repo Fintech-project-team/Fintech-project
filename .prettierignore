@@ -10,3 +10,6 @@ AGENTS.md
 CLAUDE.md
 apps/mobile/android
 apps/mobile/ios
+
+# Original reference documents are verified by hash, not reformatted.
+docs/references/*.source.md

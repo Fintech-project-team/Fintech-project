@@ -1,6 +1,6 @@
 # Claude Code와 Codex의 팀 스킬
 
-현재 팀은 개발 관리자 포함 세 명이며, 사용자 한 명은 Codex, 다른 두 명은 Claude Code를 사용한다. 인원과 역할은 [ownership](../ownership.md), 작업 공통 규칙은 루트 CLAUDE.md/AGENTS.md, 검사 선택은 [GATE_MATRIX](GATE_MATRIX.md)가 기준이다.
+현재 팀은 공동 PM 겸 개발자 두 명이다. 각자의 Codex/Claude Code 사용 배정은 강제하지 않는다. 인원과 역할은 [ownership](../ownership.md), 작업 공통 규칙은 루트 CLAUDE.md/AGENTS.md, 검사 선택은 [GATE_MATRIX](GATE_MATRIX.md)가 기준이다.
 
 ## 공유 구성
 
