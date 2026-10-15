@@ -1,0 +1,356 @@
+{
+  "date": "2026-10-15",
+  "scope": "Documents, source fidelity, semantic markers, links, 27 decision IDs, 43 screen IDs, independent arithmetic/date examples; no app/API/DB/LLM/device tests",
+  "checks": [
+    {
+      "check": "source_byte_identity:roadmap-v8.source.md",
+      "status": "PASS",
+      "detail": "a3f7ae6fe6d1f403edf6946a6842bd4b020fd83047ef94c1e28784b9456f3380"
+    },
+    {
+      "check": "source_byte_identity:detailed-plan-v7.source.md",
+      "status": "PASS",
+      "detail": "94bb3757bd43074111d780ec2ca5ccae026c231a7835537859bb7c2d6ab18b98"
+    },
+    {
+      "check": "latest_brief_preserved",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "active_local_links",
+      "status": "PASS",
+      "detail": []
+    },
+    {
+      "check": "active_markdown_tables",
+      "status": "PASS",
+      "detail": []
+    },
+    {
+      "check": "active_markdown_fences",
+      "status": "PASS",
+      "detail": []
+    },
+    {
+      "check": "27_summary_ids_order",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "27_report_content_matches_summary",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "43_screen_ids_preserved",
+      "status": "PASS",
+      "detail": []
+    },
+    {
+      "check": "wireframe_changes_disclosed",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "server_provides_local_calculates",
+      "status": "PASS",
+      "detail": []
+    },
+    {
+      "check": "auth_two_synthetic_identifiers",
+      "status": "PASS",
+      "detail": []
+    },
+    {
+      "check": "auth_flow_lifetime",
+      "status": "PASS",
+      "detail": []
+    },
+    {
+      "check": "annual_scope",
+      "status": "PASS",
+      "detail": []
+    },
+    {
+      "check": "date_fallback_refund",
+      "status": "PASS",
+      "detail": []
+    },
+    {
+      "check": "budget",
+      "status": "PASS",
+      "detail": []
+    },
+    {
+      "check": "server_P1",
+      "status": "PASS",
+      "detail": []
+    },
+    {
+      "check": "two_person_roles",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "document_ownership",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "local_engine_only",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "immutable_finance_manual_correction",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "reserve_dual_caps_and_restoration",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "C01_C02_C03_preserved",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "simulation_scope",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "no_reasked_thresholds",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "no_unwanted_research_management",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "no_stale_mandates",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "identity_and_version_integrity",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "db_limits_disclosed",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "no_unverified_implementation_pass",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "four_historical_memories_point_current",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "document_example:base",
+      "status": "PASS",
+      "detail": {
+        "actual": 1100000,
+        "expected": 1100000
+      }
+    },
+    {
+      "check": "document_example:settlement",
+      "status": "PASS",
+      "detail": {
+        "actual": 1100000,
+        "expected": 1100000
+      }
+    },
+    {
+      "check": "document_example:overlap",
+      "status": "PASS",
+      "detail": {
+        "actual": 700000,
+        "expected": 700000
+      }
+    },
+    {
+      "check": "document_example:overlap_paid",
+      "status": "PASS",
+      "detail": {
+        "actual": 700000,
+        "expected": 700000
+      }
+    },
+    {
+      "check": "document_example:expense_edit",
+      "status": "PASS",
+      "detail": {
+        "actual": 1120000,
+        "expected": 1120000
+      }
+    },
+    {
+      "check": "document_example:reserve_edit",
+      "status": "PASS",
+      "detail": {
+        "actual": 1200000,
+        "expected": 1200000
+      }
+    },
+    {
+      "check": "document_example:salary_wait",
+      "status": "PASS",
+      "detail": {
+        "actual": 1600000,
+        "expected": 1600000
+      }
+    },
+    {
+      "check": "document_example:salary_received",
+      "status": "PASS",
+      "detail": {
+        "actual": 4300000,
+        "expected": 4300000
+      }
+    },
+    {
+      "check": "document_example:selected_savings",
+      "status": "PASS",
+      "detail": {
+        "actual": 4100000,
+        "expected": 4100000
+      }
+    },
+    {
+      "check": "document_example:internal_selected",
+      "status": "PASS",
+      "detail": {
+        "actual": 1000000,
+        "expected": 1000000
+      }
+    },
+    {
+      "check": "document_example:outside_selection",
+      "status": "PASS",
+      "detail": {
+        "actual": 500000,
+        "expected": 500000
+      }
+    },
+    {
+      "check": "document_example:date_only_close",
+      "status": "PASS",
+      "detail": {
+        "actual": 80000,
+        "expected": 80000
+      }
+    },
+    {
+      "check": "document_example:wrong_link_removed",
+      "status": "PASS",
+      "detail": {
+        "actual": 400000,
+        "expected": 400000
+      }
+    },
+    {
+      "check": "document_example:partial_settlement",
+      "status": "PASS",
+      "detail": {
+        "actual": 700000,
+        "expected": 700000
+      }
+    },
+    {
+      "check": "document_example:maximum_shortfall",
+      "status": "PASS",
+      "detail": {
+        "actual": 200000,
+        "expected": 200000
+      }
+    },
+    {
+      "check": "document_example:refund_period",
+      "status": "PASS",
+      "detail": {
+        "actual": -50000,
+        "expected": -50000
+      }
+    },
+    {
+      "check": "document_example:card_details",
+      "status": "PASS",
+      "detail": {
+        "actual": 300000,
+        "expected": 300000
+      }
+    },
+    {
+      "check": "document_example:restore_reserve_overlap",
+      "status": "PASS",
+      "detail": {
+        "actual": 400000,
+        "expected": 400000
+      }
+    },
+    {
+      "check": "document_example:account_cap_even_if_aggregate_ok",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "document_example:aggregate_cap_even_if_each_ok",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "document_example:valid_caps",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "document_example:leap_calendar_year",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "document_example:annual_boundary_excludes_start",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "check": "document_example:TC_C06_C1",
+      "status": "PASS",
+      "detail": {
+        "actual": [1700000, 1600000, 1300000, 1200000, -100000],
+        "expected": [1700000, 1600000, 1300000, 1200000, -100000]
+      }
+    },
+    {
+      "check": "document_example:TC_C06_C2",
+      "status": "PASS",
+      "detail": {
+        "actual": [2700000, 2400000, 2300000, 2000000, -300000],
+        "expected": [2700000, 2400000, 2300000, 2000000, -300000]
+      }
+    },
+    {
+      "check": "document_example:TC_C06_C3",
+      "status": "PASS",
+      "detail": {
+        "actual": [3700000, 3400000, 3300000, 3000000, -300000],
+        "expected": [3700000, 3400000, 3300000, 3000000, -300000]
+      }
+    }
+  ],
+  "passed": 57,
+  "failed": 0
+}

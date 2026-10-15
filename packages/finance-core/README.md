@@ -1,5 +1,5 @@
-# 현재 MVP 순수 계산
+# 로컬 계산 경계
 
-현재 구현 전 Node 골격이다. [계산 규칙](../../docs/calculation-rules.md)의 B−F−P와 계산 내역을 앱 측 순수 계산 경계 하나로 구현한다. 미지급 지출과 모아둘 돈을 합산하고 입력을 수정하지 않는다.
+B가 Flutter 순수 Dart 계산 모듈을 구현한다. U=B−E−(R−O), 소비 집계·반복 후보 수치·시뮬레이션·조정은 입력/시점을 받아 결정적으로 계산한다. 서버·위젯에 계산식을 복제하지 않는다. 이 폴더는 기존 Node 골격이며 Flutter에서 직접 import하지 않는다. 실제 Dart 경로는 초기화 시 정한다.
 
-Flutter에서 이 TypeScript 골격을 직접 import하지 않는다. 실제 Dart 위치·패키지는 [초기화](../../docs/harness/FLUTTER_TRANSITION.md)에서 정한다. API의 원자적 지급/잔액 보정과 순수 계산은 구분하며 화면 계산식을 서버에 중복 구현하지 않는다. LLM은 이 금액을 결정하지 않는다.
+[현행 기준](../../docs/calculation-rules.md). 상세 문서는 해당 담당 영역의 `docs/`에 두고 공통 계약을 복제하지 않는다.
