@@ -2,7 +2,7 @@
   "id": "PAYSE-DOCS-20261018",
   "role": "integration",
   "baseCommit": "9a80c840d5db245722ac922c527ffcfee5f2ba65",
-  "branch": "develop",
+  "branch": "docs/integration/payse-common-contract",
   "allowedPaths": [
     "AGENTS.md",
     "CLAUDE.md",
