@@ -1,5 +1,5 @@
 # 공통 JSON 계약
 
-현재는 스키마 구현 전 Node 골격이다. [수동 MVP 계약](../../docs/contracts.md)에 맞춰 상태·예정 지출·모아둘 돈·지급/잔액 보정 사례를 먼저 확정한다. 기존 수집/배분 API 초안을 현행 필수로 사용하지 않는다.
+A/B가 데이터 의미·null·관계·오류·버전·멱등·소유권 경계를 함께 확인한다. PAYSE 공통 JSON은 공급자에 독립적이다. CODEF는 참고 자료이며 실제 공급자 adapter는 후속 연동에서 검증한다. Flutter와 서버는 언어 독립 JSON/검증 사례를 공유하며 TypeScript 타입을 Flutter에 직접 import하지 않는다. 실제 스키마와 구현 경로는 초기화에서 정한다.
 
-Flutter와 Node는 언어 독립 JSON과 검증 사례를 공유한다. TypeScript 타입을 앱에서 직접 import하지 않는다. Dart/서버 스키마 연결은 [초기화 기준](../../docs/harness/FLUTTER_TRANSITION.md)을 따른다. 직후 LLM의 후보는 확정 항목과 분리한다.
+[현행 기준](../../docs/data-contracts.md). 상세 문서는 해당 담당 영역의 `docs/`에 두고 공통 계약을 복제하지 않는다.

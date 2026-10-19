@@ -68,6 +68,69 @@ test('contracts changes select all consumers and finance selects mobile', () => 
 test('missing product implementation does not require a fake product test for docs', () => {
   assert.equal(selectGates(['docs/mvp-scope.md'], policy, false).length, 0);
 });
+test('Dart feature writes respect the same role and shared-state boundaries', () => {
+  const dartTask = { ...task, allowedPaths: ['apps/mobile/lib/features/overview/'] };
+  assert.deepEqual(
+    violations(
+      ['apps/mobile/lib/features/overview/view.dart'],
+      dartTask,
+      'docs/tasks/x.json',
+      policy,
+    ),
+    [],
+  );
+  assert.equal(
+    violations(
+      ['apps/mobile/lib/features/planning/view.dart'],
+      { ...dartTask, allowedPaths: ['apps/mobile/lib/'] },
+      'docs/tasks/x.json',
+      policy,
+    ).length,
+    1,
+  );
+  assert.equal(
+    violations(
+      ['apps/mobile/lib/data/repository.dart'],
+      { ...dartTask, allowedPaths: ['apps/mobile/lib/'] },
+      'docs/tasks/x.json',
+      policy,
+    ).length,
+    1,
+  );
+  assert.equal(
+    violations(
+      ['apps/mobile/pubspec.yaml'],
+      { ...dartTask, allowedPaths: ['apps/mobile/'] },
+      'docs/tasks/x.json',
+      policy,
+    ).length,
+    1,
+  );
+});
+test('Dart changes and shared harness changes select the actual mobile implementation', () => {
+  assert.deepEqual(
+    selectGates(['apps/mobile/lib/main.dart'], policy, true, ['mobile']).map((gate) => gate.name),
+    ['mobile'],
+  );
+  assert.deepEqual(
+    selectGates(['scripts/harness/run-flutter.mjs'], policy, true, ['mobile']).map(
+      (gate) => gate.name,
+    ),
+    ['mobile'],
+  );
+  assert.deepEqual(
+    selectGates(['scripts/harness/lib.mjs'], policy, true, ['mobile', 'api']).map(
+      (gate) => gate.name,
+    ),
+    ['mobile', 'api'],
+  );
+});
+test('direct changes to an unimplemented server still require its gate', () => {
+  assert.deepEqual(
+    selectGates(['apps/api/src/handler.ts'], policy, true, ['mobile']).map((gate) => gate.name),
+    ['api'],
+  );
+});
 test('fixtures and migration files select their owning product gate', () => {
   assert.deepEqual(
     selectGates(['apps/mock-bank/fixtures/normal.json'], policy, false).map((x) => x.name),

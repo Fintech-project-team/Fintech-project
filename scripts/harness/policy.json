@@ -5,9 +5,26 @@
     "cashflow": [
       "apps/mobile/src/features/connection/",
       "apps/mobile/src/features/recurring/",
-      "apps/mobile/src/features/spending/"
+      "apps/mobile/src/features/spending/",
+      "apps/mobile/lib/features/auth/",
+      "apps/mobile/lib/features/connection/",
+      "apps/mobile/lib/features/overview/",
+      "apps/mobile/lib/features/recurring/",
+      "apps/mobile/lib/features/simulation/",
+      "apps/mobile/test/features/auth/",
+      "apps/mobile/test/features/connection/",
+      "apps/mobile/test/features/overview/",
+      "apps/mobile/test/features/recurring/",
+      "apps/mobile/test/features/simulation/"
     ],
-    "allocation": ["apps/mobile/src/features/allocation/", "docs/demo/"],
+    "allocation": [
+      "apps/mobile/src/features/allocation/",
+      "docs/demo/",
+      "apps/mobile/lib/features/planning/",
+      "apps/mobile/lib/features/adjustment/",
+      "apps/mobile/test/features/planning/",
+      "apps/mobile/test/features/adjustment/"
+    ],
     "integration": [""]
   },
   "shared": [
@@ -31,7 +48,18 @@
     "docs/harness/",
     "docs/decisions/",
     "apps/mobile/app/",
-    "apps/mobile/src/shared/"
+    "apps/mobile/src/shared/",
+    "apps/mobile/lib/app/",
+    "apps/mobile/lib/data/",
+    "apps/mobile/lib/shared/",
+    "apps/mobile/test/app/",
+    "apps/mobile/test/data/",
+    "apps/mobile/test/shared/",
+    "apps/mobile/docs/",
+    "apps/mobile/pubspec.yaml",
+    "apps/mobile/analysis_options.yaml",
+    "apps/mobile/flutter-toolchain.json",
+    "apps/mobile/lib/main.dart"
   ],
   "mandatoryReferences": [
     "docs/mvp-scope.md",
@@ -42,9 +70,9 @@
   ],
   "productGates": {
     "mobile": {
-      "prefixes": ["apps/mobile/"],
+      "prefixes": ["apps/mobile/", "packages/payse_calculation/"],
       "workspace": "apps/mobile",
-      "scripts": ["typecheck", "test"]
+      "scripts": ["check"]
     },
     "api": {
       "prefixes": ["apps/api/"],
