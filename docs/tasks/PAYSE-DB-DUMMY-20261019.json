@@ -1,0 +1,31 @@
+{
+  "id": "PAYSE-DB-DUMMY-20261019",
+  "role": "data",
+  "baseCommit": "a008df66b0a7399bbc7b369ff89368a42f4d4986",
+  "branch": "feat/data/payse-db-dummy",
+  "allowedPaths": [
+    "apps/api/docs/database-design.md",
+    "apps/api/database/",
+    "apps/api/fixtures/",
+    "apps/api/tests/test_fixtures.py",
+    "docs/tasks/PAYSE-DB-DUMMY-20261019.json"
+  ],
+  "acceptance": [
+    "기존 파일 변경 없이 DB DDL·ERD·컬럼 근거와 결정적 합성 금융 JSON을 새 파일로 추가한다",
+    "금융 계산은 Flutter에 유지하고 서버의 저장 제약 검증과 구분한다",
+    "연간 범위·9기관·부분 정산·카드/이체 중복·환불·급여·월말/이력·누락 시나리오를 검증한다",
+    "SQL·fixture 검사와 하네스 BLOCKED·API/Flutter 미구현을 구분한다"
+  ],
+  "readBefore": [
+    "apps/api/docs/data-model-draft.md",
+    "docs/development-notes.md",
+    "docs/product-baseline.md",
+    "docs/data-contracts.md",
+    "docs/database-schema.md",
+    "docs/calculation-rules.md",
+    "docs/app-architecture.md",
+    "docs/decisions/2026-10-19-annual-v07-settlement-v09.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/AGENT_REVIEW.md"
+  ]
+}
