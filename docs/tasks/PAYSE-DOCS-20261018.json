@@ -1,0 +1,50 @@
+{
+  "id": "PAYSE-DOCS-20261018",
+  "role": "integration",
+  "baseCommit": "9a80c840d5db245722ac922c527ffcfee5f2ba65",
+  "branch": "develop",
+  "allowedPaths": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "README.md",
+    "PAYSE-핵심기억-05.md",
+    "PAYSE-결정사항-27개-요약.md",
+    "docs/PAYSE-README.md",
+    "docs/product-baseline.md",
+    "docs/data-contracts.md",
+    "docs/database-schema.md",
+    "docs/app-architecture.md",
+    "docs/team-plan.md",
+    "docs/ownership.md",
+    "docs/open-decisions.md",
+    "docs/first-tasks.md",
+    "docs/contracts.md",
+    "docs/demo/README.md",
+    "docs/reconciliation-report.md",
+    "docs/toolchain.md",
+    "docs/EXTENSION_POINTS.md",
+    "packages/contracts/README.md",
+    "apps/mock-bank/README.md",
+    "apps/mock-bank/fixtures/README.md"
+  ],
+  "acceptance": [
+    "CODEF는 참고 자료이며 MVP는 PAYSE 공통 계약의 합성 금융 데이터를 제공한다",
+    "확정된 필드 의미와 로컬 계산·서버 저장 경계를 보완하고 미확정 구현값은 별도 표시한다",
+    "v0.8 시뮬레이션·v0.9 조정·v1.0 통합으로 현행 버전 표현을 일치시킨다",
+    "사용성 검증 인원 축소·생략과 일정 미확정은 변경 요청으로 표시하고 자동 적용하지 않는다",
+    "GitHub/노션·제품 코드·SQL·의존성·하네스 정책·참조 원문을 변경하지 않는다",
+    "원본 저장소 쓰기 권한 미부여로 허용 작업 폴더의 수정본을 검사하고 적용 여부를 구분한다"
+  ],
+  "readBefore": [
+    "docs/data-contracts.md",
+    "docs/database-schema.md",
+    "docs/calculation-rules.md",
+    "docs/app-architecture.md",
+    "docs/team-plan.md",
+    "docs/product-baseline.md",
+    "docs/open-decisions.md",
+    "docs/first-tasks.md",
+    "docs/harness/AGENT_REVIEW.md",
+    "docs/toolchain.md"
+  ]
+}

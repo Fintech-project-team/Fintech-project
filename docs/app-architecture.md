@@ -22,6 +22,14 @@ PostgreSQL: 원천 참조·확정 설정·사용자/세션·버전·변경 기�
 
 Flutter 공식 가이드의 UI/데이터 분리와 의존성 주입 원칙을 적용한다. 별도 use-case 계층은 복합 작업에만 도입한다. 모든 필드 조회에 빈 전달 클래스·추상 팩토리·공통 BaseManager를 만드는 구조는 요구하지 않는다. [Flutter 아키텍처 권고](https://docs.flutter.dev/app-architecture/recommendations), [Flutter 구조 가이드](https://docs.flutter.dev/app-architecture/guide)
 
+### PAYSE 응답 변환 경계
+
+MVP의 준비 합성 JSON은 PAYSE 계약으로 직접 제공할 수 있다. 사용하지 않는 CODEF 중간 응답·별도 변환 서버를 만들지 않는다. 후속 실제 금융 연동에서는 공급자/조회 기능별 adapter가 필드·날짜·금액 단위·원천 상태를 PAYSE 계약으로 변환한다. 이는 형식 변환이며 U·연간 소비·반복 후보 수치·미래 잔액의 서버 계산이 아니다.
+
+Flutter의 API client가 응답을 받고 FinancialRepository가 값 유무·버전·참조를 확인해 불변 앱 모델을 제공한다. 각 화면은 공급자 원문을 직접 해석하지 않는다. 로컬 계산 모듈에는 확인된 입력과 누락 상태를 전달하며 실패 값을 0으로 보정하지 않는다. API JSON·DB 테이블·Dart 클래스의 모양을 강제로 일치시키지 않는다.
+
+같은 계약의 fake repository와 실제 서버 repository를 교체할 때 화면/계산의 금융 의미가 바뀌지 않아야 한다. 공통 형식 도입을 이유로 전역 싱글톤·거대 BaseManager·새 마이크로서비스·공급자별 화면 분기를 추가하지 않는다. LLM에는 기존 최소 입력만 전달하며 공통 금융 응답 전체를 자동 전송하지 않는다.
+
 ## 2. 싱글톤과 전역 상태 제한
 
 | 대상                                              | 수명·생성 방식                                                                  | 금지할 방식                                                                                           |
@@ -40,14 +48,14 @@ Flutter 공식 가이드의 UI/데이터 분리와 의존성 주입 원칙을 �
 
 ## 3. 상태의 단일 소유자
 
-| 상태                  | 소유자                                                | 화면 갱신 원칙                                                            |
-| --------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------- |
-| 금융 원본/확정 설정   | 서버 DB; 앱에서는 FinancialRepository의 불변 Snapshot | 성공한 최신 스냅샷 하나에서 홈·계산 내역·계획 화면 파생                   |
-| 원격 로그인 유효성    | 서버 DemoSession(userId 기준)                         | 로컬 PIN 성공과 별개. 서버 거절을 PIN 성공으로 무시하지 않음              |
-| 로컬 잠금             | LocalLockController                                   | 네트워크 없이 PIN 확인. 사용자 활동·백그라운드 경과로 잠금 판정           |
-| 예정 지출/보호액 입력 | 각 편집 ViewModel                                     | Snapshot 복제 후 초안 계산. 저장 전 원본 캐시를 직접 변경하지 않음        |
-| 소비 목록·결과        | SimulationViewModel                                   | snapshotVersion/inputRevision/ruleVersion 및 세션 식별에 맞는 결과만 채택 |
-| 금융사 동의·실패 연출 | ConnectionFlowController                              | 최종 성공 요청 전 서버 연결 상태를 성공으로 확정하지 않음                 |
+| 상태                  | 소유자                                                                   | 화면 갱신 원칙                                                            |
+| --------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| 금융 원본/확정 설정   | 원본은 서버의 버전 있는 JSON 또는 DB, 확정 설정은 DB; 앱은 불변 Snapshot | 성공한 최신 스냅샷 하나에서 홈·계산 내역·계획 화면 파생                   |
+| 원격 로그인 유효성    | 서버 DemoSession(userId 기준)                                            | 로컬 PIN 성공과 별개. 서버 거절을 PIN 성공으로 무시하지 않음              |
+| 로컬 잠금             | LocalLockController                                                      | 네트워크 없이 PIN 확인. 사용자 활동·백그라운드 경과로 잠금 판정           |
+| 예정 지출/보호액 입력 | 각 편집 ViewModel                                                        | Snapshot 복제 후 초안 계산. 저장 전 원본 캐시를 직접 변경하지 않음        |
+| 소비 목록·결과        | SimulationViewModel                                                      | snapshotVersion/inputRevision/ruleVersion 및 세션 식별에 맞는 결과만 채택 |
+| 금융사 동의·실패 연출 | ConnectionFlowController                                                 | 최종 성공 요청 전 서버 연결 상태를 성공으로 확정하지 않음                 |
 
 ViewModel의 상태는 loading/ready/insufficient/error/saving 등 서로 구분 가능한 상태로 표현한다. `isLoading`, `isSuccess`, `isFailed`를 독립 플래그로 남발해 동시에 참이 되는 상태를 만들지 않는다. 구체 enum/타입은 상세 구현에서 정하되 빈 목록·0원·조회 실패·미계산을 같은 값으로 합치지 않는다.
 
