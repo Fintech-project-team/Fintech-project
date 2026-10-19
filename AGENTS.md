@@ -1,5 +1,5 @@
 1. 개발자는 총 2명이며 두 사람 모두 공동 PM이다. 데이터·DB·API·LLM은 A, Flutter·UI·로컬 계산은 B가 맡고 공통 변경은 영향받는 담당자끼리 확인한다.
-2. 제품 범위는 docs/product-baseline.md와 docs/PAYSE-README.md를 따른다. 서버가 CODEF 형식의 합성 금융 데이터를 제공하며 실제 본인인증·금융 연동은 범위 밖이다.
+2. 제품 범위는 docs/product-baseline.md와 docs/PAYSE-README.md를 따른다. 서버는 PAYSE 공통 계약의 합성 금융 데이터를 제공한다. CODEF는 참고 자료이며 실제 본인인증·금융 연동은 범위 밖이다.
 3. 작업 전 docs/harness/GATE_MATRIX.md, docs/ownership.md, 작업 명세의 미확인·변경 부분을 읽고 git branch/status/diff를 확인한다.
 4. 작업 명세에 담당 역할·기준 커밋·허용 경로·완료 조건을 적고 승인된 범위만 수정한다.
 5. 같은 명세·변경에 대한 유효한 계획이 없으면 node scripts/harness/verify-change.mjs --task <작업명세.json> --plan으로 필수 문서·검사를 확인한다.
