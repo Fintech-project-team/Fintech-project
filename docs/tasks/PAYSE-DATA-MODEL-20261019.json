@@ -1,0 +1,35 @@
+{
+  "id": "PAYSE-DATA-MODEL-20261019",
+  "role": "integration",
+  "baseCommit": "87445aaebe77a9931aa21dc72d2843f457f9c205",
+  "branch": "docs/integration/payse-data-model",
+  "allowedPaths": [
+    "apps/api/docs/data-model-draft.md",
+    "docs/development-notes.md",
+    "docs/tasks/PAYSE-DATA-MODEL-20261019.json"
+  ],
+  "acceptance": [
+    "GitHub #17과 기존 기초 문서를 참조하여 v1.0 필드·타입·null·권한·관계·저장 후보를 새 MD로 정리한다",
+    "급여 확인의 임시 결정과 개별 회차·미래 계획 수정 결정을 구분하고 기존 회차와 지급 기록을 보존한다",
+    "금액 계산은 Flutter에 유지하고 서버의 소유권·자료 버전·저장 제약 검증과 혼동하지 않는다",
+    "자료/계약/계산 버전, 기간 밖 참조, 중복 방지와 공급자 adapter 경계를 명시한다",
+    "기존 파일을 수정하지 않고 허용한 새 파일 세 개만 Git 공유 대상으로 추가한다",
+    "원천 API·DB·Flutter 구현 완료를 주장하지 않으며 문서 검증과 실제 구현 검증을 구분한다",
+    "공통 문서 추가 때문에 integration 역할을 사용하되 두 담당자의 확인 대상과 실제 허용 경로를 제한한다"
+  ],
+  "readBefore": [
+    "docs/product-baseline.md",
+    "docs/data-contracts.md",
+    "docs/database-schema.md",
+    "docs/calculation-rules.md",
+    "docs/v0.6-screen-rules.md",
+    "docs/app-architecture.md",
+    "docs/ownership.md",
+    "docs/development-workflow.md",
+    "docs/toolchain.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/harness/AGENT_REVIEW.md",
+    "docs/harness/COMMIT_PR_POLICY.md"
+  ]
+}
