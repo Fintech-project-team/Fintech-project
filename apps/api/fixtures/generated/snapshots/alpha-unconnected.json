@@ -1,0 +1,76 @@
+{
+  "userId": "f0a4be6c-01d7-53eb-ab2c-74675b22fd8c",
+  "schemaVersion": "PAYSE-DRAFT-1",
+  "currency": "KRW",
+  "dataVersion": "1",
+  "sourceVersion": "fixture-1:alpha:2026-10-19:base",
+  "ruleVersion": "PAYSE-CALC-1",
+  "asOf": "2026-10-19T12:00:00+09:00",
+  "institutions": [
+    {
+      "code": "bank.kb",
+      "kind": "bank",
+      "name": "국민",
+      "accountCount": 2,
+      "cardCount": 0
+    },
+    {
+      "code": "bank.shinhan",
+      "kind": "bank",
+      "name": "신한",
+      "accountCount": 1,
+      "cardCount": 0
+    },
+    {
+      "code": "bank.hana",
+      "kind": "bank",
+      "name": "하나",
+      "accountCount": 1,
+      "cardCount": 0
+    },
+    {
+      "code": "bank.ibk",
+      "kind": "bank",
+      "name": "기업",
+      "accountCount": 1,
+      "cardCount": 0
+    },
+    {
+      "code": "bank.kakao",
+      "kind": "bank",
+      "name": "카카오뱅크",
+      "accountCount": 1,
+      "cardCount": 0
+    },
+    {
+      "code": "card.hyundai",
+      "kind": "card",
+      "name": "현대",
+      "accountCount": 0,
+      "cardCount": 1
+    },
+    {
+      "code": "card.samsung",
+      "kind": "card",
+      "name": "삼성",
+      "accountCount": 0,
+      "cardCount": 1
+    },
+    {
+      "code": "card.woori",
+      "kind": "card",
+      "name": "우리",
+      "accountCount": 0,
+      "cardCount": 1
+    },
+    {
+      "code": "card.kb",
+      "kind": "card",
+      "name": "국민",
+      "accountCount": 0,
+      "cardCount": 1
+    }
+  ],
+  "institutionLinks": [],
+  "coverage": []
+}

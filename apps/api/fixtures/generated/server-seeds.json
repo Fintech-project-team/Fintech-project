@@ -1,0 +1,32 @@
+{
+  "warning": "합성 개발 시드 전용. 금융 응답에 포함 금지. 실제 인증 구현 아님.",
+  "users": [
+    {
+      "userId": "f0a4be6c-01d7-53eb-ab2c-74675b22fd8c",
+      "syntheticName": "PAYSE 합성 alpha",
+      "syntheticPhone": "01000000001",
+      "displayName": "데모 1",
+      "codeVerifier": "DISABLED:auth-design-pending",
+      "createdAt": "2026-10-19T00:00:00+09:00",
+      "initialCase": "alpha-ready"
+    },
+    {
+      "userId": "87f7bbf9-2355-5210-9325-f25d83a8ff35",
+      "syntheticName": "PAYSE 합성 beta",
+      "syntheticPhone": "01000000002",
+      "displayName": "데모 2",
+      "codeVerifier": "DISABLED:auth-design-pending",
+      "createdAt": "2026-10-19T00:00:00+09:00",
+      "initialCase": "beta-ready"
+    },
+    {
+      "userId": "d04073fd-f7ab-518d-8938-f2920d593db2",
+      "syntheticName": "PAYSE 합성 gamma",
+      "syntheticPhone": "01000000003",
+      "displayName": "데모 3",
+      "codeVerifier": "DISABLED:auth-design-pending",
+      "createdAt": "2026-10-19T00:00:00+09:00",
+      "initialCase": "gamma-month-end"
+    }
+  ]
+}
