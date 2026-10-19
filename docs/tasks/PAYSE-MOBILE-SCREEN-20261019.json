@@ -1,0 +1,27 @@
+{
+  "id": "PAYSE-MOBILE-SCREEN-20261019",
+  "role": "integration",
+  "baseCommit": "0ac42c5d1a4a4145f7d423d126f4702b04783d65",
+  "branch": "docs/integration/mobile-screen-rules",
+  "allowedPaths": [
+    "apps/mobile/docs/screen-rules-update.md",
+    "docs/tasks/PAYSE-MOBILE-SCREEN-20261019.json"
+  ],
+  "acceptance": [
+    "v0.6~v0.9 프로토타입 점검에서 정한 화면 동작을 apps/mobile/docs의 새 문서 한 곳에 기록하고 기존 공통 MD는 수정하지 않는다",
+    "각 항목을 B 결정과 A 확인 필요로 구분하고, 기존 v0.6 화면 규칙과 다른 점(12-1 기본 선택, 01-3 건너뛰기 등)을 명시한다",
+    "금액은 Flutter 로컬 계산, 서버는 검증·저장이라는 경계와 원천 불변·소비 카테고리 제외 규칙을 바꾸지 않는다",
+    "A 확인이 필요한 데이터·API 영향 7건을 목록으로 남기고 확인 전 구현 확정으로 표시하지 않는다",
+    "제품 코드·SQL·더미·의존성·하네스 정책·기존 작업 명세·GitHub/노션을 변경하지 않는다"
+  ],
+  "readBefore": [
+    "docs/development-notes.md",
+    "docs/v0.6-screen-rules.md",
+    "docs/calculation-rules.md",
+    "docs/data-contracts.md",
+    "apps/api/docs/data-model-draft.md",
+    "apps/mobile/docs/bootstrap.md",
+    "docs/harness/AGENT_REVIEW.md",
+    "docs/harness/COMMIT_PR_POLICY.md"
+  ]
+}
