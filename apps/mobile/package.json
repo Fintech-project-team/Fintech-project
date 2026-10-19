@@ -2,5 +2,11 @@
   "name": "@flowcast/mobile",
   "version": "0.0.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "check": "node ../../scripts/harness/run-flutter.mjs check",
+    "typecheck": "node ../../scripts/harness/run-flutter.mjs analyze",
+    "test": "node ../../scripts/harness/run-flutter.mjs test",
+    "format:check": "node ../../scripts/harness/run-flutter.mjs format"
+  }
 }

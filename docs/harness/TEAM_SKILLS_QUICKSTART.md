@@ -23,8 +23,10 @@ flowcast-task 스킬을 읽고 적용할 규칙과 스킬 파일 위치만 설�
 | Dart 로직 / 위젯 테스트        | flowcast-dart-test / flowcast-widget-test       |
 | 앱 흐름·서버 연결 / Flutter UI | flowcast-integration-test / flowcast-flutter-ui |
 
-**Flutter 개발 전:** 초기화 담당자가 정한 SDK 버전을 [공식 설치 안내](https://docs.flutter.dev/install)로 준비하고 `flutter doctor`로 확인합니다. 현재는 앱 초기화·SDK 버전 확정 전입니다. 팀의 pubspec·pubspec.lock이 생긴 뒤 앱 폴더에서 `flutter pub get --enforce-lockfile`로 의존성을 받습니다. 처음 준비하거나 잠금 파일이 바뀔 때만 수행합니다. 기기 E2E는 팀이 정한 에뮬레이터/실기기도 필요합니다.
+**Flutter 개발 전:** 초기화 담당자가 정한 SDK 버전을 [공식 설치 안내](https://docs.flutter.dev/install)로 준비하고 `flutter doctor`로 확인합니다. 공통 앱은 `apps/mobile`, SDK는 Flutter 3.47.7 stable / Dart 3.13.5입니다. 초기화가 통합된 브랜치를 받은 뒤 앱 폴더에서 `flutter pub get --enforce-lockfile`로 의존성을 받습니다. 처음 준비하거나 잠금 파일이 바뀔 때만 수행합니다. 기기 E2E는 팀이 정한 에뮬레이터/실기기도 필요합니다.
 
 이 여섯 스킬에는 별도 npx 실행·플러그인·MCP 설치가 필요 없습니다. 개인 로그인·API 키·개인 경로는 Git에 올리지 않습니다. 유효한 통과 결과는 재사용합니다. 호출되지 않거나 준비가 부족하면 오류와 스킬 출처를 담당자에게 전달합니다.
 
 현재 제품 작업은 [PAYSE 제품 기준](../product-baseline.md)에 따라 v0.6 설계·더미 준비와 로컬 계산부터 진행합니다. 실제 LLM은 v0.7 P0입니다. E2E 체계·디자인 시스템 구축은 보류하며, 최신 문서 정정을 받기 위해 기존 스킬 ZIP이나 새 플러그인을 다시 설치할 필요는 없습니다.
+
+Mac의 6·7단계는 [공유된 Mac 안내](MAC_FLUTTER_VSCODE_GUIDE.md)를 따릅니다. 앱을 각자 새로 생성하지 않고 Git으로 같은 pubspec·lockfile·lib/test를 받습니다.

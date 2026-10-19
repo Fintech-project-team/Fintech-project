@@ -1,45 +1,43 @@
-# Flutter와 현재 MVP의 전환 상태
+# Flutter 공통 앱과 남은 구현
 
-모바일 방향은 Flutter/Dart다. 현재 제품 범위는 [PAYSE 제품 기준](../product-baseline.md)의 서버 더미·로컬 계산이며, 앱·스킬 설치·테스트 체계의 완료 여부를 구분한다.
+2026-10-19 초기화 기준. 앱 루트는 `apps/mobile`, 진입점은 `lib/main.dart`, SDK는 Flutter **3.47.7 stable**와 포함 Dart **3.13.5**다. Mac 설치 안내와 같은 버전이다. 제품 범위는 [PAYSE 기준](../product-baseline.md)을 따른다.
 
-| 항목              | 현재                                                   | 필요한 시점의 다음 작업                                 |
-| ----------------- | ------------------------------------------------------ | ------------------------------------------------------- |
-| 앱                | app/src와 Node workspace만 있고 pubspec·Dart 구현 없음 | 초기화 시 팀 SDK·실제 Flutter 경로 확정                 |
-| API               | Node 골격, 서버·DB 구현 없음                           | 더미 조회·사용자 설정·세션·지급 연결/정정 저장 연결     |
-| mock-bank         | 이전 수집 계획의 골격                                  | 준비 더미 제공. 별도 프로세스 여부는 구현에서 결정      |
-| 역할 정책         | policy.json은 이전 app/src 경로                        | 실제 lib/test 경로와 역할·검사를 초기화 때 함께 반영    |
-| 계약              | JSON 모델·명령은 docs/contracts.md 초안                | Dart/서버 검증과 원자적 상태 변경 사례 확정             |
-| 계산              | finance-core는 Node 골격                               | 앱 측 순수 U=B−E−(R−O) 계산의 실제 Dart 위치 결정       |
-| LLM               | 아직 없음                                              | v0.7 실제 연동 P0, v0.8/v0.9 설명 보조 P1               |
-| E2E·디자인 시스템 | 미구축                                                 | 사용자 요청에 따라 보류. 이번 문서 작업에 포함하지 않음 |
+| 항목              | 현재 초기화본                                                        | 남은 작업                                                   |
+| ----------------- | -------------------------------------------------------------------- | ----------------------------------------------------------- |
+| 앱                | pubspec·lockfile·시작 화면·Android/iOS 플랫폼 소스                   | v0.6 제품 화면·인증·API 연결                                |
+| 역할 정책         | `lib/features/`와 대응 `test/features/`의 역할 경로 연결             | 각 실제 작업의 allowedPaths를 필요한 파일로 제한            |
+| 검사              | SDK 일치·Dart 포맷·Flutter 분석·위젯 테스트 실행기, CI workflow 파일 | GitHub 실제 CI 실행·Mac 실행·실기기 빌드 확인               |
+| API/DB            | 기존 Node 골격 유지                                                  | 더미 조회·세션·설정·정정 영속화                             |
+| 계산              | 기존 finance-core Node 골격은 계산 구현으로 사용하지 않음            | `packages/payse_calculation/` 순수 Dart 모듈 구현·벡터 검증 |
+| LLM               | 초기화에 포함하지 않음                                               | v0.7 실제 연동 P0, v0.8/v0.9 설명 보조 P1                   |
+| E2E·디자인 시스템 | 체계 구축 보류 유지                                                  | 별도 요청·범위에 따라 진행                                  |
 
-기존 TypeScript 패키지를 Flutter에서 직접 import하지 않는다. 화면 계산을 서버로 이전하거나 Dart/TS에 중복 구현하지 않는다. API는 링크·설정·배정의 상태 전이와 저장 제약을 검증한다. 원천 금융 값은 수정하지 않고 화면 결과는 Flutter가 계산한다. 양 플랫폼 목표와 단계별 검증은 제품 기준을 따르며 문서 적용으로 기기 검증이 완료되지는 않는다.
+앱 골격은 제품 기능 완료가 아니다. 계산은 Flutter에서 수행하고 서버로 옮기거나 Dart/TS에 중복 구현하지 않는다. 개인 SDK 경로·서명·키·캐시를 Git에 추가하지 않는다. 개발용 플랫폼 식별자는 `com.example.payse`이며 정식 배포 전에 실제 식별자를 확정한다.
 
-## 경로와 역할
+## 팀원이 받았을 때
 
-초기화 후보는 `apps/mobile/lib/app/`, `lib/shared/`, `lib/features/{onboarding,balance,recurring,spending,allocation}/`, `test/`다. 이름·추가 폴더는 실제 초기화 명세에서 필요한 것만 확정한다. 폴더 이름 자체를 버전 범위로 읽지 않는다. 반복 후보·계획·시뮬레이션·조정은 제품 기준의 단계에 맞춰 실제 Flutter 모듈로 나눈다.
+공통 초기화가 통합된 브랜치를 받은 뒤 저장소 루트에서 실행한다.
 
-이 후보는 현재 하네스의 허용 경로가 아니다. 기존 app/src에는 새 Expo 코드를 추가하지 않는다. integration 초기화가 역할 정책·Dart 검사·공유 계산·Node/Dart package 공존·IDE 설정을 함께 맞춘 뒤 기능 작업을 시작한다. 통과시키려고 기능 명세의 역할만 integration으로 바꾸지 않는다.
+```sh
+cd apps/mobile
+flutter pub get --enforce-lockfile
+flutter analyze --no-pub
+flutter test --no-pub
+```
 
-## 기능을 구현할 때의 검사
+pub get은 최초 준비 또는 lockfile 변경 시 수행한다. 최초 lockfile 생성은 초기화 담당자가 처리했고 팀원은 같은 lockfile을 받는다. IDE는 저장소 루트를 열고 `PAYSE Flutter` 실행 구성을 사용한다. 시뮬레이터/실기기 연결은 별도 준비다.
 
-Node 하네스는 JS/TS 제품을 검사하며 Dart 자동 게이트가 아직 없다. Node PASS 또는 product NOT_APPLICABLE을 Flutter 완료 근거로 사용하지 않는다. 실제 패키지 루트에서 다음 중 작업에 필요한 검사를 연결한다.
+## 실제 경로와 검사
 
-| 변경                     | 추가 근거                                                                                   |
-| ------------------------ | ------------------------------------------------------------------------------------------- |
-| Dart 코드·테스트         | `dart format --output=none --set-exit-if-changed <변경한 Dart 파일 목록>`                   |
-| Flutter 패키지           | `flutter analyze`와 영향받은 `flutter test <실제 테스트 파일>`                              |
-| 순수 Dart 패키지         | `dart analyze`와 관련 `dart test <실제 테스트 파일>`                                        |
-| 계산·입력 명령·공통 계약 | 원천 불변·지급 연결/정정·중복 처리·실패/충돌 등 영향받는 Dart·서버 검사                     |
-| 실제 화면·저장 연결      | 해당 작업 완료 조건에 필요한 연결 근거. E2E 체계 구축 보류와 기능 검사 생략을 혼동하지 않음 |
-| 문서·스킬만 변경         | 공통 검사·내용/링크/스킬 정합성. 앱·기기 테스트는 해당 없음                                 |
+- `lib/app/`: 공통 진입점·구성. 공유 데이터 계층은 필요할 때 `lib/data/`에 만든다.
+- `lib/features/{auth,connection,overview,planning,recurring,simulation,adjustment}/`: 제품 기능. 비어 있는 폴더를 미리 만들거나 기능 완료로 표시하지 않는다.
+- 역할은 [ownership](../ownership.md)과 policy.json을 따른다. 기존 app/src는 이전 Node 골격으로 보존하며 신규 Expo 코드를 추가하지 않는다.
+- 모바일 상세는 `apps/mobile/docs/`, 기능 상세는 담당 `<feature>/docs/`에 둔다.
 
-E2E를 별도 진행하기로 한 시점에는 실제 앱·API·기기 경계와 테스트를 정한다. 더미 제공 계약은 확인하되 별도 mock-bank 서버 설치를 준비 조건으로 강제하지 않는다. 웹 미리보기·위젯 테스트·기기 검증은 각각 확인한 범위만 보고한다.
+저장소 루트의 `node scripts/harness/run-flutter.mjs check`는 버전 검사 후 읽기 전용 Dart 포맷, `flutter analyze --no-pub`, `flutter test --no-pub`를 실행한다. SDK 불일치는 중단하며 검사 중 의존성을 갱신하지 않는다. 포맷 수정은 작업에 허용된 변경 파일에만 한다.
 
-분석은 읽기 검사이고 포맷 수정은 허용 파일로 제한한다. 필요한 SDK·pubspec·검사 명령이 없으면 해당 구현 검증은 BLOCKED다. 같은 코드·입력·설정·의존성·환경의 PASS는 [기존 기준](AGENT_REVIEW.md)에 따라 재사용하며 같은 문서를 매번 다시 읽지 않는다.
+기존 Node 하네스는 실제 Dart 소스도 제품 존재 판정에 포함한다. Flutter 소스 변경은 mobile 검사로 연결하고 공통 검사기 변경은 실제 구현이 있는 소비자를 검사한다. 직접 변경된 서버/패키지는 구현이 없어도 해당 검사 요구를 유지하여 누락된 명령을 숨기지 않는다. 기존 Node 구조·lint·하네스 검사는 유지한다.
 
-## 도구와 잠금 파일
+`code-spec` 자동 검사는 JS/TS 대상이며 Dart 문서 주석은 작성자 검토 대상이다. Node PASS, 위젯 테스트 PASS, Android/iOS 빌드 PASS, 사용자 검증 PASS를 서로 대체하지 않는다. CI 파일을 추가한 사실은 원격 CI 실행 성공이 아니다.
 
-팀 버전은 [toolchain](../toolchain.md)을 따른다. Flutter SDK의 실제 버전은 초기화 때 확인·고정하고 포함된 Dart SDK를 사용한다. Node 루트 lockfile과 앱 pubspec.lock을 함께 보존한다. 최초 준비 또는 잠금 파일 변경 시에만 의존성을 받는다.
-
-Android/iOS 프로젝트는 앱 소스로 공유하고 생성 캐시·개인 서명 파일은 제외한다. 현재 스킬에 별도 MCP·SDK 설치가 포함돼 있지 않으며, 새 MVP 정합성 문서 적용도 앱 초기화나 추가 플러그인 설치가 아니다.
+공식 근거: [Flutter 앱 생성](https://docs.flutter.dev/reference/create-new-app), [Dart 잠금 파일](https://dart.dev/tools/pub/cmd/pub-get#enforce-lockfile), [Flutter 테스트](https://docs.flutter.dev/testing/overview).

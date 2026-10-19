@@ -45,7 +45,7 @@ function run(name, script, argv = []) {
   if (r.stderr) process.stderr.write(r.stderr);
   report.checks.push({
     name,
-    status: r.error ? 'BLOCKED' : r.status === 0 ? 'PASS' : 'FAIL',
+    status: r.error || r.status === 2 ? 'BLOCKED' : r.status === 0 ? 'PASS' : 'FAIL',
     exitCode: r.status,
   });
   return !r.error && r.status === 0;
@@ -105,8 +105,15 @@ try {
     assertNoSymlink(root, ref);
     if (!fs.existsSync(ref)) throw new Error('Missing core reference: ' + ref);
   }
-  const hasProduct = sources.some((p) => /^(apps|packages)\/.*\.[cm]?[jt]sx?$/u.test(p));
-  const gates = selectGates(changed, policy, hasProduct);
+  const productSources = sources.filter((p) =>
+    /^(apps|packages)\/.*(?:\.[cm]?[jt]sx?|\.dart)$/u.test(p),
+  );
+  const presentGates = Object.entries(policy.productGates)
+    .filter(([, gate]) =>
+      gate.prefixes.some((prefix) => productSources.some((p) => p.startsWith(prefix))),
+    )
+    .map(([name]) => name);
+  const gates = selectGates(changed, policy, productSources.length > 0, presentGates);
   Object.assign(report, {
     references: refs,
     productGates: gates.map((g) => g.name),
