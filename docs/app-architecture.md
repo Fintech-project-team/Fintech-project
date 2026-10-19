@@ -131,3 +131,7 @@ packages/payse_calculation/
 - 순수 패키지를 UI·네트워크 없이 시험할 수 있는가?
 
 캡슐화는 책임 분리다. 기기 코드의 절대 열람 불가를 보장하지 않는다. 난독화도 역공학 방지 보장이 아니므로 비밀 키는 API에만 둔다. [Flutter 난독화의 한계](https://docs.flutter.dev/deployment/obfuscate)
+
+## 2026-10-19 공통 앱 초기화 범위
+
+`apps/mobile/lib/main.dart`, `lib/app/`, `test/app/`와 Android/iOS 소스를 초기화했다. 이는 위 구조 기준을 구현할 시작점이며 Repository·ViewModel·순수 계산·제품 화면이 모두 완성됐다는 뜻은 아니다. 새 상태 관리·라우터·Service Locator 패키지는 추가하지 않았다. 기능과 공유 데이터 파일은 필요한 작업에서 생성하며 실제 역할·검사는 [Flutter 전환](harness/FLUTTER_TRANSITION.md)을 따른다.

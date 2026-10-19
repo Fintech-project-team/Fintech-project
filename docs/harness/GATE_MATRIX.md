@@ -5,7 +5,7 @@
 | 작업 영역        | 읽을 문서                                           | 추가 검사                                                |
 | ---------------- | --------------------------------------------------- | -------------------------------------------------------- |
 | 모든 작업        | mvp-scope.md, ownership.md, 이 문서, 작업 명세      | 범위·구조·Prettier·ESLint·하네스 테스트·코드 명세        |
-| UI               | architecture.md, contracts.md                       | mobile typecheck/test                                    |
+| UI               | architecture.md, contracts.md                       | mobile check: SDK·Dart 포맷·Flutter 분석·테스트          |
 | API·더미·AI·DB   | architecture.md, contracts.md                       | 해당 서버 typecheck/test                                 |
 | 공통 데이터 형식 | contracts.md, architecture.md, calculation-rules.md | contracts와 이를 사용하는 모든 앱·서버 typecheck/test    |
 | 금융 계산        | calculation-rules.md, contracts.md                  | finance-core·mobile typecheck/test                       |
@@ -49,9 +49,11 @@ CODE_SPEC.md와 EXTENSION_POINTS.md도 공통 필수 문서다. Git 작업은 CO
 
 ## Flutter 작업의 추가 판정
 
-위 mobile typecheck/test 표는 현재 Node 하네스의 동작이다. 신규 모바일 목표는 Flutter이며 Dart 자동 게이트는 아직 연결되지 않았다. [FLUTTER_TRANSITION.md](FLUTTER_TRANSITION.md)의 초기화·역할 경로·추가 분석/테스트를 함께 확인한다. Dart 변경이 있는데 Node 하네스가 product NOT_APPLICABLE로 나왔다고 제품 검사를 생략하지 않는다.
+2026-10-19 초기화 이후 mobile 검사는 `apps/mobile/package.json`의 `check`를 통해 실제 SDK 버전·Dart 포맷·Flutter 분석·위젯 테스트로 연결된다. 명령은 `scripts/harness/run-flutter.mjs`에 있다. 이전 Node의 mobile typecheck/test라는 표기는 해당 wrapper의 분석/테스트 명령으로 호환한다.
 
-Flutter 기능 완료를 판단할 때는 실제 pubspec, 준비된 정책·명령, 관련 Dart 포맷·분석·테스트·필요한 기기 근거가 있어야 한다. 필요한 준비가 없으면 BLOCKED다. 스킬·문서만 수정한 이번 종류의 작업에는 앱 검사를 추가하지 않는다.
+하네스는 Dart 소스도 실제 제품 소스로 인식한다. 공유 검사기 변경은 실제 소스가 존재하는 소비자까지 검사하며, 직접 변경된 서버/패키지의 검사는 빈 골격이라는 이유로 생략하지 않는다. 제품 코드를 바꾸지 않은 일반 MD 작업에는 모바일 검사를 강제하지 않는다.
+
+최초 준비에는 앱 루트에서 `flutter pub get --enforce-lockfile`이 필요하다. SDK·명령 누락 또는 버전 불일치는 BLOCKED다. 테스트 실패는 FAIL이며, 원격 CI·Android/iOS 빌드·기기 검증은 별도 근거가 필요하다. Dart 문서 주석의 의미는 [CODE_SPEC](CODE_SPEC.md)에 따라 검토한다.
 
 ## 현재 MVP에 맞는 검사 선택
 

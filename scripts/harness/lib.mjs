@@ -126,9 +126,10 @@ export function violations(files, task, taskPath, policy) {
  * @param files - 변경 파일.
  * @param policy - 검사 정책.
  * @param productPresent - 기존 제품 코드 여부.
+ * @param presentGates - 실제 제품 소스가 있는 검사 이름. 생략 시 기존 전체 소비자 검사를 유지한다.
  * @returns workspace 검사 목록.
  */
-export function selectGates(files, policy, productPresent) {
+export function selectGates(files, policy, productPresent, presentGates) {
   const code = files.filter((p) => /^(apps|packages)\//u.test(p) && !/\.md$/u.test(p));
   const shared = files.some(
     (p) =>
@@ -140,7 +141,7 @@ export function selectGates(files, policy, productPresent) {
   return Object.entries(policy.productGates)
     .filter(
       ([name, gate]) =>
-        all ||
+        (all && (!presentGates || presentGates.includes(name))) ||
         gate.prefixes.some((p) => code.some((f) => f.startsWith(p))) ||
         (name === 'mobile' && code.some((p) => p.startsWith('packages/finance-core/'))),
     )
