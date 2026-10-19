@@ -13,3 +13,10 @@ apps/mobile/ios
 
 # Original reference documents are verified by hash, not reformatted.
 docs/references/*.source.md
+
+# Flutter caches/generated metadata; Dart uses dart format.
+**/.dart_tool/**
+**/.pub-cache/**
+**/.flutter-plugins-dependencies
+apps/mobile/.metadata
+apps/mobile/pubspec.lock

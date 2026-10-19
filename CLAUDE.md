@@ -12,7 +12,7 @@
 12. 작업 폴더 하나에 쓰기 에이전트 하나만 둔다. 동시 작업은 checkout/worktree를 분리하고 기존 변경을 보존한다.
 13. 기능→개인→develop→main 순서로 PR을 보낸다. develop/main은 개발 관리자 enpl(개인 브랜치 sunghyun-dev)이 merge한다.
 14. 작업 전 develop 변경을 반영한다. 공유 브랜치 force push, 보호 규칙 해제, 작업과 무관한 코드 정리를 하지 않는다.
-15. 모바일은 Flutter다. v0.6 모델·더미·DB·API·식별 설계는 P0, 서버 구현은 P1이다. 저장 API 없이 재로그인 유지 완료로 보고하지 않는다. 초기화는 docs/harness/FLUTTER_TRANSITION.md를 따른다.
+15. 모바일은 Flutter다. v0.6 모델·더미·DB·API·식별 설계는 P0, 서버 구현은 P1이다. 저장 API 없이 재로그인 유지 완료로 보고하지 않는다. 공통 Flutter 앱은 apps/mobile이며 준비·검사는 docs/harness/FLUTTER_TRANSITION.md를 따른다.
 16. 금액·소비 집계·반복 후보 수치·시뮬레이션은 Flutter 순수 Dart 모듈에서 계산한다. U=B−E−(R−O)이며 원천 잔액·거래·카드 사용액은 사용자 수정 불가다.
 17. 계산·기간·정정 규칙은 docs/calculation-rules.md를 따른다. 정수 금액·기준 시각·입력/계산 버전을 유지하고 확정 정책을 사용 검증 때문에 다시 미결정으로 만들지 않는다.
 18. v0.7 실제 LLM 연동은 P0, v0.8/v0.9 설명 보조는 P1이다. 서버는 LLM 해석·후보와 근거를 반환하고 금액·미래 잔액을 계산하지 않는다.

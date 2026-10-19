@@ -10,6 +10,8 @@ export default tseslint.config(
       '**/build/**',
       '**/coverage/**',
       '**/.expo/**',
+      '**/.dart_tool/**',
+      '**/.pub-cache/**',
       'apps/mobile/android/**',
       'apps/mobile/ios/**',
     ],

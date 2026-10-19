@@ -1,0 +1,33 @@
+name: Flutter checks
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/payse_calculation/**'
+      - 'packages/contracts/**'
+      - 'scripts/harness/**'
+      - '.github/workflows/flutter.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  flutter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FLUTTER_SUPPRESS_ANALYTICS: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version-file: apps/mobile/pubspec.yaml
+          cache: true
+      - run: flutter --no-version-check pub get --enforce-lockfile
+        working-directory: apps/mobile
+      - run: node scripts/harness/run-flutter.mjs check

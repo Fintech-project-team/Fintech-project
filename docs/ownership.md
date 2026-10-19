@@ -33,6 +33,15 @@ cashflow 표의 recurring/와 spending/은 apps/mobile/src/features/ 아래 경�
 
 기능→개인→develop→main 흐름과 기존 merge 담당은 [Git 규칙](harness/COMMIT_PR_POLICY.md)을 유지한다. 인원 변경만으로 계정 권한·브랜치·보호 규칙을 수정하거나 누가 제외됐는지 추정하지 않는다. 기존 브랜치 이름은 실제 권한 확인 자료이며 3명 운영 요구가 아니다.
 
-## Flutter 전환
+## Flutter 실제 역할 경로
 
-역할표는 현재 `scripts/harness/policy.json`의 이전 골격 경로다. 신규 Flutter 경로는 [전환 기준](harness/FLUTTER_TRANSITION.md)에 따라 실제 lib/test 경로·정책·검사를 초기화 작업에서 함께 맞춘다. 본 문서 적용만으로 코드 수정 허용 경로가 확장되지는 않는다.
+위 `app/src` 표와 정책 경로는 이전 골격의 호환성을 위해 남긴다. 2026-10-19 공통 초기화 이후 신규 모바일 구현은 아래 실제 경로와 `scripts/harness/policy.json`의 교집합을 따른다.
+
+| 역할        | Flutter 경로                                                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| integration | `apps/mobile/lib/main.dart`, `lib/app/`, `lib/data/`, `lib/shared/`, 대응 공통 테스트, 모바일 공통 docs, pubspec·SDK·플랫폼·검사 설정 |
+| cashflow    | `apps/mobile/lib/features/{auth,connection,overview,recurring,simulation}/`, `apps/mobile/test/features/` 아래 같은 기능명            |
+| allocation  | `apps/mobile/lib/features/{planning,adjustment}/`, `apps/mobile/test/features/` 아래 같은 기능명, 기존 `docs/demo/`                   |
+| data        | 기존 `apps/api/`, `apps/mock-bank/`; Flutter 공유 Repository를 단독 변경하는 권한은 추가하지 않음                                     |
+
+기능 폴더는 실제 작업 시 필요한 것만 만든다. 테스트도 담당 기능과 같은 경계로 제한한다. 공통 계약·pubspec·SDK 버전은 integration 변경으로 검토하고 기능 작업의 역할만 바꿔 검사를 통과시키지 않는다. 초기화 완료와 금융 기능 완료는 [전환 기준](harness/FLUTTER_TRANSITION.md)에서 구분한다.
