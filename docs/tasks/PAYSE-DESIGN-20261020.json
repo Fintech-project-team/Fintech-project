@@ -1,0 +1,46 @@
+{
+  "id": "PAYSE-DESIGN-20261020",
+  "role": "integration",
+  "baseCommit": "f06e2af8c260a32a6a6b9e06b73bc9b4c7a821cf",
+  "branch": "feat/integration/design-tokens",
+  "allowedPaths": [
+    "docs/design.md",
+    "docs/tasks/PAYSE-DESIGN-20261020.json",
+    "apps/mobile/lib/shared/design/",
+    "apps/mobile/test/shared/design/",
+    "apps/mobile/lib/app/payse_app.dart",
+    "apps/mobile/test/app/bootstrap_test.dart",
+    "apps/mobile/pubspec.yaml",
+    "apps/mobile/assets/fonts/"
+  ],
+  "acceptance": [
+    "GitHub #61 2단계(전체 계획 1단계: 디자인 토큰·라이트 테마·공통 위젯): docs/design.md를 새로 만들고 확정 홈 시안 home-c-final.html(C Minimal Spacious)을 기준으로 기본 토큰만 정의한다. 출처는 디자인 초안 PAYSE_DESIGN.md v1.0(2026-10-16)과 결정일 2026-10-20이다. 입력 필드·바텀시트·선택 컴포넌트, 02-2 계산 내역(디지털 영수증 콘셉트 예정) 등 다른 화면에서 검토가 필요한 컴포넌트는 '미정 + 결정 기준'으로 남기고 빈 값을 임의로 채우지 않는다(team-plan 58행)",
+    "라이트 테마만 지원한다. 색·간격·반경·글자 토큰을 lib/shared/design/의 단일 소스로 두고 ThemeData·ColorScheme·TextTheme와 금융 상태용 ThemeExtension으로 매핑해 PayseApp에 연결한다",
+    "테마 연결 전후로 기존 화면(BootstrapScreen)의 렌더링을 비교해 보고한다. 비교 이미지는 레포 밖에 두고 골든 파일을 커밋하지 않는다. 허용 경로 밖 파일에 영향이 있으면 수정하지 않고 먼저 보고한다",
+    "글꼴은 Pretendard v1.3.9 정적 OTF 4굵기(400·500·600·700)를 assets/fonts/에 OFL 라이선스 파일과 함께 레포에 저장하고 pubspec.yaml fonts에 등록한다. 내려받기 전에 정확한 파일명·배포 출처·용량·라이선스를 알리고 별도 승인을 받는다. 승인 전에는 pubspec·assets를 바꾸지 않는다. 새 pub 패키지는 추가하지 않는다",
+    "공통 위젯은 실제로 쓸 최소 개수만 만든다: AmountHero(정상·음수·정보 부족), PrimaryButton(화면 폭 차콜 띠), LedgerRow, StatusNotice(저장 실패·버전 충돌·정보 부족·경고), MoonGlyph(데이터와 연결하지 않은 고정 모양)",
+    "LedgerRow는 홈과 계산 내역에서 함께 쓸 수 있게 보조 설명·화살표·행 간격을 화면별로 조정하는 구조로 만들되, 확정된 홈 시각 규칙(직접 그린 마이너스 선 16×1.75px → 항목명 → 8px 색 칩, 항목명 첫 줄 정렬)만 기본값으로 적용한다. 02-2의 미확정 디자인을 구현하지 않으며 탐색용 02-2 HTML도 수정하지 않는다",
+    "금융 상태 표현: 음수는 U+2212 기호와 오류 색·호출자가 준 부족 문장, 값이 없으면 0원이 아니라 '계산할 수 없어요', 저장 실패·버전 충돌은 서로 다른 문구·아이콘·행동으로 구분한다. 위젯은 금액·비율을 계산하지 않고 정수 금액 표시 형식만 다룬다(CLAUDE.md 16)",
+    "구성 막대는 구현하지 않는다. 색·순서(모아둘 돈 #555A61 → 예정 지출 #9EA3AA → 쓸 수 있는 돈 #F4CF65)만 확정 값으로 기록하고, 비율 계산 위치·음수/정보 부족 등 예외 상태 처리 규칙은 미정으로 남긴다. 계산 모듈 변경을 전제하지 않으며 기존 계산 결과 활용 가능성은 추후 검토 항목으로 둔다. 달-월급 주기 연동도 만들지 않는다",
+    "위젯 테스트로 토큰 적용, 음수 표시, null 금액이 0원으로 보이지 않음, 오류·충돌 상태 구분, LedgerRow 마이너스 접근성 라벨과 선택 요소(보조 설명·화살표·행 간격)를 검사하고 FLUTTER_TRANSITION.md의 Dart 포맷·분석·테스트와 verify-change 본 검사를 통과한다",
+    "브랜드 로고·워드마크·다크 모드·기능 화면(lib/features)·저장소/Repository·계산 모듈·더미·API·기존 MD·다른 작업 명세·탐색용 HTML·GitHub/노션은 변경하지 않는다"
+  ],
+  "readBefore": [
+    "docs/mvp-scope.md",
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/harness/FLUTTER_TRANSITION.md",
+    "docs/app-architecture.md",
+    "docs/v0.6-screen-rules.md",
+    "apps/mobile/docs/screen-rules-update.md",
+    "docs/calculation-rules.md",
+    "docs/team-plan.md",
+    "docs/open-decisions.md",
+    "docs/development-notes.md",
+    ".claude/skills/flowcast-flutter-ui/SKILL.md",
+    "docs/harness/AGENT_REVIEW.md",
+    "docs/harness/COMMIT_PR_POLICY.md"
+  ]
+}
