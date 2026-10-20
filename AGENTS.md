@@ -1,4 +1,4 @@
-1. 개발자는 총 2명이며 두 사람 모두 공동 PM이다. 데이터·DB·API·LLM은 A, Flutter·UI·로컬 계산은 B가 맡고 공통 변경은 영향받는 담당자끼리 확인한다.
+1. 개발자는 총 2명이며 두 사람 모두 공동 PM이다. 데이터·DB·API는 A, Flutter·UI·로컬 계산은 B가 맡는다. 공통 변경은 영향받는 담당자끼리 확인한다.
 2. 제품 범위는 docs/product-baseline.md와 docs/PAYSE-README.md를 따른다. 서버는 PAYSE 공통 계약의 합성 금융 데이터를 제공한다. CODEF는 참고 자료이며 실제 본인인증·금융 연동은 범위 밖이다.
 3. 작업 전 docs/harness/GATE_MATRIX.md, docs/ownership.md, 작업 명세의 미확인·변경 부분을 읽고 git branch/status/diff를 확인한다.
 4. 작업 명세에 담당 역할·기준 커밋·허용 경로·완료 조건을 적고 승인된 범위만 수정한다.
@@ -9,7 +9,7 @@
 9. 다른 담당자의 코드는 읽어 연결 방식을 확인한다. 수정·포맷·이름 변경은 자기 작업의 허용 경로에서만 한다.
 10. 범위 밖 문제는 재현 방법과 경로를 Issue/PR에 적고 담당자에게 전달한다. 임시 복사로 공통 데이터 형식을 바꾸지 않는다.
 11. 수정 범위를 넓힐 때 담당자와 작업 명세를 먼저 조정한다. 이미 승인된 작업을 다시 승인받지 않는다.
-12. 작업 폴더 하나에 쓰기 에이전트 하나만 둔다. 동시 작업은 checkout/worktree를 분리하고 기존 변경을 보존한다.
+12. 한 checkout에는 쓰기 에이전트 하나만 둔다. 읽기 전용 검토는 공유할 수 있으며 동시에 수정할 에이전트는 checkout/worktree를 분리하고 기존 변경을 보존한다.
 13. 기능→개인→develop→main 순서로 PR을 보낸다. develop/main은 개발 관리자 enpl(개인 브랜치 sunghyun-dev)이 merge한다.
 14. 작업 전 develop 변경을 반영한다. 공유 브랜치 force push, 보호 규칙 해제, 작업과 무관한 코드 정리를 하지 않는다.
 15. 모바일은 Flutter다. v0.6 모델·더미·DB·API·식별 설계는 P0, 서버 구현은 P1이다. 저장 API 없이 재로그인 유지 완료로 보고하지 않는다. 공통 Flutter 앱은 apps/mobile이며 준비·검사는 docs/harness/FLUTTER_TRANSITION.md를 따른다.

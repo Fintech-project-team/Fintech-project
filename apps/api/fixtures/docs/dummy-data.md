@@ -63,6 +63,6 @@ python apps/api/fixtures/export_sql.py apps/api/fixtures/generated --out .harnes
 
 - Flutter는 우선 alpha-unconnected→alpha-ready, salary-wait→partial→confirmed, settlement-corrected, gamma-month-end를 FakeRepository 입력으로 확인한다.
 - 원천 필드 읽기 전용, null·coverage 표시, 급여 대기·회차 편집·분류 정정을 확인한다. 새 공통 형식 문자열과 필드 배치는 두 담당자 확인 후 API에서 고정한다.
-- 연간/월별 결과는 v0.7, 지급 연결 수동 정정은 v0.9라는 최신 GitHub 합의를 유지한다. AI 담당은 미정이다.
+- 연간/월별 결과는 v0.7, 지급 연결 수동 정정은 v0.9라는 최신 GitHub 합의를 유지한다.
 - 세션/인증·API·실제 LLM·실제 금융 API·Flutter 숫자 계산을 이 자료가 구현하지 않는다. 같은 JSON이 DB에 적재된 사실과 앱 동작 검증을 혼동하지 않는다.
 - 실제 공급자 ID alias 매핑·페이지·오류 응답·최종 JSON Schema/OpenAPI는 #20 또는 후속 실연동에서 완성한다. 기존 파일은 수정하지 않았다.
