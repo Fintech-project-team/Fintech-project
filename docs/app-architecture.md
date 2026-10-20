@@ -108,7 +108,10 @@ apps/mobile/
   docs/                          # 모바일 공통 상세
   lib/features/<feature>/docs/   # 기능별 세부 문서
 apps/api/
-  lib/{routes,application,infrastructure}/
+  src/main/java/com/payse/api/   # Java 운영 소스; bootstrap 초기화, 업무 계층은 기능 구현 시 추가
+  src/main/resources/
+  src/test/java/
+  tools/                         # API 개발 검사 도구
   docs/
 packages/payse_calculation/
   lib/                           # 순수 계산·값 객체
@@ -118,7 +121,7 @@ packages/payse_calculation/
 
 이 경로는 새 구현의 권고 배치다. 기존 `packages/finance-core`와 둘 다 계산 권위를 갖도록 만들지 않는다. 실제 저장소 구조를 확인한 뒤 한 곳을 선택/대응시키고 공통 문서에 기록한다. 이미 운영되는 API를 무단 이동하거나 Node 골격을 Dart 앱 구현 완료로 간주하지 않는다.
 
-총 2명이 공동 PM이다. A는 데이터·DB·API·LLM, B는 Flutter·UI·로컬 계산을 담당한다. 최신 업무표의 데이터/서버 업무 집중을 완화하도록 계산 구현 책임을 B로 조정했다. 공통 계약은 작성 담당과 영향을 받는 다른 담당자가 확인한다. 별도 PM 승인을 추가하지 않는다. 기능 세부 문서는 공통 계약을 링크하고 산식/금액 의미를 독자적으로 재정의하지 않는다.
+총 2명이 공동 PM이다. A는 데이터·DB·API, B는 Flutter·UI·로컬 계산을 담당한다. 최신 업무표의 데이터/서버 업무 집중을 완화하도록 계산 구현 책임을 B로 조정했다. 공통 계약은 작성 담당과 영향을 받는 다른 담당자가 확인한다. 별도 PM 승인을 추가하지 않는다. 기능 세부 문서는 공통 계약을 링크하고 산식/금액 의미를 독자적으로 재정의하지 않는다.
 
 ## 9. 검토 기준
 

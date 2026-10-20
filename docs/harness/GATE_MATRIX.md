@@ -60,3 +60,11 @@ CODE_SPEC.md와 EXTENSION_POINTS.md도 공통 필수 문서다. Git 작업은 CO
 범위는 [제품 기준](../product-baseline.md)과 [계산 규칙](../calculation-rules.md)이다. 변경된 버전에 맞춰 U=B−E−(R−O), 원천 불변, 선택 계좌, 지급 연결·수동 정정, 기간·시뮬레이션, 저장 실패·버전 충돌을 실제 담당 계층에서 검사한다.
 
 숫자는 Flutter 순수 Dart, 서버는 사용자 격리·저장 제약·멱등·LLM 계약을 검사한다. v0.7 실제 LLM과 후속 설명 보조의 우선순위를 구분한다. 준비된 더미 제공 계약은 필요하지만 별도 mock-bank 프로세스 도입을 강제하지 않는다. 문서만 적용한 작업에 앱·기기 완료를 요구하거나 완료로 보고하지 않는다. 기존 필수 검사 규칙을 완화하지 않는다.
+
+## API Java 초기화 이후
+
+2026-10-20부터 API typecheck는 Java 컴파일+주석 검사, API test는 JUnit+기존 Python 더미 검사에 연결한다. 주석 자동 검사 대상은 apps/api의 src/main/java·src/test/java·tools 아래 직접 작성한 Java 코드다. `node scripts/harness/run-api.mjs check`는 실행 JAR 생성까지 포함한다. JDK 21 또는 테스트용 Python 3.10+ 부재는 BLOCKED, 컴파일/테스트 실패는 FAIL이다. 기존 Node lint는 Java 검증을 대신하지 않는다.
+
+Java 소스도 공통 변경의 실제 소비자로 인식한다. Flutter 전용 변경은 기존 mobile 선택을 유지하므로 API JDK를 요구하지 않는다. 공통 검사기 변경은 mobile과 api를 함께 검사한다. 종합 검사에서 API typecheck와 test는 각각 최대 17분이다(전체 합계 17분이 아님). 내부 Gradle은 명령당 14분, Python 더미 검사는 2분, Java/Python 버전 확인은 각각 10초로 제한하고 나머지는 프로세스 기동·종료 여유다. 단독 API check도 같은 내부 제한을 사용한다. 다른 제품 검사 제한 시간은 유지한다.
+
+API 전용 CI는 API/계약/공통 검사기 변경에서 실행하고 기존 Flutter CI는 수정하지 않는다. 프로세스 생존·초기 차단 테스트와 실제 DB 연결/SQL 동시성/금융 API·Flutter 통합을 구분한다.

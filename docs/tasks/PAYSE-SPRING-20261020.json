@@ -1,0 +1,47 @@
+{
+  "acceptance": [
+    "Java 21 + Spring Boot 초기화와 실제 컴파일/테스트/주석 검사 연결",
+    "금융 모델/SQL/더미/Flutter 코드와 계산 위치 불변",
+    "프론트 전용 변경은 기존 mobile 검사만 선택하고 JDK 설치 요구 없음",
+    "API Java 전역 규칙과 생성/수정 날짜·목적·사용처 주석 정의",
+    "충돌 사전 검사·백업·재실행 가능한 적용 배치파일 검증"
+  ],
+  "baseCommit": "e081e57841733cdb13fa9d8406d467f99c8d9659",
+  "id": "PAYSE-SPRING-20261020",
+  "role": "integration",
+  "branch": "chore/api/spring-bootstrap",
+  "readBefore": [
+    "docs/data-contracts.md",
+    "apps/api/docs/data-model-draft.md",
+    "apps/api/docs/database-design.md",
+    "docs/database-schema.md",
+    "docs/app-architecture.md",
+    "docs/calculation-rules.md",
+    "docs/harness/AGENT_REVIEW.md",
+    "apps/mobile/lib/app/payse_app.dart"
+  ],
+  "allowedPaths": [
+    "apps/api/src/",
+    "apps/api/tools/",
+    "apps/api/docs/spring-bootstrap.md",
+    "apps/api/README.md",
+    "apps/api/package.json",
+    "apps/api/build.gradle",
+    "apps/api/settings.gradle",
+    "apps/api/gradle/",
+    "apps/api/gradlew",
+    "apps/api/gradlew.bat",
+    "apps/api/gradle.lockfile",
+    "scripts/harness/run-api.mjs",
+    "scripts/harness/lib.mjs",
+    "scripts/harness/verify-change.mjs",
+    "scripts/harness/tests/api-runner.test.mjs",
+    "scripts/harness/tests/java-gates.test.mjs",
+    "docs/toolchain.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/harness/GATE_MATRIX.md",
+    ".github/workflows/api.yml",
+    "docs/harness/engineering-rules.md"
+  ],
+  "scopeNote": "사용자가 승인한 필요한 MD 정합화 범위에서 발견한 서버 프레임워크 미정 문구를 Java 확정으로 수정한다. 프론트 규칙은 유지한다."
+}

@@ -1,6 +1,6 @@
 # 제품·버전 기준
 
-개정일 2026-10-18. [최신 업무표](references/work-brief.source.md)를 최우선 적용한다. v8/v7에서 달라진 점은 [충돌 보고](reconciliation-report.md)에 기록한다.
+개정일 2026-10-20. 사용자 최신 확정 사항을 우선하며 [업무표](references/work-brief.source.md)의 범위·우선순위를 함께 적용한다. v8/v7에서 달라진 점은 [충돌 보고](reconciliation-report.md)에 기록한다.
 
 ## 범위와 실행 책임
 
@@ -10,7 +10,7 @@ PAYSE는 Flutter iOS·Android에서 `파악 → 판단 → 조정`을 제공하�
 
 LLM은 서버 게이트웨이를 통해 호출한다. 거래명·유형·설명 해석을 반환하며, 금융 금액/일정의 규칙 계산과 최종 결과 구성은 로컬이 담당한다. 계좌 계산을 서버로 보내는 이전 확정 재계산 문구는 적용하지 않는다. 서버 역할을 LLM 호출 하나로 축소하지도 않는다.
 
-Flutter/Dart·PostgreSQL은 확정이다. 서버 언어·프레임워크·상태 관리 도구는 개발자가 위 책임 경계를 지키며 선택한다. Dart API는 선택 가능한 기존 권장안이며 필수 스택이 아니다. 자체 LLM 서버는 요구하지 않는다.
+Flutter/Dart·PostgreSQL·Java + Spring Boot는 확정이다. API의 Java·Spring Boot·Gradle 버전은 [도구 기준](toolchain.md)을 따른다. Flutter 상태 관리 도구는 담당자가 위 책임 경계를 지키며 선택한다. 자체 LLM 서버는 요구하지 않는다.
 
 ## 최신 업무표의 우선순위
 

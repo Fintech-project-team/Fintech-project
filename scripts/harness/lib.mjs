@@ -164,6 +164,7 @@ export function references(task, files, policy) {
     refs.add('docs/contracts.md');
   }
   if (paths.some((p) => p.startsWith('packages/'))) refs.add('docs/calculation-rules.md');
+  if (paths.some((p) => p.startsWith('apps/api/'))) refs.add('apps/api/src/AGENTS.md');
   if (task.role === 'integration') {
     refs.add('docs/development-workflow.md');
     refs.add('docs/toolchain.md');
@@ -188,4 +189,14 @@ export function digest(root, files) {
     else hash.update('DELETED');
   }
   return hash.digest('hex');
+}
+
+/**
+ * @created 2026-10-20
+ * @description 구현된 제품 소스의 언어를 판별한다. 문서·캐시를 구현으로 보지 않는다.
+ * @param file - 저장소 상대경로.
+ * @returns JS/TS, Dart 또는 Java 제품 소스인지 여부.
+ */
+export function isProductSource(file) {
+  return /^(apps|packages)\/.*(?:\.[cm]?[jt]sx?|\.dart|\.java)$/u.test(file);
 }
