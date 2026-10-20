@@ -20,6 +20,10 @@ flutter:
   uses-material-design: true
   assets:
     - assets/fonts/OFL.txt
+    - assets/fixtures/alpha-ready.json
+    - assets/fixtures/alpha-shock.json
+    - assets/fixtures/salary-wait.json
+    - assets/fixtures/alpha-unconnected.json
   fonts:
     - family: Pretendard
       fonts:
