@@ -8,7 +8,7 @@ assignees: ''
 
 ## 목표 / 담당 역할
 
-담당자와 작업 역할을 따로 적는다. 역할은 data / cashflow / allocation / integration 중 하나이며 인원수가 아니다. 3인 배정·겸임 기준은 docs/ownership.md를 따른다.
+담당자와 작업 역할을 따로 적는다. 역할은 data / cashflow / allocation / integration 중 하나이며 인원수가 아니다. 2인 공동 PM·개발자의 역할 배정·겸임 기준은 docs/ownership.md를 따른다.
 
 ## 기준·범위
 

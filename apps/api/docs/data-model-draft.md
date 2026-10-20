@@ -244,7 +244,7 @@ v1.0 급여 확인은 **임시 결정**이다. 합성 시나리오가 같은 자
 
 ## 근거
 
-조회 기준 develop `c0af85ab5ced423e780a02717c51ebb7eaa409d2`. 추가 결정은 월간 계획 지속·말일 처리, 개별 회차와 미래 계획 수정의 구분, 더미 급여 완료 명시 상태 사용(임시)이다. 기존 문서의 해당 미결정 문구는 수정하지 않고 이 문서에서 확정 사실을 기록했다. 문서 작성·공유 방식과 AI 담당 미정은 별도 공유 기준에 기록했다.
+조회 기준 develop `c0af85ab5ced423e780a02717c51ebb7eaa409d2`. 추가 결정은 월간 계획 지속·말일 처리, 개별 회차와 미래 계획 수정의 구분, 더미 급여 완료 명시 상태 사용(임시)이다. 기존 문서의 해당 미결정 문구는 수정하지 않고 이 문서에서 확정 사실을 기록했다. 문서 작성·공유 방식은 별도 공유 기준에 기록했다.
 
 - [데이터·API 기초 계약](https://github.com/Fintech-project-team/Fintech-project/blob/c0af85ab5ced423e780a02717c51ebb7eaa409d2/docs/data-contracts.md): 데이터·수정 권한·소유권·버전·저장 경계.
 - [DB 설계 기초](https://github.com/Fintech-project-team/Fintech-project/blob/c0af85ab5ced423e780a02717c51ebb7eaa409d2/docs/database-schema.md): 기존 저장 후보와 제약. `recurring_plans` 및 새 필드는 이 초안의 후속 설계 제안.
