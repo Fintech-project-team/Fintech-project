@@ -2,5 +2,11 @@
   "name": "@flowcast/api",
   "version": "0.0.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "typecheck": "node ../../scripts/harness/run-api.mjs compile",
+    "test": "node ../../scripts/harness/run-api.mjs test",
+    "check": "node ../../scripts/harness/run-api.mjs check",
+    "start": "node ../../scripts/harness/run-api.mjs start"
+  }
 }

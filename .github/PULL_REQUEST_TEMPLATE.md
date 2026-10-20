@@ -15,7 +15,7 @@ base(받는 쪽) ← compare(보내는 쪽)
 상세: docs/harness/COMMIT_PR_POLICY.md 의 빠른 안내
 -->
 
-> 개발 관리자 포함 3명의 기여자가 참여합니다. 관리자는 개발·통합을 맡으며 프로젝트 소유자를 뜻하지 않습니다.
+> 현재 개발자는 총 2명이며 두 사람 모두 공동 PM입니다. 개발 관리자 역할과 기존 Git 통합 권한은 docs/harness/COMMIT_PR_POLICY.md를 따릅니다.
 
 ## 해결하는 문제와 결과
 

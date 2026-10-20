@@ -11,8 +11,10 @@ import {
   selectGates,
   references,
   digest,
+  isProductSource,
 } from './lib.mjs';
 import { inspectCodeSpec } from './code-spec.mjs';
+import { API_GATE_TIMEOUT_MS } from './run-api.mjs';
 
 const root = process.cwd();
 const report = {
@@ -31,13 +33,14 @@ let exitCode = 2;
  * @param name - 검사 이름.
  * @param script - Node 실행 파일.
  * @param argv - 인자.
+ * @param timeoutMs - 검사 제한 시간. Java 최초 의존성 준비는 더 긴 시간을 허용한다.
  * @returns 검사 성공 여부.
  */
-function run(name, script, argv = []) {
+function run(name, script, argv = [], timeoutMs = 120000) {
   const r = spawnSync(process.execPath, [script, ...argv], {
     cwd: root,
     encoding: 'utf8',
-    timeout: 120000,
+    timeout: timeoutMs,
     windowsHide: true,
     maxBuffer: 8 * 1024 * 1024,
   });
@@ -105,9 +108,7 @@ try {
     assertNoSymlink(root, ref);
     if (!fs.existsSync(ref)) throw new Error('Missing core reference: ' + ref);
   }
-  const productSources = sources.filter((p) =>
-    /^(apps|packages)\/.*(?:\.[cm]?[jt]sx?|\.dart)$/u.test(p),
-  );
+  const productSources = sources.filter(isProductSource);
   const presentGates = Object.entries(policy.productGates)
     .filter(([, gate]) =>
       gate.prefixes.some((prefix) => productSources.some((p) => p.startsWith(prefix))),
@@ -196,7 +197,12 @@ try {
           continue;
         }
         checks.push(
-          run(gate.name + ':' + name, npmCli, ['run', name, '--workspace', gate.workspace]),
+          run(
+            gate.name + ':' + name,
+            npmCli,
+            ['run', name, '--workspace', gate.workspace],
+            gate.name === 'api' ? API_GATE_TIMEOUT_MS : 120000,
+          ),
         );
       }
     }

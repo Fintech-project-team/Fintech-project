@@ -1,3 +1,5 @@
+> **적용 상태 안내 — 2026-10-20:** 이 문서는 2026-10-15~18의 결정 기록을 보존한 자료다. 아래의 현재·최신은 기록 당시를 가리킨다. 후속 결정으로 서버는 Java + Spring Boot로 확정되었다. 현행 구현은 [제품 기준](docs/product-baseline.md), [담당 기준](docs/ownership.md), [도구 기준](docs/toolchain.md)을 따른다. 아래 본문은 당시 기록으로 보존한다.
+
 # PAYSE 결정사항 27개 — 최신 업무표·2인 체제 반영
 
 개정일: 2026-10-18. [5차 핵심 기억](PAYSE-핵심기억-05.md)과 [현행 MD](docs/PAYSE-README.md)를 따른다. 최신 업무표를 우선 적용하고 충돌은 [보고서](docs/reconciliation-report.md)에 기록했다.
