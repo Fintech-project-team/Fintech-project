@@ -1,0 +1,35 @@
+{
+  "id": "PAYSE-API-20-20261021",
+  "role": "data",
+  "branch": "docs/api/issue-20-spec",
+  "baseCommit": "a34372f955759b0840e23669928f4701aa27cb4f",
+  "allowedPaths": [
+    "apps/api/docs/v0.6/README.md",
+    "apps/api/docs/v0.6/api-contract.md",
+    "apps/api/docs/v0.6/response-models.md",
+    "apps/api/docs/v0.6/review-checklist.md",
+    "docs/tasks/PAYSE-API-20-20261021.json"
+  ],
+  "readBefore": [
+    "docs/product-baseline.md",
+    "docs/data-contracts.md",
+    "docs/database-schema.md",
+    "docs/calculation-rules.md",
+    "docs/v0.6-screen-rules.md",
+    "apps/mobile/docs/screen-rules-update.md",
+    "apps/mobile/lib/app/payse_app.dart",
+    "apps/api/docs/data-model-draft.md",
+    "apps/api/docs/database-design.md",
+    "apps/api/src/AGENTS.md",
+    "docs/harness/COMMIT_PR_POLICY.md",
+    "docs/harness/AGENT_REVIEW.md"
+  ],
+  "acceptance": [
+    "#20의 연결 전후 조회·페이지·CRUD·로그인/복구·오류·동시성·멱등 외부 계약을 명시한다.",
+    "Flutter fake repository가 참고할 필드·응답·접근 제한·실패 처리를 정리한다.",
+    "기존 MD·소스·SQL·fixture·Flutter 파일을 변경하지 않는다.",
+    "Java 내부 구조·인증 저장·DB 변경 및 구현 검증은 후속 자료로 보존하고 이번 적용에서 제외한다.",
+    "신규 파일 5개 전용 배치·브랜치·관련 이슈 #20을 포함한 커밋 안내를 제공한다."
+  ],
+  "scopeNote": "2026-10-21 사용자 승인: #20 API 명세만 적용. apps/api 신규 문서 4개 및 검사기용 docs/tasks 신규 JSON 1개. 기존 파일 수정, Java·SQL·Flutter 구현, GitHub/Notion 쓰기는 제외. 이전 넓은 범위 산출물은 작업 외부에 그대로 보존한다."
+}
