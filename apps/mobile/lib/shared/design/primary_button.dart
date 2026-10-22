@@ -35,6 +35,7 @@ class PrimaryButton extends StatelessWidget {
       enabled: enabled,
       label: label,
       excludeSemantics: true,
+      onTap: onPressed,
       child: Material(
         color: background,
         child: InkWell(
