@@ -4,13 +4,13 @@
 
 ## 자료 구성
 
-- 개발용 합성 사용자 3명(alpha/beta/gamma), 사용자당 5은행의 계좌 6개·4카드사 카드 4개. 한 은행에 입출금+정기예금을 두어 선택 합산을 확인한다. 적금도 포함한다. 이 계정 수/금액/명칭은 제품 정책 확정이 아니다.
+- 개발용 합성 사용자 3명(alpha/beta/gamma), 사용자당 5은행의 계좌 6개·4카드사 카드 4개. 한 은행에 입출금+정기예금을 두어 선택 합산을 확인한다. 적금도 포함한다. 샘플 계정 수·금융 금액·상품/가맹점 표시는 제품의 영구 제한이 아니다. 합성 인증 이름은 [API 이름 계약](../../../../docs/api-contract.md#인증-입력과-단일-이름)의 확정 매핑을 따른다.
 - 기준 시각은 파일에 고정한다. alpha/beta는 2026-10-19, 급여 상태는 10-25, gamma 월말은 2027-01-31이다. 서로 다른 기준시각·자료 버전을 섞지 않는다.
 - 연결한 전체 계좌/카드는 최근 달력1년 범위를 가진다. 홈 선택과 별개다. 정상 완전 조회·정상 0건·부분 누락·조회 실패를 구분한다. 날짜만인 거래에 자정 시각을 만들지 않는다.
 - `generated/snapshots/*.json`은 전달 형식 초안의 완전한 독립 스냅샷이다. 페이지 분할·실패 HTTP 응답은 [공통 API 계약](../../../../docs/api-contract.md)과 [응답 모델](../../../../docs/api-response-models.md)의 규격이며 `nextCursor:null`이 실제 API 구현 완료를 뜻하지 않는다.
-- `generated/server-seeds.json`은 서버 전용 합성 시드 메타데이터다. 이름/전화번호/비활성 코드 표식을 금융 응답·LLM에 섞지 않는다. 실제 SMS·인증 기능은 없다.
+- `generated/server-seeds.json`은 서버 전용 합성 시드 메타데이터다. 사용자 키는 userId·name·syntheticPhone·codeVerifier·createdAt·initialCase다. 구 syntheticName/displayName은 허용하지 않는다. 이름/전화번호/비활성 코드 표식을 금융 응답·LLM에 섞지 않는다. 실제 SMS·인증 기능은 없다.
 - `generated/catalog.json`은 시나리오 설명·검증 기대값·후속 Flutter 입력이다. 기대값과 검증용 기초잔액을 앱 API 결과로 반환하지 않는다. 일부는 수기로 지정한 벡터이며 Flutter 구현 테스트 통과 근거가 아니다.
-- `generated/manifest.json`은 키 정렬·공백 제거한 UTF-8 JSON 의미값의 SHA-256이다. 파일 포맷 변경과 데이터 변경을 구분한다. 배포 ZIP의 바이트 무결성은 별도 검증한다.
+- `generated/manifest.json`은 키 정렬·공백 제거한 UTF-8 JSON 의미값의 SHA-256이다. 파일 포맷 변경과 데이터 변경을 구분한다. 배포 ZIP의 바이트 무결성은 별도 검증한다. 검증기는 해시 외에도 합성 사용자 매핑·저장 형식·소유권·초기 시나리오를 대조하므로 잘못된 시드를 다시 해시해도 거절한다.
 
 ## 시나리오
 
@@ -55,7 +55,7 @@ python -m unittest discover -s apps/api/tests -p test_fixtures.py -v
 python apps/api/fixtures/export_sql.py apps/api/fixtures/generated --out .harness/payse-initial.sql
 ```
 
-마지막 명령의 기본 시드는 연결0·선택0이다. 검증용 준비 상태가 필요할 때만 `--ready`를 추가한다. SQL exporter는 DB에 접속하지 않는다. 실제 적재는 새 검증 DB에 DDL 001→002→생성 SQL 순으로 한다. 기존 DB에 임의 적용하지 않는다. 운영 reset/upsert 도구는 아니다.
+마지막 명령의 기본 시드는 연결0·선택0이다. 검증용 준비 상태가 필요할 때만 `--ready`를 추가한다. SQL exporter는 DB에 접속하지 않는다. 실제 적재는 새 검증 DB에 DDL 001→002→생성 SQL 순으로 한다. 기존 DB에 임의 적용하지 않는다. 운영 reset/upsert 도구는 아니다. 구 이름 열이 있는 DB는 [기존 DB 전환 절차](../../docs/identity-migration.md)를 따르며 이 시드로 덮지 않는다.
 
 새 JSON을 공유할 때 저장소의 Prettier로 변경 파일만 포맷한다. manifest는 의미값 해시이므로 포맷 후에도 검증된다. 생성기는 같은 버전/입력에서 동일 바이트를 만들며 포맷 파이프라인 적용 후 바이트는 달라질 수 있다.
 

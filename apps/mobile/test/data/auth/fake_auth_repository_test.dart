@@ -47,6 +47,72 @@ void main() {
     expect(session.accessToken, hasLength(64));
   });
 
+  test('allowed separators normalize before matching and reverification in any form', () async {
+    final (:repo, advance: _) = build();
+    const formatted = DemoCredentials(
+      name: '  김합성 ',
+      phone: ' 010-1111 2222 ',
+      code: '246810',
+    );
+    final session =
+        ((await repo.createSession(formatted)) as AuthOk<DemoSession>).value;
+    final reverified = await repo.reverify(
+      session.accessToken,
+      const DemoCredentials(
+        name: '김합성 ',
+        phone: '010-1111-2222',
+        code: '246810',
+      ),
+    );
+    expect(reverified, isA<AuthOk<ReverifiedSession>>());
+    expect(
+      (reverified as AuthOk<ReverifiedSession>).value.sessionId,
+      session.sessionId,
+    );
+    expect(await repo.createSession(good), isA<AuthRejected<DemoSession>>());
+    expect(
+      await repo.reverify(session.accessToken, good),
+      isA<AuthOk<ReverifiedSession>>(),
+      reason: '새 로그인 거절 뒤에도 기존 세션 유지',
+    );
+  });
+
+  test(
+    'well-formed mismatches are 401 and English names remain case sensitive',
+    () async {
+      final repo = FakeAuthRepository(
+        accounts: const [
+          FakeDemoAccount(
+            userId: 'english',
+            name: 'Kim',
+            phone: '01011112222',
+            code: '246810',
+          ),
+        ],
+      );
+      expect(
+        await repo.createSession(
+          const DemoCredentials(
+            name: 'kim',
+            phone: '01011112222',
+            code: '246810',
+          ),
+        ),
+        isA<AuthRejected<DemoSession>>(),
+      );
+      expect(
+        await repo.createSession(
+          const DemoCredentials(
+            name: 'Kim',
+            phone: '01011112222',
+            code: '246810',
+          ),
+        ),
+        isA<AuthOk<DemoSession>>(),
+      );
+    },
+  );
+
   test('mismatch and an already active account look the same', () async {
     final (:repo, advance: _) = build();
     expect(
@@ -125,6 +191,55 @@ void main() {
     );
   });
 
+  test(
+    'allowed separators do not bypass the normalized failure limit',
+    () async {
+      final (:repo, :advance) = build();
+      const forms = [
+        (' 김합성 ', '01011112222'),
+        ('김합성', '010-1111-2222'),
+        ('김합성 ', '010 1111 2222'),
+        (' 김합성', '010-1111 2222'),
+        ('김합성', '01011112222'),
+      ];
+      for (var i = 0; i < forms.length; i++) {
+        final result = await repo.createSession(
+          DemoCredentials(
+            name: forms[i].$1,
+            phone: forms[i].$2,
+            code: '00000$i',
+          ),
+        );
+        if (i < 4) {
+          expect(result, isA<AuthRejected<DemoSession>>());
+        } else {
+          expect(
+            result,
+            isA<AuthRateLimited<DemoSession>>(),
+            reason: '다섯 형태의 실패가 한 조합으로 합산',
+          );
+        }
+      }
+      expect(
+        await repo.createSession(good),
+        isA<AuthRateLimited<DemoSession>>(),
+      );
+      expect(
+        await repo.createSession(
+          const DemoCredentials(
+            name: ' 김합성 ',
+            phone: '010-1111-2222',
+            code: '246810',
+          ),
+        ),
+        isA<AuthRateLimited<DemoSession>>(),
+        reason: '정규화 전 형태도 같은 차단 대상',
+      );
+      advance(const Duration(minutes: 5));
+      expect(await repo.createSession(good), isA<AuthOk<DemoSession>>());
+    },
+  );
+
   test('format errors are 422 and do not count toward the limit', () async {
     final (:repo, advance: _) = build();
     for (final bad in [
@@ -144,17 +259,55 @@ void main() {
         code: '246810',
       ),
       const DemoCredentials(
-        name: '김합성\n',
+        name: '김  합성',
         phone: '01011112222',
         code: '246810',
       ),
       const DemoCredentials(
-        name: '\u00A0김합성',
+        name: '\t김합성',
+        phone: '01011112222',
+        code: '246810',
+      ),
+      const DemoCredentials(
+        name: '\u00a0김합성',
         phone: '01011112222',
         code: '246810',
       ),
       const DemoCredentials(
         name: '김합성\u3000',
+        phone: '01011112222',
+        code: '246810',
+      ),
+      const DemoCredentials(
+        name: '김합성\n',
+        phone: '01011112222',
+        code: '246810',
+      ),
+      const DemoCredentials(
+        name: '김합성',
+        phone: '\t01011112222',
+        code: '246810',
+      ),
+      const DemoCredentials(
+        name: '김합성',
+        phone: '01011112222\n',
+        code: '246810',
+      ),
+      const DemoCredentials(
+        name: '김합성',
+        phone: '0101111\u00a02222',
+        code: '246810',
+      ),
+      const DemoCredentials(name: '김합성', phone: '０１０１１１１２２２２', code: '246810'),
+      const DemoCredentials(name: '김합성', phone: '01011112222', code: '２４６８１０'),
+      const DemoCredentials(
+        name: '김합성',
+        phone: '01011112222',
+        code: '246810\n',
+      ),
+      const DemoCredentials(name: 'ㄱㄴ', phone: '01011112222', code: '246810'),
+      const DemoCredentials(
+        name: '12345',
         phone: '01011112222',
         code: '246810',
       ),
@@ -169,7 +322,33 @@ void main() {
     expect(
       await repo.createSession(good),
       isA<AuthOk<DemoSession>>(),
-      reason: '형식 오류 11번 뒤에도 차단되지 않음',
+      reason: '형식 오류 반복 뒤에도 차단되지 않음',
+    );
+  });
+
+  test('reverify shares 422 validation without consuming failures or ending the session', () async {
+    final (:repo, advance: _) = build();
+    final session =
+        ((await repo.createSession(good)) as AuthOk<DemoSession>).value;
+    const bad = DemoCredentials(
+      name: '김 합성',
+      phone: '01011112222',
+      code: '246810',
+    );
+    for (var i = 0; i < 6; i++) {
+      expect(
+        await repo.reverify(session.accessToken, bad),
+        isA<AuthInvalidInput<ReverifiedSession>>(),
+      );
+    }
+    expect(
+      await repo.reverify(session.accessToken, good),
+      isA<AuthOk<ReverifiedSession>>(),
+    );
+    expect(
+      await repo.reverify('unknown-token', bad),
+      isA<AuthSessionInvalid<ReverifiedSession>>(),
+      reason: '토큰 검사 순서를 입력 형식 검사보다 먼저 유지',
     );
   });
 
@@ -187,74 +366,6 @@ void main() {
       final session = (result as AuthOk<DemoSession>).value;
       expect(session.name, '김합성', reason: '입력 원문이 아닌 계정의 저장 이름');
       expect(session.userId, 'u1');
-    },
-  );
-
-  test('edge spaces and phone separators map to the same account and failure count', () async {
-    final (:repo, advance: _) = build();
-    final variants = [
-      const DemoCredentials(
-        name: ' 김합성 ',
-        phone: '01011112222',
-        code: '000000',
-      ),
-      const DemoCredentials(
-        name: '김합성',
-        phone: '010-1111-2222',
-        code: '000001',
-      ),
-      const DemoCredentials(
-        name: '김합성 ',
-        phone: '010 1111 2222',
-        code: '000002',
-      ),
-      const DemoCredentials(
-        name: ' 김합성',
-        phone: '010-1111 2222',
-        code: '000003',
-      ),
-    ];
-    for (final v in variants) {
-      expect(await repo.createSession(v), isA<AuthRejected<DemoSession>>());
-    }
-    final fifth = await repo.createSession(
-      const DemoCredentials(name: '김합성', phone: '01011112222', code: '000004'),
-    );
-    expect(
-      fifth,
-      isA<AuthRateLimited<DemoSession>>(),
-      reason: '다섯 형태의 실패가 한 조합으로 합산',
-    );
-    expect(
-      await repo.createSession(
-        const DemoCredentials(
-          name: ' 김합성 ',
-          phone: '010-1111-2222',
-          code: '246810',
-        ),
-      ),
-      isA<AuthRateLimited<DemoSession>>(),
-      reason: '정규화 전 형태도 같은 차단 대상',
-    );
-  });
-
-  test(
-    'reverify accepts the normalized identity of the same account',
-    () async {
-      final (:repo, advance: _) = build();
-      final session =
-          ((await repo.createSession(good)) as AuthOk<DemoSession>).value;
-      expect(
-        await repo.reverify(
-          session.accessToken,
-          const DemoCredentials(
-            name: ' 김합성 ',
-            phone: '010-1111-2222',
-            code: '246810',
-          ),
-        ),
-        isA<AuthOk<ReverifiedSession>>(),
-      );
     },
   );
 

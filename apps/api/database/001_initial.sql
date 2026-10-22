@@ -14,31 +14,28 @@ CREATE DOMAIN payse.positive_money AS bigint CHECK (VALUE BETWEEN 1 AND 90000000
 
 CREATE TABLE payse.demo_users (
   id uuid NOT NULL,
-  synthetic_name text NOT NULL,
+  name text NOT NULL,
   synthetic_phone text NOT NULL,
-  display_name text NOT NULL,
   code_verifier text NOT NULL,
   data_version bigint NOT NULL,
   created_at timestamptz NOT NULL,
   PRIMARY KEY (id),
-  UNIQUE (synthetic_name, synthetic_phone),
+  UNIQUE (name, synthetic_phone),
   CHECK (data_version >= 1),
   CHECK (created_at IS NULL OR isfinite(created_at)),
-  CHECK (synthetic_name IS NULL OR length(btrim(synthetic_name)) > 0),
-  CHECK (synthetic_phone IS NULL OR length(btrim(synthetic_phone)) > 0),
-  CHECK (display_name IS NULL OR length(btrim(display_name)) > 0),
+  CONSTRAINT identity_name_format CHECK (name COLLATE "C" ~ '^[가-힣A-Za-z]{2,20}$'),
+  CONSTRAINT identity_phone_format CHECK (synthetic_phone COLLATE "C" ~ '^010[0-9]{8}$'),
+
   CHECK (code_verifier IS NULL OR length(btrim(code_verifier)) > 0)
 );
 
 COMMENT ON COLUMN payse.demo_users.id IS '안정된 내부 식별자; 원천 버전·날짜 변경에도 유지';
 
-COMMENT ON COLUMN payse.demo_users.synthetic_name IS '합성 조회 이름; 제출 원문 저장소가 아님';
+COMMENT ON COLUMN payse.demo_users.name IS '합성 인증·허용 호칭의 단일 이름; 제출 원문 저장소가 아님';
 
 COMMENT ON COLUMN payse.demo_users.synthetic_phone IS '합성 조회 전화번호; 단독 인증 불가';
 
-COMMENT ON COLUMN payse.demo_users.display_name IS '허용 화면 표시명';
-
-COMMENT ON COLUMN payse.demo_users.code_verifier IS '서버 전용 코드 검증값; 이번 시드는 DISABLED로 인증 불가';
+COMMENT ON COLUMN payse.demo_users.code_verifier IS '서버 전용 코드 검증값; 준비 시드는 DISABLED로 인증 불가';
 
 COMMENT ON COLUMN payse.demo_users.data_version IS '원천/확정 설정 변경마다 한 트랜잭션에서 증가';
 
