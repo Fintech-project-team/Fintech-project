@@ -95,11 +95,9 @@ final class AuthNetworkFailure<T> extends AuthOutcome<T> {
 /// 2026-10-21: 데모 세션 인증 계약(api-contract §2). 가짜 구현과 실제 API 구현이 같은 의미를 지킨다.
 /// 화면·ViewModel은 이 인터페이스만 쓰고 예외 대신 [AuthOutcome]을 받는다.
 abstract interface class AuthRepository {
-  /// 2026-10-21: POST /demo-sessions. [credentials]와 기기 설치 ID [installationId]로 세션 발급을 요청한다.
-  Future<AuthOutcome<DemoSession>> createSession(
-    DemoCredentials credentials, {
-    required String installationId,
-  });
+  /// 2026-10-21: POST /demo-sessions. [credentials]로 세션 발급을 요청한다.
+  /// 2026-10-22: 최신 계약에 따라 설치 식별값 입력을 제거했다.
+  Future<AuthOutcome<DemoSession>> createSession(DemoCredentials credentials);
 
   /// 2026-10-21: POST /demo-sessions/current/reverify. 유효한 [accessToken]의 소유자가 [credentials]와
   /// 맞는지 확인한다. 새 세션·토큰을 발급하지 않는다(PIN 분실·5회 오류 복구, C01).
@@ -118,11 +116,11 @@ class UnavailableAuthRepository implements AuthRepository {
   const UnavailableAuthRepository();
 
   /// 2026-10-21: 세션을 만들지 않고 서비스 불가를 반환한다.
+  /// 2026-10-22: 설치 식별값 없는 인증 인터페이스에 맞췄다.
   @override
   Future<AuthOutcome<DemoSession>> createSession(
-    DemoCredentials credentials, {
-    required String installationId,
-  }) async => const AuthUnavailable();
+    DemoCredentials credentials,
+  ) async => const AuthUnavailable();
 
   /// 2026-10-21: 재확인하지 않고 서비스 불가를 반환한다.
   @override

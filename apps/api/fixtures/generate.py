@@ -17,7 +17,7 @@ from uuid import UUID, uuid5
 NAMESPACE = UUID('bdc76ac7-c7c9-4a66-8b3d-7fd0ef7bdb6b')
 BANKS = [('bank.kb','국민'),('bank.shinhan','신한'),('bank.hana','하나'),('bank.ibk','기업'),('bank.kakao','카카오뱅크')]
 CARDS = [('card.hyundai','현대'),('card.samsung','삼성'),('card.woori','우리'),('card.kb','국민')]
-SCHEMA = 'PAYSE-DRAFT-1'
+SCHEMA = 'PAYSE-DRAFT-2'
 RULE = 'PAYSE-CALC-1'
 
 
@@ -103,8 +103,7 @@ def make_snapshot(alias: str, as_of: str = '2026-10-19T12:00:00+09:00') -> dict:
     firstmonth=f'{today:%Y-%m}'
     revision={'userId':user,'revisionId':revisionid,'planId':planid,'effectiveFromMonth':firstmonth,'label':'합성 통신비','amountKRW':50000,'monthlyDay':25,'paymentTiming':'immediate','scheduleBasis':'withdrawal','withdrawalAccountId':accounts[0]['accountId'],'cardId':None,'status':'active','scheduleOverrides':[]}
     revision['isCurrent']=True
-    plan={k:v for k,v in revision.items() if k not in ('revisionId','effectiveFromMonth','isCurrent')}
-    plan['firstOccurrenceMonth']=firstmonth
+    plan={'userId':user,'planId':planid,'firstOccurrenceMonth':firstmonth}
     obligations=[]
     for key,label,amount,day in [('rent','월세',300000,22),('repair','수리비',100000,18),('bill','카드 청구',110000,10),('telecom','통신비',50000,25)]:
         obligations.append({'userId':user,'obligationId':ident('obligation',key),'label':label,'withdrawalAccountId':accounts[0]['accountId'],'amountKRW':amount,'dueDate':month_shift(today,0,day).isoformat(),'status':'active','statementId':statement['statementId'] if key=='bill' else None,'recurringPlanId':planid if key=='telecom' else None,'recurrenceKey':f'{planid}:{firstmonth}' if key=='telecom' else None,'planRevisionId':revisionid if key=='telecom' else None})
@@ -198,7 +197,7 @@ def build() -> tuple[dict, dict, dict]:
     add('cancelled-approval',cancelled,'미성립 승인 취소는 지급·환불과 별개',{'originalTransactionId':p['transactionId'],'extraNetConsumptionKRW':0})
     gamma=make_snapshot('gamma','2027-01-31T12:00:00+09:00')
     r=gamma['recurringPlanRevisions'][0];r.update(monthlyDay=31,amountKRW=100000,scheduleOverrides=[{'occurrenceMonth':'2027-02','plannedDate':'2027-02-26','evidenceRef':'fixture-confirmed-feb-date'}])
-    plan=gamma['recurringPlans'][0];plan.update(monthlyDay=31,amountKRW=100000,scheduleOverrides=copy.deepcopy(r['scheduleOverrides']))
+    plan=gamma['recurringPlans'][0]
     jan=gamma['obligations'][-1];jan.update(amountKRW=100000,dueDate='2027-01-31')
     future=copy.deepcopy(r);future.update(revisionId=uid('gamma/revision/march'),effectiveFromMonth='2027-03',amountKRW=110000,scheduleOverrides=[])
     gamma['recurringPlanRevisions'].append(future)

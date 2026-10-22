@@ -1,6 +1,6 @@
 {
   "userId": "f0a4be6c-01d7-53eb-ab2c-74675b22fd8c",
-  "schemaVersion": "PAYSE-DRAFT-1",
+  "schemaVersion": "PAYSE-DRAFT-2",
   "currency": "KRW",
   "dataVersion": "1",
   "sourceVersion": "fixture-1:alpha:2026-10-19:base",

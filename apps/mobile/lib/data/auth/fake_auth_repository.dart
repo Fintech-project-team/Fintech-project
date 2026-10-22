@@ -46,19 +46,16 @@ class FakeAuthRepository implements AuthRepository {
   final Map<String, List<DateTime>> _failures = {};
   final Map<String, DateTime> _blockedUntil = {};
 
-  static final RegExp _uuid = RegExp(
-    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
-  );
   static final RegExp _phone = RegExp(r'^010[0-9]{8}$');
   static final RegExp _code = RegExp(r'^[0-9]{6}$');
 
   /// 2026-10-21: 세션 발급을 흉내 낸다. 형식 오류는 실패로 세지 않고 422, 그다음 시도 제한·자격 대조 순이다.
+  /// 2026-10-22: 설치 식별값 검사만 제거하고 자격 대조·사용자별 활성 세션 제한은 유지한다.
   @override
   Future<AuthOutcome<DemoSession>> createSession(
-    DemoCredentials credentials, {
-    required String installationId,
-  }) async {
-    if (!_wellFormed(credentials) || !_uuid.hasMatch(installationId)) {
+    DemoCredentials credentials,
+  ) async {
+    if (!_wellFormed(credentials)) {
       return const AuthInvalidInput();
     }
     final limited = _rateLimit<DemoSession>(credentials);
