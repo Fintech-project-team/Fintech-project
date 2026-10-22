@@ -14,6 +14,8 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from uuid import UUID
 
+from identity_contract import validate_server_seeds
+
 LIMIT=9_000_000_000_000
 SEOUL=timezone(timedelta(hours=9))
 COLLECTION_IDS={'accounts':'accountId','cards':'cardId','transactions':'transactionId','relatedTransactions':'transactionId','statements':'statementId','obligations':'obligationId','reserves':'reserveId','allocations':'allocationId','settlements':'linkId','recurringPlans':'planId','recurringPlanRevisions':'revisionId','recurringDecisions':'decisionId'}
@@ -299,18 +301,28 @@ def validate_snapshot(s: dict) -> None:
 
 
 def validate_directory(path: Path) -> int:
-    """2026-10-19: Verify manifest bytes and every complete fixture; return validated snapshot count."""
+    """2026-10-19: Verify manifest and complete fixtures; return validated snapshot count.
+
+    2026-10-22: Also validate private seed identities and their financial owner links.
+    """
     manifest=json.loads((path/'manifest.json').read_text(encoding='utf-8'))
     require(manifest['hashMode']=='canonical-json-utf8','unsupported fixture hash mode')
+    require({'server-seeds.json', 'catalog.json'} <= set(manifest['sha256']), 'required fixture manifest entry missing')
     for name,digest in manifest['sha256'].items():
         require(not Path(name).is_absolute() and '..' not in Path(name).parts,'unsafe manifest path')
         obj=json.loads((path/name).read_text(encoding='utf-8'))
         canonical=json.dumps(obj,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode('utf-8')
         require(hashlib.sha256(canonical).hexdigest()==digest,'fixture manifest mismatch: '+name)
-    count=0
+    snapshots = {}
     for entry in json.loads((path/'catalog.json').read_text(encoding='utf-8'))['cases']:
-        validate_snapshot(json.loads((path/entry['file']).read_text(encoding='utf-8')));count+=1
-    return count
+        require(entry['file'] in manifest['sha256'], 'catalog case missing from manifest')
+        require(entry['id'] not in snapshots, 'duplicate catalog case ID')
+        snapshot = json.loads((path/entry['file']).read_text(encoding='utf-8'))
+        validate_snapshot(snapshot)
+        snapshots[entry['id']] = snapshot
+    seeds = json.loads((path/'server-seeds.json').read_text(encoding='utf-8'))
+    validate_server_seeds(seeds, snapshots)
+    return len(snapshots)
 
 
 if __name__=='__main__':

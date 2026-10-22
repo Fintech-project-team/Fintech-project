@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import 'auth_input_format.dart';
+import 'auth_input_rules.dart';
 import 'auth_repository.dart';
 import 'random_id.dart';
 
@@ -47,18 +47,21 @@ class FakeAuthRepository implements AuthRepository, SessionResolver {
   final Map<String, List<DateTime>> _failures = {};
   final Map<String, DateTime> _blockedUntil = {};
 
-  /// 2026-10-21: 세션 발급을 흉내 낸다. 서버처럼 입력을 정규화한 뒤 형식 오류는 실패로 세지 않고 422,
-  /// 그다음 시도 제한·자격 대조 순이다. 성공 응답의 name은 제출 문자열이 아닌 계정의 저장 이름이다.
+  /// 2026-10-21: 세션 발급을 흉내 낸다. 형식 오류는 실패로 세지 않고 422, 그다음 시도 제한·자격 대조 순이다.
+  /// 2026-10-22: 공유 입력 규칙으로 정규화한 값으로 대조·시도 제한을 판정한다. 성공 응답의 name은 제출 문자열이 아닌
+  /// 계정의 저장 이름이다.
   @override
   Future<AuthOutcome<DemoSession>> createSession(
-    DemoCredentials submitted,
+    DemoCredentials credentials,
   ) async {
-    final credentials = _normalized(submitted);
-    if (!_wellFormed(credentials)) return const AuthInvalidInput();
-    final limited = _rateLimit<DemoSession>(credentials);
+    final normalized = _normalizeCredentials(credentials);
+    if (normalized == null) {
+      return const AuthInvalidInput();
+    }
+    final limited = _rateLimit<DemoSession>(normalized);
     if (limited != null) return limited;
-    final account = _match(credentials);
-    if (account == null) return _fail(credentials);
+    final account = _match(normalized);
+    if (account == null) return _fail(normalized);
     if (_sessionsByUser.containsKey(account.userId)) {
       return const AuthRejected();
     }
@@ -80,19 +83,20 @@ class FakeAuthRepository implements AuthRepository, SessionResolver {
 
   /// 2026-10-21: 토큰 소유자와 자격이 같은지만 확인한다. 새 세션을 만들지 않는다.
   /// 토큰이 이미 무효면 자격과 상관없이 [AuthSessionInvalid]를 돌려준다.
+  /// 2026-10-22: 유효 토큰 확인 뒤 발급과 같은 공유 입력 규칙으로 자격을 정규화한다.
   @override
   Future<AuthOutcome<ReverifiedSession>> reverify(
     String accessToken,
-    DemoCredentials submitted,
+    DemoCredentials credentials,
   ) async {
     final owner = _ownerOf(accessToken);
     if (owner == null) return const AuthSessionInvalid();
-    final credentials = _normalized(submitted);
-    if (!_wellFormed(credentials)) return const AuthInvalidInput();
-    final limited = _rateLimit<ReverifiedSession>(credentials);
+    final normalized = _normalizeCredentials(credentials);
+    if (normalized == null) return const AuthInvalidInput();
+    final limited = _rateLimit<ReverifiedSession>(normalized);
     if (limited != null) return limited;
-    final account = _match(credentials);
-    if (account == null || account.userId != owner) return _fail(credentials);
+    final account = _match(normalized);
+    if (account == null || account.userId != owner) return _fail(normalized);
     return AuthOk(
       ReverifiedSession(
         userId: owner,
@@ -117,16 +121,18 @@ class FakeAuthRepository implements AuthRepository, SessionResolver {
   /// 2026-10-21: 테스트·운영 흉내용으로 [userId]의 활성 세션을 서버 쪽에서 끝낸다(운영 종료, 09-13).
   void terminateSessionOf(String userId) => _sessionsByUser.remove(userId);
 
-  /// 2026-10-22: 서버 규칙대로 이름 앞뒤 U+0020과 전화번호 공백·하이픈만 지운 자격을 반환한다. 코드는 그대로 둔다.
-  DemoCredentials _normalized(DemoCredentials c) => DemoCredentials(
-    name: normalizeName(c.name),
-    phone: normalizePhone(c.phone),
-    code: c.code,
-  );
-
-  /// 2026-10-21: 정규화한 요청이 이름·전화번호·인증번호 형식(auth_input_format.dart)에 맞으면 true를 반환한다.
-  bool _wellFormed(DemoCredentials c) =>
-      isValidName(c.name) && isValidPhone(c.phone) && isValidCode(c.code);
+  /// 2026-10-22: [credentials]를 공유 형식 규칙으로 검사해 정규화한 자격을 반환하고, 형식 오류면 null을 반환한다.
+  /// 발급·재확인의 대조와 시도 제한 키에 같은 값을 사용하며 원문을 저장하지 않는다.
+  DemoCredentials? _normalizeCredentials(DemoCredentials credentials) {
+    final name = normalizeName(credentials.name);
+    final phone = normalizePhone(credentials.phone);
+    if (!isValidName(name) ||
+        !isValidPhone(phone) ||
+        !isValidCode(credentials.code)) {
+      return null;
+    }
+    return DemoCredentials(name: name, phone: phone!, code: credentials.code);
+  }
 
   /// 2026-10-21: 자격 대조 실패를 기록한다. 이번 실패로 차단되면 429, 아니면 401을 반환한다(5번째 실패부터 429).
   AuthOutcome<T> _fail<T>(DemoCredentials c) {

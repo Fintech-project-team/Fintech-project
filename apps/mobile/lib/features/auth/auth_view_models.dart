@@ -72,7 +72,7 @@ class IdentityViewModel extends ChangeNotifier {
     if (!isValidName(n)) return (null, IdentityError.name);
     final p = normalizePhone(phone.text);
     if (!isValidPhone(p)) return (null, IdentityError.phone);
-    return (IdentityDraft(name: n, phone: p), null);
+    return (IdentityDraft(name: n, phone: p!), null);
   }
 
   /// 2026-10-21: 형식을 검사해 통과하면 정규화한 입력을, 아니면 null을 반환하고 오류를 표시한다.
