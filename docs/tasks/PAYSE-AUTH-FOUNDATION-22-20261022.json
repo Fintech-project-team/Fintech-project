@@ -1,0 +1,43 @@
+{
+  "id": "PAYSE-AUTH-FOUNDATION-22-20261022",
+  "role": "data",
+  "branch": "feat/api/issue-22-auth-foundation",
+  "baseCommit": "e275a9682bae0d72c84c9d1936f037e0ffee866f",
+  "allowedPaths": [
+    "apps/api/src/AGENTS.md",
+    "apps/api/src/main/java/com/payse/api/auth/AuthCredentials.java",
+    "apps/api/src/main/java/com/payse/api/auth/AuthSecrets.java",
+    "apps/api/src/main/java/com/payse/api/auth/AuthCrypto.java",
+    "apps/api/src/main/java/com/payse/api/auth/IssuedToken.java",
+    "apps/api/src/main/java/com/payse/api/auth/AuthCryptoConfiguration.java",
+    "apps/api/src/test/java/com/payse/api/auth/AuthCredentialsTest.java",
+    "apps/api/src/test/java/com/payse/api/auth/AuthCryptoTest.java",
+    "apps/api/src/test/java/com/payse/api/auth/AuthCryptoConfigurationTest.java",
+    "apps/api/docs/auth-foundation.md",
+    "apps/api/docs/history/2026-10-22-issue21-review-issue22-start.md",
+    "apps/api/docs/history/2026-10-22-issue-completion-review.md",
+    "docs/tasks/PAYSE-AUTH-FOUNDATION-22-20261022.json"
+  ],
+  "readBefore": [
+    "docs/harness/GATE_MATRIX.md",
+    "docs/ownership.md",
+    "docs/product-baseline.md",
+    "docs/data-contracts.md",
+    "docs/api-contract.md",
+    "docs/api-response-models.md",
+    "docs/database-schema.md",
+    "docs/harness/CODE_SPEC.md",
+    "apps/api/src/AGENTS.md",
+    "apps/api/docs/v0.6/auth-design.md",
+    "apps/api/docs/v0.6/auth-verification.md",
+    "apps/api/docs/spring-bootstrap.md",
+    "apps/mobile/lib/data/auth/auth_input_rules.dart"
+  ],
+  "acceptance": [
+    "#22 첫 구현으로 공유 입력 규칙을 따르는 순수 인증 값 객체, 서버 비밀 설정 검증, JDK 기반 코드 HMAC·토큰 digest·제한 키 기반을 구현한다. 소스/로그에 비밀 원문을 쓰거나 금융 계산을 추가하지 않는다.",
+    "HTTP 인증 경로·DB/시드/역할·모바일·공통 문서·의존성을 변경하지 않는다. 실제 로그인/세션/조회 완료로 표시하지 않는다. 사용자의 추가 요청에 따라 apps/api/src/AGENTS.md에 프론트 동기화 필요사항만 전달하고 모바일 파일 수정은 프론트 담당자가 수행한다는 API 전역 규칙을 명시한다.",
+    "입력 문자 경계·잘못된 키·verifier·token·사용자/키/도메인 분리·동시 요청의 연산 독립·표현식 비밀 노출 방지·비활성/활성 설정을 테스트한다.",
+    "기존 API 검사·실행 JAR·하네스의 유효한 결과를 확인하고 현재 브랜치에서 적용 가능한 배치와 관련 이슈가 포함된 전체 양식 커밋 메시지를 제공한다. 이슈 검토 메모는 history의 임시 기록으로 보관하고 활성 개발 문서의 필수 기준 참조는 제거한다. GitHub/Notion 및 사용자 원본은 읽기만 유지한다."
+  ],
+  "scopeNote": "인증 기반 구현 범위다. API 전역 지침의 프론트 인계 규칙과 인증 Java/테스트를 유지한다. 이슈 판단은 대화로 보고하며 해당 검토 메모는 history의 임시 기록으로 보관한다. 이 메모를 개발 규칙·확정 요구사항으로 사용하지 않는다. 최종 변경은 신규 12개와 기존 API 지침 1개다. 모바일 직접 수정은 없다."
+}
