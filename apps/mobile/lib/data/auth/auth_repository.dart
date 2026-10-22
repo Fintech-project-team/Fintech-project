@@ -135,3 +135,9 @@ class UnavailableAuthRepository implements AuthRepository {
   Future<AuthOutcome<void>> endSession(String accessToken) async =>
       const AuthUnavailable();
 }
+
+/// 2026-10-22: 서버가 Bearer 토큰으로 현재 세션의 사용자를 정하는 경계. 요청 본문의 userId를 믿지 않기 위해 쓴다.
+abstract interface class SessionResolver {
+  /// 2026-10-22: 활성 세션 [accessToken]의 사용자 ID를 반환한다. 무효면 null이다.
+  String? userIdForToken(String accessToken);
+}

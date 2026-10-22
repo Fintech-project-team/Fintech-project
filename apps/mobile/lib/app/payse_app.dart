@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +8,9 @@ import '../data/auth/auth_repository.dart';
 import '../data/auth/credential_stores.dart';
 import '../data/auth/fake_auth_repository.dart';
 import '../data/auth/session_cleanup.dart';
+import '../data/connection/fake_financial_server.dart';
+import '../data/connection/financial_api.dart';
+import '../data/connection/user_snapshot_repository.dart';
 import '../data/financial_snapshot_repository.dart';
 import '../data/fixture_scenario.dart';
 import '../data/snapshot_source.dart';
@@ -14,6 +19,7 @@ import '../features/auth/auth_services.dart';
 import '../shared/design/font_licenses.dart';
 import '../shared/design/payse_theme.dart';
 import 'dev/dev_demo_accounts.dart';
+import 'dev/dev_user_fixtures.dart';
 import 'dev/fixture_debug_screen.dart';
 import 'local_lock_controller.dart';
 import 'main_entry.dart';
@@ -28,6 +34,7 @@ class PayseApp extends StatefulWidget {
   /// 릴리스 빌드에서는 [enableDevTools] 값과 무관하게 개발용 진입점이 없다(컴파일 시점 상수 kReleaseMode로 제거).
   /// 2026-10-21: [authRepository]·[sessionStore]·[pinStore]·[consentStore]는 인증 경계(기본은 메모리 가짜 구현),
   /// [now]는 잠금·타이머 시각, [lockTimeout]은 무입력 잠금 시간이다. 테스트에서 바꿔 끼운다.
+  /// 2026-10-22: [userFixtures]는 사용자별 금융 원본 대응이다.
   const PayseApp({
     super.key,
     this.snapshotSource,
@@ -38,6 +45,7 @@ class PayseApp extends StatefulWidget {
     this.consentStore,
     this.now,
     this.lockTimeout = const Duration(minutes: 10),
+    this.userFixtures,
   });
 
   final SnapshotSource? snapshotSource;
@@ -48,6 +56,9 @@ class PayseApp extends StatefulWidget {
   final ConsentStore? consentStore;
   final DateTime Function()? now;
   final Duration lockTimeout;
+
+  /// 2026-10-22: 사용자 ID → 불변 금융 원본. 생략하면 개발 데모 계정 원본을 쓴다(테스트에서 바꿔 끼움).
+  final Map<String, FixtureScenario>? userFixtures;
 
   /// 2026-10-20: 앱 루트 상태 객체를 반환한다. 인자 없음.
   @override
@@ -70,13 +81,16 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
     consentStore: widget.consentStore ?? MemoryConsentStore(),
     now: _now,
   );
+  late final FakeFinancialServer? _financialServer = _defaultFinancialServer();
+  UserFinancialRepository _financial =
+      const UnavailableUserFinancialRepository();
+  int _financialSession = 0;
+  FixtureScenario? _devScenario;
   late final LocalLockController _lock = LocalLockController(
     now: _now,
     timeout: widget.lockTimeout,
   );
-  FixtureScenario _scenario = FixtureScenario.defaultScenario;
   _EntryStage _stage = _EntryStage.checking;
-  bool _freshSignup = false;
   bool _signInAgain = false;
   final GlobalKey<NavigatorState> _rootNavigator = GlobalKey<NavigatorState>();
 
@@ -121,6 +135,44 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
     }
   }
 
+  /// 2026-10-22: 기본 가짜 금융 서버를 반환한다. 릴리스 빌드는 실제 서버가 없으므로 null(서비스 불가),
+  /// 개발 빌드는 인증 저장소가 세션을 판정할 수 있을 때 사용자별 원본 에셋을 읽는 가짜 서버를 만든다.
+  FakeFinancialServer? _defaultFinancialServer() {
+    if (kReleaseMode) {
+      return null;
+    } else {
+      final sessions = _authRepository;
+      if (sessions is! SessionResolver) return null;
+      final fixtures = widget.userFixtures ?? devUserFixtures;
+      return FakeFinancialServer(
+        sessions: sessions as SessionResolver,
+        now: _now,
+        loadSource: (userId) async {
+          final scenario = fixtures[userId];
+          if (scenario == null) throw StateError('원본이 없는 사용자');
+          final raw = await _source.load(scenario);
+          return (jsonDecode(raw) as Map).cast<String, Object?>();
+        },
+      );
+    }
+  }
+
+  /// 2026-10-22: 저장된 세션으로 이번 세션의 금융 저장소를 새로 만든다. 이전 세션 저장소는 닫아 늦은 응답을 버리고,
+  /// 개발용 스냅샷 덮어쓰기도 세션·계정이 바뀌면 지운다(서버 장부는 남음).
+  Future<void> _openFinancialSession() async {
+    final stored = await _auth.sessionStore.read();
+    final server = _financialServer;
+    _financial.close();
+    _devScenario = null;
+    _financial = stored == null || server == null
+        ? const UnavailableUserFinancialRepository()
+        : FakeUserFinancialRepository(
+            server: server,
+            accessToken: stored.accessToken,
+          );
+    _financialSession++;
+  }
+
   /// 2026-10-21: 저장된 세션·PIN 유무로 진입 단계를 정한다. 세션 없음 → 00-1, PIN 없음 → 10-4, 둘 다 있음 → 11-1.
   Future<void> _decideEntry() async {
     final session = await _auth.sessionStore.read();
@@ -135,22 +187,23 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
     });
   }
 
-  /// 2026-10-21: 가입·PIN 설정을 마쳤다. 금융사 연결 자리부터 보이고 잠금 판정을 켠다.
-  void _onSignedUp() {
+  /// 2026-10-21: 가입·PIN 설정을 마쳤다. 잠금 판정을 켠다.
+  /// 2026-10-22: 이번 세션의 금융 저장소를 열고, 첫 화면은 사용자 저장 상태(연결 전이면 연결 자리)를 따른다.
+  Future<void> _onSignedUp() async {
+    await _openFinancialSession();
+    if (!mounted) return;
     setState(() {
       _stage = _EntryStage.active;
-      _freshSignup = true;
       _signInAgain = false;
     });
     _lock.enable();
   }
 
   /// 2026-10-21: 재실행 11-1 확인을 마쳤다. 스냅샷을 다시 조회하는 첫 화면으로 가고 잠금 판정을 켠다.
-  void _onUnlockedAtLaunch() {
-    setState(() {
-      _stage = _EntryStage.active;
-      _freshSignup = false;
-    });
+  Future<void> _onUnlockedAtLaunch() async {
+    await _openFinancialSession();
+    if (!mounted) return;
+    setState(() => _stage = _EntryStage.active);
     _lock.enable();
   }
 
@@ -160,16 +213,36 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
   void _onSessionInvalid() {
     _rootNavigator.currentState?.popUntil((route) => route.isFirst);
     _lock.disable();
+    _financial.close();
+    _financial = const UnavailableUserFinancialRepository();
+    _financialSession++;
+    _devScenario = null;
     setState(() {
       _stage = _EntryStage.signedOut;
       _signInAgain = true;
-      _freshSignup = false;
     });
+  }
+
+  /// 2026-10-22: 금융 조회에서 세션 무효(401)를 받았다(09-13). 기기 세션·PIN을 지운 뒤 신규 로그인으로 보낸다.
+  Future<void> _onFinancialSessionInvalid() async {
+    await _auth.sessionStore.clear();
+    await _auth.pinStore.clear();
+    if (!mounted) return;
+    _onSessionInvalid();
   }
 
   /// 2026-10-20: [scenario] 스냅샷을 읽는 Repository를 만든다. 화면은 이 계약만 사용한다.
   FinancialSnapshotRepository _repositoryFor(FixtureScenario scenario) =>
       FakeFinancialSnapshotRepository(source: _source, scenario: scenario);
+
+  /// 2026-10-22: 첫 화면의 스냅샷 출처를 반환한다. 개발용 스냅샷을 고른 경우에만 그 원본을 그대로 보이고,
+  /// 아니면 로그인한 사용자의 저장 상태를 투영한 스냅샷을 쓴다.
+  FinancialSnapshotRepository _entryRepository() {
+    final override = _devScenario;
+    return override == null
+        ? UserSnapshotRepository(_financial)
+        : _repositoryFor(override);
+  }
 
   /// 2026-10-19: context의 위젯 트리에 앱 시작 화면을 반환한다.
   /// 2026-10-21: 진입 단계별 화면과, 잠금 중이면 아래 화면 상태를 보존한 채 가린 11-1 잠금을 반환한다.
@@ -230,10 +303,10 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
         onSessionInvalid: _onSessionInvalid,
       ),
       _EntryStage.active => MainEntry(
-        scenario: _scenario,
-        repositoryFor: _repositoryFor,
-        showConnectionFirst: _freshSignup,
+        repository: _entryRepository(),
+        reloadKey: (_financialSession, _devScenario),
         devEntryBuilder: _devEntryOrNull,
+        onSessionInvalid: _onFinancialSessionInvalid,
       ),
     };
   }
@@ -258,9 +331,9 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
           onPressed: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => FixtureDebugScreen(
-                initial: _scenario,
+                initial: _devScenario ?? FixtureScenario.defaultScenario,
                 repositoryFor: _repositoryFor,
-                onScenarioChanged: (s) => setState(() => _scenario = s),
+                onScenarioChanged: (s) => setState(() => _devScenario = s),
               ),
             ),
           ),

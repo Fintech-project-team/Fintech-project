@@ -1,3 +1,5 @@
+import 'connection/access_restriction.dart';
+
 /// 2026-10-20: 더미 JSON 형식이 계약과 맞지 않을 때 던진다. [path]는 문제 필드 위치다.
 class SnapshotFormatException implements Exception {
   /// 2026-10-20: 필드 위치 [path]와 이유 [reason]으로 만든다.
@@ -253,6 +255,7 @@ class PaymentCard {
     required this.maskedNumber,
     required this.cardType,
     required this.withdrawalAccountId,
+    this.withdrawalAccountRestricted = false,
   });
 
   final String cardId;
@@ -262,6 +265,9 @@ class PaymentCard {
   final String cardType;
   final String? withdrawalAccountId;
 
+  /// 2026-10-22: 출금 계좌가 미연결이라 응답에서 생략됐으면 true다(원래 미확인인 null과 구분).
+  final bool withdrawalAccountRestricted;
+
   static PaymentCard _parse(_Fields f) => PaymentCard(
     cardId: f.string('cardId'),
     institutionCode: f.string('institutionCode'),
@@ -269,6 +275,7 @@ class PaymentCard {
     maskedNumber: f.string('maskedNumber'),
     cardType: f.string('cardType'),
     withdrawalAccountId: f.stringOrNull('withdrawalAccountId'),
+    withdrawalAccountRestricted: !f.map.containsKey('withdrawalAccountId'),
   );
 }
 
@@ -288,11 +295,17 @@ class SourceTransaction {
     required this.purchaseDate,
     required this.withdrawalDate,
     required this.payseTransactionType,
+    this.accountRestricted = false,
+    this.cardRestricted = false,
   });
 
   final String transactionId;
   final String? accountId;
   final String? cardId;
+
+  /// 2026-10-22: 반대쪽 계좌·카드가 미연결이라 응답에서 생략됐으면 true다(원래 미확인인 null과 구분).
+  final bool accountRestricted;
+  final bool cardRestricted;
   final String recordKind;
   final int amountKrw;
   final String direction;
@@ -326,6 +339,8 @@ class SourceTransaction {
       purchaseDate: f.businessDateOrNull('purchaseDate'),
       withdrawalDate: f.businessDateOrNull('withdrawalDate'),
       payseTransactionType: f.stringOrNull('payseTransactionType'),
+      accountRestricted: !f.map.containsKey('accountId'),
+      cardRestricted: !f.map.containsKey('cardId'),
     );
   }
 }
@@ -356,6 +371,46 @@ class Coverage {
   );
 }
 
+/// 2026-10-22: 부분 연결 제한 표식 하나(docs/api-response-models.md §2.1). 숨긴 대상의 ID·개수·금액은 담지 않는다.
+class AccessRestriction {
+  /// 2026-10-22: 공개 위치 [ownerType]·[ownerId]·[field]와 비공개 자원 종류 [targetKind]로 만든다.
+  const AccessRestriction({
+    required this.ownerType,
+    required this.ownerId,
+    required this.field,
+    required this.targetKind,
+  });
+
+  final String ownerType;
+  final String? ownerId;
+  final String field;
+  final String targetKind;
+
+  /// 2026-10-22: 등록 조합·ownerId 규칙을 검사하며 한 표식을 읽는다. 맞지 않으면 형식 오류다.
+  static AccessRestriction _parse(_Fields f) {
+    final ownerType = f.string('ownerType');
+    final ownerId = f.stringOrNull('ownerId');
+    final field = f.string('field');
+    final targetKind = f.string('targetKind');
+    final valid = isValidRestriction(
+      ownerType: ownerType,
+      ownerId: ownerId,
+      field: field,
+      targetKind: targetKind,
+      reason: f.string('reason'),
+    );
+    if (!valid) {
+      throw SnapshotFormatException(f.path, '등록되지 않은 제한 조합');
+    }
+    return AccessRestriction(
+      ownerType: ownerType,
+      ownerId: ownerId,
+      field: field,
+      targetKind: targetKind,
+    );
+  }
+}
+
 /// 2026-10-20: 한 사용자의 불변 금융 스냅샷. 원천 값을 그대로 담고 합계·U를 계산하지 않는다.
 class FinancialSnapshot {
   /// 2026-10-20: 파싱된 필드로 만든다. [accounts]·[cards]·[transactions]가 null이면 원문에 해당 묶음이 없는 것(미노출)이다.
@@ -373,7 +428,14 @@ class FinancialSnapshot {
     required this.accounts,
     required this.cards,
     required this.transactions,
+    this.accessRestrictions = const [],
   });
+
+  /// 2026-10-22: 이 앱이 읽는 형식. 원본(PAYSE-DRAFT-2, 개발용 원본 직접 보기)과 HTTP 표현(PAYSE-API-0.6-2).
+  static const Set<String> supportedSchemas = {
+    'PAYSE-DRAFT-2',
+    'PAYSE-API-0.6-2',
+  };
 
   final String userId;
   final String schemaVersion;
@@ -391,6 +453,56 @@ class FinancialSnapshot {
   final List<PaymentCard>? cards;
   final List<SourceTransaction>? transactions;
 
+  /// 2026-10-22: HTTP 표현(PAYSE-API-0.6-2) 연결 후 응답의 필수 키(docs/api-response-models.md §1).
+  /// 연결 전 응답에는 이 키들이 없어야 한다(머리 7개+institutions·institutionLinks·coverage의 10개만).
+  static const List<String> connectedApiKeys = [
+    'accounts',
+    'cards',
+    'transactions',
+    'statements',
+    'settings',
+    'obligations',
+    'reserves',
+    'allocations',
+    'settlements',
+    'recurringPlans',
+    'recurringDecisions',
+    'recurringPlanRevisions',
+    'occurrenceOverrides',
+    'relatedTransactions',
+    'referenceResolutions',
+    'transactionRelations',
+    'occurrenceLinks',
+    'page',
+    'accessRestrictions',
+  ];
+
+  /// 2026-10-22: 제한 표식 ownerType별로 기준 객체가 들어 있는 응답 배열과 ID 필드.
+  static const Map<String, List<(String, String)>> _ownerSources = {
+    'card': [('cards', 'cardId')],
+    'transaction': [
+      ('transactions', 'transactionId'),
+      ('relatedTransactions', 'transactionId'),
+    ],
+    'statement': [('statements', 'statementId')],
+    'obligation': [('obligations', 'obligationId')],
+    'allocation': [('allocations', 'allocationId')],
+    'recurringPlan': [('recurringPlans', 'planId')],
+    'recurringPlanRevision': [('recurringPlanRevisions', 'revisionId')],
+  };
+
+  /// 2026-10-22: 부분 연결 제한 표식. 연결 권한 때문에 숨긴 위치를 '값 없음'과 구분하는 데 쓴다.
+  final List<AccessRestriction> accessRestrictions;
+
+  /// 2026-10-22: ([ownerType], [ownerId], [field]) 위치에 연결 제한 표식이 있으면 true를 반환한다.
+  bool isRestricted(String ownerType, String? ownerId, String field) =>
+      accessRestrictions.any(
+        (r) =>
+            r.ownerType == ownerType &&
+            r.ownerId == ownerId &&
+            r.field == field,
+      );
+
   /// 2026-10-20: 디코드된 JSON [json]을 스냅샷으로 바꾼다. 형식이 맞지 않으면 SnapshotFormatException을 던진다.
   /// 화면에 필요한 필드만 읽고 나머지 필드는 무시한다. 값은 보정하지 않는다.
   factory FinancialSnapshot.fromJson(Object? json) {
@@ -399,11 +511,69 @@ class FinancialSnapshot {
     if (currency != 'KRW') {
       throw SnapshotFormatException(r'$.currency', 'KRW만 지원(실제: "$currency")');
     }
+    final schema = f.string('schemaVersion');
+    if (!supportedSchemas.contains(schema)) {
+      throw SnapshotFormatException(r'$.schemaVersion', '지원하지 않는 형식');
+    }
     final links = f._required('institutionLinks', '배열');
     if (links is! List) throw f._wrong('institutionLinks', links, '배열');
+    if (schema == 'PAYSE-API-0.6-2') _checkApiShape(f, links.isNotEmpty);
+    final restrictions =
+        f.listOrAbsent('accessRestrictions', AccessRestriction._parse) ??
+        const <AccessRestriction>[];
+    _checkRestrictionOwners(f, restrictions);
+    final cards = f.listOrAbsent('cards', PaymentCard._parse);
+    final transactions = f.listOrAbsent(
+      'transactions',
+      SourceTransaction._parse,
+    );
+    bool marked(String type, String id, String field) => restrictions.any(
+      (r) => r.ownerType == type && r.ownerId == id && r.field == field,
+    );
+    for (final c in cards ?? const <PaymentCard>[]) {
+      if (c.withdrawalAccountRestricted &&
+          !marked('card', c.cardId, 'withdrawalAccountId')) {
+        throw SnapshotFormatException(
+          r'$.cards',
+          'withdrawalAccountId 생략에 제한 표식이 없음',
+        );
+      }
+    }
+    for (final t in transactions ?? const <SourceTransaction>[]) {
+      if ((t.accountRestricted &&
+              !marked('transaction', t.transactionId, 'accountId')) ||
+          (t.cardRestricted &&
+              !marked('transaction', t.transactionId, 'cardId'))) {
+        throw SnapshotFormatException(
+          r'$.transactions',
+          '계좌·카드 참조 생략에 제한 표식이 없음',
+        );
+      }
+    }
+    return FinancialSnapshot._fromParts(
+      f: f,
+      schema: schema,
+      currency: currency,
+      links: links,
+      cards: cards,
+      transactions: transactions,
+      restrictions: restrictions,
+    );
+  }
+
+  /// 2026-10-22: 읽은 부분들로 스냅샷을 만든다. [fromJson]이 검사를 마친 뒤 부른다.
+  factory FinancialSnapshot._fromParts({
+    required _Fields f,
+    required String schema,
+    required String currency,
+    required List<Object?> links,
+    required List<PaymentCard>? cards,
+    required List<SourceTransaction>? transactions,
+    required List<AccessRestriction> restrictions,
+  }) {
     return FinancialSnapshot(
       userId: f.string('userId'),
-      schemaVersion: f.string('schemaVersion'),
+      schemaVersion: schema,
       currency: currency,
       dataVersion: f.string('dataVersion'),
       sourceVersion: f.string('sourceVersion'),
@@ -413,8 +583,58 @@ class FinancialSnapshot {
       institutionLinkCount: links.length,
       coverage: f.list('coverage', Coverage._parse),
       accounts: f.listOrAbsent('accounts', Account._parse),
-      cards: f.listOrAbsent('cards', PaymentCard._parse),
-      transactions: f.listOrAbsent('transactions', SourceTransaction._parse),
+      cards: cards,
+      transactions: transactions,
+      accessRestrictions: restrictions,
     );
+  }
+
+  /// 2026-10-22: HTTP 응답의 연결 전·후 키 구성을 검사한다. 연결 후([connected])에는 필수 배열·settings·page·
+  /// accessRestrictions가 모두 있어야 하고(누락을 '해당 없음'으로 받지 않음), 연결 전에는 금융 키가 없어야 한다.
+  /// 연결 후 settings·page는 객체, 나머지는 배열이어야 하며 null을 허용하지 않는다.
+  static void _checkApiShape(_Fields f, bool connected) {
+    for (final key in connectedApiKeys) {
+      final present = f.map.containsKey(key);
+      if (connected && !present) {
+        throw SnapshotFormatException('\$.$key', '연결 후 응답의 필수 키 없음');
+      }
+      if (connected) {
+        final value = f.map[key];
+        final ok = key == 'settings' || key == 'page'
+            ? value is Map
+            : value is List;
+        if (!ok) {
+          throw SnapshotFormatException('\$.$key', '연결 후 응답의 필수 키 형식이 다름');
+        }
+      }
+      if (!connected && present) {
+        throw SnapshotFormatException('\$.$key', '연결 전 응답에 금융 키가 있음');
+      }
+    }
+  }
+
+  /// 2026-10-22: 일반 객체 제한 표식의 ownerId가 이 응답에 실제로 공개된 객체인지 검사한다(§2.1).
+  /// 다음 페이지가 남은 응답(page.nextCursor가 있음)에서는 아직 받지 않은 거래를 기준으로 한 표식을 허용한다.
+  static void _checkRestrictionOwners(
+    _Fields f,
+    List<AccessRestriction> restrictions,
+  ) {
+    final page = f.map['page'];
+    final morePages = page is Map && page['nextCursor'] != null;
+    for (final r in restrictions) {
+      final sources = _ownerSources[r.ownerType];
+      if (sources == null) continue;
+      final found = sources.any((source) {
+        final rows = f.map[source.$1];
+        return rows is List &&
+            rows.any((row) => row is Map && row[source.$2] == r.ownerId);
+      });
+      if (!found && !(r.ownerType == 'transaction' && morePages)) {
+        throw SnapshotFormatException(
+          r'$.accessRestrictions',
+          '제한 표식의 기준 객체가 응답에 공개되지 않음',
+        );
+      }
+    }
   }
 }

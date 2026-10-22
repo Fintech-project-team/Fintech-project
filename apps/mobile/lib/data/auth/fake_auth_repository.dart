@@ -26,7 +26,7 @@ class FakeDemoAccount {
 /// - 이름+전화번호 조합 기준 최근 5분 실패 5회면 5번째 실패부터 429·5분 차단. 차단 중 시도는 종료 시각을 늘리지 않는다.
 /// - 입력은 서버 규칙대로 정규화한다. 형식 오류는 422이며 실패로 세지 않는다. 무효 토큰은 401 SESSION_INVALID.
 /// 실제 서버 연동이 아니며 앱을 다시 시작하면 상태가 사라진다.
-class FakeAuthRepository implements AuthRepository {
+class FakeAuthRepository implements AuthRepository, SessionResolver {
   /// 2026-10-21: 계정 목록 [accounts], 시각 [now], 토큰·ID 난수 [random]으로 만든다.
   FakeAuthRepository({
     required List<FakeDemoAccount> accounts,
@@ -109,6 +109,10 @@ class FakeAuthRepository implements AuthRepository {
     _sessionsByUser.remove(owner);
     return const AuthOk(null);
   }
+
+  /// 2026-10-22: 활성 세션 [accessToken]의 사용자 ID를 반환한다. 종료·모르는 토큰이면 null이다(금융 API의 401 판정용).
+  @override
+  String? userIdForToken(String accessToken) => _ownerOf(accessToken);
 
   /// 2026-10-21: 테스트·운영 흉내용으로 [userId]의 활성 세션을 서버 쪽에서 끝낸다(운영 종료, 09-13).
   void terminateSessionOf(String userId) => _sessionsByUser.remove(userId);
