@@ -1,6 +1,6 @@
 # PAYSE Mac 설치와 사용
 
-공통 초기화 SDK 기준은 Flutter **3.47.7 stable**, 포함된 Dart **3.13.5**입니다. SDK 변경은 [toolchain.md](../toolchain.md)와 앱 잠금 파일을 함께 검토한 뒤 반영합니다. 이미 완료한 단계는 생략합니다. 기기 연결은 보류합니다.
+팀 SDK 기준은 Flutter **3.47.7 stable**, 포함된 Dart **3.13.5**입니다. SDK 변경은 [toolchain.md](../toolchain.md)와 앱 잠금 파일을 함께 검토한 뒤 반영합니다. 이미 완료한 단계는 생략합니다. 기기 연결·서명·플랫폼 빌드는 설치·분석·위젯 검사와 구분해 준비합니다.
 
 ## 1 Git과 VS Code 준비
 
@@ -77,4 +77,6 @@ flutter test --no-pub
 
 실제 작업 명세와 와이어프레임을 `flowcast-task`에 지정하고 [앱 구조](../app-architecture.md), [데이터 계약](../data-contracts.md), [역할 경로](../ownership.md)에 따라 `lib/`와 `test/`를 수정합니다. 저장소 루트의 `node scripts/harness/run-flutter.mjs check`는 SDK·Dart 포맷·분석·위젯 검사를 함께 실행합니다. 포맷 수정은 작업 명세에 허용된 변경 파일로 제한합니다.
 
-VS Code의 `PAYSE Flutter` 실행 구성은 `apps/mobile/lib/main.dart`를 가리킵니다. 현재 시작 화면은 초기화 확인용입니다. 기기 연결·Xcode 서명·Android/iOS 빌드는 별도 준비이며 위젯 테스트 성공을 기기 빌드 성공으로 보고하지 않습니다. [Flutter iOS 준비](https://docs.flutter.dev/platform-integration/ios/setup)
+VS Code의 `PAYSE Flutter` 실행 구성은 `apps/mobile/lib/main.dart`를 가리킵니다. 현재 화면과 기능 범위는 [모바일 화면 안내](../../apps/mobile/docs/screen-rules-update.md)를 확인합니다. 기기 연결·Xcode 서명·Android/iOS 빌드는 별도 준비이며 위젯 테스트 성공을 기기 빌드 성공으로 보고하지 않습니다. [Flutter iOS 준비](https://docs.flutter.dev/platform-integration/ios/setup)
+
+초기 안내의 작업 단계·기기 연결 보류 설명은 [문서 이력](../../apps/api/docs/history/2026-10-22-harness-doc-history.md)에 보존합니다.

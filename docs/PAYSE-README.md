@@ -1,20 +1,30 @@
 # PAYSE MVP 1.0 — 현행 개발 기준
 
-개정일: 2026-10-20. **사용자 최신 확정 사항을 우선 적용한 2인 공동 PM·개발 기준**이다. v8 이후의 직접 결정과 기존 업무표의 범위·우선순위를 함께 따른다. 앱·API·DB 구현 완료 보고가 아니다.
+**사용자 최신 확정 사항을 우선 적용한 2인 공동 PM·개발 기준**이다. v8 이후의 직접 결정과 기존 업무표의 범위·우선순위를 함께 따른다. 앱·API·DB 구현 완료 보고가 아니다.
 
 현재 기준은 CODEF 참고 전환, PAYSE 공통 계약, Java + Spring Boot 확정, Flutter 로컬 계산을 반영한다. 사용성 검증 축소·생략은 적용하지 않고 [미승인 변경](open-decisions.md)에 표시한다. 실제 공급자 호환·금융/인증 API·앱 통합 완료를 뜻하지 않는다.
 
 ## 읽는 순서
 
-1. [제품·버전 기준](product-baseline.md): 확정 범위·인증·분석·비용.
-2. [2인 역할·개발 순서](team-plan.md): 담당 업무, 산출물, 문서 경로·변경 조건.
-3. [앱 구조](app-architecture.md): 로컬 계산·서버 저장·상태 수명.
-4. [계산 기준](calculation-rules.md): 현재 금액·반복·시뮬레이션·보호·정정.
-5. [데이터·API 기초 계약](data-contracts.md): 사용자 식별 권장안·데이터 경계·조회/저장.
-6. [DB 최소 구조안](database-schema.md): 저장 단위·핵심 컬럼·제약과 근거.
-7. [v0.6 화면 규칙](v0.6-screen-rules.md): 기존 43개 화면/상태 대응 및 변경점.
-8. [남은 설계 작업](open-decisions.md): 확정 정책을 다시 묻지 않는 개발 확인 목록.
-9. [충돌·정리·검증 보고](reconciliation-report.md): 이전 기준과 달라진 점·검증 범위.
+작업에 필요한 항목만 읽는다. 다음 문서가 각 주제의 단일 기준이며 공통 의미를 앱별 문서에 복제하지 않는다.
+
+| 내용                            | 기준 문서                                                                                                       |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 제품·버전·인증 수명·비용        | [제품 기준](product-baseline.md)                                                                                |
+| 2인 담당·경로·문서 작성/공유    | [팀 계획](team-plan.md), [수정 범위](ownership.md), [작성·공유](development-notes.md)                           |
+| 의존성·계산 위치·상태 수명      | [앱 구조](app-architecture.md)                                                                                  |
+| 현재 금액·기간·반복·보호·정정   | [계산 기준](calculation-rules.md)                                                                               |
+| 외부 공급자·LLM 경계·공통 인수  | [데이터 계약 색인](data-contracts.md)                                                                           |
+| 필드·타입·필수 여부·수정 권한   | [공통 데이터 모델](data-model.md)                                                                               |
+| v0.6 HTTP·인증 입력·쓰기·오류   | [HTTP 계약](api-contract.md)                                                                                    |
+| 연결 전/부분 연결·공개·페이지   | [응답 모델](api-response-models.md)                                                                             |
+| 실제 SQL·DB 사전·이행/검증 상태 | [DB 구조](database-schema.md)                                                                                   |
+| 화면 동작·디자인 값             | [화면 규칙](v0.6-screen-rules.md), [디자인](design.md)                                                          |
+| 코드 작성·필수 검사·Git         | [CODE_SPEC](harness/CODE_SPEC.md), [검사 기준](harness/GATE_MATRIX.md), [Git 정책](harness/COMMIT_PR_POLICY.md) |
+| 구현 대기·미승인 범위 변경      | [남은 작업](open-decisions.md)                                                                                  |
+| 과거 기준과 정리 근거           | [검토 이력](reconciliation-report.md)                                                                           |
+
+`apps/api/docs/`는 내부 인증 설계·실행 안내·검증 사례를 유지한다. 기존 데이터 모델·DB·HTTP·응답 문서 경로는 위 기준으로 안내하며 독립 규칙을 병행하지 않는다. 실제 DTO·SQL·Flutter 구현과 검사는 해당 코드/상세 문서의 상태로 확인한다.
 
 ## 적용 우선순위
 
@@ -27,6 +37,7 @@
 
 ## 산출물 상태
 
-2026-10-18 문서 개정 당시 산출물은 개발 기초 MD와 검증 기록이었다. 이후 데이터·DB 작업은 [데이터 명세](../apps/api/docs/data-model-draft.md)와 [DB 설계](../apps/api/docs/database-design.md), Java 초기화의 구현·미구현 범위는 [서버 초기화 안내](../apps/api/docs/spring-bootstrap.md)를 따른다. 초기화를 금융·인증 API 완료로 표시하지 않는다.
+데이터·DB 작업은 [공통 데이터 모델](data-model.md)과 [DB 사전](database-schema.md), Java 초기화의 구현·미구현 범위는 [서버 초기화 안내](../apps/api/docs/spring-bootstrap.md)를 따른다. 초기화를 금융·인증 API 완료로 표시하지 않는다.
 
-현행 제품·개발 기준은 이 색인에서 연결한 현재 기준 문서다. [5차 핵심 기억](../PAYSE-핵심기억-05.md)과 [27개 결정 요약](../PAYSE-결정사항-27개-요약.md)은 2026-10-15~18의 기록으로 보존하며 후속 직접 결정과 현행 문서를 대체하지 않는다. 기존 저장소의 검사·Git 보호 절차는 보존한다. 노션은 계속 읽기 전용이다.
+현행 제품·개발 기준은 이 색인에서 연결한 현재 기준 문서다. [5차 핵심 기억](../PAYSE-핵심기억-05.md)과 [27개 결정 요약](../PAYSE-결정사항-27개-요약.md)은 과거 기록이며 후속 직접 결정과 현행 문서를 대체하지 않는다. 작성·조회·검토의 시점별 근거는 [공통 문서 이력](../apps/api/docs/history/2026-10-22-common-doc-history.md)에 보존한다. 기존 저장소의 검사·Git 보호 절차는 보존한다. 노션은 계속 읽기 전용이다.
+전체 이력의 위치와 읽기 기준은 [이력 색인](../apps/api/docs/history/README.md)을 따른다.

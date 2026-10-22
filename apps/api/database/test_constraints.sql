@@ -39,10 +39,10 @@ BEGIN
   UPDATE payse.financial_accounts SET balance_krw=-1 WHERE id=alice_account;
   IF NOT FOUND THEN RAISE EXCEPTION 'negative source balance must be representable'; END IF;
 
-  INSERT INTO payse.demo_sessions VALUES(gen_random_uuid(),alice,'test-digest-1',gen_random_uuid(),now(),NULL);
-  PERFORM pg_temp.expect_failure(format('INSERT INTO payse.demo_sessions VALUES (gen_random_uuid(),%L,%L,gen_random_uuid(),now(),NULL)',alice,'test-digest-2'),'23505');
+  INSERT INTO payse.demo_sessions (id,user_id,token_digest,issued_at,ended_at) VALUES(gen_random_uuid(),alice,'test-digest-1',now(),NULL);
+  PERFORM pg_temp.expect_failure(format('INSERT INTO payse.demo_sessions (id,user_id,token_digest,issued_at,ended_at) VALUES (gen_random_uuid(),%L,%L,now(),NULL)',alice,'test-digest-2'),'23505');
   UPDATE payse.demo_sessions SET ended_at=now() WHERE user_id=alice;
-  INSERT INTO payse.demo_sessions VALUES(gen_random_uuid(),alice,'test-digest-3',gen_random_uuid(),now(),NULL);
+  INSERT INTO payse.demo_sessions (id,user_id,token_digest,issued_at,ended_at) VALUES(gen_random_uuid(),alice,'test-digest-3',now(),NULL);
   IF (SELECT count(*) FROM payse.reserves WHERE user_id=alice) <> 1 THEN RAISE EXCEPTION 'session end changed settings'; END IF;
 
   SELECT o.id,o.statement_id INTO obligation_id,statement_id FROM payse.obligations o WHERE o.user_id=alice AND o.statement_id IS NOT NULL;

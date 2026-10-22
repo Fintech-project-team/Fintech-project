@@ -204,6 +204,7 @@ class CodeViewModel extends ChangeNotifier {
   /// 받은 세션을 [PendingSessionCleanup]으로 끝낸다. 종료가 확인되지 않으면 정리 담당이 토큰을 보관하고,
   /// 다음 발급 요청 전에 다시 시도한다. 복구는 저장된 토큰으로 재확인만 하며,
   /// 토큰이 이미 무효면 기기 세션·PIN을 정리하고 [CodeStatus.sessionInvalid]로 둔다(화면 생존과 무관).
+  /// 2026-10-22: 가입 요청에서 제거된 설치 식별값을 전달하지 않는다.
   Future<bool> submit() async {
     if (!canSubmit) return false;
     _status = CodeStatus.submitting;
@@ -216,10 +217,7 @@ class CodeViewModel extends ChangeNotifier {
     final AuthOutcome<Object?> outcome;
     if (purpose == IdentityPurpose.signup) {
       await services.cleanup.retryPending();
-      final result = await services.repository.createSession(
-        credentials,
-        installationId: services.installationId,
-      );
+      final result = await services.repository.createSession(credentials);
       if (result case AuthOk(:final value)) {
         if (_disposed) {
           await services.cleanup.end(value.accessToken);

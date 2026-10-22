@@ -48,7 +48,6 @@ CREATE TABLE payse.demo_sessions (
   id uuid NOT NULL,
   user_id uuid NOT NULL,
   token_digest text NOT NULL,
-  installation_id uuid NOT NULL,
   issued_at timestamptz NOT NULL,
   ended_at timestamptz,
   PRIMARY KEY (id),
@@ -66,8 +65,6 @@ COMMENT ON COLUMN payse.demo_sessions.id IS '안정된 내부 식별자; 원천 
 COMMENT ON COLUMN payse.demo_sessions.user_id IS '인증 세션에서 정한 소유자; 다른 사용자 참조 차단';
 
 COMMENT ON COLUMN payse.demo_sessions.token_digest IS '무작위 세션 토큰 검증값; 원문/PIN 저장 금지';
-
-COMMENT ON COLUMN payse.demo_sessions.installation_id IS '설치 식별값; 이것만으로 인증하지 않음';
 
 COMMENT ON COLUMN payse.demo_sessions.issued_at IS '실제 발급 시각';
 
@@ -113,7 +110,7 @@ COMMENT ON COLUMN payse.source_contexts.user_id IS '인증 세션에서 정한 �
 
 COMMENT ON COLUMN payse.source_contexts.source_version IS '사용자별 현재 원천 묶음 버전';
 
-COMMENT ON COLUMN payse.source_contexts.schema_version IS '전달 필드의 형식 버전';
+COMMENT ON COLUMN payse.source_contexts.schema_version IS '원본 데이터 형식 버전; API 응답 표현 버전과 별도';
 
 COMMENT ON COLUMN payse.source_contexts.rule_version IS 'Flutter 계산 규칙 버전; 서버 계산을 의미하지 않음';
 
@@ -791,7 +788,7 @@ COMMENT ON COLUMN payse.reserve_allocations.reserve_id IS '보호 설정';
 
 COMMENT ON COLUMN payse.reserve_allocations.obligation_id IS '충당할 의무';
 
-COMMENT ON COLUMN payse.reserve_allocations.amount_krw IS '원래 배정액';
+COMMENT ON COLUMN payse.reserve_allocations.amount_krw IS '지급 해제 누계를 포함한 현재 유효 총 배정액; 최초값은 변경 이력';
 
 COMMENT ON COLUMN payse.reserve_allocations.released_krw IS '근거가 있는 해제 누계';
 

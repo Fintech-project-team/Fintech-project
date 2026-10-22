@@ -70,7 +70,7 @@ def main():
         run(args.psql,args.database,(folder/filename).read_text(encoding='utf-8'))
     owner=run(args.psql,args.database,"SELECT id FROM payse.demo_users WHERE synthetic_name='PAYSE 합성 alpha';")
     receipt=run(args.psql,args.database,f"SELECT id FROM payse.write_receipts WHERE user_id='{owner}' LIMIT 1;")
-    session=f"INSERT INTO payse.demo_sessions VALUES (gen_random_uuid(),'{owner}','race-{{}}',gen_random_uuid(),now(),NULL);"
+    session=f"INSERT INTO payse.demo_sessions (id,user_id,token_digest,issued_at,ended_at) VALUES (gen_random_uuid(),'{owner}','race-{{}}',now(),NULL);"
     race(args.psql,args.database,session.format('a'),session.format('b'),expected_error='23505')
     version=run(args.psql,args.database,f"SELECT data_version FROM payse.demo_users WHERE id='{owner}';")
     update=f"UPDATE payse.demo_users SET data_version=data_version+1 WHERE id='{owner}' AND data_version={version} RETURNING id"

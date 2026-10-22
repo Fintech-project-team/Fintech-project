@@ -22,9 +22,8 @@ class _ScriptedAuthRepository implements AuthRepository {
   /// 2026-10-21: 호출 수를 세고 [createGate]가 있으면 열릴 때까지 기다린 뒤 정해 둔 결과를 반환한다.
   @override
   Future<AuthOutcome<DemoSession>> createSession(
-    DemoCredentials credentials, {
-    required String installationId,
-  }) async {
+    DemoCredentials credentials,
+  ) async {
     createCalls++;
     await createGate?.future;
     return createResult;
@@ -65,7 +64,6 @@ class _Env {
       sessionStore: sessions,
       pinStore: pins,
       consentStore: MemoryConsentStore(),
-      installationId: '3f2c9a4e-1b7d-4c2e-9a10-7f6e5d4c3b2a',
       now: clock.now,
       cleanup: cleanup,
     ),

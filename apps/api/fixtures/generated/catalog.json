@@ -1,6 +1,6 @@
 {
   "fixtureVersion": "PAYSE-FIXTURE-1",
-  "schemaVersion": "PAYSE-DRAFT-1",
+  "schemaVersion": "PAYSE-DRAFT-2",
   "ruleVersion": "PAYSE-CALC-1",
   "cases": [
     {

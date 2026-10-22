@@ -1,6 +1,7 @@
 import 'dart:math';
 
-/// 2026-10-21: [random]으로 소문자 UUID v4 문자열을 만들어 반환한다. installationId·가짜 세션 ID에 쓴다.
+/// 2026-10-21: [random]으로 소문자 UUID v4 문자열을 만들어 반환한다. 가짜 세션 ID에 쓴다.
+/// 2026-10-22: 설치 식별값 제거에 맞춰 사용처 설명을 정리했다.
 String randomUuidV4([Random? random]) {
   final r = random ?? Random.secure();
   final bytes = List<int>.generate(16, (_) => r.nextInt(256));

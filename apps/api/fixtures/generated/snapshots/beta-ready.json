@@ -1,6 +1,6 @@
 {
   "userId": "87f7bbf9-2355-5210-9325-f25d83a8ff35",
-  "schemaVersion": "PAYSE-DRAFT-1",
+  "schemaVersion": "PAYSE-DRAFT-2",
   "currency": "KRW",
   "dataVersion": "1",
   "sourceVersion": "fixture-1:beta:2026-10-19:base",
@@ -5661,15 +5661,6 @@
     {
       "userId": "87f7bbf9-2355-5210-9325-f25d83a8ff35",
       "planId": "24bbace8-8ee1-5b4b-bc19-327ace2a3c5b",
-      "label": "합성 통신비",
-      "amountKRW": 50000,
-      "monthlyDay": 25,
-      "paymentTiming": "immediate",
-      "scheduleBasis": "withdrawal",
-      "withdrawalAccountId": "1d383795-5b7c-56f9-9535-ff418040183d",
-      "cardId": null,
-      "status": "active",
-      "scheduleOverrides": [],
       "firstOccurrenceMonth": "2026-10"
     }
   ],

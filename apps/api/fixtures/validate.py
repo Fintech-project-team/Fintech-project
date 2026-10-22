@@ -19,6 +19,7 @@ SEOUL=timezone(timedelta(hours=9))
 COLLECTION_IDS={'accounts':'accountId','cards':'cardId','transactions':'transactionId','relatedTransactions':'transactionId','statements':'statementId','obligations':'obligationId','reserves':'reserveId','allocations':'allocationId','settlements':'linkId','recurringPlans':'planId','recurringPlanRevisions':'revisionId','recurringDecisions':'decisionId'}
 ROOT_KEYS={'userId','schemaVersion','currency','dataVersion','sourceVersion','ruleVersion','asOf','institutions','institutionLinks','coverage'}
 FINANCIAL_KEYS=set(COLLECTION_IDS)|{'settings','page','occurrenceOverrides','occurrenceLinks','referenceResolutions','transactionRelations'}
+PLAN_KEYS={'userId','planId','firstOccurrenceMonth'}
 
 
 def require(condition: bool, message: str) -> None:
@@ -62,7 +63,7 @@ def validate_snapshot(s: dict) -> None:
     require(ROOT_KEYS<=s.keys(),'missing snapshot keys')
     require(not(set(s)-ROOT_KEYS-FINANCIAL_KEYS),'unknown snapshot keys')
     uuid(s['userId']);owner=s['userId']
-    require(s['schemaVersion']=='PAYSE-DRAFT-1' and s['ruleVersion']=='PAYSE-CALC-1' and s['currency']=='KRW','unsupported contract')
+    require(s['schemaVersion']=='PAYSE-DRAFT-2' and s['ruleVersion']=='PAYSE-CALC-1' and s['currency']=='KRW','unsupported contract')
     require(isinstance(s['dataVersion'],str) and re.fullmatch('[1-9][0-9]*',s['dataVersion']) and int(s['dataVersion'])<=9223372036854775807,'bad dataVersion')
     asof=instant(s['asOf']);today=asof.astimezone(SEOUL).date()
     institutions={i['code']:i for i in s['institutions']}
@@ -80,6 +81,9 @@ def validate_snapshot(s: dict) -> None:
     maps={}
     for name,idfield in COLLECTION_IDS.items():
         require(isinstance(s[name],list),'collection must be array')
+        if name=='recurringPlans':
+            for row in s[name]:
+                require(isinstance(row,dict) and set(row)==PLAN_KEYS,'recurring plan must contain only identity and first occurrence month')
         maps[name]={x[idfield]:x for x in s[name]}
         require(len(maps[name])==len(s[name]),f'duplicate {name}')
         for row in s[name]:
@@ -187,7 +191,9 @@ def validate_snapshot(s: dict) -> None:
             month(override['occurrenceMonth']);day(override['plannedDate'])
             require(override['occurrenceMonth'] not in months and override['evidenceRef'],'override duplicate/evidence');months.add(override['occurrenceMonth'])
     for p in plans.values():
-        month(p['firstOccurrenceMonth']);require(any(r['planId']==p['planId'] and r['effectiveFromMonth']==p['firstOccurrenceMonth'] for r in revisions.values()),'missing initial plan revision')
+        month(p['firstOccurrenceMonth'])
+        first_revision_month=min((r['effectiveFromMonth'] for r in revisions.values() if r['planId']==p['planId']),default=None)
+        require(first_revision_month==p['firstOccurrenceMonth'],'plan first month differs from earliest revision')
     require(all((r['planId'],r['effectiveFromMonth']) in versionkeys for r in revisions.values()),'retired revision without replacement')
     obligations=maps['obligations'];occurrencekeys=set();statement_obligations=set()
     for o in obligations.values():
@@ -201,12 +207,16 @@ def validate_snapshot(s: dict) -> None:
             require(o['recurringPlanId'] in plans and o['planRevisionId'] in revisions,'occurrence references')
             require(o['recurrenceKey'].startswith(o['recurringPlanId']+':'),'recurrence namespace');month(o['recurrenceKey'][-7:])
             require(revisions[o['planRevisionId']]['planId']==o['recurringPlanId'],'wrong pinned revision')
+            require(plans[o['recurringPlanId']]['firstOccurrenceMonth']<=o['recurrenceKey'][-7:],'occurrence precedes plan first month')
+            require(revisions[o['planRevisionId']]['effectiveFromMonth']<=o['recurrenceKey'][-7:],'occurrence precedes pinned revision')
             require(o['recurrenceKey'] not in occurrencekeys,'duplicate recurrence');occurrencekeys.add(o['recurrenceKey'])
         else:
             require(o['recurringPlanId'] is None and o['planRevisionId'] is None,'partial recurrence')
     for ov in s['occurrenceOverrides']:
         require(ov['userId']==owner and ov['planRevisionId'] in revisions and ov['withdrawalAccountId'] in accounts,'override ownership')
         plan_id=ov['recurrenceKey'][:-8];require(plan_id in plans and revisions[ov['planRevisionId']]['planId']==plan_id,'override plan');month(ov['recurrenceKey'][-7:]);day(ov['dueDate']);money(ov['amountKRW'])
+        require(plans[plan_id]['firstOccurrenceMonth']<=ov['recurrenceKey'][-7:],'override precedes plan first month')
+        require(revisions[ov['planRevisionId']]['effectiveFromMonth']<=ov['recurrenceKey'][-7:],'override precedes pinned revision')
         require(ov['recurrenceKey'] not in occurrencekeys,'override/materialized duplicate');occurrencekeys.add(ov['recurrenceKey'])
     for decision in maps['recurringDecisions'].values():
         require(decision['decision'] in ('approved','excluded'),'decision enum')
@@ -252,7 +262,7 @@ def validate_snapshot(s: dict) -> None:
         day(proof['expectedPayDate']);require(proof['confirmation'] in ('unknown','partial','confirmed'),'salary confirmation')
         require(proof['confirmation']=='unknown' or bool(proof['transactionIds']),'salary evidence missing')
         for tid in proof['transactionIds']:
-            require(tid in txs and txs[tid]['accountId']==salary['salaryAccountId'] and txs[tid]['direction']=='in' and txs[tid]['balanceReflected'] is True,'salary proof invalid')
+            require(tid in txs and txs[tid]['recordKind']=='account_entry' and txs[tid]['direction']=='in' and txs[tid]['status']=='posted' and txs[tid]['balanceReflected'] is True,'salary proof invalid')
     for link in s['occurrenceLinks']:
         require(link['evidenceRef'] and link['recurrenceKey'][:-8] in plans,'occurrence link key')
         refs=[(link['purchaseTransactionId'],txs),(link['statementId'],maps['statements']),(link['obligationId'],obligations)]
