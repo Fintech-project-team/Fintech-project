@@ -14,7 +14,7 @@ import '../../app/app_test_utils.dart';
 /// 2026-10-21: 테스트 전용 계정. 코드는 테스트 값이며 서버 확정 값이 아니다.
 const _account = FakeDemoAccount(
   userId: 'test-user',
-  name: 'PAYSE 합성 test',
+  name: '테스트계정',
   phone: '01099990000',
   code: '246810',
 );
@@ -230,6 +230,46 @@ void main() {
     expect(find.byKey(const ValueKey('pin-setup-pad')), findsOneWidget);
     expect((await h.sessions.read())?.userId, _account.userId);
   });
+
+  testWidgets(
+    '10-2: a name with an inner space is a name error; 10-2 sends nothing',
+    (tester) async {
+      final h = _Harness();
+      await h.pump(tester);
+      await tester.tap(find.text('시작하기'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('terms-all')));
+      await tester.pump();
+      await tester.tap(find.text('다음'));
+      await tester.pumpAndSettle();
+
+      await fillIdentity(tester, '테스트 계정', '01099990000');
+      expect(find.text('이름을 확인해주세요.'), findsOneWidget);
+      expect(h.spy.createCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'signup with edge spaces and separators stores the account name, not the input',
+    (tester) async {
+      final h = _Harness();
+      await h.pump(tester);
+      await tester.tap(find.text('시작하기'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('terms-all')));
+      await tester.pump();
+      await tester.tap(find.text('다음'));
+      await tester.pumpAndSettle();
+
+      await fillIdentity(tester, '  테스트계정 ', '010-9999 0000');
+      await submitCode(tester, _account.code);
+
+      expect(find.byKey(const ValueKey('pin-setup-pad')), findsOneWidget);
+      final stored = await h.sessions.read();
+      expect(stored?.name, _account.name);
+      expect(stored?.userId, _account.userId);
+    },
+  );
 
   testWidgets('10-3 timer is display-only and restarts only after 0:00', (
     tester,

@@ -42,6 +42,7 @@ Future<(MemorySessionStore, MemoryLocalPinStore)> signedInStores() async {
   await sessions.save(
     const StoredSession(
       userId: 'test-user',
+      name: '데모알파',
       sessionId: 'test-session',
       accessToken: 'test-token',
     ),

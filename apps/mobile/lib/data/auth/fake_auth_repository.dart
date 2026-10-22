@@ -1,10 +1,11 @@
 import 'dart:math';
 
+import 'auth_input_format.dart';
 import 'auth_repository.dart';
 import 'random_id.dart';
 
-/// 2026-10-21: 가짜 저장소가 아는 데모 계정. 이름·전화번호는 server-seeds.json의 합성 값,
-/// [code]는 서버 코드가 확정되기 전 호출자가 주는 임시 검증 값이다.
+/// 2026-10-21: 가짜 저장소가 아는 데모 계정. [name]은 docs/api-contract.md §2의 통합 이름,
+/// [userId]·[phone]은 server-seeds.json의 합성 값을 따른다. [code]는 서버 코드가 확정되기 전 호출자가 주는 임시 검증 값이다.
 class FakeDemoAccount {
   /// 2026-10-21: 계정 [userId], 정규화한 [name]·[phone], 임시 [code]로 만든다.
   const FakeDemoAccount({
@@ -23,7 +24,7 @@ class FakeDemoAccount {
 /// 2026-10-21: [AuthRepository]의 메모리 구현. api-contract §2의 서버 동작을 흉내 낸다.
 /// - 이름·전화번호·코드가 모두 맞고 활성 세션이 없을 때만 발급. 불일치·사용 중은 같은 거절.
 /// - 이름+전화번호 조합 기준 최근 5분 실패 5회면 5번째 실패부터 429·5분 차단. 차단 중 시도는 종료 시각을 늘리지 않는다.
-/// - 형식 오류는 422이며 실패로 세지 않는다. 무효 토큰은 401 SESSION_INVALID.
+/// - 입력은 서버 규칙대로 정규화한다. 형식 오류는 422이며 실패로 세지 않는다. 무효 토큰은 401 SESSION_INVALID.
 /// 실제 서버 연동이 아니며 앱을 다시 시작하면 상태가 사라진다.
 class FakeAuthRepository implements AuthRepository {
   /// 2026-10-21: 계정 목록 [accounts], 시각 [now], 토큰·ID 난수 [random]으로 만든다.
@@ -46,18 +47,14 @@ class FakeAuthRepository implements AuthRepository {
   final Map<String, List<DateTime>> _failures = {};
   final Map<String, DateTime> _blockedUntil = {};
 
-  static final RegExp _phone = RegExp(r'^010[0-9]{8}$');
-  static final RegExp _code = RegExp(r'^[0-9]{6}$');
-
-  /// 2026-10-21: 세션 발급을 흉내 낸다. 형식 오류는 실패로 세지 않고 422, 그다음 시도 제한·자격 대조 순이다.
-  /// 2026-10-22: 설치 식별값 검사만 제거하고 자격 대조·사용자별 활성 세션 제한은 유지한다.
+  /// 2026-10-21: 세션 발급을 흉내 낸다. 서버처럼 입력을 정규화한 뒤 형식 오류는 실패로 세지 않고 422,
+  /// 그다음 시도 제한·자격 대조 순이다. 성공 응답의 name은 제출 문자열이 아닌 계정의 저장 이름이다.
   @override
   Future<AuthOutcome<DemoSession>> createSession(
-    DemoCredentials credentials,
+    DemoCredentials submitted,
   ) async {
-    if (!_wellFormed(credentials)) {
-      return const AuthInvalidInput();
-    }
+    final credentials = _normalized(submitted);
+    if (!_wellFormed(credentials)) return const AuthInvalidInput();
     final limited = _rateLimit<DemoSession>(credentials);
     if (limited != null) return limited;
     final account = _match(credentials);
@@ -73,6 +70,7 @@ class FakeAuthRepository implements AuthRepository {
     return AuthOk(
       DemoSession(
         userId: account.userId,
+        name: account.name,
         sessionId: session.sessionId,
         accessToken: session.accessToken,
         issuedAt: _now(),
@@ -85,10 +83,11 @@ class FakeAuthRepository implements AuthRepository {
   @override
   Future<AuthOutcome<ReverifiedSession>> reverify(
     String accessToken,
-    DemoCredentials credentials,
+    DemoCredentials submitted,
   ) async {
     final owner = _ownerOf(accessToken);
     if (owner == null) return const AuthSessionInvalid();
+    final credentials = _normalized(submitted);
     if (!_wellFormed(credentials)) return const AuthInvalidInput();
     final limited = _rateLimit<ReverifiedSession>(credentials);
     if (limited != null) return limited;
@@ -114,15 +113,16 @@ class FakeAuthRepository implements AuthRepository {
   /// 2026-10-21: 테스트·운영 흉내용으로 [userId]의 활성 세션을 서버 쪽에서 끝낸다(운영 종료, 09-13).
   void terminateSessionOf(String userId) => _sessionsByUser.remove(userId);
 
-  /// 2026-10-21: 요청 형식(이름 앞뒤 공백 없음·2~20자, 010 11자리, ASCII 숫자 6자리)이 맞으면 true를 반환한다.
-  bool _wellFormed(DemoCredentials c) {
-    final nameLength = c.name.runes.length;
-    return c.name == c.name.trim() &&
-        nameLength >= 2 &&
-        nameLength <= 20 &&
-        _phone.hasMatch(c.phone) &&
-        _code.hasMatch(c.code);
-  }
+  /// 2026-10-22: 서버 규칙대로 이름 앞뒤 U+0020과 전화번호 공백·하이픈만 지운 자격을 반환한다. 코드는 그대로 둔다.
+  DemoCredentials _normalized(DemoCredentials c) => DemoCredentials(
+    name: normalizeName(c.name),
+    phone: normalizePhone(c.phone),
+    code: c.code,
+  );
+
+  /// 2026-10-21: 정규화한 요청이 이름·전화번호·인증번호 형식(auth_input_format.dart)에 맞으면 true를 반환한다.
+  bool _wellFormed(DemoCredentials c) =>
+      isValidName(c.name) && isValidPhone(c.phone) && isValidCode(c.code);
 
   /// 2026-10-21: 자격 대조 실패를 기록한다. 이번 실패로 차단되면 429, 아니면 401을 반환한다(5번째 실패부터 429).
   AuthOutcome<T> _fail<T>(DemoCredentials c) {
