@@ -47,7 +47,7 @@ class _ScriptedAuthRepository implements AuthRepository {
   }
 }
 
-const _draft = IdentityDraft(name: 'PAYSE 합성 test', phone: '01099990000');
+const _draft = IdentityDraft(name: '데모테스트', phone: '01099990000');
 
 /// 2026-10-21: 테스트용 의존성 묶음.
 class _Env {

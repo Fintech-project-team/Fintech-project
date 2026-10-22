@@ -17,7 +17,7 @@
     "snapshots/settlement-corrected.json": "f73598c55b4984f2015b0ecee115c2a4958a1f6c8669e29e67fb08c3e6cc820d",
     "snapshots/cancelled-approval.json": "fb1e109e9887c716c2f6722f8eb9ca87547fec8b77c22248789bbd68c85c7fb0",
     "snapshots/gamma-month-end.json": "548369496d07d24d406f3b918abb76ebbb4ebbb8257681cb3567af676f5e308c",
-    "server-seeds.json": "25526e2386234f345c9c3d6683fa0730412d2de0bc997064a2391c058fe4a43d",
+    "server-seeds.json": "409a6021052766f644208f0df72a1047c744e382530a0e012c8dd7d9b99f159c",
     "catalog.json": "c81d952f782054a502dc75fe373f8775b635e185a64f15cc06b103808af77ece"
   }
 }

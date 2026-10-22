@@ -43,7 +43,7 @@ def export(directory: Path, ready=False, cases=None) -> str:
         insert('institutions',{k:i[k] for k in ('code','kind','name')})
     for s in snapshots:
         owner=s['userId'];seed=next(u for u in seeds if u['userId']==owner)
-        insert('demo_users',{'id':owner,'synthetic_name':seed['syntheticName'],'synthetic_phone':seed['syntheticPhone'],'display_name':seed['displayName'],'code_verifier':seed['codeVerifier'],'data_version':int(s['dataVersion']),'created_at':seed['createdAt']})
+        insert('demo_users',{'id':owner,'name':seed['name'],'synthetic_phone':seed['syntheticPhone'],'code_verifier':seed['codeVerifier'],'data_version':int(s['dataVersion']),'created_at':seed['createdAt']})
         insert('source_contexts',{'user_id':owner,'source_version':s['sourceVersion'],'schema_version':s['schemaVersion'],'rule_version':s['ruleVersion'],'as_of':s['asOf'],'coverage':s['coverage'],'salary_evidence':s['settings']['salary']['receiptEvidence'],'occurrence_links':s['occurrenceLinks']})
         if ready:
             for link in s['institutionLinks']:

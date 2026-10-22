@@ -1,6 +1,5 @@
-# 가입·로그인·잠금 (GitHub #25)
+# 가입·로그인·잠금
 
-- 작성: 2026-10-21 · B(hyeyeonso) · 작업 명세 `docs/tasks/PAYSE-MOBILE-AUTH-20261021.json`
 - 상위 기준: [v0.6 화면 규칙](../../../docs/v0.6-screen-rules.md), [화면 규칙 보완](screen-rules-update.md), [앱 구조](../../../docs/app-architecture.md) §3·§4, [v0.6 API 계약](../../api/docs/v0.6/api-contract.md) §2, [디자인 값](../../../docs/design.md) §5
 
 ## 1. 완료 범위와 한계
@@ -19,8 +18,8 @@
 lib/app/payse_app.dart        진입 판단(세션·PIN 유무) + 잠금 덮개 + 수명 감시
 lib/app/local_lock_controller.dart   10분 무입력 판정(주입 시계, 백그라운드 복귀 재계산)
 lib/app/main_entry.dart       PIN 뒤 스냅샷 재조회 → 미연결이면 연결 자리, 연결됨이면 하단 탭
-lib/data/auth/                AuthRepository 계약 · FakeAuthRepository · 저장 인터페이스(Session/LocalPin/Consent) · 메모리 구현
-lib/features/auth/            화면(auth_screens) · 흐름 Navigator(auth_flows) · ViewModel · 입력 규칙(auth_validation)
+lib/data/auth/                공통 입력 규칙(auth_input_rules) · AuthRepository 계약 · FakeAuthRepository · 저장 인터페이스(Session/LocalPin/Consent) · 메모리 구현
+lib/features/auth/            화면(auth_screens) · 흐름 Navigator(auth_flows) · ViewModel · 공통 입력 규칙 export와 PIN 규칙(auth_validation)
 lib/shared/design/            PayseTextField · SelectionCheck(Row/ListRow) · PayseChip · PayseToggle · PinPad · CodeTimerField
 ```
 
@@ -54,16 +53,17 @@ PIN 실패: 횟수는 `LocalPinStore`가 PIN과 함께 보관한다. 지금은 �
 | `lib/app/dev/dev_demo_accounts.dart`    | 서버 코드 확정 후 개발용 임시 코드 교체 또는 삭제                                |
 | 릴리스 기본 `UnavailableAuthRepository` | 실제 서버 구현으로 교체                                                          |
 
-## 4. A 답변과 남은 확인 (2026-10-21)
+작성·답변 당시 기록은 [이름 이행 이력](../../api/docs/history/2026-10-22-identity-transition.md)에 보존한다.
 
-| 항목              | A 답변                                                      | 지금 처리                                                                                                      | 남은 일                                                         |
-| ----------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| 이름 형식         | name을 하나로 일원화하고 문서를 고칠 예정                   | 시드 이름 `PAYSE 합성 alpha`가 통과하도록 "한글 완성형·영문 단어를 가운데 공백 하나로 이은 2~20자"로 임시 해석 | A 문서 갱신 후 가운데 공백 허용 여부를 다시 대조                |
-| 데모 계정 코드    | 지금은 임시 값으로 진행                                     | 개발 빌드만 임시 코드 `000001`~`000003` 사용(릴리스 제외)                                                      | 서버 코드 확정 시 교체(시드 대조 테스트가 알림)                 |
-| 호칭(displayName) | displayName을 name으로 일원화, 로그인 응답에 name 추가 예정 | 계약 응답에 아직 없어 다루지 않음                                                                              | 계약 갱신 후 `DemoSession`에 name을 받아 기기에 호칭용으로 저장 |
-| 서버의 name 사용  | 계정 조회·인증, 입력 대조, 로그인 성공 응답                 | 앱은 10-2 입력을 요청 뒤 버림(그대로)                                                                          | 없음                                                            |
+## 4. 이름 계약과 구현 경계
 
-#26 관련 답변: beta·gamma 연결 전 스냅샷 필요. 일부 기관 제외 연결은 원본 더미를 보존하고 FakeRepository가 계정 원본을 부분 연결 상태로 변환한다.
+인증 입력은 [공통 HTTP 계약](../../../docs/api-contract.md#인증-입력과-단일-이름)을 따른다. 화면과 FakeAuthRepository는 `lib/data/auth/auth_input_rules.dart`의 순수 함수를 공유한다. `auth_validation.dart`의 공개 함수 경로와 PIN 규칙은 유지한다. 이름은 앞뒤 U+0020만 제거한 한글 완성형·영문 2~20자이며 내부 공백은 허용하지 않는다. 전화번호는 U+0020·U+002D만 제거하고 코드는 정규화하지 않는 ASCII 6자리다.
+
+- 개발 계정 이름은 서버 시드의 `name`인 데모알파·데모베타·데모감마다. UUID·전화번호도 같은 시드와 대조한다. 금융 권한과 소유권에는 이름 대신 userId를 사용한다.
+- 개발용 코드 `000001`~`000003`은 릴리스에서 제외되는 Fake 전용 값이다. 서버 `codeVerifier`는 비활성 상태이며 실제 코드 검증·HTTP 인증 구현 완료가 아니다.
+- 로그인 201의 `name`은 API 계약에 정의돼 있다. 현재 `DemoSession` 모델의 name 수신·호칭 저장은 아직 미구현이며 별도 연결 작업이다. 이름을 표시할 구체 화면 위치는 B가 정한다.
+- 인증 입력의 메모리 수명은 [제품 기준](../../../docs/product-baseline.md)을 따른다. 형식 오류 422와 자격 불일치 401을 구분하며, 실제 서버·보안 저장소는 위 구현 경계에 따라 교체한다.
+- 기관 일부 제외 연결은 원본 더미를 보존하고 FakeRepository가 계정 원본을 부분 연결 상태로 변환한다. [응답 계약](../../../docs/api-response-models.md)을 따른다.
 
 ## 5. 정해지지 않아 임시로 둔 문구
 

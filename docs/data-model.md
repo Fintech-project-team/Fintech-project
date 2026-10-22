@@ -2,7 +2,7 @@
 
 v1.0 논리 필드·타입·관계·수정 권한의 단일 기준이다. [#17 데이터 명세서](https://github.com/Fintech-project-team/Fintech-project/issues/17)에 대응한다. 이 문서의 모델을 API와 Flutter가 함께 사용한다. 실제 HTTP 생략/페이지 규칙은 [응답 계약](api-response-models.md), 요청·오류·인증은 [API 계약](api-contract.md), 물리 저장은 [DB 사전](database-schema.md)을 따른다.
 
-PAYSE-DRAFT-2 원본 fixture와 초기 SQL은 존재하지만 HTTP 응답·인증 기능·이름 통합 이행이 구현됐다는 뜻은 아니다. JSON Schema/OpenAPI 완성본을 대신하지 않는다. 공동 변경은 [문서 공유 기준](development-notes.md)에 따라 영향받는 담당자가 확인한다.
+PAYSE-DRAFT-2 원본 fixture·초기 SQL·단일 name 생성/검증 도구는 구현돼 있다. 실제 HTTP 응답·인증 기능은 미구현이며 기존 사용자 DB의 이름 전환도 별도 실행이다. JSON Schema/OpenAPI 완성본을 대신하지 않는다. 공동 변경은 [문서 공유 기준](development-notes.md)에 따라 영향받는 담당자가 확인한다.
 
 ## 1. 읽는 방법과 공통 규칙
 
@@ -166,7 +166,7 @@ Snapshot은 `recurringPlanRevisions: RecurringPlanRevision[]`, `occurrenceOverri
 | 객체/필드                                                       | 타입                                       | 필수 여부          | 수정 권한·의미                                                                                           | 저장 대응                              |
 | --------------------------------------------------------------- | ------------------------------------------ | ------------------ | -------------------------------------------------------------------------------------------------------- | -------------------------------------- |
 | DemoUser.userId                                                 | ID                                         | 필수               | 서버: 재로그인해도 동일 ID                                                                               | demo_users.id                          |
-| name / syntheticPhone                                           | 문자열 각각                                | 필수               | 사전 합성 시드. name은 인증·호칭 공통 값, phone 단독 인증 금지. 이름/전화번호는 정규화 후 공백 없이 저장 | 목표 demo_users.name / synthetic_phone |
+| name / syntheticPhone                                           | 문자열 각각                                | 필수               | 사전 합성 시드. name은 인증·호칭 공통 값, phone 단독 인증 금지. 이름/전화번호는 정규화 후 공백 없이 저장 | demo_users.name / synthetic_phone      |
 | codeVerifier / createdAt                                        | 검증 문자열 / 시각                         | 필수               | 서버 전용: 별도 데모 코드 검증값/시드 생성 시각                                                          | code_verifier/created_at               |
 | Session.sessionId / userId                                      | ID 각각                                    | 필수               | 서버: 사용자별 활성 세션 1개; 기존 로그인 유지·새 로그인 거절                                            | demo_sessions.id/user_id               |
 | tokenDigest / issuedAt / endedAt                                | 검증 문자열 / 시각 / 시각                  | 필수 / 필수 / null | 서버 전용: 무작위 토큰 검증/발급/명시 종료. 자동 만료 정책 추가 안 함                                    | 대응 세션 컬럼                         |
@@ -262,7 +262,7 @@ v1.0 급여 확인은 **임시 결정**이다. 합성 시나리오가 같은 자
 
 ## DemoUser 이름 계약과 이행 상태
 
-DemoUser의 이름 필드는 §6의 `name` 하나다. 인증 입력·저장 공백·세 UUID/name 매핑·반환 위치는 [API 이름 계약](api-contract.md#인증-입력과-단일-이름)이 단일 기준이다. 실제 SQL·server-seeds.json·생성/검증/export 도구는 아직 구 이름 구조이므로 [DB 이름 이행 목표](database-schema.md#단일-name-이행-목표--미구현)를 따른다. 이행 완료와 목표 계약을 혼동하지 않는다.
+DemoUser의 이름 필드는 §6의 `name` 하나다. 인증 입력·저장 공백·세 UUID/name 매핑·반환 위치는 [API 이름 계약](api-contract.md#인증-입력과-단일-이름)이 단일 기준이다. 초기 SQL·server-seeds.json·생성/검증/export 도구는 단일 name을 사용한다. 기존 DB는 [별도 전환 절차](database-schema.md#단일-name-저장과-기존-db-전환)를 따르며 도구 준비와 실제 DB 적용 완료를 구분한다.
 
 ## 원본 모델과 API 투영의 구분
 
