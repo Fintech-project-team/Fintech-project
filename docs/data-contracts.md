@@ -35,7 +35,7 @@ CODEF는 금융 데이터 항목을 검토하는 참고 자료다. MVP에서 COD
 
 | 객체                          | 핵심 정보                                                                                   | 이유·제약                                                              |
 | ----------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| DemoUser                      | userId, 합성 이름/전화번호, displayName, 코드 검증값                                        | 재접속 식별과 소유권. 사용자 제출 원문 저장과 구별                     |
+| DemoUser                      | userId, name(합성 인증·호칭 이름), 합성 전화번호, 코드 검증값                               | 재접속 식별과 소유권. 사용자 제출 원문 저장과 구별                     |
 | DemoSession                   | sessionId, userId, token 검증값, issued/ended 시점, 무작위 설치 식별                        | 사용자별 활성1개. deviceId 단독 인증 금지                              |
 | InstitutionLink               | 기관 ID/종류, userId, 형식 동의·연결 상태/시점                                              | 연결 전후 노출 범위, 최종 동의−제외 목록                               |
 | FinancialAccount              | accountId, userId, 기관/상품, 가린 번호, balanceKRW, asOf                                   | 잔액 원천 불변. 포함 여부·nickname은 별도 사용자 설정                  |
@@ -135,27 +135,27 @@ API는 언어 독립 JSON으로 전달한다. 아래 필드명은 기존 논리 
 
 ## API 경로 권장안
 
-| 경로                                                                 | 책임                                                                                    |
-| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| POST /demo-sessions                                                  | 합성 이름/전화번호+별도 코드 확인, 단일 세션 원자 발급. 불일치/사용 중 동일 오류        |
-| DELETE /demo-sessions/current                                        | 현재 세션 종료, 사용자 금융 설정 유지                                                   |
-| POST /demo-sessions/current/reverify                                 | 기존 유효 토큰과 해당 사용자의 입력/코드 재확인, 새 세션 미발급                         |
-| GET /snapshot                                                        | 연결 전 최소 메타데이터 또는 연결 후 허용 원천/설정·버전                                |
-| GET /transactions                                                    | 사용자·연결 범위·조회 기간·페이지/버전 기준의 원천 거래                                 |
-| POST /institution-links                                              | 최종 동의−제외 목록 한 논리 작업 저장                                                   |
-| PATCH /account-selection, PATCH /accounts/{id}                       | 계산 포함 계좌, nickname만 변경. 잔액 변경 없음                                         |
-| PATCH /settings                                                      | 급여·카드 결제 계획 중 허용 필드. 실제 카드 출금 계좌는 조회만                          |
-| POST /obligations, PATCH /obligations/{id}, DELETE /obligations/{id} | 예정 지출 추가/미지급 수정/취소. 이미 지급한 근거 삭제 없이 취소 상태 보존              |
-| POST /reserves, PATCH /reserves/{id}, DELETE /reserves/{id}          | 보호 설정 CRUD. 유효 배정이 있으면 먼저 명시 해제·관련 제약 확인                        |
-| POST /settlement-links/corrections                                   | 유효 연결 해제/재연결, 관련 배정·이력·버전을 한 작업으로 저장                           |
-| POST /recurring-analysis                                             | 로컬이 산출한 후보/근거의 사용자 소유권 확인 후 LLM 해석 반환. 서버 금융 수치 생성 없음 |
-| POST /recommendations/{id}/approve 또는 exclude                      | 근거·허용 설정·참조 검증, 사용자 승인/제외 저장                                         |
-| PATCH /transactions/{id}/classification                              | PAYSE 네 거래 분류 변경; 원천 사실 변경 없음                                            |
-| POST /demo-events/{id}/apply                                         | 준비된 경제적 사건 한 번 반영. 임의 원천 금액 편집 엔드포인트 아님                      |
-| POST /reserve-adjustments/confirm                                    | 한 보호 설정 확정. 가상 items/결과를 영속 저장하지 않음                                 |
-| POST /plan-explanations                                              | P1 설명. 사용자 식별 입력·불필요 원천 없이 최소 근거; 금융 쓰기 없음                    |
+| 경로                                                                 | 책임                                                                                                 |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| POST /demo-sessions                                                  | 합성 이름/전화번호+별도 코드 확인, 단일 세션 원자 발급 및 저장된 name 반환. 불일치/사용 중 동일 오류 |
+| DELETE /demo-sessions/current                                        | 현재 세션 종료, 사용자 금융 설정 유지                                                                |
+| POST /demo-sessions/current/reverify                                 | 기존 유효 토큰과 해당 사용자의 입력/코드 재확인, 새 세션 미발급                                      |
+| GET /snapshot                                                        | 연결 전 최소 메타데이터 또는 연결 후 허용 원천/설정·버전                                             |
+| GET /transactions                                                    | 사용자·연결 범위·조회 기간·페이지/버전 기준의 원천 거래                                              |
+| POST /institution-links                                              | 최종 동의−제외 목록 한 논리 작업 저장                                                                |
+| PATCH /account-selection, PATCH /accounts/{id}                       | 계산 포함 계좌, nickname만 변경. 잔액 변경 없음                                                      |
+| PATCH /settings                                                      | 급여·카드 결제 계획 중 허용 필드. 실제 카드 출금 계좌는 조회만                                       |
+| POST /obligations, PATCH /obligations/{id}, DELETE /obligations/{id} | 예정 지출 추가/미지급 수정/취소. 이미 지급한 근거 삭제 없이 취소 상태 보존                           |
+| POST /reserves, PATCH /reserves/{id}, DELETE /reserves/{id}          | 보호 설정 CRUD. 유효 배정이 있으면 먼저 명시 해제·관련 제약 확인                                     |
+| POST /settlement-links/corrections                                   | 유효 연결 해제/재연결, 관련 배정·이력·버전을 한 작업으로 저장                                        |
+| POST /recurring-analysis                                             | 로컬이 산출한 후보/근거의 사용자 소유권 확인 후 LLM 해석 반환. 서버 금융 수치 생성 없음              |
+| POST /recommendations/{id}/approve 또는 exclude                      | 근거·허용 설정·참조 검증, 사용자 승인/제외 저장                                                      |
+| PATCH /transactions/{id}/classification                              | PAYSE 네 거래 분류 변경; 원천 사실 변경 없음                                                         |
+| POST /demo-events/{id}/apply                                         | 준비된 경제적 사건 한 번 반영. 임의 원천 금액 편집 엔드포인트 아님                                   |
+| POST /reserve-adjustments/confirm                                    | 한 보호 설정 확정. 가상 items/결과를 영속 저장하지 않음                                              |
+| POST /plan-explanations                                              | P1 설명. 사용자 식별 입력·불필요 원천 없이 최소 근거; 금융 쓰기 없음                                 |
 
-위 기초 필드의 엔드포인트별 배치, 미정 상태 코드·페이지 키·실패 제한 수치·삭제 응답은 #20의 상세 명세에서 채운다. 새 경로는 권장안이며 배포된 API가 아니다. 일반적인 삭제 API 요구가 금융 거래 원문 삭제 권한을 뜻하지 않는다.
+위 기초 필드의 엔드포인트별 배치, 상태 코드·페이지 키·실패 제한 수치·삭제 응답은 [#20 상세 명세](../apps/api/docs/v0.6/api-contract.md)를 따른다. 새 경로는 권장안이며 배포된 API가 아니다. 일반적인 삭제 API 요구가 금융 거래 원문 삭제 권한을 뜻하지 않는다.
 
 반복 후보의 로컬 ID만 보내서는 서버가 승인/제외 대상을 알 수 없다. 승인/제외 요청에는 후보 ID·규칙/원천 버전·근거 거래 ID 집합을 포함하고, 승인 시 사용자가 확인한 금액·예정일·출금 계좌를 함께 보낸다. 서버는 해당 근거의 소유권/존재/버전과 저장 제약을 검증하고 결정을 저장한다. 승인 전 모든 후보 수치를 서버에 영구 보관해야 한다는 요구는 아니다.
 
@@ -166,3 +166,15 @@ API는 언어 독립 JSON으로 전달한다. 아래 필드명은 기존 논리 
 자동 지급 연결은 확인된 원천 ID/청구/명시 매핑을 사용한다. 같은 금액·날짜·상호만으로 확정하지 않는다. 근거가 부족하면 확인 필요로 남기고 사용자가 내부 연결을 바로잡는다. 사용자별 금액 산출은 로컬, 서버는 저장 가능성·참조·중복만 검증한다.
 
 금액은 KRW 정수, 단일 값/중간 합계 절댓값 상한 9,000,000,000,000원이다. nickname은 앞뒤 공백 제거 후 grapheme 1~12개·이모지 허용·중복 허용·특수문자만 불가·null 되돌리기이며 원천 상품명과 분리한다. 정확한 허용 문자 표는 화면 상세와 같은 벡터로 검증한다.
+
+## 이름 계약 보완 — 2026-10-21
+
+사용자 이름은 `name` 하나로 통합한다. 인증 대조와 허용 화면 호칭에 같은 서버 저장값을 쓰고 로그인 201에 필수 반환한다. 인증 식별값만 정규화 후 공백 없이 저장하며 금융 상품명·거래 메모·계좌 별칭의 원문 규칙은 유지한다. 확정된 세 이름·기존 SQL/시드 이행 경계는 [인증 설계 §2](../apps/api/docs/v0.6/auth-design.md)를 따른다. 금융 Snapshot이나 reverify 응답에 이름 필드를 추가하는 결정은 아니다.
+
+## 연결 상태·표현 보완 — 사용자 채택 5·6·7
+
+- `name`은 합성 계정 조회·입력 대조·이름+전화번호 인증 제한·로그인 201 표시값에만 사용한다. 금융 소유권/권한은 `userId`다. 호칭 위치는 프론트 담당자가 정한다.
+- alpha·beta·gamma 모두 최초 연결 전 상태를 지원한다. 각 계정 원본의 공통 메타정보·기관 목록을 사용하고 institutionLinks/coverage는 [], 금융 키는 생략한다. alpha 자료를 다른 계정에 재사용하거나 계정별 연결 전 JSON 복제를 의무화하지 않는다.
+- 최초 연결 전 응답 생성과 재로그인을 구분한다. 이미 저장된 연결·계좌 선택·설정은 해당 userId로 복원하며 로그인 때문에 초기화하지 않는다.
+- FakeRepository와 실제 API는 같은 부분 연결·종속 참조 규칙을 따른다. 원본 fixture는 보존하고 별도 사용자 상태를 입력으로 API 표현을 만든다. 카드/계좌 배열만 필터링하거나 금융 원천 ID를 접근 제한이라는 이유로 null로 바꾸지 않는다.
+- 정확한 허용 키·제한 표현·상태 전이·실패 기준·예시는 [v0.6 응답 모델](../apps/api/docs/v0.6/response-models.md)이 기준이다. 연결된 미선택 계좌(included=false)는 계속 조회 가능하다. 이 추가로 실제 API/FakeRepository 구현 완료를 뜻하지 않는다.
