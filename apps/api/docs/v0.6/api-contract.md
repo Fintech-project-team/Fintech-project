@@ -19,12 +19,16 @@ W는 요청 최상위 필드다. 키는 1~128 ASCII 영숫자·점·밑줄·하�
 
 ## 2. 인증·탈퇴
 
-| 메서드·경로                          | 요청                                                       | 성공                                                                                         |
-| ------------------------------------ | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| POST /demo-sessions                  | `{name:string,phone:string,code:string,installationId:ID}` | 201 `{userId:ID,sessionId:ID,accessToken:string,tokenType:"Bearer",issuedAt:Time}`           |
-| DELETE /demo-sessions/current        | Bearer, 본문 없음                                          | 204, 현재 세션 종료                                                                          |
-| POST /demo-sessions/current/reverify | Bearer + `{name:string,phone:string,code:string}`          | 200 `{userId:ID,sessionId:ID,verified:true}`. 새 토큰 없음                                   |
-| POST /account-deactivation           | Bearer + `{idempotencyKey:string}`                         | 200 `{receiptId:ID,deactivatedAt:Time,purgeAfter:Time,replayed:boolean}`. 금융 Snapshot 없음 |
+| 메서드·경로                          | 요청                                                       | 성공                                                                                           |
+| ------------------------------------ | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| POST /demo-sessions                  | `{name:string,phone:string,code:string,installationId:ID}` | 201 `{userId:ID,name:string,sessionId:ID,accessToken:string,tokenType:"Bearer",issuedAt:Time}` |
+| DELETE /demo-sessions/current        | Bearer, 본문 없음                                          | 204, 현재 세션 종료                                                                            |
+| POST /demo-sessions/current/reverify | Bearer + `{name:string,phone:string,code:string}`          | 200 `{userId:ID,sessionId:ID,verified:true}`. 새 토큰 없음                                     |
+| POST /account-deactivation           | Bearer + `{idempotencyKey:string}`                         | 200 `{receiptId:ID,deactivatedAt:Time,purgeAfter:Time,replayed:boolean}`. 금융 Snapshot 없음   |
+
+이름은 요청·사용자 모델·성공 응답에서 `name` 하나로 사용한다. `POST /demo-sessions`의 201에는 검증된 사용자 레코드의 비어 있지 않은 `name`을 필수 반환한다. 제출 문자열을 그대로 반사하거나 `syntheticName`·`displayName`을 별도 이름 필드로 반환하지 않는다. 재확인 200에는 이름 필드를 추가하지 않는다. 사용자 식별·소유권은 기존 UUID `userId`를 유지한다.
+
+인증 식별값만 정규화 후 공백 없이 저장한다. 허용된 입력 구분자 처리와 거절 기준은 [인증 설계 §2](auth-design.md)를 따른다. 이름 내부 공백을 삭제해 다른 이름으로 바꾸거나 상품명·거래 메모·계좌 별칭의 공백을 일괄 삭제하지 않는다. 이름 이행은 기존 SQL·더미에 아직 구현되지 않았으며 확정된 시드 값과 적용 경계는 같은 설계에 명시한다.
 
 이름·전화번호는 합성 입력만 안내한다. 앞뒤 공백/명시 허용 구분자 정규화는 기존 화면 기준을 따른다. code는 ASCII 숫자 6자리다. 로컬 형식 오류 문구와 서버 자격 존재 여부를 구분한다. 형식에 맞는 자격 불일치·이미 활성 세션 존재·비활성 계정은 같은 `401 AUTH_REJECTED`와 일반 메시지다.
 
