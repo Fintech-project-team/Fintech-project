@@ -138,3 +138,11 @@ packages/payse_calculation/
 ## 2026-10-19 공통 앱 초기화 범위
 
 `apps/mobile/lib/main.dart`, `lib/app/`, `test/app/`와 Android/iOS 소스를 초기화했다. 이는 위 구조 기준을 구현할 시작점이며 Repository·ViewModel·순수 계산·제품 화면이 모두 완성됐다는 뜻은 아니다. 새 상태 관리·라우터·Service Locator 패키지는 추가하지 않았다. 기능과 공유 데이터 파일은 필요한 작업에서 생성하며 실제 역할·검사는 [Flutter 전환](harness/FLUTTER_TRANSITION.md)을 따른다.
+
+## 세 계정·연결 범위와 Repository 계약
+
+alpha·beta·gamma는 각 userId의 원본 fixture·저장 상태를 사용한다. 최초 연결 전 응답은 같은 변환 함수 책임으로 생성하고, 로그인할 때마다 원본 시드 상태를 다시 덮지 않는다. API와 FakeRepository는 [v0.6 응답 모델](../apps/api/docs/v0.6/response-models.md)의 연결 전/부분 연결·누락·제한 계약을 공통으로 따른다.
+
+FakeRepository는 불변 원본과 사용자별 변경 상태를 분리한다. 연결 확정·계좌 선택 성공 시 기존 버전 규칙을 모사하고 cursor·누적 페이지를 폐기한다. 실패한 요청·연출 성공만으로 상태/버전을 확정하지 않는다. 계정 전환 때 이전 계정 캐시·페이지·늦은 응답을 새 계정에 적용하지 않는다. `name`은 호칭 값이며 계정 캐시/소유권 키는 userId다. 구체적인 오류 클래스·화면 호칭 위치·위젯/상태 관리 방식은 B의 구현 영역이다.
+
+접근 제한 자료는 정상 객체의 필수 FK에 null을 채워 넣지 않고 제한 상태를 유지하는 mapper/model로 다룬다. 숨겨진 계좌가 있는 카드의 출금 능력 등 해당 의존 계산만 보류하며 서버로 금융 계산을 이동하지 않는다. 이 문서 보완은 실제 API/FakeRepository 연결 완료 보고가 아니다.
