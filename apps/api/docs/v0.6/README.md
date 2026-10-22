@@ -12,7 +12,7 @@
 | [응답 모델](response-models.md)  | 원천 필드 참조, 연결 전후 표현, 페이지, 수정 권한 |
 | [인계·검증](review-checklist.md) | #20 요구사항 대조, 프론트 인계, 실제 검증 범위    |
 
-금융 필드 사전은 [데이터 모델](../data-model-draft.md), 물리 저장은 [DB 설계](../database-design.md)가 기준이다. 기존 MD·SQL·fixture·Flutter·Java 파일은 변경하지 않는다. 이번 신규 파일은 이 폴더의 MD 4개와 `docs/tasks/PAYSE-API-20-20261021.json` 1개다.
+금융 필드 사전은 [데이터 모델](../data-model-draft.md), 물리 저장은 [DB 설계](../database-design.md)가 기준이다. 최초 #20 작업은 이 폴더의 MD 4개와 `docs/tasks/PAYSE-API-20-20261021.json` 1개만 추가했다. 이후 #21에서 사용자가 확정한 이름 통합과 로그인 201의 name 추가를 이 계약에 반영했다. 최신 이름 규칙은 [인증 설계](auth-design.md) §2를 따른다. SQL·fixture·Flutter·Java 구현은 이번 문서 개정으로 변경되지 않는다.
 
 인증 내부 설계는 [#21](https://github.com/Fintech-project-team/Fintech-project/issues/21), 세션·조회 구현은 [#22](https://github.com/Fintech-project-team/Fintech-project/issues/22), 설정 저장 구현은 [#23](https://github.com/Fintech-project-team/Fintech-project/issues/23)의 후속 범위다. DB migration·파쇄 운영 작업의 구체 이슈 배정은 이 문서에서 확정하지 않는다. 앞서 작성한 내부 구조·DB 보완·실험 기록은 별도 후속 자료로 보존하며 이번 적용 대상에 포함하지 않는다.
 
@@ -38,4 +38,8 @@ v0.6은 데모 세션·재확인·종료·탈퇴, 최초 기관 연결, 계좌 �
 
 반복 후보 승인·분류 정정·거래에서 계획 등록은 v0.7, 미래 시뮬레이션은 v0.8, 정산 정정·돌발 사건·보호 조정은 v0.9의 후속 쓰기다. 기관 추가/해제 화면의 P1 우선순위도 유지한다. #20 명세 완료로 서버 구현·재접속 유지 완료를 선언하지 않는다.
 
-API에 화면 번호·문구·탭 순서를 저장하지 않는다. Flutter는 Repository/mapper에서 API 표현을 화면·계산 모델로 변환한다. 이번 작업으로 현재 프론트 파일이 바뀌지는 않으며 연결 전 표현·부분 연결·페이지·멱등·탈퇴를 fake repository에 반영할 내용은 [인계 표](review-checklist.md)에 정리한다.
+API에 화면 번호·문구·탭 순서를 저장하지 않는다. Flutter는 Repository/mapper에서 API 표현을 화면·계산 모델로 변환한다. 이번 작업으로 프론트 구현 코드는 바뀌지 않으며 연결 전 표현·부분 연결·페이지·멱등·탈퇴를 fake repository에 반영할 내용은 [인계 표](review-checklist.md)에 정리한다.
+
+## #21 이름·연결 표현 보완
+
+사용자 채택 5·6·7에 따라 이름 사용 범위, 세 계정의 최초 연결 전 공통 변환, FakeRepository/API의 동일 부분 연결 계약을 보완한다. 현재 화면 호칭 위치·새 연결 시나리오 파일 수를 임의 확정하지 않는다. [응답 모델](response-models.md)에 조건/필드/예시를, [인계·검증](review-checklist.md)에 사례와 미구현 경계를 둔다. 로드맵의 v0.6 단계·서버 구현 P1, Flutter 로컬 계산, 기관 추가/해제 P1은 유지한다. 원문 references는 과거 자료로 보존한다.

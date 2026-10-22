@@ -1,6 +1,6 @@
 # PAYSE 데이터 명세 초안
 
-2026-10-19 · v1.0 범위·확장 경계 보완본 · GitHub [#17 데이터 명세서](https://github.com/Fintech-project-team/Fintech-project/issues/17) 검토용. 기존 MD와 구현 파일은 변경하지 않았다. 제품 결정은 유지하며 아래 영문 필드명·열거값·물리 저장 매핑은 **구현 제안**이다. 완성 JSON Schema·API 명세·DDL이 아니다.
+2026-10-19 · v1.0 범위·확장 경계 보완본 · GitHub [#17 데이터 명세서](https://github.com/Fintech-project-team/Fintech-project/issues/17) 검토용. 최초 #17 작성 당시 기존 MD와 구현 파일은 변경하지 않았다. 이후 #21의 이름·연결 표현 문서 보완은 아래 추가 절을 따른다. 제품 결정은 유지하며 아래 영문 필드명·열거값·물리 저장 매핑은 **구현 제안**이다. 완성 JSON Schema·API 명세·DDL이 아니다.
 
 목적: 백엔드가 준비할 데이터와 Flutter가 받을 데이터를 일치시키고, 이어지는 #19 DB 설계·#18 더미 생성·#20 API 설계에 같은 의미를 전달한다. 공동 확인 방식은 [문서 공유 기준](../../../docs/development-notes.md)을 따른다.
 
@@ -153,19 +153,19 @@ Snapshot은 `recurringPlanRevisions: RecurringPlanRevision[]`, `occurrenceOverri
 
 아래 민감 필드는 일반 Snapshot·금융 더미 공개 JSON·LLM 입력에 포함하지 않는다. 합성 계정 시드와 금융 자료는 별개다.
 
-| 객체/필드                                                       | 타입                                       | 필수 여부          | 수정 권한·의미                                                                 | 저장 대응                              |
-| --------------------------------------------------------------- | ------------------------------------------ | ------------------ | ------------------------------------------------------------------------------ | -------------------------------------- |
-| DemoUser.userId                                                 | ID                                         | 필수               | 서버: 재로그인해도 동일 ID                                                     | demo_users.id                          |
-| syntheticName / syntheticPhone / displayName                    | 문자열 각각                                | 필수               | 운영 시드: 합성 자료만. name/phone 단독 인증 금지; displayName은 허용 화면에만 | 대응 사용자 컬럼                       |
-| codeVerifier / createdAt                                        | 검증 문자열 / 시각                         | 필수               | 서버 전용: 별도 데모 코드 검증값/시드 생성 시각                                | code_verifier/created_at               |
-| Session.sessionId / userId / installationId                     | ID 각각                                    | 필수               | 서버: 사용자별 활성 1개, 설치 ID는 인증 근거 아님                              | demo_sessions 대응 컬럼                |
-| tokenDigest / issuedAt / endedAt                                | 검증 문자열 / 시각 / 시각                  | 필수 / 필수 / null | 서버 전용: 무작위 토큰 검증/발급/명시 종료. 자동 만료 정책 추가 안 함          | 대응 세션 컬럼                         |
-| WriteReceipt.receiptId / operationKey                           | ID / 문자열                                | 필수               | 서버: 사용자+작업키 유일. 같은 요청 재시도 한 번 처리                          | write_receipts.id/operation_key        |
-| requestDigest / action / changedRefs                            | 문자열 / 작업 종류 문자열 / 대상 참조 배열 | 필수               | 서버: 허용된 저장 본문만 해시. 인증 원문·시뮬레이션 저장 금지                  | 대응 기록 컬럼                         |
-| beforeAfter / resultVersion / createdAt                         | 변경 필드 객체 / 버전 문자열 / 시각        | 필수               | 서버: 정정에 필요한 최소 설정·관계 기록. 금융 파생값 저장 아님                 | before_after/result_version/created_at |
-| WriteRequest.expectedDataVersion / ruleVersion / idempotencyKey | 버전 문자열 / 문자열 / 문자열              | 필수               | 사용자 요청, 서버 대조. 동일 키 다른 본문·오래된 버전은 저장 거절              | 요청·write_receipts                    |
-| AuthInput.name / phone / code                                   | 문자열 각각                                | 필수               | 인증 요청 메모리만, 제출값 추가 저장·로그·LLM 전송 금지                        | 저장 안 함                             |
-| LocalPIN                                                        | 6자리 입력                                 | 조건               | 기기 잠금/복구만. 서버로 원문·검증값 전송 금지                                 | 기기 보안 저장 설계 대상               |
+| 객체/필드                                                       | 타입                                       | 필수 여부          | 수정 권한·의미                                                                                           | 저장 대응                              |
+| --------------------------------------------------------------- | ------------------------------------------ | ------------------ | -------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| DemoUser.userId                                                 | ID                                         | 필수               | 서버: 재로그인해도 동일 ID                                                                               | demo_users.id                          |
+| name / syntheticPhone                                           | 문자열 각각                                | 필수               | 사전 합성 시드. name은 인증·호칭 공통 값, phone 단독 인증 금지. 이름/전화번호는 정규화 후 공백 없이 저장 | 목표 demo_users.name / synthetic_phone |
+| codeVerifier / createdAt                                        | 검증 문자열 / 시각                         | 필수               | 서버 전용: 별도 데모 코드 검증값/시드 생성 시각                                                          | code_verifier/created_at               |
+| Session.sessionId / userId / installationId                     | ID 각각                                    | 필수               | 서버: 사용자별 활성 1개, 설치 ID는 인증 근거 아님                                                        | demo_sessions 대응 컬럼                |
+| tokenDigest / issuedAt / endedAt                                | 검증 문자열 / 시각 / 시각                  | 필수 / 필수 / null | 서버 전용: 무작위 토큰 검증/발급/명시 종료. 자동 만료 정책 추가 안 함                                    | 대응 세션 컬럼                         |
+| WriteReceipt.receiptId / operationKey                           | ID / 문자열                                | 필수               | 서버: 사용자+작업키 유일. 같은 요청 재시도 한 번 처리                                                    | write_receipts.id/operation_key        |
+| requestDigest / action / changedRefs                            | 문자열 / 작업 종류 문자열 / 대상 참조 배열 | 필수               | 서버: 허용된 저장 본문만 해시. 인증 원문·시뮬레이션 저장 금지                                            | 대응 기록 컬럼                         |
+| beforeAfter / resultVersion / createdAt                         | 변경 필드 객체 / 버전 문자열 / 시각        | 필수               | 서버: 정정에 필요한 최소 설정·관계 기록. 금융 파생값 저장 아님                                           | before_after/result_version/created_at |
+| WriteRequest.expectedDataVersion / ruleVersion / idempotencyKey | 버전 문자열 / 문자열 / 문자열              | 필수               | 사용자 요청, 서버 대조. 동일 키 다른 본문·오래된 버전은 저장 거절                                        | 요청·write_receipts                    |
+| AuthInput.name / phone / code                                   | 문자열 각각                                | 필수               | 인증 요청 메모리만, 제출값 추가 저장·로그·LLM 전송 금지                                                  | 저장 안 함                             |
+| LocalPIN                                                        | 6자리 입력                                 | 조건               | 기기 잠금/복구만. 서버로 원문·검증값 전송 금지                                                           | 기기 보안 저장 설계 대상               |
 
 코드 검증 후 활성 세션이 없을 때만 발급한다. 활성 세션이 있으면 기존 로그인 유지·새 로그인 거절이다. PIN 복구는 기존 토큰+합성 입력·코드 재확인 후 로컬 재설정하며 새 세션을 만들지 않는다. 토큰 분실과 정상 PIN 복구를 동일 처리하지 않는다. 로그아웃/데모 탈퇴로 금융 설정을 초기화하지 않는다.
 
@@ -252,3 +252,15 @@ v1.0 급여 확인은 **임시 결정**이다. 합성 시나리오가 같은 자
 - [화면 규칙](https://github.com/Fintech-project-team/Fintech-project/blob/c0af85ab5ced423e780a02717c51ebb7eaa409d2/docs/v0.6-screen-rules.md): 별칭·상품명·카드 내역·할부 원문·계획 편집 표시.
 - [JSON Schema 객체](https://json-schema.org/understanding-json-schema/reference/object): 필수 키와 null을 구분하는 표현 근거.
 - [PostgreSQL 제약](https://www.postgresql.org/docs/current/ddl-constraints.html): 관계·유일성·행 간 제약의 구현 범위. 제품 정책의 근거로 확대하지 않는다.
+
+## DemoUser 이름 통합 보완 — 2026-10-21
+
+별도 인증명·표시명 대신 `name` 하나를 사용하고 로그인 201에 검증된 서버 저장값을 반환한다. 기존 userId와 전화번호를 유지하며 이름만으로 사용자를 식별/인증하지 않는다. 세 이름의 UUID 매핑과 정규화/저장 규칙은 [인증 설계 §2](v0.6/auth-design.md)가 기준이다. 이번에 바꾸는 것은 목표 계약이며 현행 SQL·server-seeds.json·생성/검증/export 도구는 후속 전환 대상이다. 금융 snapshot 필드·값·식별자와 사용자 설정의 공백 규칙은 변경하지 않는다.
+
+## 원본 모델과 API 투영의 구분 — 사용자 채택 6·7
+
+위 필드 표는 `PAYSE-DRAFT-1` 원본의 정상 객체를 설명한다. HTTP/FakeRepository의 `PAYSE-API-0.6-1`은 [응답 모델](v0.6/response-models.md)에 따라 접근 제한 필드를 생략하고 accessRestrictions를 함께 제공한다. 정상 모델의 필수 FK를 임의 null로 채워 원본 검증기에 통과시키지 않는다. API 표현 검증은 별도로 필요하며 원본 검증기 성공이 API 계약 통과를 뜻하지 않는다.
+
+alpha·beta·gamma 최초 상태는 각 사용자 원본 메타정보·기관 목록에서 같은 규칙으로 생성한다. 최초에는 institutionLinks/coverage=[]이고 금융 키가 없다. 기관 연결·계좌 선택·설정 저장 후 재로그인은 저장 상태를 복원한다. 각 계정 원본과 상태는 userId 기준으로 격리하고 이름을 관계 키로 쓰지 않는다.
+
+접근 제한은 계좌·카드 외에 거래·청구·급여 근거·계획/버전/회차·보호·배정·정산·관계/출처 참조까지 적용한다. 숨겨진 부모의 자식을 남기지 않고 미상 null·빈 배열·확인된 0원·미수신 페이지를 구분한다. included는 홈 계산 포함 여부이며 연결 권한을 대체하지 않는다.
