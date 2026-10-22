@@ -56,7 +56,6 @@ class PayseApp extends StatefulWidget {
 
 /// 2026-10-20: 앱 수명 동안 필요한 등록과 Repository 생성, 개발용 스냅샷 선택을 맡는다.
 /// 2026-10-21: 인증 의존성 생성, 진입 판단, 10분 무입력·백그라운드 복귀 잠금도 맡는다.
-/// 2026-10-22: 인증 의존성에서 설치 식별값 생성을 제거했다.
 class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
   late final SnapshotSource _source =
       widget.snapshotSource ?? AssetSnapshotSource(rootBundle);

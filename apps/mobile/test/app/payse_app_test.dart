@@ -34,7 +34,12 @@ void main() {
   testWidgets('session without PIN resumes at 10-4', (tester) async {
     final sessions = MemorySessionStore();
     await sessions.save(
-      const StoredSession(userId: 'u', sessionId: 's', accessToken: 't'),
+      const StoredSession(
+        userId: 'u',
+        name: '데모알파',
+        sessionId: 's',
+        accessToken: 't',
+      ),
     );
     await tester.pumpWidget(
       PayseApp(enableDevTools: false, sessionStore: sessions),

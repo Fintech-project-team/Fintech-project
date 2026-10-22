@@ -3,37 +3,68 @@ import 'package:payse/features/auth/auth_validation.dart';
 
 void main() {
   test(
-    'name: Korean syllables or English, 2-20 chars, inner single spaces',
+    'name: only edge U+0020 is trimmed; Korean syllables or English 2-20',
     () {
-      for (final ok in ['홍길동', 'Kim', 'PAYSE 합성 alpha', '가나']) {
+      for (final ok in ['데모알파', 'Kim', '가나', '홍길동', 'abcdefghijklmnopqrst']) {
         expect(isValidName(normalizeName(ok)), isTrue, reason: ok);
       }
-      for (final bad in ['가', 'ㄱㄴㄷ', '홍길동1', 'a  b', '가' * 21, '김-철수', '']) {
+      expect(normalizeName('  데모알파 '), '데모알파', reason: '앞뒤 일반 공백만 제거');
+      expect(isValidName(normalizeName('  데모알파 ')), isTrue);
+
+      for (final bad in [
+        '데모 알파',
+        'PAYSE 합성 alpha',
+        '데모\t알파',
+        '\t데모알파',
+        '데모알파\n',
+        ' 데모알파',
+        '데모알파　',
+        '데모　알파',
+        '가',
+        'ㄱㄴㄷ',
+        '홍길동1',
+        '가' * 21,
+        '김-철수',
+        '',
+      ]) {
         expect(isValidName(normalizeName(bad)), isFalse, reason: bad);
       }
-      expect(normalizeName('  홍길동 '), '홍길동', reason: '앞뒤 공백만 정규화');
+      expect(normalizeName('\t데모알파'), '\t데모알파', reason: '탭은 지우지 않음');
+      expect(normalizeName(' 데모알파'), ' 데모알파', reason: 'NBSP는 지우지 않음');
     },
   );
 
-  test('phone: only spaces and hyphens are removed, 010 + 8 digits', () {
+  test('phone: only U+0020 and U+002D are removed, 010 + 8 ASCII digits', () {
     expect(normalizePhone('010-0000-0001'), '01000000001');
     expect(normalizePhone(' 010 0000 0001 '), '01000000001');
-    expect(
-      normalizePhone('010.0000.0001'),
-      isNull,
-      reason: '허용하지 않은 구분자는 지우지 않음',
-    );
-    expect(isValidPhone('01000000001'), isTrue);
-    expect(isValidPhone('01100000001'), isFalse);
-    expect(isValidPhone('0100000000'), isFalse);
-    expect(isValidPhone(null), isFalse);
+    expect(isValidPhone(normalizePhone('010-0000 0001')), isTrue);
+    for (final bad in [
+      '010\t0000\t0001',
+      '010\n00000001',
+      '010 00000001',
+      '010　00000001',
+      '010.0000.0001',
+      '+821000000001',
+      '０１０００００００１',
+      '01100000001',
+      '0100000000',
+    ]) {
+      expect(isValidPhone(normalizePhone(bad)), isFalse, reason: bad);
+    }
   });
 
-  test('code: exactly 6 ASCII digits', () {
+  test('code: exactly 6 ASCII digits, never normalized', () {
     expect(isValidCode('000001'), isTrue);
-    expect(isValidCode('00001'), isFalse);
-    expect(isValidCode('٠٠٠٠٠١'), isFalse, reason: 'ASCII 숫자만');
-    expect(isValidCode('12345a'), isFalse);
+    for (final bad in [
+      '00001',
+      ' 000001',
+      '000001 ',
+      '٠٠٠٠٠١',
+      '０００００１',
+      '12345a',
+    ]) {
+      expect(isValidCode(bad), isFalse, reason: bad);
+    }
   });
 
   test('weak PIN: same digit x6 or step +1/-1', () {
