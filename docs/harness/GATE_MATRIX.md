@@ -49,7 +49,7 @@ CODE_SPEC.md와 EXTENSION_POINTS.md도 공통 필수 문서다. Git 작업은 CO
 
 ## Flutter 작업의 추가 판정
 
-2026-10-19 초기화 이후 mobile 검사는 `apps/mobile/package.json`의 `check`를 통해 실제 SDK 버전·Dart 포맷·Flutter 분석·위젯 테스트로 연결된다. 명령은 `scripts/harness/run-flutter.mjs`에 있다. 이전 Node의 mobile typecheck/test라는 표기는 해당 wrapper의 분석/테스트 명령으로 호환한다.
+mobile 검사는 `apps/mobile/package.json`의 `check`를 통해 실제 SDK 버전·Dart 포맷·Flutter 분석·위젯 테스트로 연결된다. 명령은 `scripts/harness/run-flutter.mjs`에 있다. 이전 Node의 mobile typecheck/test라는 표기는 해당 wrapper의 분석/테스트 명령으로 호환한다.
 
 하네스는 Dart 소스도 실제 제품 소스로 인식한다. 공유 검사기 변경은 실제 소스가 존재하는 소비자까지 검사하며, 직접 변경된 서버/패키지의 검사는 빈 골격이라는 이유로 생략하지 않는다. 제품 코드를 바꾸지 않은 일반 MD 작업에는 모바일 검사를 강제하지 않는다.
 
@@ -61,9 +61,9 @@ CODE_SPEC.md와 EXTENSION_POINTS.md도 공통 필수 문서다. Git 작업은 CO
 
 숫자는 Flutter 순수 Dart, 서버는 사용자 격리·저장 제약·멱등·LLM 계약을 검사한다. v0.7 실제 LLM과 후속 설명 보조의 우선순위를 구분한다. 준비된 더미 제공 계약은 필요하지만 별도 mock-bank 프로세스 도입을 강제하지 않는다. 문서만 적용한 작업에 앱·기기 완료를 요구하거나 완료로 보고하지 않는다. 기존 필수 검사 규칙을 완화하지 않는다.
 
-## API Java 초기화 이후
+## API Java 검사
 
-2026-10-20부터 API typecheck는 Java 컴파일+주석 검사, API test는 JUnit+기존 Python 더미 검사에 연결한다. 주석 자동 검사 대상은 apps/api의 src/main/java·src/test/java·tools 아래 직접 작성한 Java 코드다. `node scripts/harness/run-api.mjs check`는 실행 JAR 생성까지 포함한다. JDK 21 또는 테스트용 Python 3.10+ 부재는 BLOCKED, 컴파일/테스트 실패는 FAIL이다. 기존 Node lint는 Java 검증을 대신하지 않는다.
+API typecheck는 Java 컴파일+주석 검사, API test는 JUnit+기존 Python 더미 검사에 연결한다. 주석 자동 검사 대상은 apps/api의 src/main/java·src/test/java·tools 아래 직접 작성한 Java 코드다. `node scripts/harness/run-api.mjs check`는 실행 JAR 생성까지 포함한다. JDK 21 또는 테스트용 Python 3.10+ 부재는 BLOCKED, 컴파일/테스트 실패는 FAIL이다. 기존 Node lint는 Java 검증을 대신하지 않는다.
 
 Java 소스도 공통 변경의 실제 소비자로 인식한다. Flutter 전용 변경은 기존 mobile 선택을 유지하므로 API JDK를 요구하지 않는다. 공통 검사기 변경은 mobile과 api를 함께 검사한다. 종합 검사에서 API typecheck와 test는 각각 최대 17분이다(전체 합계 17분이 아님). 내부 Gradle은 명령당 14분, Python 더미 검사는 2분, Java/Python 버전 확인은 각각 10초로 제한하고 나머지는 프로세스 기동·종료 여유다. 단독 API check도 같은 내부 제한을 사용한다. 다른 제품 검사 제한 시간은 유지한다.
 

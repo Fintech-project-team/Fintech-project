@@ -5,13 +5,13 @@ import '../../data/auth/session_cleanup.dart';
 /// 2026-10-21: 인증 화면이 쓰는 의존성 묶음. 앱 시작 지점에서 만들어 생성자로 넘긴다(전역 조회 없음).
 class AuthServices {
   /// 2026-10-21: 인증 저장소 [repository], 기기 저장소 [sessionStore]·[pinStore]·[consentStore],
-  /// 기기 설치 ID [installationId], 시각 [now], 저장하지 않을 세션의 종료 담당 [cleanup]으로 만든다.
+  /// 시각 [now], 저장하지 않을 세션의 종료 담당 [cleanup]으로 만든다.
+  /// 2026-10-22: 인증 계약에서 제거한 설치 식별값을 보관하지 않는다.
   const AuthServices({
     required this.repository,
     required this.sessionStore,
     required this.pinStore,
     required this.consentStore,
-    required this.installationId,
     required this.now,
     required this.cleanup,
   });
@@ -21,7 +21,6 @@ class AuthServices {
   final SessionStore sessionStore;
   final LocalPinStore pinStore;
   final ConsentStore consentStore;
-  final String installationId;
   final DateTime Function() now;
 }
 

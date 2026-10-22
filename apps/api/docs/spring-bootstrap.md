@@ -1,6 +1,6 @@
 # Spring Boot 초기화 범위와 실행
 
-2026-10-20 사용자 결정: Java + Spring Boot. Java 21, Spring Boot 4.1.1, API 전용 Gradle 9.7.1로 고정한다. Spring BOM과 gradle.lockfile로 의존성을 관리한다. 모바일 Android Gradle과 별도다.
+서버는 Java + Spring Boot를 사용한다. Java 21, Spring Boot 4.1.1, API 전용 Gradle 9.7.1로 고정한다. Spring BOM과 gradle.lockfile로 의존성을 관리한다. 모바일 Android Gradle과 별도다.
 
 ## 구현 범위
 
@@ -19,7 +19,7 @@ JDK 21을 준비하고 `JAVA_HOME`과 PATH를 확인한다. 기존 더미 검사
 ```text
 node scripts/harness/run-api.mjs check
 node scripts/harness/run-api.mjs start
-node scripts/harness/verify-change.mjs --task docs/tasks/PAYSE-SPRING-20261020.json
+node scripts/harness/verify-change.mjs --task "docs/tasks/<작업ID>.json"
 ```
 
 check는 Java 컴파일·JUnit HTTP/설정 검사·운영/테스트/개발 도구의 Javadoc 검사·실행 JAR 생성·기존 Python 더미 검사를 수행한다. 실제 PostgreSQL 연결·기존 SQL의 동시성·Flutter 금융 통합을 대신하지 않는다. Gradle 첫 실행에는 공식 배포/의존성 다운로드가 필요하다.
@@ -30,15 +30,15 @@ DB 연결 시에만 SPRING_PROFILES_ACTIVE=database와 PAYSE_JDBC_URL, PAYSE_DB_
 
 ## 프론트 영향
 
-Flutter 소스·pubspec·SDK·Android/iOS·금융 계약·계산 규칙·DDL·fixture는 이 초기화에서 변경하지 않는다. Flutter만 수정하는 작업은 mobile 검사만 선택하며 API용 JDK/Gradle을 요구하지 않는다. 공통 검사기/계약을 수정하는 작업은 실제 구현이 있는 소비자를 함께 검사한다.
+API 초기화와 Flutter의 SDK·플랫폼·계산 책임을 분리한다. Flutter만 수정하는 작업은 mobile 검사만 선택하며 API용 JDK/Gradle을 요구하지 않는다. 공통 검사기/계약을 수정하는 작업은 실제 구현이 있는 소비자를 함께 검사한다.
 
-Java DTO와 Dart 모델은 기존 JSON 이름·날짜 정밀도·금액 단위·null/누락·버전 의미를 공유한다. 새 서버에 맞춰 프론트 모델을 바꾸지 않는다. 현재 저장소의 Flutter는 bootstrap UI이므로 실제 금융 API 호출부의 통합 완료는 아직 검증할 수 없다.
+Java DTO와 Dart 모델은 기존 JSON 이름·날짜 정밀도·금액 단위·null/누락·버전 의미를 공유한다. 새 서버에 맞춰 프론트 모델을 바꾸지 않는다. 현재 Flutter에는 인증 화면·FakeRepository·탭 골격이 있다. [모바일 구현 경계](../../mobile/docs/fake-repository.md)를 확인하며 준비된 더미를 읽는 동작을 실제 금융 API 통합 완료로 표시하지 않는다.
 
 ## 주석과 구조
 
-[src/AGENTS.md](../src/AGENTS.md)는 apps/api 전체의 필수 개발 규칙이다. Java 주석 의무·자동 검사는 src/main/java·src/test/java·tools의 직접 작성한 Java 코드에 적용한다. 이름 있는 타입·메서드의 생성일·목적·사용처와 기존 메서드/DTO의 수정일·목적을 기록한다. 자동 검사는 형식 검사이며 실제 호출 관계·unknown의 허용 근거·수정 누락은 diff 리뷰 대상이다.
+공통 코드 구조·설정·주석은 [CODE_SPEC](../../../docs/harness/CODE_SPEC.md), API 적용 범위·필수 Java 주석은 [src/AGENTS.md](../src/AGENTS.md)를 따른다. 초기화 안내에서 같은 규칙을 별도로 정의하지 않는다.
 
-Spring singleton bean은 상태 없는 서비스·DB pool 등 자원 수명에만 사용한다. 계정·세션·잔액·트랜잭션을 전역 필드에 보관하지 않는다. API 업무 패키지는 실제 기능 구현 시 만들며 초기화만을 위해 빈 계층을 늘리지 않는다.
+객체 수명·생성자 주입·가변 전역 상태 제한은 [앱 구조](../../../docs/app-architecture.md)를 따른다. 실제 기능의 책임·입출력·권한·실패·검사는 [문서 작성 기준](../../../docs/development-notes.md)에 따라 기존 API 상세를 보완한다. bootstrap만을 위해 빈 업무 계층을 생성하지 않는다.
 
 ## 공식 근거
 
@@ -47,3 +47,5 @@ Spring singleton bean은 상태 없는 서비스·DB pool 등 자원 수명에�
 - [Spring JDBC](https://docs.spring.io/spring-framework/reference/data-access/jdbc/core.html): JDBC 연결/자원 관리.
 - [DB 초기화](https://docs.spring.io/spring-boot/how-to/data-initialization.html): 스키마 관리 수단 단일화.
 - [Spring 요청 검증](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/requestbody.html): 기본 400과 PAYSE 업무 검증 422의 명시적 매핑 필요.
+
+작성·변경·검증 이력은 [API 문서 이력](history/2026-10-22-api-doc-history.md)에 보존한다.

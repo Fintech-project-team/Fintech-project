@@ -2,16 +2,9 @@
 
 근거: 사용자 직접 지시(총 2명·모두 PM 겸 개발자), [최신 담당 업무표](references/work-brief.source.md). A/B는 역할 표기이며 실명 배정이나 세 번째 인력 추가가 아니다.
 
-## 영향과 조정
+## 운영 원칙
 
-| 기존 구조의 영향                    | 조정                                                                              |
-| ----------------------------------- | --------------------------------------------------------------------------------- |
-| PM 1명 + 개발자 2명으로 읽히는 표기 | 총 2명, 제품 범위·일정 판단은 공동 PM                                             |
-| A에 API·DB·LLM·모든 계산 집중       | A는 데이터/서버, B는 Flutter/UI/로컬 계산 담당. 계약·수치 근거는 상호 확인        |
-| 전담 디자인·QA가 있는 듯한 일정     | B가 화면·디자인 문서 작성, A/B 각자 영역 검증 후 통합 교차 검증                   |
-| 서버 구현이 설계와 같은 우선순위    | 업무표대로 P0 설계/더미 준비, P1 서버 구현. 미구현 의존 기능은 완료 처리하지 않음 |
-| 화면마다 독립 계산·공통 문서 복제   | 계산 한 모듈, 공통 의미 한 문서. 담당 상세는 링크로 참조                          |
-| 지급 정정이 후속/보류               | v0.9에 자동 연결+수동 정정 반영; UI/API/DB 원자 저장·재계산 검증 작업 추가        |
+제품 범위·일정은 공동 PM인 두 개발자가 판단한다. B가 화면·디자인 문서를 작성하고 각자가 담당 영역을 검증한 뒤 통합 결과를 서로 확인한다. 별도 디자인·QA·승인 인력을 전제하지 않는다. 작업 우선순위와 완료 의존성은 아래 표를 따른다.
 
 ## 업무와 인수인계
 
@@ -30,7 +23,7 @@
 
 LLM 연동·비용 통제는 v0.7 제품 필수다. 산출·인수 조건은 허용 입력/해석 응답·비용 한도·오류 처리이며, 금액 산출은 B의 로컬 규칙을 따른다.
 
-A의 필수 설계가 먼저 필요한 동안 B는 같은 계약의 fake repository로 화면/계산을 진행할 수 있다. 이 임시 경로를 서버 저장 완료로 보고하지 않는다. B의 계산 담당 전환은 실행 위치만을 이유로 자동 결정한 것이 아니라, 최신 업무표의 데이터/서버 업무량과 2인 역할 균형을 고려한 이번 조정이다.
+A의 필수 설계가 먼저 필요한 동안 B는 같은 계약의 FakeRepository로 화면/계산을 진행할 수 있다. FakeRepository 사용을 서버 저장 완료로 보고하지 않는다.
 
 ## 진행 순서와 완료 판단
 
@@ -40,23 +33,20 @@ A의 필수 설계가 먼저 필요한 동안 B는 같은 계약의 fake reposit
 4. P1 서버 구현 후 앱 종료·재로그인 유지, 다른 사용자 차단, 실패 재시도·중복 방지를 통합 검증한다.
 5. v0.7~v1.0을 연결하고 아래 GitHub 등록 일정을 기준으로 통합·QA 진행을 확인한다. 작업량 초과 시 선택 기능의 P1을 먼저 검토한다. 세션·조회·설정 저장은 P1 구현 순서이지만 재접속 유지·격리·통합 완료의 필수 의존성이므로 범위 변경 없이 생략하지 않는다.
 
-‘인원 조정’은 기존 두 사람 사이 책임 재배치다. 추가 채용·외주·세 번째 승인자를 전제하지 않는다. 실제 작업 시간 산정 전에는 위 순서가 3주 내 완료 가능하다고 보증하지 않는다.
+업무 책임은 기존 두 사람 사이에서 배분한다. 추가 채용·외주·세 번째 승인자를 전제하지 않는다. 실제 작업 시간 산정 전에는 위 순서가 3주 내 완료 가능하다고 보증하지 않는다.
 
 ## GitHub 작업과 인계 기준
 
-조회 기준일 2026-10-18. 현재 운영 보드는 [PAYSE 개발 일정(Project #3)](https://github.com/orgs/Fintech-project-team/projects/3)이다. 작업 상태·실제 담당·날짜는 GitHub에서 관리한다. MD는 제품 규칙·계약·완료 조건을 관리하며 이슈 26개의 상태표를 복제하지 않는다. GitHub 작업 등록이나 날짜 도래는 구현 완료 증거가 아니다.
+운영 보드는 [PAYSE 개발 일정(Project #3)](https://github.com/orgs/Fintech-project-team/projects/3)이다. 작업 상태·실제 담당·날짜는 GitHub에서 관리한다. MD는 제품 규칙·계약·완료 조건을 관리하며 이슈 상태표를 복제하지 않는다. 작업 등록이나 날짜 도래는 구현 완료 증거가 아니다. 과거 조회 시점의 배정·일정·문구 차이는 [공통 문서 이력](../apps/api/docs/history/2026-10-22-common-doc-history.md)에 보존한다.
 
-- 현재 배정은 A 영역 enpl, B 영역 hyeyeonso, 통합/QA는 공동이다. 이는 조회 시점의 배정이며 계정 권한이나 담당 변경 권한을 부여하지 않는다.
-- [#17 데이터 명세](https://github.com/Fintech-project-team/Fintech-project/issues/17)와 [#24 Flutter 골격](https://github.com/Fintech-project-team/Fintech-project/issues/24)은 10/19, [#20 API 명세](https://github.com/Fintech-project-team/Fintech-project/issues/20)는 10/21로 등록되어 있다. B가 사용하는 필드·값 유무·버전·정상/실패 사례는 해당 기능 착수 전에 A/B가 확인한다. 완성 API 전까지 B는 확인된 범위의 fake repository로 개발한다. 10/19 최소 계약 선인계는 권고 실행안이며 이 문서가 GitHub 일정 완료를 확정하지 않는다.
-- [#18 더미](https://github.com/Fintech-project-team/Fintech-project/issues/18)의 CODEF 형식 문구는 최신 직접 결정과 충돌한다. PAYSE 공통 형식을 적용하며 GitHub 문구는 이번 작업에서 수정하지 않았다.
-- [#22 세션·조회](https://github.com/Fintech-project-team/Fintech-project/issues/22), [#23 설정 저장](https://github.com/Fintech-project-team/Fintech-project/issues/23)의 실제 동작이 검증되어야 [#30 서버 연결](https://github.com/Fintech-project-team/Fintech-project/issues/30)의 저장/재접속 유지가 완료된다. 여기서 실제 API는 준비 더미를 제공하는 PAYSE 서버이며 금융기관 실연동이 아니다.
-- 등록 마감은 v0.6 10/27, v0.7 10/28, v0.8 10/29, v0.9 10/30, 통합·동결 11/2, QA·리허설 11/3~4, 발표 11/5다. 이는 2026년 운영 계획의 조회 기록이다. 이전의 '2주차 말 동결'을 별도 동결일로 병행하지 않는다. 이 날짜로 API 비용 기한·제품 범위·출시일을 새로 정의하지 않는다.
-- 사용성 검증 5~8명 목표와 GitHub #40의 축소/생략안은 [미승인 범위 변경](open-decisions.md)으로 분리한다. #31의 10/23 날짜와 '주말 보충' 문구는 GitHub 정정 대상이며 실제 날짜를 임의 이동하지 않는다.
+- [#17 데이터 명세](https://github.com/Fintech-project-team/Fintech-project/issues/17)·[#20 API 명세](https://github.com/Fintech-project-team/Fintech-project/issues/20)와 [#24 Flutter 골격](https://github.com/Fintech-project-team/Fintech-project/issues/24)을 연결할 때, B가 사용하는 필드·값 유무·버전·정상/실패 사례를 해당 기능 착수 전에 A/B가 확인한다. 완성 API 전까지 B는 확인된 범위의 FakeRepository로 개발한다.
+- [#22 세션·조회](https://github.com/Fintech-project-team/Fintech-project/issues/22), [#23 설정 저장](https://github.com/Fintech-project-team/Fintech-project/issues/23)의 실제 동작이 검증되어야 [#30 서버 연결](https://github.com/Fintech-project-team/Fintech-project/issues/30)의 저장/재접속 유지가 완료된다. 실제 API는 준비 더미를 제공하는 PAYSE 서버이며 금융기관 실연동이 아니다.
+- GitHub 일정으로 API 비용 기한·제품 범위·출시일을 새로 정의하지 않는다. 비용은 [제품 기준](product-baseline.md), 사용성 검증 범위 차이와 원격 문구 정정 대기는 [남은 작업](open-decisions.md)을 따른다.
 
 ## 문서 경로와 변경 조건
 
 - 공통 기준은 저장소 `docs/`: 제품·데이터/API·계산·구조·공통 디자인. 이 문서는 공통 기준의 위치를 정한다. 현재 앱/API 초기화 상태는 app-architecture.md와 apps/api/docs/spring-bootstrap.md를 따른다.
-- 공통 디자인 값이 필요할 때 B가 `docs/design.md`를 만든다. 미정 색/폰트/간격을 지금 임의로 채운 빈 틀은 추가하지 않는다.
+- B는 기존 `docs/design.md`에서 공통 디자인 값을 관리한다. 미정 색/폰트/간격을 임의 확정하거나 빈 문서 틀을 중복 생성하지 않는다.
 - 모바일 상세는 `apps/mobile/docs/`, 기능 상세는 해당 기능의 `docs/`, API 상세는 `apps/api/docs/`, 계산 상세는 계산 모듈의 `docs/`에 둔다. 실제 저장소가 다르면 대응 경로를 한 번 기록하며 병렬 구조를 만들지 않는다.
 - 상세 문서는 목적·작성 담당·적용 범위·상위 기준 링크·변경 이유·검증 결과를 포함한다. 다른 문서의 수식/필드 정의를 복사해 독립 권위로 만들지 않는다.
 - 한 담당 영역의 세부 문서는 담당자가 작성한다. 공통 디자인·API·데이터·계산·상대방 작업에 영향이 있으면 **관련 담당자끼리 변경 전후와 영향만 확인**한다. 별도 PM 승인 단계를 만들지 않는다.

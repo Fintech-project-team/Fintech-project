@@ -1,13 +1,13 @@
 # PAYSE 더미 데이터 사용 기준
 
-2026-10-19 · #18 준비 산출물. [데이터 명세](../../docs/data-model-draft.md)와 [DB 설계](../../docs/database-design.md)를 사용한다. CODEF는 참고만 하며 실제 공급자 형식·카드사 결제 규칙 준수를 주장하지 않는다.
+[공통 데이터 모델](../../../../docs/data-model.md)과 [DB 사전](../../../../docs/database-schema.md)를 사용한다. CODEF는 참고만 하며 실제 공급자 형식·카드사 결제 규칙 준수를 주장하지 않는다.
 
 ## 자료 구성
 
 - 개발용 합성 사용자 3명(alpha/beta/gamma), 사용자당 5은행의 계좌 6개·4카드사 카드 4개. 한 은행에 입출금+정기예금을 두어 선택 합산을 확인한다. 적금도 포함한다. 이 계정 수/금액/명칭은 제품 정책 확정이 아니다.
 - 기준 시각은 파일에 고정한다. alpha/beta는 2026-10-19, 급여 상태는 10-25, gamma 월말은 2027-01-31이다. 서로 다른 기준시각·자료 버전을 섞지 않는다.
 - 연결한 전체 계좌/카드는 최근 달력1년 범위를 가진다. 홈 선택과 별개다. 정상 완전 조회·정상 0건·부분 누락·조회 실패를 구분한다. 날짜만인 거래에 자정 시각을 만들지 않는다.
-- `generated/snapshots/*.json`은 전달 형식 초안의 완전한 독립 스냅샷이다. 페이지 분할·실패 HTTP 응답은 #20 대상이며 `nextCursor:null`이 실제 API 구현 완료를 뜻하지 않는다.
+- `generated/snapshots/*.json`은 전달 형식 초안의 완전한 독립 스냅샷이다. 페이지 분할·실패 HTTP 응답은 [공통 API 계약](../../../../docs/api-contract.md)과 [응답 모델](../../../../docs/api-response-models.md)의 규격이며 `nextCursor:null`이 실제 API 구현 완료를 뜻하지 않는다.
 - `generated/server-seeds.json`은 서버 전용 합성 시드 메타데이터다. 이름/전화번호/비활성 코드 표식을 금융 응답·LLM에 섞지 않는다. 실제 SMS·인증 기능은 없다.
 - `generated/catalog.json`은 시나리오 설명·검증 기대값·후속 Flutter 입력이다. 기대값과 검증용 기초잔액을 앱 API 결과로 반환하지 않는다. 일부는 수기로 지정한 벡터이며 Flutter 구현 테스트 통과 근거가 아니다.
 - `generated/manifest.json`은 키 정렬·공백 제거한 UTF-8 JSON 의미값의 SHA-256이다. 파일 포맷 변경과 데이터 변경을 구분한다. 배포 ZIP의 바이트 무결성은 별도 검증한다.
@@ -17,7 +17,7 @@
 | 파일 이름                        | 검증 목적                                             |
 | -------------------------------- | ----------------------------------------------------- |
 | alpha-ready.json                 | 연간 자료·선택 계좌·카드 정산·부분 정산·보호 배정     |
-| beta-ready.json                  | 동일한 표시 이름/금액을 가진 다른 사용자 격리         |
+| beta-ready.json                  | 동일한 금융 표시명/금액을 가진 다른 사용자 격리       |
 | alpha-unconnected.json           | 초기 복원: 연결0·금융 자료 미노출                     |
 | salary-wait.json                 | 급여일 미입금; 당일/연체 예정 지출 홈 반영 대기       |
 | salary-partial.json              | 부분 입금도 원천 잔액에는 반영; confirmed 전까지 대기 |
@@ -65,4 +65,12 @@ python apps/api/fixtures/export_sql.py apps/api/fixtures/generated --out .harnes
 - 원천 필드 읽기 전용, null·coverage 표시, 급여 대기·회차 편집·분류 정정을 확인한다. 새 공통 형식 문자열과 필드 배치는 두 담당자 확인 후 API에서 고정한다.
 - 연간/월별 결과는 v0.7, 지급 연결 수동 정정은 v0.9라는 최신 GitHub 합의를 유지한다.
 - 세션/인증·API·실제 LLM·실제 금융 API·Flutter 숫자 계산을 이 자료가 구현하지 않는다. 같은 JSON이 DB에 적재된 사실과 앱 동작 검증을 혼동하지 않는다.
-- 실제 공급자 ID alias 매핑·페이지·오류 응답·최종 JSON Schema/OpenAPI는 #20 또는 후속 실연동에서 완성한다. 기존 파일은 수정하지 않았다.
+- 페이지·오류·공개 투영은 [HTTP 계약](../../../../docs/api-contract.md)과 [응답 모델](../../../../docs/api-response-models.md)에 정의된 범위를 따른다. 실행 가능한 JSON Schema/OpenAPI와 실제 API 구현은 별도이며 공급자 ID alias 매핑·외부 호환은 후속 실연동에서 검증한다. 원본과 공개 응답은 아래 형식 경계를 따른다.
+
+## 원본과 공개 응답의 형식
+
+- 원본 schemaVersion은 PAYSE-DRAFT-2다. recurringPlans는 userId/planId/firstOccurrenceMonth만 제공한다. 금액·명칭·일정·출금 계좌·카드·상태는 recurringPlanRevisions에서 읽는다. 중복 필드가 남은 계획은 검증 실패다.
+- 기존 금융값·UUID·asOf·sourceVersion·dataVersion·고정된 planRevisionId는 보존한다. API/FakeRepository 표현은 PAYSE-API-0.6-2이며 원본 JSON을 그대로 공개하지 않는다. 부분 연결·민감 값 제거 규칙은 [응답 모델](../../../../docs/api-response-models.md)을 따른다.
+- Flutter는 새로운 미래 회차에 해당하는 현재 버전을 선택하고 기존 회차는 고정 버전을 유지한다. 숨겨진 버전 때문에 완전성이 확보되지 않으면 영향받는 미래 회차 계산을 보류한다. 원본 복사본·입력 계약의 일치 검사와 실제 부분 연결 mapper·미래 회차 계산·실기기 동작 검증을 구분한다. 후자의 구현·통합은 별도 검증 대상이다.
+
+작성·변경·검증 이력은 [API 문서 이력](../../docs/history/2026-10-22-api-doc-history.md)에 보존한다.
