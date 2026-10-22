@@ -14,7 +14,7 @@ import '../../app/app_test_utils.dart';
 /// 2026-10-21: 테스트 전용 계정. 코드는 테스트 값이며 서버 확정 값이 아니다.
 const _account = FakeDemoAccount(
   userId: 'test-user',
-  name: 'PAYSE 합성 test',
+  name: '데모테스트',
   phone: '01099990000',
   code: '246810',
 );

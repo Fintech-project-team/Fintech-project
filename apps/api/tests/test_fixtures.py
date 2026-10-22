@@ -1,5 +1,6 @@
 """2026-10-19: Fixture preparation tests, independent from Flutter product tests."""
 import copy
+import hashlib
 import json
 import os
 import shutil
@@ -14,6 +15,7 @@ sys.path.insert(0,str(FIXTURES))
 from generate import build, uid, write_files
 from validate import validate_snapshot, validate_directory
 from export_sql import literal, export
+from identity_contract import validate_server_seeds, validate_stored_identity
 
 
 @contextmanager
@@ -64,6 +66,92 @@ class FixtureTests(unittest.TestCase):
         with temporary_directory() as temp:
             with self.assertRaises(FileExistsError):
                 write_files(Path(temp))
+
+    def test_seed_identity_mapping_and_uuid_stability(self):
+        """2026-10-22: Keep existing owners while exposing exactly one canonical name."""
+        self.assertEqual([u['name'] for u in self.seeds['users']],['데모알파','데모베타','데모감마'])
+        self.assertEqual([u['userId'] for u in self.seeds['users']],[uid('alpha'),uid('beta'),uid('gamma')])
+        for user in self.seeds['users']:
+            self.assertNotIn('syntheticName',user)
+            self.assertNotIn('displayName',user)
+        validate_server_seeds(self.seeds,self.cases)
+
+    def test_stored_identity_rejects_whitespace_unicode_and_invalid_bounds(self):
+        """2026-10-22: Storage accepts canonical values only, without silent normalization."""
+        invalid_names=['가','A'*21,' 데모알파','데모 알파','데모알파 ','데모알파\n','데모\t알파','데모\u00a0알파','데모\u200b알파','데모１','ㄱㄴ',None,123]
+        for name in invalid_names:
+            with self.subTest(name=repr(name)),self.assertRaises(ValueError):
+                validate_stored_identity(name,'01000000001')
+        for phone in ['0100000000','010000000001','01100000001','010-0000-0001','010 0000 0001','01000000001\n','０１００００００００１','+821000000001',None,1000000001]:
+            with self.subTest(phone=repr(phone)),self.assertRaises(ValueError):
+                validate_stored_identity('데모알파',phone)
+        for name in ['가나','Ab','A'*20,'가'*20]:
+            validate_stored_identity(name,'01000000001')
+
+    def test_seed_shape_and_credential_mapping_tampering_rejected(self):
+        """2026-10-22: Reject legacy keys, changed identities and active credentials."""
+        mutations=[
+            lambda s:s['users'][0].pop('name'),
+            lambda s:s['users'][0].update(syntheticName='데모알파'),
+            lambda s:s['users'][0].update(displayName='데모알파'),
+            lambda s:s['users'].append(copy.deepcopy(s['users'][0])),
+            lambda s:s['users'][0].update(userId=str(uuid4())),
+            lambda s:s['users'][0].update(name='다른이름'),
+            lambda s:s['users'][0].update(syntheticPhone='01000000009'),
+            lambda s:s['users'][0].update(initialCase='beta-ready'),
+            lambda s:s['users'][0].update(codeVerifier='000001'),
+            lambda s:s['users'][0].update(codeVerifier='enabled-digest'),
+            lambda s:s['users'].pop(),
+            lambda s:s.update(extra=True),
+        ]
+        for index,mutate in enumerate(mutations):
+            with self.subTest(index=index):
+                seeds=copy.deepcopy(self.seeds);mutate(seeds)
+                with self.assertRaises(ValueError):
+                    validate_server_seeds(seeds,self.cases)
+
+    def test_seed_creation_timestamp_and_snapshot_owner_required(self):
+        """2026-10-22: A valid seed must point to its own dated initial snapshot."""
+        for value in [None,'invalid','2026-10-19','2026-10-19T00:00:00',123]:
+            with self.subTest(value=value):
+                seeds=copy.deepcopy(self.seeds);seeds['users'][0]['createdAt']=value
+                with self.assertRaises(ValueError):
+                    validate_server_seeds(seeds,self.cases)
+        snapshots=copy.deepcopy(self.cases);snapshots.pop('alpha-ready')
+        with self.assertRaises(ValueError):
+            validate_server_seeds(self.seeds,snapshots)
+        snapshots=copy.deepcopy(self.cases);snapshots['alpha-ready']['userId']=uid('beta')
+        with self.assertRaises(ValueError):
+            validate_server_seeds(self.seeds,snapshots)
+
+    def test_rehashed_invalid_private_seed_still_rejected(self):
+        """2026-10-22: Hash integrity alone must not authorize an invalid identity."""
+        with temporary_directory() as temp:
+            directory=Path(temp)/'fixtures';write_files(directory)
+            path=directory/'server-seeds.json'
+            seeds=json.loads(path.read_text(encoding='utf-8'))
+            seeds['users'][0]['name']='데모 알파'
+            path.write_text(json.dumps(seeds,ensure_ascii=False),encoding='utf-8')
+            manifest_path=directory/'manifest.json'
+            manifest=json.loads(manifest_path.read_text(encoding='utf-8'))
+            manifest['sha256']['server-seeds.json']=hashlib.sha256(json.dumps(seeds,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode('utf-8')).hexdigest()
+            manifest_path.write_text(json.dumps(manifest),encoding='utf-8')
+            for check in [validate_directory,export]:
+                with self.subTest(check=check.__name__),self.assertRaisesRegex(ValueError,'stored identity name'):
+                    check(directory)
+
+    def test_manifest_requires_seed_and_catalog_case_coverage(self):
+        """2026-10-22: Omitting a file from integrity coverage cannot bypass validation."""
+        for missing in ['server-seeds.json','catalog.json','alpha-ready.json']:
+            with self.subTest(missing=missing),temporary_directory() as temp:
+                directory=Path(temp)/'fixtures';write_files(directory)
+                manifest_path=directory/'manifest.json'
+                manifest=json.loads(manifest_path.read_text(encoding='utf-8'))
+                actual=next((key for key in manifest['sha256'] if key.endswith(missing)),missing)
+                manifest['sha256'].pop(actual)
+                manifest_path.write_text(json.dumps(manifest),encoding='utf-8')
+                with self.assertRaises(ValueError):
+                    validate_directory(directory)
 
     def test_annual_coverage_including_empty_account(self):
         s=self.case();empty=s['accounts'][4]['accountId']
@@ -294,6 +382,9 @@ class FixtureTests(unittest.TestCase):
         with temporary_directory() as temp:
             p=Path(temp)/'fixtures';write_files(p)
             initial=export(p);ready=export(p,ready=True)
+            self.assertIn('INSERT INTO payse.demo_users (id, name, synthetic_phone,',initial)
+            self.assertNotIn('synthetic_name',initial)
+            self.assertNotIn('display_name',initial)
             self.assertNotIn('INSERT INTO payse.institution_links',initial)
             self.assertIn('INSERT INTO payse.institution_links',ready)
             for command in ('DELETE FROM','DROP TABLE','TRUNCATE','UPDATE payse.'):
