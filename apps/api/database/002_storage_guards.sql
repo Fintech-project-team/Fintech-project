@@ -23,6 +23,19 @@ END $$;
 
 CREATE FUNCTION payse.assert_user_storage(owner uuid) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
+  -- The first nominal month must equal the earliest revision, including retained history.
+  IF EXISTS (
+    SELECT 1 FROM payse.recurring_plans p
+    LEFT JOIN payse.recurring_plan_revisions r ON (r.user_id,r.plan_id)=(p.user_id,p.id)
+    WHERE p.user_id=owner GROUP BY p.id,p.first_occurrence_month
+    HAVING min(r.effective_from_month) IS DISTINCT FROM p.first_occurrence_month
+  ) OR EXISTS (
+    SELECT 1 FROM payse.obligations o JOIN payse.recurring_plans p ON (p.user_id,p.id)=(o.user_id,o.plan_id)
+    WHERE o.user_id=owner AND o.occurrence_month<p.first_occurrence_month
+  ) OR EXISTS (
+    SELECT 1 FROM payse.occurrence_overrides o JOIN payse.recurring_plans p ON (p.user_id,p.id)=(o.user_id,o.plan_id)
+    WHERE o.user_id=owner AND o.occurrence_month<p.first_occurrence_month
+  ) THEN RAISE EXCEPTION 'Invalid plan first month or occurrence before plan start' USING ERRCODE='23514'; END IF;
   IF EXISTS (SELECT 1 FROM payse.recurring_plan_revisions WHERE user_id=owner GROUP BY plan_id,effective_from_month HAVING count(*) FILTER (WHERE is_current)=0)
   THEN RAISE EXCEPTION 'Revision authority retired without replacement' USING ERRCODE='23514'; END IF;
   IF EXISTS (
@@ -104,6 +117,10 @@ BEGIN
   ) OR EXISTS (
     SELECT 1 FROM payse.obligations o JOIN payse.recurring_plan_revisions r ON (r.user_id,r.id)=(o.user_id,o.plan_revision_id)
     WHERE o.user_id=owner AND (r.payment_timing<>'immediate' OR r.effective_from_month>o.occurrence_month)
+  ) OR EXISTS (
+    -- Accepted individual edits cannot pin a revision that starts after the occurrence.
+    SELECT 1 FROM payse.occurrence_overrides o JOIN payse.recurring_plan_revisions r ON (r.user_id,r.id)=(o.user_id,o.plan_revision_id)
+    WHERE o.user_id=owner AND r.effective_from_month>o.occurrence_month
   ) THEN RAISE EXCEPTION 'Invalid recurring payment basis or pinned revision' USING ERRCODE='23514'; END IF;
   IF EXISTS (
     SELECT 1 FROM payse.transaction_relations r
@@ -134,12 +151,12 @@ BEGIN
       proof->>'confirmation' IS NULL OR jsonb_typeof(proof->'transactionIds') IS DISTINCT FROM 'array' OR
       (proof->>'confirmation' IN ('partial','confirmed') AND jsonb_array_length(proof->'transactionIds')=0))
   ) OR EXISTS (
+    -- A past source deposit is independent of the user's current salary-account setting.
     SELECT 1 FROM payse.source_contexts c CROSS JOIN LATERAL jsonb_array_elements(c.salary_evidence) proof
     CROSS JOIN LATERAL jsonb_array_elements_text(proof->'transactionIds') ref
     LEFT JOIN payse.financial_transactions t ON t.user_id=owner AND t.id=ref::uuid
-    LEFT JOIN payse.user_settings s ON s.user_id=owner
     WHERE c.user_id=owner AND (t.id IS NULL OR t.direction<>'in' OR t.record_kind<>'account_entry' OR
-      t.reflection_reason<>'reflected' OR t.account_id IS DISTINCT FROM s.salary_account_id)
+      t.status<>'posted' OR t.reflection_reason<>'reflected')
   ) THEN RAISE EXCEPTION 'Salary evidence references unconfirmed or foreign deposit' USING ERRCODE='23514'; END IF;
   IF EXISTS (
     SELECT 1 FROM payse.user_settings s CROSS JOIN LATERAL jsonb_array_elements(s.card_plan_overrides) e

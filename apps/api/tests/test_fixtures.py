@@ -155,6 +155,28 @@ class FixtureTests(unittest.TestCase):
         self.assertEqual(a['reserves'],b['reserves'])
         self.assertEqual(b['accounts'][0]['balanceKRW'],-200000)
 
+    def test_salary_evidence_survives_account_setting_change(self):
+        """2026-10-21: Keep source salary proofs unchanged when the selected salary account changes or clears."""
+        for case in ('salary-partial','salary-confirmed'):
+            for target in (None, 1):
+                with self.subTest(case=case,target=target):
+                    s=self.case(case)
+                    source=copy.deepcopy((s['transactions'],s['settings']['salary']['receiptEvidence']))
+                    s['settings']['salary']['salaryAccountId']=None if target is None else s['accounts'][target]['accountId']
+                    validate_snapshot(s)
+                    self.assertEqual((s['transactions'],s['settings']['salary']['receiptEvidence']),source)
+
+    def test_salary_evidence_still_requires_owned_posted_incoming_fact(self):
+        """2026-10-21: Reject missing, foreign, outgoing and unconfirmed salary evidence after separating settings."""
+        for changes in ({'direction':'out'}, {'status':'approved'}, {'status':'cancelled'}, {'status':'unknown'}, {'balanceReflected':False,'reflectionReason':'not_reflected'}):
+            with self.subTest(changes=changes):
+                def mutate(s):
+                    proof=s['settings']['salary']['receiptEvidence'][0]['transactionIds'][0]
+                    next(t for t in s['transactions'] if t['transactionId']==proof).update(changes)
+                self.rejects(mutate,'salary-confirmed')
+        for transaction_id in (uid('missing-salary'),uid('beta/transaction/salary/2026-09')):
+            self.rejects(lambda s:s['settings']['salary']['receiptEvidence'][0].update(transactionIds=[transaction_id]),'salary-confirmed')
+
     def test_partial_refund_outside_window(self):
         s=self.case('refund-outside-window');original=s['relatedTransactions'][0]
         refund=next(t for t in s['transactions'] if t['originalTransactionId']==original['transactionId'])
@@ -170,16 +192,89 @@ class FixtureTests(unittest.TestCase):
 
     def test_month_end_and_pinned_revision(self):
         s=self.case('gamma-month-end');revs=s['recurringPlanRevisions'];plan=s['recurringPlans'][0]
-        self.assertEqual(plan['monthlyDay'],31)
+        self.assertEqual(plan['firstOccurrenceMonth'],'2027-01')
+        self.assertEqual(revs[0]['monthlyDay'],31)
         self.assertEqual(revs[0]['scheduleOverrides'][0]['plannedDate'],'2027-02-26')
         self.assertEqual(revs[1]['effectiveFromMonth'],'2027-03')
+        february=next(o for o in s['obligations'] if o['recurrenceKey'] and o['recurrenceKey'].endswith('2027-02'))
+        self.assertEqual(february['planRevisionId'],revs[0]['revisionId'])
+        self.assertEqual(february['dueDate'],'2027-02-26')
         march=next(o for o in s['obligations'] if o['recurrenceKey'] and o['recurrenceKey'].endswith('2027-03'))
         self.assertEqual(march['planRevisionId'],revs[0]['revisionId']);self.assertEqual(march['amountKRW'],100000)
         self.assertEqual(revs[1]['amountKRW'],110000);self.assertEqual(s['occurrenceOverrides'][0]['amountKRW'],120000)
+        self.assertEqual(s['occurrenceOverrides'][0]['planRevisionId'],revs[1]['revisionId'])
+        self.assertEqual(s['occurrenceOverrides'][0]['recurrenceKey'],plan['planId']+':2027-04')
+        before=copy.deepcopy(s)
+        validate_snapshot(s)
+        self.assertEqual(s,before)
+
+    def test_recurring_plan_has_one_value_authority(self):
+        for name,s in self.cases.items():
+            with self.subTest(name=name):
+                self.assertEqual(s['schemaVersion'],'PAYSE-DRAFT-2')
+                for plan in s.get('recurringPlans',[]):
+                    self.assertEqual(set(plan),{'userId','planId','firstOccurrenceMonth'})
+        self.rejects(lambda s:s.update(schemaVersion='PAYSE-DRAFT-1'))
+
+    def test_recurring_plan_rejects_missing_and_extra_keys(self):
+        for key in ('userId','planId','firstOccurrenceMonth'):
+            with self.subTest(missing=key):
+                s=self.case()
+                del s['recurringPlans'][0][key]
+                with self.assertRaisesRegex(ValueError,'recurring plan must contain only'):
+                    validate_snapshot(s)
+        revision=self.case()['recurringPlanRevisions'][0]
+        for key,value in revision.items():
+            if key not in ('userId','planId'):
+                with self.subTest(forbidden=key):
+                    self.rejects(lambda s:s['recurringPlans'][0].update({key:value}))
+        self.rejects(lambda s:s['recurringPlans'][0].update(unknownPlanKey='unexpected'))
+
+    def test_recurring_plan_rejects_duplicate_identity_and_missing_revision(self):
+        self.rejects(lambda s:s['recurringPlans'].append(copy.deepcopy(s['recurringPlans'][0])))
+        self.rejects(lambda s:s['recurringPlanRevisions'].clear())
+        self.rejects(lambda s:s['recurringPlans'][0].update(firstOccurrenceMonth='2026-11'))
+
+    def test_recurring_plan_first_month_matches_earliest_revision(self):
+        """2026-10-22: Reject shifting a plan boundary away from its earliest retained revision."""
+        for first_month in ('2026-12','2027-02','2027-03','2027-04'):
+            with self.subTest(first_month=first_month):
+                self.rejects(lambda s:s['recurringPlans'][0].update(firstOccurrenceMonth=first_month),'gamma-month-end')
+        s=self.case('gamma-month-end')
+        earlier={**s['recurringPlanRevisions'][0],'revisionId':uid('gamma/earlier-revision'),'effectiveFromMonth':'2026-12'}
+        s['recurringPlanRevisions'].append(earlier)
+        with self.assertRaisesRegex(ValueError,'plan first month differs from earliest revision'):
+            validate_snapshot(s)
+
+    def test_recurring_plan_first_month_preserves_retired_pinned_history(self):
+        """2026-10-22: Allow a same-month replacement while old pinned revisions and occurrences remain."""
+        s=self.case('gamma-month-end')
+        original=copy.deepcopy((s['obligations'],s['occurrenceOverrides']))
+        initial=s['recurringPlanRevisions'][0]
+        initial['isCurrent']=False
+        replacement={**copy.deepcopy(initial),'revisionId':uid('gamma/initial-replacement'),'amountKRW':100001,'isCurrent':True}
+        s['recurringPlanRevisions'].append(replacement)
+        validate_snapshot(s)
+        self.assertEqual(s['recurringPlans'][0]['firstOccurrenceMonth'],'2027-01')
+        self.assertEqual((s['obligations'],s['occurrenceOverrides']),original)
+        self.assertEqual(s['obligations'][-1]['planRevisionId'],initial['revisionId'])
 
     def test_duplicate_occurrence_and_revision(self):
         self.rejects(lambda s:s['obligations'].append({**s['obligations'][-1],'obligationId':uid('duplicate')}))
         self.rejects(lambda s:s['recurringPlanRevisions'].append({**s['recurringPlanRevisions'][0],'revisionId':uid('duplicate-revision')}))
+
+    def test_occurrence_cannot_precede_its_pinned_revision(self):
+        """2026-10-21: Reject impossible revision dates for saved obligations and individual overrides."""
+        self.rejects(lambda s:s['occurrenceOverrides'][0].update(recurrenceKey=s['recurringPlans'][0]['planId']+':2026-12'),'gamma-month-end')
+        self.rejects(lambda s:next(o for o in s['obligations'] if o['recurrenceKey']).update(recurrenceKey=s['recurringPlans'][0]['planId']+':2026-12'),'gamma-month-end')
+        s=self.case('gamma-month-end')
+        override=s['occurrenceOverrides'][0]
+        revision=next(r for r in s['recurringPlanRevisions'] if r['revisionId']==override['planRevisionId'])
+        revision['effectiveFromMonth']='2027-04'
+        validate_snapshot(s)
+        revision['effectiveFromMonth']='2027-05'
+        with self.assertRaisesRegex(ValueError,'override precedes pinned revision'):
+            validate_snapshot(s)
 
     def test_coverage_lies_rejected(self):
         self.rejects(lambda s:s['coverage'][0].update(requestedStart='2025-10-19'))

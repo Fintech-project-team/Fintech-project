@@ -2,8 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:payse/data/auth/auth_repository.dart';
 import 'package:payse/data/auth/fake_auth_repository.dart';
 
-const _install = '3f2c9a4e-1b7d-4c2e-9a10-7f6e5d4c3b2a';
-
 /// 2026-10-21: 테스트 전용 계정과 시각으로 가짜 저장소를 만든다. 코드는 테스트 값이며 서버 값이 아니다.
 ({FakeAuthRepository repo, void Function(Duration) advance}) build() {
   var now = DateTime(2026, 10, 21, 9);
@@ -41,7 +39,7 @@ DemoCredentials wrong(int i) =>
 void main() {
   test('matching credentials issue one session', () async {
     final (:repo, advance: _) = build();
-    final result = await repo.createSession(good, installationId: _install);
+    final result = await repo.createSession(good);
 
     expect(result, isA<AuthOk<DemoSession>>());
     final session = (result as AuthOk<DemoSession>).value;
@@ -52,13 +50,13 @@ void main() {
   test('mismatch and an already active account look the same', () async {
     final (:repo, advance: _) = build();
     expect(
-      await repo.createSession(wrong(0), installationId: _install),
+      await repo.createSession(wrong(0)),
       isA<AuthRejected<DemoSession>>(),
     );
 
-    await repo.createSession(good, installationId: _install);
+    await repo.createSession(good);
     expect(
-      await repo.createSession(good, installationId: _install),
+      await repo.createSession(good),
       isA<AuthRejected<DemoSession>>(),
       reason: '이미 활성 세션이 있으면 같은 401',
     );
@@ -70,18 +68,15 @@ void main() {
       final (:repo, :advance) = build();
       for (var i = 0; i < 4; i++) {
         expect(
-          await repo.createSession(wrong(i), installationId: _install),
+          await repo.createSession(wrong(i)),
           isA<AuthRejected<DemoSession>>(),
         );
       }
-      final fifth = await repo.createSession(
-        wrong(4),
-        installationId: _install,
-      );
+      final fifth = await repo.createSession(wrong(4));
       expect(fifth, isA<AuthRateLimited<DemoSession>>(), reason: '5번째부터 429');
       expect((fifth as AuthRateLimited).retryAfter, const Duration(minutes: 5));
 
-      final blocked = await repo.createSession(good, installationId: _install);
+      final blocked = await repo.createSession(good);
       expect(
         blocked,
         isA<AuthRateLimited<DemoSession>>(),
@@ -89,10 +84,7 @@ void main() {
       );
 
       advance(const Duration(minutes: 3));
-      final later = await repo.createSession(
-        wrong(5),
-        installationId: _install,
-      );
+      final later = await repo.createSession(wrong(5));
       expect(
         (later as AuthRateLimited).retryAfter,
         const Duration(minutes: 2),
@@ -100,10 +92,7 @@ void main() {
       );
 
       advance(const Duration(minutes: 2));
-      expect(
-        await repo.createSession(good, installationId: _install),
-        isA<AuthOk<DemoSession>>(),
-      );
+      expect(await repo.createSession(good), isA<AuthOk<DemoSession>>());
     },
   );
 
@@ -111,7 +100,6 @@ void main() {
     final (:repo, advance: _) = build();
     final token = ((await repo.createSession(
       good,
-      installationId: _install,
     )) as AuthOk<DemoSession>).value.accessToken;
     for (var i = 0; i < 4; i++) {
       expect(
@@ -127,14 +115,11 @@ void main() {
   test('changing the code does not bypass the name+phone limit', () async {
     final (:repo, advance: _) = build();
     for (var i = 0; i < 5; i++) {
-      await repo.createSession(wrong(i), installationId: _install);
+      await repo.createSession(wrong(i));
     }
+    expect(await repo.createSession(good), isA<AuthRateLimited<DemoSession>>());
     expect(
-      await repo.createSession(good, installationId: _install),
-      isA<AuthRateLimited<DemoSession>>(),
-    );
-    expect(
-      await repo.createSession(other, installationId: _install),
+      await repo.createSession(other),
       isA<AuthOk<DemoSession>>(),
       reason: '다른 조합은 영향 없음',
     );
@@ -142,10 +127,6 @@ void main() {
 
   test('format errors are 422 and do not count toward the limit', () async {
     final (:repo, advance: _) = build();
-    expect(
-      await repo.createSession(good, installationId: 'not-a-uuid'),
-      isA<AuthInvalidInput<DemoSession>>(),
-    );
     for (final bad in [
       const DemoCredentials(name: '김합성', phone: '01011112222', code: '24681'),
       const DemoCredentials(name: '김합성', phone: '01011112222', code: '24681a'),
@@ -155,14 +136,14 @@ void main() {
     ]) {
       for (var i = 0; i < 3; i++) {
         expect(
-          await repo.createSession(bad, installationId: _install),
+          await repo.createSession(bad),
           isA<AuthInvalidInput<DemoSession>>(),
           reason: '${bad.name}/${bad.phone}/${bad.code}',
         );
       }
     }
     expect(
-      await repo.createSession(good, installationId: _install),
+      await repo.createSession(good),
       isA<AuthOk<DemoSession>>(),
       reason: '형식 오류 15번 뒤에도 차단되지 않음',
     );
@@ -172,10 +153,8 @@ void main() {
     'reverify keeps the same session; invalid token is SESSION_INVALID',
     () async {
       final (:repo, advance: _) = build();
-      final session = ((await repo.createSession(
-        good,
-        installationId: _install,
-      )) as AuthOk<DemoSession>).value;
+      final session =
+          ((await repo.createSession(good)) as AuthOk<DemoSession>).value;
 
       final ok = await repo.reverify(session.accessToken, good);
       expect(ok, isA<AuthOk<ReverifiedSession>>());
@@ -207,29 +186,21 @@ void main() {
     'ending a session frees the account; ending again is SESSION_INVALID',
     () async {
       final (:repo, advance: _) = build();
-      final session = ((await repo.createSession(
-        good,
-        installationId: _install,
-      )) as AuthOk<DemoSession>).value;
+      final session =
+          ((await repo.createSession(good)) as AuthOk<DemoSession>).value;
 
       expect(await repo.endSession(session.accessToken), isA<AuthOk<void>>());
       expect(
         await repo.endSession(session.accessToken),
         isA<AuthSessionInvalid<void>>(),
       );
-      expect(
-        await repo.createSession(good, installationId: _install),
-        isA<AuthOk<DemoSession>>(),
-      );
+      expect(await repo.createSession(good), isA<AuthOk<DemoSession>>());
     },
   );
 
   test('unavailable repository never reports success', () async {
     const repo = UnavailableAuthRepository();
-    expect(
-      await repo.createSession(good, installationId: _install),
-      isA<AuthUnavailable<DemoSession>>(),
-    );
+    expect(await repo.createSession(good), isA<AuthUnavailable<DemoSession>>());
     expect(
       await repo.reverify('t', good),
       isA<AuthUnavailable<ReverifiedSession>>(),

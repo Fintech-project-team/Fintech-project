@@ -33,18 +33,13 @@ class _SpyAuthRepository implements AuthRepository {
 
   /// 2026-10-21: 발급 요청 수를 세고 [inner]에 넘긴다.
   @override
-  Future<AuthOutcome<DemoSession>> createSession(
-    DemoCredentials credentials, {
-    required String installationId,
-  }) {
+  Future<AuthOutcome<DemoSession>> createSession(DemoCredentials credentials) {
     createCalls++;
     final gate = createGate;
     if (gate == null) {
-      return inner.createSession(credentials, installationId: installationId);
+      return inner.createSession(credentials);
     }
-    return gate.future.then(
-      (_) => inner.createSession(credentials, installationId: installationId),
-    );
+    return gate.future.then((_) => inner.createSession(credentials));
   }
 
   /// 2026-10-21: 재확인 요청 수를 세고 [inner]에 넘긴다.

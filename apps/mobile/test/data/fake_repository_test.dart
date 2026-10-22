@@ -33,7 +33,7 @@ class _MissingAssetBundle extends CachingAssetBundle {
 /// 2026-10-20: 계약 최소 필드를 갖춘 정상 스냅샷 맵을 반환한다. 테스트마다 일부를 바꿔 쓴다.
 Map<String, Object?> _minimalSnapshot() => {
   'userId': 'u-1',
-  'schemaVersion': 'PAYSE-DRAFT-1',
+  'schemaVersion': 'PAYSE-DRAFT-2',
   'currency': 'KRW',
   'dataVersion': '7',
   'sourceVersion': 'src-7',
