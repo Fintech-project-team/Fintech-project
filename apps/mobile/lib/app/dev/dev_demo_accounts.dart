@@ -6,19 +6,19 @@ import '../../data/auth/fake_auth_repository.dart';
 const List<FakeDemoAccount> devDemoAccounts = [
   FakeDemoAccount(
     userId: 'f0a4be6c-01d7-53eb-ab2c-74675b22fd8c',
-    name: 'PAYSE 합성 alpha',
+    name: '데모알파',
     phone: '01000000001',
     code: '000001',
   ),
   FakeDemoAccount(
     userId: '87f7bbf9-2355-5210-9325-f25d83a8ff35',
-    name: 'PAYSE 합성 beta',
+    name: '데모베타',
     phone: '01000000002',
     code: '000002',
   ),
   FakeDemoAccount(
     userId: 'd04073fd-f7ab-518d-8938-f2920d593db2',
-    name: 'PAYSE 합성 gamma',
+    name: '데모감마',
     phone: '01000000003',
     code: '000003',
   ),

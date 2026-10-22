@@ -6,7 +6,7 @@
 
 ## 1. 계약과 현재 구현 경계
 
-합성 자격·설치 식별값 제거·기존 세션 우선·PIN/복구·로그아웃·탈퇴·입력 수명은 [공통 API 인증 계약](../../../../docs/api-contract.md#2-인증탈퇴)을 따른다. 금융 소유권·원천/계산 경계는 [공통 모델](../../../../docs/data-model.md), 실제 초기 DDL과 이름 이행 상태는 [DB 사전](../../../../docs/database-schema.md)을 따른다. 설치 식별값 제거는 초기 DDL에 반영돼 있으나 기존 DB에 ALTER를 실행했다는 뜻은 아니다. 실제 인증 API와 Flutter HTTP 연동, DB 이름 이행은 후속 작업이다. Flutter Fake 인증·로컬 PIN 구현 상태와 실제 서버 연결 완료를 구분한다.
+합성 자격·설치 식별값 제거·기존 세션 우선·PIN/복구·로그아웃·탈퇴·입력 수명은 [공통 API 인증 계약](../../../../docs/api-contract.md#2-인증탈퇴)을 따른다. 금융 소유권·원천/계산 경계는 [공통 모델](../../../../docs/data-model.md), 실제 초기 DDL과 이름 이행 상태는 [DB 사전](../../../../docs/database-schema.md)을 따른다. 설치 식별값 제거는 초기 DDL에 반영돼 있으나 기존 DB에 ALTER를 실행했다는 뜻은 아니다. 초기 DB·시드는 단일 name이며 기존 DB 전환은 [전환 도구](../identity-migration.md)의 별도 실행이다. 실제 인증 API와 Flutter HTTP 연동은 후속 작업이다. Flutter Fake 인증·로컬 PIN 구현 상태와 실제 서버 연결 완료를 구분한다.
 
 ## 2. 서버 비밀값 처리
 
@@ -91,7 +91,7 @@
 
 | 구조                                 | 현재 상태 / 필요한 설계                                                                                                                                                                                                                                                                           | 이유                                                                                                                             |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| demo_users                           | id·전화번호·code_verifier 유지. 현재 synthetic_name/display_name은 [DB 이름 목표](../../../../docs/database-schema.md#단일-name-이행-목표--미구현)로 이행. nullable `deactivated_at timestamptz`, `purge_after timestamptz` 추가안. 둘 다 null 또는 둘 다 유한값이며 purge_after > deactivated_at | 기존 사용자 UUID 유지와 접근 차단. 1년 정확성은 서울 달력 계산·검증으로 확인                                                     |
+| demo_users                           | id·전화번호·code_verifier 유지. 초기 DDL의 name·제약과 기존 DB 전환은 [DB 사전](../../../../docs/database-schema.md#단일-name-저장과-기존-db-전환)을 따름. nullable `deactivated_at timestamptz`, `purge_after timestamptz` 추가안. 둘 다 null 또는 둘 다 유한값이며 purge_after > deactivated_at | 기존 사용자 UUID 유지와 접근 차단. 1년 정확성은 서울 달력 계산·검증으로 확인                                                     |
 | demo_sessions                        | id, user_id, token_digest UNIQUE, issued_at, ended_at 유지. 설치 식별 컬럼은 새 초기 SQL에서 제거. 기존 `active_session_per_user` 부분 UNIQUE 유지                                                                                                                                                | 앱 판단 외에 DB에서도 사용자당 활성 하나 보장. expires_at/JWT/refresh token 도입 없음                                            |
 | auth_rate_limits 신규안              | `kind text`(combo/ip), `key_digest text`(64 hex) 복합 PK; `event_times timestamptz[] NOT NULL`; nullable `blocked_until timestamptz`                                                                                                                                                              | combo는 최근 실패 최대 5개·차단 시각, ip는 최근 요청 최대 60개만 보관. null 요소/무한 시각 거절, 시간순 유지. 개인정보 원문 없음 |
 | account_deactivation_receipts 신규안 | `id uuid PK`, `user_id uuid UNIQUE`, `session_id uuid`, `operation_key text`, `deactivated_at timestamptz`, `purge_after timestamptz`, 모두 NOT NULL. `(user_id,session_id)`→demo_sessions(user_id,id) FK RESTRICT; 사용자+키 UNIQUE                                                              | 비활성화 1회 및 종료 세션/키 결합. 응답 시각을 그대로 재전송. 토큰 원문·금융 Snapshot 없음                                       |
@@ -107,7 +107,7 @@ IP 행은 판정 전에 최근 60초 기록을 거르고, 새 요청을 추가�
 
 ## 7. 현재 구현 공백·인계
 
-- 현재 시드 `code_verifier=DISABLED:auth-design-pending`는 인증 불가 표식이다. 기존 두 이름은 [API 이름 매핑](../../../../docs/api-contract.md#인증-입력과-단일-이름)으로 이행해야 한다. #22의 인증 구현 전에 서버 시드 생성기·검증기·SQL exporter·DB 이행·이름 문자열에 의존하는 DB 테스트를 함께 조정하고 UUID·전화번호·금융 자료·세션을 보존해야 한다. 미등록 사용자의 이름을 공백 삭제나 추측으로 생성하지 않는다. #21 문서 추가만으로 로그인 가능한 시드가 생기지 않으며 서버 시작/로그인마다 시드를 초기화하지 않는다.
+- 현재 시드 `code_verifier=DISABLED:auth-design-pending`는 인증 불가 표식이다. 생성기·검증기·SQL exporter·초기 DDL은 [API 이름 매핑](../../../../docs/api-contract.md#인증-입력과-단일-이름)을 사용한다. 기존 DB는 별도 전환 후 사용하며 UUID·전화번호·금융 자료·세션을 보존한다. 미등록 사용자의 이름을 공백 삭제나 추측으로 생성하지 않는다. #21 문서 추가만으로 로그인 가능한 시드가 생기지 않으며 서버 시작/로그인마다 시드를 초기화하지 않는다.
 - 현재 Java는 생존 확인 외 경로를 차단하는 초기화 상태다. 실제 인증 API·요청별 RLS·Flutter HTTP 연동과 기기 검증은 미완료다. Flutter Fake 인증·로컬 PIN 구현과 구분한다.
 - 현재 정책은 상위 API 계약에 통합돼 있다. 과거 원문 references의 탈퇴/재가입 표현을 새 요구사항으로 적용하지 않는다. 인증 내부 설계와 후속 세션·조회·탈퇴 구현을 구분한다.
 - B는 재실행·10분 무입력·10분 이상 백그라운드 후 PIN 잠금, 5회 오류/분실의 기존 토큰 재확인, 토큰의 OS 보안 저장을 구현한다. 오류 횟수 저장/정상 해제 시 초기화 같은 로컬 상세는 B의 기능 문서에서 정리하고 서버 제한과 합치지 않는다. 서버에서 기기 PIN의 성공 여부를 신뢰하지 않는다.

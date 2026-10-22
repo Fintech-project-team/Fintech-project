@@ -14,6 +14,8 @@ from datetime import date, timedelta
 from pathlib import Path
 from uuid import UUID, uuid5
 
+from identity_contract import DISABLED_CODE_VERIFIER, IDENTITY_USERS, validate_server_seeds
+
 NAMESPACE = UUID('bdc76ac7-c7c9-4a66-8b3d-7fd0ef7bdb6b')
 BANKS = [('bank.kb','국민'),('bank.shinhan','신한'),('bank.hana','하나'),('bank.ibk','기업'),('bank.kakao','카카오뱅크')]
 CARDS = [('card.hyundai','현대'),('card.samsung','삼성'),('card.woori','우리'),('card.kb','국민')]
@@ -211,7 +213,21 @@ def build() -> tuple[dict, dict, dict]:
         if 'accounts' in s and all(c['status']=='complete' for c in s['coverage']):
             entry['ledgerOpeningBalances']=[{'accountId':a['accountId'],'balanceKRW':a['balanceKRW']-sum((1 if t['direction']=='in' else -1)*t['amountKRW'] for t in s['transactions'] if t['recordKind']=='account_entry' and t['accountId']==a['accountId'] and t['balanceReflected'] is True),'purpose':'검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음'} for a in s['accounts']]
     catalog['localVectors']=[{'id':'same-day-no-time','scope':'Flutter 후속 검증 입력','incomeKRW':300000,'outflowKRW':400000,'date':'2026-10-25','timestamps':None,'expected':'일 마감 순액은 -100000; 일중 최초 부족 시각은 미상'}, {'id':'simulation-count-boundary','scope':'Flutter 후속 검증 입력','counts':[0,1,5,6],'expected':['결과 해제','계산 허용','계산 허용','거절']}, {'id':'three-salary-boundaries','scope':'Flutter 후속 검증 입력','asOf':'2027-01-31T12:00:00+09:00','paydays':['2027-02-28','2027-03-31','2027-04-30'],'expected':'반열린 3구간, 종료 상한 2027-04-30; 실제 거래/회차 자동 생성 금지'}]
-    seeds={'warning':'합성 개발 시드 전용. 금융 응답에 포함 금지. 실제 인증 구현 아님.', 'users':[{'userId':uid(alias),'syntheticName':f'PAYSE 합성 {alias}','syntheticPhone':f'0100000{i:04d}','displayName':f'데모 {i}','codeVerifier':'DISABLED:auth-design-pending','createdAt':'2026-10-19T00:00:00+09:00','initialCase':name} for i,(alias,name) in enumerate([('alpha','alpha-ready'),('beta','beta-ready'),('gamma','gamma-month-end')],1)]}
+    seeds = {
+        'warning': '합성 개발 시드 전용. 금융 응답에 포함 금지. 실제 인증 구현 아님.',
+        'users': [
+            {
+                'userId': identity['user_id'],
+                'name': identity['name'],
+                'syntheticPhone': identity['synthetic_phone'],
+                'codeVerifier': DISABLED_CODE_VERIFIER,
+                'createdAt': '2026-10-19T00:00:00+09:00',
+                'initialCase': identity['initial_case'],
+            }
+            for identity in IDENTITY_USERS
+        ],
+    }
+    validate_server_seeds(seeds, cases)
     return cases,seeds,catalog
 
 

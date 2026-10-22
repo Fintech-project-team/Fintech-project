@@ -14,9 +14,16 @@ void main() {
     final users = (seeds['users'] as List).cast<Map<String, dynamic>>();
 
     expect(devDemoAccounts, hasLength(users.length));
+    expect(devDemoAccounts.map((account) => account.name), [
+      '데모알파',
+      '데모베타',
+      '데모감마',
+    ]);
     for (var i = 0; i < users.length; i++) {
       expect(devDemoAccounts[i].userId, users[i]['userId']);
-      expect(devDemoAccounts[i].name, users[i]['syntheticName']);
+      expect(devDemoAccounts[i].name, users[i]['name']);
+      expect(users[i].containsKey('syntheticName'), isFalse);
+      expect(users[i].containsKey('displayName'), isFalse);
       expect(devDemoAccounts[i].phone, users[i]['syntheticPhone']);
       expect(
         users[i]['codeVerifier'],
