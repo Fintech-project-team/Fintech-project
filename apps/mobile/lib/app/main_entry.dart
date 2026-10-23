@@ -113,8 +113,11 @@ class _MainEntryState extends State<MainEntry> {
             snapshot,
           )) {
             EntryDestination.home => Builder(
-              builder: (context) =>
-                  AppShell(devEntry: widget.devEntryBuilder(context)),
+              builder: (context) => AppShell(
+                snapshot: snapshot,
+                onReload: _reload,
+                devEntry: widget.devEntryBuilder(context),
+              ),
             ),
             EntryDestination.connect ||
             EntryDestination.chooseAccounts => Builder(
