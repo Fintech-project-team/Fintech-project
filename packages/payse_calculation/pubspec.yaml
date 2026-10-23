@@ -1,0 +1,12 @@
+name: payse_calculation
+description: PAYSE pure Dart local calculation (PAYSE-CALC-1).
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.13.5 <3.14.0'
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: 6.0.0
