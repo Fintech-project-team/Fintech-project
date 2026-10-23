@@ -1,0 +1,51 @@
+{
+  "id": "PAYSE-CALC-27-20261023",
+  "role": "integration",
+  "baseCommit": "bc70484655879a1adfe6b98f4831f4f2dad72013",
+  "branch": "feat/integration/local-calculation",
+  "allowedPaths": [
+    "docs/tasks/PAYSE-CALC-27-20261023.json",
+    "packages/payse_calculation/",
+    "scripts/harness/run-flutter.mjs",
+    "scripts/harness/tests/flutter-runner.test.mjs",
+    "apps/mobile/pubspec.yaml",
+    "apps/mobile/pubspec.lock",
+    "docs/harness/FLUTTER_TRANSITION.md",
+    "apps/mobile/lib/features/README.md",
+    ".github/workflows/flutter.yml"
+  ],
+  "acceptance": [
+    "목적: GitHub #27(B-04, P0). packages/payse_calculation/에 순수 Dart 계산 패키지를 만들고 U=B−E−(R−O), 월급일 구간, 입금 확인 시 전환, 정산·실제 출금액, TC-C06~08의 구간별 H/A·일 마감·일중 순서 불확정 경고를 구현한다. 기준은 docs/calculation-rules.md(PAYSE-CALC-1), docs/data-model.md §1·§4·§6·§9, docs/references/detailed-plan-v7.source.md §7-1(TC-C01~12)이다. 2026-10-23 사용자 결정: 위치는 별도 패키지, FinancialSnapshot 어댑터·lib/data 배정·정산 파싱은 #28, 최대 부족액·최초 부족 시점·전체 시뮬레이션 결과 계약은 제외",
+    "순수성·불변성: lib는 dart:core·dart:collection만 사용하고 flutter·네트워크·DB·LLM·현재 시각·난수를 읽지 않는다. 입력·결과 목록은 생성 시 복사한 수정 불가 목록이다. 같은 입력은 같은 결과이며 입력 목록의 순서를 바꿔도 결과가 같다. 결과는 dataVersion·sourceVersion·ruleVersion·asOf·inputRevision을 그대로 보존한다. ruleVersion은 PAYSE-CALC-1만 받고 그 밖의 값은 입력 오류다",
+    "금액: 모든 금액은 int 원. Money 0~9e12(잔액 외 입력·보호액·의무 금액), PositiveMoney 1~9e12(배정 amountKRW·정산 allocatedKRW·가상 소비), 부호 있는 금액 ±9e12(계좌 잔액·B·U·H·A·차이)다. 개별 입력, 덧셈·뺄셈 결과마다 범위를 검사하며 벗어나면 CalculationInputException(code=amountOutOfRange)이다. 잘라내거나 0으로 바꾸지 않는다. 필드명 의미는 데이터 계약(amountKRW·releasedKRW·allocatedKRW·invalidatedAt·cancelledAt·confirmation·expectedPayDate)을 따르고 Dart 이름은 기존 FinancialSnapshot처럼 amountKrw 형식을 쓴다",
+    "업무 날짜: asOf(오프셋 포함 시각)를 Asia/Seoul(+09:00, 일광절약 없음) 날짜로 바꾼 값이 t0다. 날짜만 있는 값은 YYYY-MM-DD를 엄격히 검사한다. 달력 n개월 뒤는 항상 원래 기준일에서 한 번에 더하고 없는 날은 말일로 보정한다(누적 보정 금지). 월급일 1~31도 해당 월마다 원래 일자에서 말일 보정하고 보정 여부를 표시한다",
+    "B: included=true 계좌 잔액 합계. 포함 계좌가 0개, 포함 계좌 잔액 또는 asOf가 null, 포함 계좌 asOf 시각이 입력 asOf와 다르면 B와 이에 의존하는 결과는 null·insufficientData(사유 코드)다. 0원 잔액은 정상값이다. 제외 계좌는 합산하지 않는다",
+    "정산: invalidatedAt이 null인 연결만 유효하다(asOf 이후 정정도 저장된 무효이므로 시각과 무관). 의무별 정산액=유효 allocatedKRW 합계, 잔여액=amountKRW−정산액. 같은 linkId 중복, 같은 의무·거래 쌍의 유효 연결 중복, 없는 의무 참조, 유효 정산 합계>의무 금액은 입력 오류다. 거래 금액은 E 계산에 쓰지 않고 allocatedKRW만 차감한다. 거래별 배정 합계 한도는 서버 저장 제약(data-model §7)이며 계산 입력에 거래 금액이 없으므로 다시 검사하지 않는다. 근거 없는 출금은 자동 연결하지 않는다. 결과에 의무별 금액·정산액(이미 나간 돈)·잔여액·배치 상태를 반환한다",
+    "R과 O: R은 포함 계좌의 cancelledAt=null 보호액 amountKRW 합계(해제 반영된 현재 설정). 제외 계좌·취소 보호액은 R에 넣지 않는다. 배정의 미해제액=amountKRW−releasedKRW(0≤released≤amount 위반은 오류). O는 의무가 현재 E 집합에 있고 보호액이 R 집합에 있는 배정의 미해제액 합계다. 활성 의무별 미해제 합계>잔여액, 미취소 보호액별 미해제 합계>보호액, 중복 allocationId, 없는 참조는 입력 오류이며 잘라내지 않는다(순서 무관). 저장 시 M5 상한 검사는 이 작업 범위가 아니다",
+    "월급 구간(2026-10-23 사용자 결정 Q1·Q2 반영): salaryDay와 t0로 규칙 날짜 pPrev(≤t0)·pNext(>t0)를 구한다. 근거는 expectedPayDate가 규칙 날짜와 같을 때만 그 회차로 보고 날짜 근접성으로 추정하지 않는다. 회차별 근거 상태를 absent·unknown·partial·confirmed로 구분해 결과에 남긴다. pNext 회차가 confirmed면 확인 시점부터 그다음 월급일까지 구간으로 전환한다(구간 시작은 계약에 확인 시각이 없어 null). 그 밖에 pPrev 회차가 confirmed면 정상 [pPrev, pNext), unknown·partial이면 입금 대기(이전 구간 유지), absent면 입금 정보 부족(insufficientData, receiptEvidenceAbsent)이다. 같은 월에 규칙 날짜와 다른 근거가 있으면 회차를 확인할 수 없어 정보 부족(receiptScheduleMismatch)이다. 일회성 입금일로 월급일 규칙을 바꾸지 않는다. 확인 전후는 confirmation 값으로만 나누며 거래 시각을 읽지 않는다(계약에 급여 확인 시각 필드 없음). 계산기는 '전달된 근거가 그 asOf에 유효한 상태'라는 입력 전제로 계산하고, 더 나중 상태를 과거 asOf와 넘기면 확인 전 상태를 복원하지 못한다. 같은 스냅샷 근거만 넘기고 근거 거래가 posted·reflectionReason=reflected인지 확인하는 일은 #28 어댑터 책임이다. Q2-2 테스트는 상태별 동작 검증이며 확인 시각 판정 검증이 아니다. 조기 전환 구간의 periodStart null은 표시용이며 E·의무 배치·구간 계산에 쓰지 않는다(정상 구간과 결과 동일 테스트). receiptEvidence null(접근 제한 등 미수신)은 receiptEvidenceUnavailable 정보 부족으로 [](근거 없음)과 구분한다. salaryDay null이면 정보 부족, 같은 expectedPayDate 근거 둘 이상은 입력 오류다",
+    "E: 정상 구간에서는 출금 계좌가 포함 계좌인 status=active·잔여액>0·dueDate<구간 끝 의무의 잔여액 합계(연체 포함). 입금 대기에서는 C02 1·5항 문구대로 급여일(pPrev) 당일 또는 dueDate<t0(연체)인 활성 미정산 의무를 '입금 확인 후 반영 대기'로 분리하고(취소·지급 처리하지 않음), 그 밖의 의무는 D5(detailed-plan-v7 181행)의 이전 구간 유지에 따라 구간 밖이다. '대기 중 E는 항상 0'이라는 별도 원문 규칙은 없다. 이전 구간 의무는 모두 연체라 대기로 분류되어 결과적으로 E가 0이 되며, 코드에 0을 고정하지 않는다. 의무와 급여 회차를 잇는 필드는 계약에 없어 날짜로 판정한다. 확인 입력에서는 obligationId 한 집합으로 한 번만 포함한다. 2026-10-23 사용자 결정 Q3: 출금 계좌가 명시적으로 제외 계좌인 의무는 E·대기·구간 계산에서 빼고 placement=excludedAccount(구간 계산은 excludedAccountObligationIds)로 따로 반환하며 U·구간 결과를 null로 만들지 않는다. 포함 계좌에서 제외 계좌로 송금한다는 가정을 하지 않는다. 출금 계좌가 연결 계좌 목록에 없는 의무는 제외 계좌와 구분해 unknownReference 입력 오류다. 제외 의무에 연결된 배정은 O에 넣지 않고, 그 의무의 정산은 그 의무 잔여만 바꾼다",
+    "H/A(TC-C06~08): 입력은 위 장부, 월급 예정일 p1~p3(엄격히 증가, p1>t0, 최대 3개, 금액 null 허용, confirmed/assumed 표시), 가상 소비 0~5건(1~5건일 때만 비교 결과)이다. 상한 cap=min(p3, t0+달력3개월), 구간 C1=[t0,p1)·C2=[p1,p2)·C3=[p2,p3)의 끝은 min(p_k, cap)이다. p_k≤cap이면 완전, p_k>cap이면 잘린 구간, 구간 시작≥cap이면 구간 없음이다. 현금 이벤트: t0 이상 cap 미만 dueDate의 활성 의무 잔여액 출금, 월급 입금, 즉시출금은 구매일·카드 일시불은 확인된 출금일(구매일보다 이르면 오류)이다. 카드 승인일 차감 없음. 일 마감 H=이전 H+그날 입금−그날 출금(이전 A를 기초로 쓰지 않음). A=H−(같은 구간에서 그날 이후 남은 출금 예약+연체 미지급 잔여)−(남은 R−남은 예약과 겹치는 O). 가상 출금 때 H 감소와 예약 해제를 함께 처리한다(원문 calculation-rules 78행). 2026-10-23 사용자 결정 Q5: 의무의 가상 출금과 함께 그 의무에 연결된 R 집합 보호액의 미해제 배정 중 실제 가상 출금액만큼(min(연결 미해제 배정, 출금 잔여))만 해제한다. 보호액 전체·다른 의무의 배정·미배정 보호액은 해제하지 않는다. 배정(reserveId·obligationId·amountKRW·releasedKRW)으로 범위를 구분할 수 있어 추가 계약은 필요 없다. 이 가정은 projectPeriods 안의 지역 값에만 적용되고 calculateCurrentAmount의 R·O·U와 입력 객체를 바꾸지 않는다(테스트로 확인). 결과는 구간별 시작 H·종료 H·종료 직전 A·일 마감 기준 최소 H/A, 가상 소비 반영 결과와 종료 A 차이이며 세 구간을 합산하지 않는다. timePrecision은 day_end다",
+    "일중 순서: 시각 없는 같은 날 입금과 출금이 함께 있으면 해당 날짜에 intradayOrderUncertain 경고를, 전날 일 마감 H−그날 출금 합계<0이면 possibleIntradayShortfall을 함께 표시한다. 일중 최소값을 확정하지 않고 최소 H/A는 일 마감 값만 쓴다",
+    "정보 부족: null 목록(obligations·reserves·allocations·settlements)은 미확인이라 영향 결과가 insufficientData이고 빈 목록은 확인된 0건이다. p_k가 없거나 그 이전 월급 금액이 null이면 해당 구간 이후 값이 null이다. 카드 출금일 미상 가상 소비는 구매일 이후 끝나는 구간의 가상 반영 결과·차이를 null로 둔다. 구간 밖 출금일 소비·의무는 '범위 밖 미반영'으로 표시하고 영향 없음으로 쓰지 않는다. 입금 대기는 정상 상태이며 정보 부족이 아니다",
+    "보류·남은 계약 질문(2026-10-23 사용자 결정 반영): Q1은 입금 정보 부족으로 확정(null·receiptEvidenceAbsent 유지, 정상 더미에 명시 급여 근거를 넣는 일은 #28 연결 요건). Q2-2(규칙 날짜와 같은 다음 회차의 조기 confirmed)는 전환으로 구현. Q2-1(휴일 이동처럼 규칙 날짜와 다른 근거)은 현재 계약으로 회차를 표현할 수 없어 receiptScheduleMismatch 정보 부족으로 보류하고 최소 계약 변경안(SalaryReceipt에 명목 회차 payMonth YYYY-MM 추가, expectedPayDate는 확인된 실제 예정일로 의미 고정, A·B 공동 확인)을 제시한다. Q3·Q5는 결정대로 구현. Q4(대기 분류)는 날짜 기준 유지, 금액 영향 없음. Q2-1 검토안(payMonth는 명목 회차, 월 경계 예시, 회차 중복·기존 데이터, expectedPayDate 의미 고정의 소비자 영향)과 A 전달용 문구 초안은 packages/payse_calculation/docs/README.md에 두며 직접 전달하거나 계약을 바꾸지 않는다. 코드 위치·영향 테스트도 같은 문서",
+    "TC 완료 조건과 이번 범위의 차이: 원래 완료 조건은 #27 본문과 detailed-plan-v7 588행의 'TC-C01~12 모두 검증'이다. 이번 범위는 C01~04·06·08~12 원문 기대값 전체와 C05·C07 부분 충족이며 #27 전체 완료가 아니다. C05(detailed-plan-v7 §7-1 605행) 미충족: '수입·소비로 집계하지 않음' → 연간 순소비의 내 계좌 이체 제외로 #59에서 B가 검증. C07(같은 절 607행) 미충족: '최초 부족 시점·최대 부족액에 넣지 않음' → 부족 지표 구현과 함께 #34에서 B가 검증(이번 범위는 부족 지표 미구현을 기록). 테스트를 줄여 전체 완료로 표시하지 않는다. 추가 경계: 중복·초과 배정, 부분 정산·무효화·중복 연결·초과 정산, 월말·윤년(2028-02-29)·31일 월급, 구간 끝점과 cap 일치·잘림, 입금 확인 전후 중복 반영과 대기 분류, null 목록과 빈 목록, 금액 상한·중간 합계 초과, 입력 순서 무관, 구간 가정이 현재 U에 섞이지 않음",
+    "하네스·CI: run-flutter의 format·analyze·test를 apps/mobile과 packages/payse_calculation 두 루트에서 같은 고정 명령으로 실행하고 앞 루트·명령 실패를 상위 실패로 전파한다. 기존 apps/mobile 명령·SDK 검사·명령 화이트리스트는 유지한다. 패키지 .dart_tool/package_config.json이 없으면 BLOCKED다. flutter-runner 하네스 테스트로 두 루트 실행·실패 전파·준비 누락 BLOCKED를 확인한다. 2026-10-23 사용자 결정으로 .github/workflows/flutter.yml을 범위에 추가: 기존 apps/mobile pub get 다음에 packages/payse_calculation에서 같은 pub get --enforce-lockfile 단계만 추가한다(트리거 경로·subosito 캐시·Node 단계는 이미 충분해 바꾸지 않음). 로컬 재현과 원격 GitHub 실행 결과는 구분해 보고한다",
+    "의존성: 패키지 pubspec은 dependencies 없음, dev_dependencies는 SDK의 flutter_test와 앱과 같은 flutter_lints 6.0.0만 두고 pubspec.lock을 커밋한다. apps/mobile pubspec.yaml에는 payse_calculation path 의존 한 줄만 추가하고 lock은 그 결과 변경만 허용한다. 문서는 FLUTTER_TRANSITION.md와 features/README.md의 위치 안내만 고치고 패키지 상세 계약·준비 명령은 packages/payse_calculation/docs/에 둔다",
+    "범위 밖: FinancialSnapshot 어댑터와 lib/data 배정·정산·급여 근거 파싱(#28), 01-3 화면, 최대 부족액·최초 부족 시점·SimulationResult 전체 계약·가상 소비 입력 UI·카드 일정 산출, 연간 소비·반복 후보, M5 저장 검사, 서버, 실기기. verify-change 본 검사를 실행하고 FAIL·BLOCKED를 PASS로 보고하지 않는다"
+  ],
+  "readBefore": [
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/harness/FLUTTER_TRANSITION.md",
+    "docs/development-workflow.md",
+    "docs/toolchain.md",
+    "docs/calculation-rules.md",
+    "docs/data-model.md",
+    "docs/data-contracts.md",
+    "docs/app-architecture.md",
+    "docs/references/detailed-plan-v7.source.md",
+    "docs/harness/AGENT_REVIEW.md"
+  ]
+}
