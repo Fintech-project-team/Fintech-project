@@ -109,9 +109,16 @@ abstract final class PayseTypography {
     fontFeatures: tabular,
   );
 
+  static const TextStyle sectionTitle = TextStyle(
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.w600,
+    color: PayseColors.textSecondary,
+  );
+
   static const TextStyle caption = TextStyle(
-    fontSize: 12,
-    height: 1.5,
+    fontSize: 13,
+    height: 19 / 13,
     fontWeight: FontWeight.w400,
     color: PayseColors.textSecondary,
   );

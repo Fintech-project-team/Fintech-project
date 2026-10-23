@@ -139,7 +139,7 @@ ConnectionPresentationPolicy instantPolicy({
   bool failuresEnabled = true,
   List<Duration>? waits,
 }) => ConnectionPresentationPolicy(
-  failuresEnabled: failuresEnabled,
+  failuresEnabled: () => failuresEnabled,
   random: SequenceRandom(doubles: draws),
   wait: (d) async => waits?.add(d),
 );

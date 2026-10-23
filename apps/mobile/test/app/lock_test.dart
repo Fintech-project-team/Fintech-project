@@ -93,11 +93,12 @@ void main() {
           sessionStore: sessions,
           pinStore: pins,
           now: clock.now,
+          presentationPolicy: instantPresentation(),
         ),
       );
       await tester.pumpAndSettle();
       await enterPin(tester, testPin);
-      await skipConnectionPlaceholder(tester);
+      await connectAndChooseAccounts(tester);
       await tester.tap(find.text('계획').last);
       await tester.pumpAndSettle();
       return clock;

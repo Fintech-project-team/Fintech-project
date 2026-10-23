@@ -1,4 +1,7 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'payse_tokens.dart';
 
@@ -56,13 +59,20 @@ class PinPad extends StatelessWidget {
           ),
         ),
         const SizedBox(height: PayseSpace.x8),
-        PinDots(length: length, filled: filled, isError: isError),
-        const SizedBox(height: PayseSpace.x4),
-        ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 20),
-          child: message == null
-              ? const SizedBox.shrink()
-              : _PinMessage(text: message!, isError: isError),
+        _ErrorShake(
+          error: isError ? message : null,
+          child: Column(
+            children: [
+              PinDots(length: length, filled: filled, isError: isError),
+              const SizedBox(height: PayseSpace.x4),
+              ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 20),
+                child: message == null
+                    ? const SizedBox.shrink()
+                    : _PinMessage(text: message!, isError: isError),
+              ),
+            ],
+          ),
         ),
         if (secondaryMessage != null) ...[
           const SizedBox(height: PayseSpace.x1),
@@ -86,6 +96,62 @@ class PinPad extends StatelessWidget {
             onAuxiliary: onAuxiliary,
           ),
       ],
+    );
+  }
+}
+
+/// 2026-10-23: 오류가 새로 생기면 점과 문구를 약 0.4초 좌우로 흔들고 짧게 진동한다(design.md §5 PinPad).
+/// 기기의 움직임 줄이기 설정이 켜져 있으면 흔들지 않고 진동만 준다.
+class _ErrorShake extends StatefulWidget {
+  /// 2026-10-23: 현재 오류 문구 [error](오류가 없으면 null)와 흔들 [child]로 만든다.
+  const _ErrorShake({required this.error, required this.child});
+
+  final String? error;
+  final Widget child;
+
+  /// 2026-10-23: 흔들림 상태 객체를 반환한다.
+  @override
+  State<_ErrorShake> createState() => _ErrorShakeState();
+}
+
+/// 2026-10-23: 흔들림 진행을 보관한다.
+class _ErrorShakeState extends State<_ErrorShake>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shake = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 400),
+  );
+
+  /// 2026-10-23: 오류가 없던 상태에서 생기거나 다른 오류로 바뀌면 흔든다. 같은 오류가 유지되면 다시 흔들지 않는다.
+  @override
+  void didUpdateWidget(covariant _ErrorShake oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final error = widget.error;
+    if (error == null || error == oldWidget.error) return;
+    HapticFeedback.mediumImpact();
+    if (MediaQuery.disableAnimationsOf(context)) return;
+    _shake.forward(from: 0);
+  }
+
+  /// 2026-10-23: 흔들림 컨트롤러를 폐기한다.
+  @override
+  void dispose() {
+    _shake.dispose();
+    super.dispose();
+  }
+
+  /// 2026-10-23: 좌우 이동 폭이 점점 줄어드는 흔들림을 적용한 자식을 반환한다(최대 8dp, 3번 왕복).
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      key: const ValueKey('pin-shake'),
+      animation: _shake,
+      builder: (context, child) {
+        final t = _shake.value;
+        final dx = sin(t * pi * 6) * 8 * (1 - t);
+        return Transform.translate(offset: Offset(dx, 0), child: child);
+      },
+      child: widget.child,
     );
   }
 }

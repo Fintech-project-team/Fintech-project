@@ -81,6 +81,55 @@ void main() {
 
   group('loading presentation', () {
     test(
+      'the toggle is read just before the first draw and fixed for that flow',
+      () async {
+        var enabled = true;
+        var reads = 0;
+        final policy = ConnectionPresentationPolicy(
+          failuresEnabled: () {
+            reads++;
+            return enabled;
+          },
+          random: SequenceRandom(doubles: [0.05]),
+          wait: (_) async {},
+        );
+
+        final before = _controller(ScriptedRepository(), policy: policy);
+        enabled = false;
+        await _loadAll(before, {'bank.kb', 'bank.shinhan'});
+        expect(
+          before.failedInstitutions,
+          isEmpty,
+          reason: '추첨 전 변경은 현재 흐름에 적용',
+        );
+        expect(reads, 1);
+
+        enabled = true;
+        final drawn = _controller(ScriptedRepository(), policy: policy);
+        await _loadAll(drawn, {'bank.kb', 'bank.shinhan'});
+        expect(drawn.failedInstitutions.map((i) => i.code), [
+          'bank.kb',
+          'bank.shinhan',
+        ]);
+        enabled = false;
+        drawn.toggleChosen('bank.shinhan');
+        drawn.enterConsent();
+        await drawn.startLoading();
+        expect(drawn.failedInstitutions.map((i) => i.code), [
+          'bank.kb',
+        ], reason: '추첨 후 변경·뒤로 갔다 다시 진행해도 재추첨 없음');
+        await drawn.retry('bank.kb');
+        expect(drawn.failedInstitutions, isEmpty);
+        expect(reads, 2, reason: '다시 진행·다시 시도에서 토글을 다시 읽지 않음');
+
+        final next = _controller(ScriptedRepository(), policy: policy);
+        await _loadAll(next, {'bank.kb', 'bank.shinhan'});
+        expect(next.failedInstitutions, isEmpty, reason: '다음 새 흐름부터 적용');
+        expect(reads, 3);
+      },
+    );
+
+    test(
       'failures are drawn once per flow and a retry never fails again',
       () async {
         final draws = <List<String>>[];
@@ -374,7 +423,7 @@ Future<bool> _secondSave(ConnectionFlowController c) => c.saveLinks();
 class _CountingPolicy extends ConnectionPresentationPolicy {
   /// 2026-10-22: 추첨 기록 [draws]와 실패 기관 [failing]으로 만든다.
   _CountingPolicy(this.draws, this.failing)
-    : super(failuresEnabled: true, wait: (_) async {});
+    : super(failuresEnabled: () => true, wait: (_) async {});
 
   final List<List<String>> draws;
   final Set<String> failing;

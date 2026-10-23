@@ -5,19 +5,19 @@ import '../../data/fixture_scenario.dart';
 
 /// 2026-10-20: 개발·테스트 전용 더미 확인 화면. 릴리스 빌드에는 진입점이 없다.
 /// 스냅샷을 고르고 계좌·카드·거래 수와 기준 시각·버전을 보여준다. 금액을 계산하지 않는다.
+/// 2026-10-23: 개발 설정 화면. 연결 실패 연출 켜기·끄기를 두고, 더미 스냅샷은 읽기 전용 미리보기로만 보인다
+/// (첫 화면 판단·저장 대상을 바꾸지 않음).
 class FixtureDebugScreen extends StatefulWidget {
-  /// 2026-10-20: 처음 고를 [initial], 스냅샷별 Repository를 만드는 [repositoryFor],
-  /// 선택을 앱 루트에 알리는 [onScenarioChanged]로 만든다.
+  /// 2026-10-20: 스냅샷별 Repository를 만드는 [repositoryFor]로 만든다.
+  /// 2026-10-23: 앱 프로세스 동안 유지하는 실패 연출 토글 [failurePresentation]을 받는다.
   const FixtureDebugScreen({
     super.key,
-    required this.initial,
     required this.repositoryFor,
-    required this.onScenarioChanged,
+    required this.failurePresentation,
   });
 
-  final FixtureScenario initial;
   final FinancialSnapshotRepository Function(FixtureScenario) repositoryFor;
-  final ValueChanged<FixtureScenario> onScenarioChanged;
+  final ValueNotifier<bool> failurePresentation;
 
   /// 2026-10-20: 화면 상태 객체를 반환한다.
   @override
@@ -26,7 +26,7 @@ class FixtureDebugScreen extends StatefulWidget {
 
 /// 2026-10-20: 선택한 스냅샷과 조회 결과를 보관한다.
 class _FixtureDebugScreenState extends State<FixtureDebugScreen> {
-  late FixtureScenario _scenario = widget.initial;
+  FixtureScenario _scenario = FixtureScenario.defaultScenario;
   late Future<SnapshotLoadResult> _result = _load();
 
   /// 2026-10-20: 현재 스냅샷을 Repository로 조회한다.
@@ -39,19 +39,35 @@ class _FixtureDebugScreenState extends State<FixtureDebugScreen> {
       _scenario = scenario;
       _result = _load();
     });
-    widget.onScenarioChanged(scenario);
   }
 
   /// 2026-10-20: 스냅샷 선택 목록과 조회 결과를 반환한다.
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('개발용 더미 확인')),
+      appBar: AppBar(title: const Text('개발 설정')),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
           const Text('개발·테스트 전용 화면이에요. 릴리스 빌드에는 나오지 않아요.'),
           const SizedBox(height: 16),
+          ValueListenableBuilder<bool>(
+            valueListenable: widget.failurePresentation,
+            builder: (context, enabled, _) => SwitchListTile(
+              key: const ValueKey('failure-presentation-toggle'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('연결 실패 연출'),
+              subtitle: const Text(
+                '12-3에서 실패를 처음 추첨하기 전에 바꾸면 이번 연결에, 그 뒤에 바꾸면 다음 연결부터 적용돼요. '
+                '실제 저장 오류 안내는 그대로예요.',
+              ),
+              value: enabled,
+              onChanged: (v) => widget.failurePresentation.value = v,
+            ),
+          ),
+          const Divider(height: 32),
+          const Text('더미 스냅샷 미리보기(읽기 전용, 현재 계정의 화면·저장에는 쓰지 않아요)'),
+          const SizedBox(height: 8),
           for (final s in FixtureScenario.values)
             ListTile(
               key: ValueKey('scenario-${s.fileStem}'),

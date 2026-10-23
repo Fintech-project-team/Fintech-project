@@ -28,12 +28,12 @@ void main() {
   group('presentation policy', () {
     test('each institution fails at 10% and at most two fail', () {
       final policy = ConnectionPresentationPolicy(
-        failuresEnabled: true,
+        failuresEnabled: () => true,
         random: SequenceRandom(doubles: [0.05, 0.5, 0.09, 0.01, 0.0]),
       );
       expect(policy.drawFailures(['a', 'b', 'c', 'd', 'e']), {'a', 'c'});
       final none = ConnectionPresentationPolicy(
-        failuresEnabled: true,
+        failuresEnabled: () => true,
         random: SequenceRandom(doubles: [0.1, 0.5]),
       );
       expect(none.drawFailures(['a', 'b']), isEmpty, reason: '0.1은 10% 밖');
@@ -41,7 +41,7 @@ void main() {
 
     test('turned off draws nothing', () {
       final policy = ConnectionPresentationPolicy(
-        failuresEnabled: false,
+        failuresEnabled: () => false,
         random: SequenceRandom(doubles: [0.0]),
       );
       expect(policy.drawFailures(['a', 'b']), isEmpty);
@@ -51,27 +51,33 @@ void main() {
       final waits = <Duration>[];
       Future<void> record(Duration d) async => waits.add(d);
       final low = ConnectionPresentationPolicy(
-        failuresEnabled: true,
+        failuresEnabled: () => true,
         random: SequenceRandom(ints: [0]),
         wait: record,
       );
       final high = ConnectionPresentationPolicy(
-        failuresEnabled: true,
+        failuresEnabled: () => true,
         random: SequenceRandom(ints: [100000]),
         wait: record,
       );
       for (final p in [low, high]) {
-        await p.entryDelay();
+        await p.entryStepDelay();
+        await p.entryStepDelay();
         await p.stepDelay();
         await p.retryDelay();
       }
       final ms = waits.map((d) => d.inMilliseconds).toList();
-      expect(ms[0], inInclusiveRange(2000, 3000));
-      expect(ms[1], inInclusiveRange(1000, 1500));
-      expect(ms[2], inInclusiveRange(2000, 3000));
-      expect(ms[3], inInclusiveRange(2000, 3000));
-      expect(ms[4], inInclusiveRange(1000, 1500));
-      expect(ms[5], inInclusiveRange(2000, 3000));
+      for (final run in [0, 4]) {
+        expect(ms[run], inInclusiveRange(1000, 1500));
+        expect(ms[run + 1], inInclusiveRange(1000, 1500));
+        expect(
+          ms[run] + ms[run + 1],
+          inInclusiveRange(2000, 3000),
+          reason: '진입 로딩 두 단계 합 2~3초',
+        );
+        expect(ms[run + 2], inInclusiveRange(1000, 1500));
+        expect(ms[run + 3], inInclusiveRange(2000, 3000));
+      }
     });
   });
 

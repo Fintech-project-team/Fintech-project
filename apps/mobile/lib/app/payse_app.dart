@@ -10,12 +10,12 @@ import '../data/auth/fake_auth_repository.dart';
 import '../data/auth/session_cleanup.dart';
 import '../data/connection/fake_financial_server.dart';
 import '../data/connection/financial_api.dart';
-import '../data/connection/user_snapshot_repository.dart';
 import '../data/financial_snapshot_repository.dart';
 import '../data/fixture_scenario.dart';
 import '../data/snapshot_source.dart';
 import '../features/auth/auth_flows.dart';
 import '../features/auth/auth_services.dart';
+import '../features/connection/connection_presentation_policy.dart';
 import '../shared/design/font_licenses.dart';
 import '../shared/design/payse_theme.dart';
 import 'dev/dev_demo_accounts.dart';
@@ -35,6 +35,8 @@ class PayseApp extends StatefulWidget {
   /// 2026-10-21: [authRepository]·[sessionStore]·[pinStore]·[consentStore]는 인증 경계(기본은 메모리 가짜 구현),
   /// [now]는 잠금·타이머 시각, [lockTimeout]은 무입력 잠금 시간이다. 테스트에서 바꿔 끼운다.
   /// 2026-10-22: [userFixtures]는 사용자별 금융 원본 대응이다.
+  /// 2026-10-23: [presentationPolicy]는 실패 연출 사용 여부(개발 설정 토글의 현재 값)를 받아 연결 표시 정책을
+  /// 만든다. 생략하면 실제 난수·시간을 쓴다(테스트에서 바꿔 끼움).
   const PayseApp({
     super.key,
     this.snapshotSource,
@@ -46,6 +48,7 @@ class PayseApp extends StatefulWidget {
     this.now,
     this.lockTimeout = const Duration(minutes: 10),
     this.userFixtures,
+    this.presentationPolicy,
   });
 
   final SnapshotSource? snapshotSource;
@@ -60,6 +63,9 @@ class PayseApp extends StatefulWidget {
   /// 2026-10-22: 사용자 ID → 불변 금융 원본. 생략하면 개발 데모 계정 원본을 쓴다(테스트에서 바꿔 끼움).
   final Map<String, FixtureScenario>? userFixtures;
 
+  final ConnectionPresentationPolicy Function(bool Function() failuresEnabled)?
+  presentationPolicy;
+
   /// 2026-10-20: 앱 루트 상태 객체를 반환한다. 인자 없음.
   @override
   State<PayseApp> createState() => _PayseAppState();
@@ -67,6 +73,7 @@ class PayseApp extends StatefulWidget {
 
 /// 2026-10-20: 앱 수명 동안 필요한 등록과 Repository 생성, 개발용 스냅샷 선택을 맡는다.
 /// 2026-10-21: 인증 의존성 생성, 진입 판단, 10분 무입력·백그라운드 복귀 잠금도 맡는다.
+/// 2026-10-23: 개발용 스냅샷은 미리보기로만 두고, 실패 연출 토글을 앱 프로세스 동안 보관한다(세션이 바뀌어도 유지).
 class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
   late final SnapshotSource _source =
       widget.snapshotSource ?? AssetSnapshotSource(rootBundle);
@@ -85,7 +92,9 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
   UserFinancialRepository _financial =
       const UnavailableUserFinancialRepository();
   int _financialSession = 0;
-  FixtureScenario? _devScenario;
+  String? _userName;
+  final ValueNotifier<bool> _failurePresentation = ValueNotifier(true);
+  late final ConnectionPresentationPolicy _presentation = _presentationPolicy();
   late final LocalLockController _lock = LocalLockController(
     now: _now,
     timeout: widget.lockTimeout,
@@ -109,6 +118,7 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _lock.dispose();
+    _failurePresentation.dispose();
     super.dispose();
   }
 
@@ -157,13 +167,20 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
     }
   }
 
-  /// 2026-10-22: 저장된 세션으로 이번 세션의 금융 저장소를 새로 만든다. 이전 세션 저장소는 닫아 늦은 응답을 버리고,
-  /// 개발용 스냅샷 덮어쓰기도 세션·계정이 바뀌면 지운다(서버 장부는 남음).
+  /// 2026-10-23: 연결 표시 정책을 만든다. 실패 연출 사용 여부는 개발 설정 토글의 현재 값을 추첨 때마다 읽는다.
+  ConnectionPresentationPolicy _presentationPolicy() {
+    bool enabled() => _failurePresentation.value;
+    return widget.presentationPolicy?.call(enabled) ??
+        ConnectionPresentationPolicy(failuresEnabled: enabled);
+  }
+
+  /// 2026-10-22: 저장된 세션으로 이번 세션의 금융 저장소를 새로 만든다. 이전 세션 저장소는 닫아 늦은 응답을 버린다
+  /// (서버 장부는 남음).
   Future<void> _openFinancialSession() async {
     final stored = await _auth.sessionStore.read();
     final server = _financialServer;
     _financial.close();
-    _devScenario = null;
+    _userName = stored?.name;
     _financial = stored == null || server == null
         ? const UnavailableUserFinancialRepository()
         : FakeUserFinancialRepository(
@@ -216,7 +233,7 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
     _financial.close();
     _financial = const UnavailableUserFinancialRepository();
     _financialSession++;
-    _devScenario = null;
+    _userName = null;
     setState(() {
       _stage = _EntryStage.signedOut;
       _signInAgain = true;
@@ -232,17 +249,9 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
   }
 
   /// 2026-10-20: [scenario] 스냅샷을 읽는 Repository를 만든다. 화면은 이 계약만 사용한다.
+  /// 2026-10-23: 개발 설정의 읽기 전용 미리보기에만 쓰며 첫 화면 판단·저장에는 쓰지 않는다.
   FinancialSnapshotRepository _repositoryFor(FixtureScenario scenario) =>
       FakeFinancialSnapshotRepository(source: _source, scenario: scenario);
-
-  /// 2026-10-22: 첫 화면의 스냅샷 출처를 반환한다. 개발용 스냅샷을 고른 경우에만 그 원본을 그대로 보이고,
-  /// 아니면 로그인한 사용자의 저장 상태를 투영한 스냅샷을 쓴다.
-  FinancialSnapshotRepository _entryRepository() {
-    final override = _devScenario;
-    return override == null
-        ? UserSnapshotRepository(_financial)
-        : _repositoryFor(override);
-  }
 
   /// 2026-10-19: context의 위젯 트리에 앱 시작 화면을 반환한다.
   /// 2026-10-21: 진입 단계별 화면과, 잠금 중이면 아래 화면 상태를 보존한 채 가린 11-1 잠금을 반환한다.
@@ -303,8 +312,10 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
         onSessionInvalid: _onSessionInvalid,
       ),
       _EntryStage.active => MainEntry(
-        repository: _entryRepository(),
-        reloadKey: (_financialSession, _devScenario),
+        financial: _financial,
+        policy: _presentation,
+        reloadKey: _financialSession,
+        userName: _userName,
         devEntryBuilder: _devEntryOrNull,
         onSessionInvalid: _onFinancialSessionInvalid,
       ),
@@ -322,6 +333,7 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
   }
 
   /// 2026-10-20: 개발 환경 전용 진입 버튼을 반환한다. 릴리스 빌드에서는 호출되지 않는다.
+  /// 2026-10-23: 홈과 연결 흐름(12-1·01-1)에서 같은 개발 설정을 연다.
   Widget _devEntry(BuildContext context) {
     return Column(
       key: const ValueKey('dev-entry'),
@@ -331,13 +343,12 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
           onPressed: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => FixtureDebugScreen(
-                initial: _devScenario ?? FixtureScenario.defaultScenario,
                 repositoryFor: _repositoryFor,
-                onScenarioChanged: (s) => setState(() => _devScenario = s),
+                failurePresentation: _failurePresentation,
               ),
             ),
           ),
-          child: const Text('개발용: 더미 스냅샷 확인'),
+          child: const Text('개발 설정'),
         ),
       ],
     );

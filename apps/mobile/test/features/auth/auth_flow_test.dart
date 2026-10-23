@@ -20,6 +20,10 @@ const _account = FakeDemoAccount(
   code: '246810',
 );
 
+/// 2026-10-23: 연결 전 사용자가 첫 화면에서 만나는 연결 흐름(진입 로딩을 마친 '다음' 버튼)을 찾는다.
+Finder _connectEntry({bool skipOffstage = true}) =>
+    find.byKey(const ValueKey('entry-next'), skipOffstage: skipOffstage);
+
 /// 2026-10-21: 가짜 저장소 호출을 세는 감시 구현. 결과는 그대로 넘긴다.
 class _SpyAuthRepository implements AuthRepository, SessionResolver {
   /// 2026-10-21: 실제로 처리할 [inner]로 만든다.
@@ -126,6 +130,7 @@ class _Harness {
         sessionStore: sessions,
         pinStore: pins,
         now: clock.now,
+        presentationPolicy: instantPresentation(),
       ),
     );
     await tester.pumpAndSettle();
@@ -188,6 +193,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('다음'));
     await tester.pumpAndSettle();
+    expect(find.text('페이즈'), findsOneWidget, reason: '이름 칸은 예시로 안내');
 
     await fillIdentity(tester, 'ㄱㄴ', '0101');
     expect(find.text('이름을 확인해주세요.'), findsOneWidget);
@@ -337,11 +343,7 @@ void main() {
 
       await enterPin(tester, testPin);
       expect((await h.pins.verify(testPin)).matched, isTrue);
-      expect(
-        find.text('금융사 연결 화면이 들어갈 자리예요.'),
-        findsOneWidget,
-        reason: '첫 가입 후 연결 자리',
-      );
+      expect(_connectEntry(), findsOneWidget, reason: '첫 가입 후 연결 흐름');
     },
   );
 
@@ -377,8 +379,7 @@ void main() {
       await h.reachPinSetup(tester);
       await enterPin(tester, testPin);
       await enterPin(tester, testPin);
-      await tester.tap(find.text('홈으로 가기'));
-      await tester.pumpAndSettle();
+      expect(_connectEntry(), findsOneWidget);
       h.fake.terminateSessionOf(_account.userId);
 
       h.clock.advance(const Duration(minutes: 10));
@@ -416,17 +417,15 @@ void main() {
   );
 
   testWidgets(
-    '09-13: screens opened above home (dev snapshot screen) close on session invalid',
+    '09-13: screens opened above the first screen (dev settings) close on session invalid',
     (tester) async {
       final h = _Harness()..devTools = true;
       await h.reachPinSetup(tester);
       await enterPin(tester, testPin);
       await enterPin(tester, testPin);
-      await tester.tap(find.text('홈으로 가기'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('내 정보').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('개발용: 더미 스냅샷 확인'));
+      await passEntryLoading(tester);
+      await tester.scrollUntilVisible(find.text('개발 설정'), 200);
+      await tester.tap(find.text('개발 설정'));
       await tester.pumpAndSettle();
       expect(find.byType(FixtureDebugScreen), findsOneWidget);
 
@@ -444,6 +443,7 @@ void main() {
         findsNothing,
       );
       expect(find.byType(NavigationBar, skipOffstage: false), findsNothing);
+      expect(_connectEntry(skipOffstage: false), findsNothing);
       expect(find.byKey(const ValueKey('identity-name')), findsOneWidget);
     },
   );
@@ -469,44 +469,6 @@ void main() {
       expect(await h.pins.hasPin(), isFalse);
     },
   );
-
-  testWidgets('⑦ a dev snapshot override is cleared when the session changes', (
-    tester,
-  ) async {
-    final h = _Harness()..devTools = true;
-    await h.reachPinSetup(tester);
-    await enterPin(tester, testPin);
-    await enterPin(tester, testPin);
-    await tester.tap(find.text('홈으로 가기'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('내 정보').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('개발용: 더미 스냅샷 확인'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('scenario-alpha-ready')));
-    await tester.pumpAndSettle();
-    await tester.pageBack();
-    await tester.pumpAndSettle();
-
-    h.fake.terminateSessionOf(_account.userId);
-    h.clock.advance(const Duration(minutes: 10));
-    await tester.pump(const Duration(minutes: 10));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('pin-key-auxiliary')));
-    await tester.pumpAndSettle();
-    await fillIdentity(tester, _account.name, '01099990000');
-    await submitCode(tester, _account.code);
-    await fillIdentity(tester, _account.name, '01099990000');
-    await submitCode(tester, _account.code);
-    await enterPin(tester, testPin);
-    await enterPin(tester, testPin);
-
-    expect(
-      find.text('금융사 연결 화면이 들어갈 자리예요.'),
-      findsOneWidget,
-      reason: '새 세션은 개발용 덮어쓰기(연결된 alpha-ready) 대신 사용자 저장 상태(연결 전)를 따름',
-    );
-  });
 
   testWidgets('10-3: leaving is blocked while the session request is pending', (
     tester,
@@ -567,11 +529,7 @@ void main() {
     await enterPin(tester, testPin);
     await enterPin(tester, testPin);
     expect(await h.pins.hasPin(), isFalse, reason: '종료 중 PIN 설정 안 됨');
-    expect(
-      find.text('금융사 연결 화면이 들어갈 자리예요.'),
-      findsNothing,
-      reason: '활성 화면으로 가지 않음',
-    );
+    expect(_connectEntry(), findsNothing, reason: '활성 화면으로 가지 않음');
 
     h.spy.endGate!.complete();
     await tester.pumpAndSettle();
@@ -681,8 +639,7 @@ void main() {
       await h.reachPinSetup(tester);
       await enterPin(tester, testPin);
       await enterPin(tester, testPin);
-      await tester.tap(find.text('홈으로 가기'));
-      await tester.pumpAndSettle();
+      expect(_connectEntry(), findsOneWidget);
 
       h.clock.advance(const Duration(minutes: 10));
       await tester.pump(const Duration(minutes: 10));
@@ -727,7 +684,7 @@ void main() {
         reason: '복구로 PIN을 새로 만들면 실패 횟수 초기화',
       );
       expect((await h.pins.verify('246813')).matched, isTrue);
-      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(_connectEntry(), findsOneWidget, reason: '잠금 전 화면(연결 흐름 진입)이 그대로');
     },
   );
 }

@@ -14,6 +14,8 @@ import 'connection_screens.dart';
 class ConnectionFlow extends StatefulWidget {
   /// 2026-10-22: 세션 저장소 [repository], 시작 Snapshot [snapshot], 표시 정책 [policy],
   /// 01-2 확인 뒤 [onFinished], 세션 무효 [onSessionInvalid], 작업 키 난수 [random]으로 만든다.
+  /// 2026-10-23: [devEntry]는 12-1·01-1 목록 끝에 붙는 개발 설정 진입이며 릴리스에서는 null이다.
+  /// [userName]은 진입 로딩 제목에 쓰는 사용자 이름(없으면 이름 없이)이다.
   const ConnectionFlow({
     super.key,
     required this.repository,
@@ -22,6 +24,8 @@ class ConnectionFlow extends StatefulWidget {
     required this.onFinished,
     required this.onSessionInvalid,
     this.random,
+    this.devEntry,
+    this.userName,
   });
 
   final UserFinancialRepository repository;
@@ -30,6 +34,8 @@ class ConnectionFlow extends StatefulWidget {
   final VoidCallback onFinished;
   final VoidCallback onSessionInvalid;
   final Random? random;
+  final Widget? devEntry;
+  final String? userName;
 
   /// 2026-10-22: 흐름 상태 객체를 반환한다.
   @override
@@ -39,6 +45,9 @@ class ConnectionFlow extends StatefulWidget {
 /// 2026-10-22: 흐름 Navigator와 흐름 상태 소유자를 보관한다.
 class _ConnectionFlowState extends State<ConnectionFlow> {
   final GlobalKey<NavigatorState> _nav = GlobalKey<NavigatorState>();
+  final ValueNotifier<EntryLoadingPhase> _entryPhase = ValueNotifier(
+    EntryLoadingPhase.banks,
+  );
   late final ConnectionFlowController _controller = ConnectionFlowController(
     repository: widget.repository,
     snapshot: widget.snapshot,
@@ -58,6 +67,7 @@ class _ConnectionFlowState extends State<ConnectionFlow> {
   @override
   void dispose() {
     _controller.dispose();
+    _entryPhase.dispose();
     super.dispose();
   }
 
@@ -69,15 +79,33 @@ class _ConnectionFlowState extends State<ConnectionFlow> {
       MaterialPageRoute<void>(builder: (_) => page);
 
   /// 2026-10-22: 12-1 진입 로딩(2~3초)이 끝나면 12-1로 바꾼다.
+  /// 2026-10-23: 은행 → 카드사 단계를 차례로 끝내고 다 찾은 화면에서 멈춘다. 12-1로는 '다음'을 눌러야 간다.
   Future<void> _showSelectAfterEntry() async {
-    await widget.policy.entryDelay();
+    await widget.policy.entryStepDelay();
     if (!mounted) return;
-    _navigator.pushReplacement(_route(_select()));
+    _entryPhase.value = EntryLoadingPhase.cards;
+    await widget.policy.entryStepDelay();
+    if (!mounted) return;
+    _entryPhase.value = EntryLoadingPhase.done;
+  }
+
+  /// 2026-10-23: 진입 로딩 화면을 반환한다. 은행·카드사 수는 시작 Snapshot의 기관 목록에서 센다.
+  Widget _entryLoading() {
+    final institutions = widget.snapshot.institutions;
+    final banks = institutions.where((i) => i.kind == 'bank').length;
+    return InstitutionEntryLoadingScreen(
+      phase: _entryPhase,
+      bankCount: banks,
+      cardCount: institutions.length - banks,
+      userName: widget.userName,
+      onNext: () => _navigator.pushReplacement(_route(_select())),
+    );
   }
 
   /// 2026-10-22: 12-1 화면을 반환한다.
   Widget _select() => InstitutionSelectScreen(
     controller: _controller,
+    devEntry: widget.devEntry,
     onNext: () {
       _controller.enterConsent();
       _navigator.push(_route(_consent()));
@@ -107,6 +135,7 @@ class _ConnectionFlowState extends State<ConnectionFlow> {
   /// 2026-10-22: 01-1 화면을 반환한다. 가입 흐름에서는 뒤로 가기로 12-3 결과에 돌아간다.
   Widget _accounts({required bool canGoBack}) => AccountSelectScreen(
     controller: _controller,
+    devEntry: widget.devEntry,
     onBack: canGoBack ? () => _navigator.pop() : null,
     onSaved: () => _navigator.push(_route(_review())),
   );
@@ -128,11 +157,7 @@ class _ConnectionFlowState extends State<ConnectionFlow> {
         child: Navigator(
           key: _nav,
           onGenerateInitialRoutes: (_, _) => [
-            _route(
-              resume
-                  ? _accounts(canGoBack: false)
-                  : const InstitutionEntryLoadingScreen(),
-            ),
+            _route(resume ? _accounts(canGoBack: false) : _entryLoading()),
           ],
         ),
       ),
