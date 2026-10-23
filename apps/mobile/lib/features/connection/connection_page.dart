@@ -121,15 +121,7 @@ class ConnectionSection extends StatelessWidget {
         children: [
           Semantics(
             header: true,
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 13,
-                height: 18 / 13,
-                fontWeight: FontWeight.w600,
-                color: PayseColors.textSecondary,
-              ),
-            ),
+            child: Text(title, style: PayseTypography.sectionTitle),
           ),
           if (caption != null)
             Padding(

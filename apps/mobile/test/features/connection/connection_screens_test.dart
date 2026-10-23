@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:payse/data/connection/financial_api.dart';
 import 'package:payse/data/financial_snapshot.dart';
@@ -12,6 +13,8 @@ import 'package:payse/features/connection/connection_screens.dart';
 import 'package:payse/shared/design/institution_mark.dart';
 import 'package:payse/shared/design/payse_theme.dart';
 import 'package:payse/shared/design/primary_button.dart';
+import 'package:payse/shared/design/payse_tokens.dart';
+import 'package:payse/shared/design/status_notice.dart';
 
 import '../../data/connection/connection_test_utils.dart';
 import 'connection_test_support.dart';
@@ -63,6 +66,7 @@ void _consentAll(ConnectionFlowController c, Set<String> codes) {
   c.setAllConsent(true);
 }
 
+const _selectHeading = '어느 금융사의 정보를\n불러올까요?';
 const _cardWarning = '쓸 수 있는 돈을 계산하려면 은행을 1곳 이상 골라주세요.';
 const _consentWarning = '은행 1곳 이상 동의해야 계좌를 불러올 수 있어요.';
 
@@ -118,13 +122,45 @@ void main() {
   });
 
   group('12-3', () {
+    testWidgets('with the toggle off, real save failures are still explained', (
+      tester,
+    ) async {
+      final repo = ScriptedRepository()
+        ..linkResults.addAll([
+          const FinancialNetworkFailure('offline'),
+          const FinancialStaleData(),
+        ]);
+      final c = _flow(
+        repo,
+        policy: instantPolicy(draws: [0.05], failuresEnabled: false),
+      );
+      _consentAll(c, {'bank.kb'});
+      await c.startLoading();
+      await _show(
+        tester,
+        InstitutionLoadingScreen(
+          controller: c,
+          onBack: () {},
+          onSaved: () {},
+          onRestart: () {},
+        ),
+      );
+      expect(find.text('불러오지 못했어요'), findsNothing, reason: '연출 실패 없음');
+      await tester.tap(find.text('계속하기'));
+      await tester.pump();
+      expect(find.text('연결을 저장하지 못했어요'), findsOneWidget);
+      await tester.tap(find.text('다시 시도'));
+      await tester.pump();
+      expect(find.text('저장 전에 정보가 바뀌었어요'), findsOneWidget);
+    });
+
     testWidgets(
       'while loading there is no back, no exclude button and no save',
       (tester) async {
         final c = _flow(
           ScriptedRepository(),
           policy: ConnectionPresentationPolicy(
-            failuresEnabled: true,
+            failuresEnabled: () => true,
             random: SequenceRandom(doubles: [0.5], ints: [0]),
           ),
         );
@@ -142,6 +178,8 @@ void main() {
         await tester.pump();
         expect(find.text('금융사 정보를\n불러오고 있어요'), findsOneWidget);
         expect(find.text('2곳 중 0곳 완료'), findsOneWidget);
+        expect(find.text('0%'), findsOneWidget);
+        expect(find.textContaining('정보를 불러오는 중이에요.'), findsOneWidget);
         expect(find.text('불러오는 중'), findsOneWidget);
         expect(find.text('기다리는 중'), findsOneWidget);
         expect(find.byTooltip('뒤로'), findsNothing);
@@ -321,6 +359,15 @@ void main() {
         snapshot: betaSnapshot({...betaBanks}),
       );
       await _show(tester, AccountSelectScreen(controller: c, onSaved: () {}));
+      expect(
+        find.text("고른 계좌의 잔액과 거래로 계산해요. 나중에 '내 정보'에서 바꿀 수 있어요."),
+        findsOneWidget,
+      );
+      expect(
+        find.text('계좌를 1개 이상 골라주세요.'),
+        findsNothing,
+        reason: '처음에는 입출금이 골라져 있어 안내 없음',
+      );
       expect(find.text('1,500,000원'), findsOneWidget);
       expect(find.text('모아둘 돈이 있는 계좌예요'), findsNothing);
       final kb = c.accounts.first.accountId;
@@ -336,6 +383,7 @@ void main() {
       }
       await tester.pump();
       expect(_enabled(tester, '이 계좌로 계산하기'), isFalse);
+      expect(find.text('계좌를 1개 이상 골라주세요.'), findsOneWidget);
     });
 
     testWidgets('after a failed save, retry needs at least one account', (
@@ -371,20 +419,34 @@ void main() {
   });
 
   group('01-2', () {
+    /// 2026-10-23: [snapshot]으로 01-2를 띄운다.
+    Future<void> showReview(
+      WidgetTester tester,
+      FinancialSnapshot snapshot, {
+      double height = 1600,
+    }) => _show(
+      tester,
+      ConnectionReviewScreen(
+        snapshot: snapshot,
+        onBack: () {},
+        onConfirmed: () {},
+      ),
+      height: height,
+    );
+
+    /// 2026-10-23: 글자 [text]의 글자 모양을 반환한다.
+    TextStyle styleOf(WidgetTester tester, String text) =>
+        tester.widget<Text>(find.text(text).first).style!;
+
     testWidgets('shows saved values without calculating', (tester) async {
-      final snapshot = betaSnapshot(
-        {...betaBanks, ...betaCards},
-        selected: {'1d383795-5b7c-56f9-9535-ff418040183d'},
-      );
-      await _show(
+      await showReview(
         tester,
-        ConnectionReviewScreen(
-          snapshot: snapshot,
-          onBack: () {},
-          onConfirmed: () {},
+        betaSnapshot(
+          {...betaBanks, ...betaCards},
+          selected: {'1d383795-5b7c-56f9-9535-ff418040183d'},
         ),
-        height: 1600,
       );
+      expect(find.text('선택한 금융사의 정보를 불러왔어요.'), findsOneWidget);
       expect(find.text('매월 25일'), findsOneWidget);
       expect(find.text('3,000,000원'), findsOneWidget);
       expect(find.text('다음 결제 11월 10일'), findsNWidgets(3));
@@ -400,60 +462,243 @@ void main() {
         isTrue,
         reason: '예정 지출은 날짜순',
       );
-      expect(find.textContaining('보이지 않아요'), findsNothing);
+      expect(find.byKey(const ValueKey('review-scope-note')), findsNothing);
+      expect(find.byKey(const ValueKey('status-label')), findsNothing);
+      expect(find.byType(StatusNotice), findsNothing);
     });
 
-    testWidgets('hidden, unset and planned values read differently', (
+    testWidgets('amounts alone are emphasized; dates and states are not', (
       tester,
     ) async {
-      final partial = betaSnapshot({'bank.shinhan', 'card.hyundai'});
-      await _show(
+      await showReview(
         tester,
-        ConnectionReviewScreen(
-          snapshot: partial,
-          onBack: () {},
-          onConfirmed: () {},
+        betaSnapshot(
+          {...betaBanks, ...betaCards},
+          mutate: (source) {
+            ((source['settings']! as Map)['salary']!
+                    as Map)['salaryAmountKRW'] =
+                null;
+          },
         ),
-        height: 1600,
       );
-      expect(find.text('연결하지 않은 계좌'), findsOneWidget);
-      expect(find.text('출금 계좌 정보 없음 · 연결하지 않은 은행'), findsOneWidget);
-      expect(find.text('연결하지 않은 계좌의 모아둘 돈은 보이지 않아요.'), findsOneWidget);
-      expect(find.text('연결하지 않은 계좌의 예정 지출은 보이지 않아요.'), findsOneWidget);
-      expect(find.text('모아둘 돈이 없어요'), findsNothing);
+      for (final amount in ['400,000원']) {
+        final style = styleOf(tester, amount);
+        expect(style.fontSize, 16);
+        expect(style.fontWeight, FontWeight.w700);
+      }
+      final date = styleOf(tester, '다음 결제 11월 10일');
+      expect(date.fontSize, 15);
+      expect(date.fontWeight, FontWeight.w500);
+      final unset = styleOf(tester, '금액 미입력');
+      expect(unset.fontSize, 15);
+      expect(unset.fontWeight, isNot(FontWeight.w700));
+      expect(unset.color, PayseColors.textSecondary);
+      expect(styleOf(tester, '월급'), PayseTypography.sectionTitle);
+      expect(PayseTypography.sectionTitle.fontSize, 14);
+      expect(PayseTypography.sectionTitle.fontWeight, FontWeight.w600);
+      expect(
+        PayseTypography.ledgerAmount.fontSize,
+        15,
+        reason: '홈·01-1이 쓰는 공통 금액 토큰은 그대로',
+      );
+    });
 
-      final unset = betaSnapshot(
-        {...betaBanks, ...betaCards},
-        mutate: (source) {
-          final settings = source['settings']! as Map;
-          (settings['salary']! as Map)
-            ..['salaryDay'] = null
-            ..['salaryAmountKRW'] = null
-            ..['salaryAccountId'] = null;
-          (settings['cardPlans']! as List).add({
-            'userId': source['userId'],
-            'cardId': rows(source, 'cards').first['cardId'],
-            'plannedPaymentDay': 15,
-          });
-        },
-      );
-      await _show(
+    testWidgets('partial connection reads as scope, not an error', (
+      tester,
+    ) async {
+      await showReview(tester, betaSnapshot({'bank.shinhan', 'card.hyundai'}));
+      expect(find.text('연결하지 않은 금융사의 정보는 포함되지 않았어요.'), findsOneWidget);
+      expect(find.byType(StatusNotice), findsNothing, reason: '경고 띠 없음');
+      expect(find.byIcon(Icons.warning_amber_rounded), findsNothing);
+      expect(find.text('급여 계좌'), findsOneWidget);
+      expect(find.text('출금 계좌'), findsOneWidget);
+      expect(find.text('연결 안 함'), findsNWidgets(2));
+      expect(find.text('매월 25일'), findsOneWidget, reason: '월급일은 그대로');
+      expect(find.text('3,000,000원'), findsOneWidget, reason: '금액도 그대로');
+      expect(find.text('연결한 계좌에서 확인되는 모아둘 돈이 없어요.'), findsOneWidget);
+      expect(find.text('연결한 계좌에서 확인되는 예정 지출이 없어요.'), findsOneWidget);
+      expect(find.text('등록된 모아둘 돈이 없어요.'), findsNothing, reason: '숨김은 없음과 다름');
+      expect(_enabled(tester, '확인했어요'), isTrue);
+    });
+
+    testWidgets('none, hidden and partly hidden groups read differently', (
+      tester,
+    ) async {
+      await showReview(
         tester,
-        ConnectionReviewScreen(
-          snapshot: unset,
-          onBack: () {},
-          onConfirmed: () {},
+        betaSnapshot(
+          {...betaBanks, ...betaCards},
+          mutate: (source) => source
+            ..['reserves'] = <Object?>[]
+            ..['allocations'] = <Object?>[],
         ),
-        height: 1600,
+      );
+      expect(find.text('등록된 모아둘 돈이 없어요.'), findsOneWidget);
+      expect(find.textContaining('연결한 계좌'), findsNothing);
+
+      await showReview(
+        tester,
+        betaSnapshot(
+          {'bank.shinhan'},
+          mutate: (source) {
+            final shinhan = rows(source, 'accounts').firstWhere(
+              (a) => a['institutionCode'] == 'bank.shinhan',
+            )['accountId'];
+            rows(source, 'obligations').first['withdrawalAccountId'] = shinhan;
+          },
+        ),
+      );
+      expect(find.text('연결한 계좌 기준으로 보여드려요.'), findsOneWidget);
+      expect(find.text('연결한 계좌에서 확인되는 예정 지출이 없어요.'), findsNothing);
+    });
+
+    testWidgets('unset and planned values read differently', (tester) async {
+      await showReview(
+        tester,
+        betaSnapshot(
+          {...betaBanks, ...betaCards},
+          mutate: (source) {
+            final settings = source['settings']! as Map;
+            (settings['salary']! as Map)
+              ..['salaryDay'] = null
+              ..['salaryAmountKRW'] = null
+              ..['salaryAccountId'] = null;
+            (settings['cardPlans']! as List).add({
+              'userId': source['userId'],
+              'cardId': rows(source, 'cards').first['cardId'],
+              'plannedPaymentDay': 15,
+            });
+          },
+        ),
       );
       expect(find.text('월급일 미입력'), findsOneWidget);
       expect(find.text('금액 미입력'), findsOneWidget);
       expect(find.text('급여 계좌 미선택'), findsOneWidget);
       expect(find.text('매월 15일'), findsOneWidget);
+      expect(find.text('연결 안 함'), findsNothing, reason: '미입력은 미연결이 아님');
     });
+
+    for (final scale in [1.0, 1.3, 2.0]) {
+      testWidgets(
+        'long amounts and dates are not cut on a small phone at text x$scale',
+        (tester) async {
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          tester.view.physicalSize = const Size(960, 1704);
+          tester.view.devicePixelRatio = 3;
+          addTearDown(tester.view.reset);
+          final snapshot = betaSnapshot(
+            {'bank.shinhan', 'card.hyundai'},
+            mutate: (source) {
+              ((source['settings']! as Map)['salary']!
+                      as Map)['salaryAmountKRW'] =
+                  8999999999999;
+              for (final card in rows(source, 'cards')) {
+                for (final e in card['scheduleEvidence']! as List) {
+                  (e as Map)['dueDate'] = '2027-01-10';
+                }
+              }
+            },
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: buildPayseTheme(),
+              home: ConnectionReviewScreen(
+                snapshot: snapshot,
+                onBack: () {},
+                onConfirmed: () {},
+              ),
+            ),
+          );
+          expect(tester.takeException(), isNull, reason: '넘침 없음');
+          for (final text in ['8,999,999,999,999원', '다음 결제 2027년 1월 10일']) {
+            final finder = find.text(text);
+            await tester.scrollUntilVisible(
+              finder,
+              80,
+              scrollable: find.byType(Scrollable).first,
+            );
+            expect(finder, findsOneWidget);
+            expect(
+              tester.renderObject<RenderParagraph>(finder).didExceedMaxLines,
+              isFalse,
+              reason: '$text 잘림 없음',
+            );
+            expect(tester.getRect(finder).right, lessThanOrEqualTo(320));
+          }
+        },
+      );
+    }
   });
 
   group('flow', () {
+    testWidgets(
+      'entry loading finds banks, then cards, shows the count, and waits for next',
+      (tester) async {
+        final waits = <Completer<void>>[];
+        final policy = ConnectionPresentationPolicy(
+          failuresEnabled: () => true,
+          random: SequenceRandom(),
+          wait: (_) {
+            final c = Completer<void>();
+            waits.add(c);
+            return c.future;
+          },
+        );
+        await _show(
+          tester,
+          ConnectionFlow(
+            repository: ScriptedRepository(),
+            snapshot: betaSnapshot(const {}),
+            policy: policy,
+            onFinished: () {},
+            onSessionInvalid: () {},
+            userName: '데모베타',
+          ),
+        );
+        await tester.pump();
+        Finder step(String key, String text) => find.descendant(
+          of: find.byKey(ValueKey(key)),
+          matching: find.text(text),
+        );
+        expect(find.text('데모베타님이 연결할 수 있는\n금융사를 찾고 있어요'), findsOneWidget);
+        expect(step('entry-step-banks', '찾는 중'), findsOneWidget);
+        expect(step('entry-step-cards', '기다리는 중'), findsOneWidget);
+
+        waits[0].complete();
+        await tester.pump();
+        expect(step('entry-step-banks', '5곳 찾았어요'), findsOneWidget);
+        expect(step('entry-step-cards', '찾는 중'), findsOneWidget);
+
+        expect(
+          tester
+              .widget<IgnorePointer>(
+                find
+                    .ancestor(
+                      of: find.byKey(const ValueKey('entry-next')),
+                      matching: find.byType(IgnorePointer),
+                    )
+                    .first,
+              )
+              .ignoring,
+          isTrue,
+          reason: '찾는 동안 다음 버튼은 누를 수 없음',
+        );
+
+        waits[1].complete();
+        await tester.pumpAndSettle();
+        expect(find.text('연결할 수 있는 금융사\n9곳을 찾았어요'), findsOneWidget);
+        expect(find.text('이제 불러올 금융사를 골라주세요.'), findsOneWidget);
+        expect(step('entry-step-cards', '4곳 찾았어요'), findsOneWidget);
+        expect(waits, hasLength(2), reason: '다 찾은 뒤 자동 이동 대기 없음');
+        expect(find.text(_selectHeading), findsNothing);
+
+        await tester.tap(find.byKey(const ValueKey('entry-next')));
+        await tester.pumpAndSettle();
+        expect(find.text(_selectHeading), findsOneWidget);
+      },
+    );
+
     testWidgets('runs 12-1 to 01-2 and finishes only after both saves', (
       tester,
     ) async {
@@ -483,7 +728,9 @@ void main() {
           random: Random(1),
         ),
       );
-      expect(find.text('정보를 받아올 금융사를 찾고 있어요'), findsOneWidget);
+      expect(find.text('연결할 수 있는\n금융사를 찾고 있어요'), findsOneWidget);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('entry-next')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('institution-bank.kb')));
       await tester.pump();
