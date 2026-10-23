@@ -1,13 +1,16 @@
 /// 2026-10-21: 기기에 둘 세션 정보. 토큰 원문은 보안 저장소 구현에만 넘긴다.
+/// [name]은 로그인 201이 돌려준 호칭용 이름이며 소유권 판단에 쓰지 않는다.
 class StoredSession {
-  /// 2026-10-21: [userId]·[sessionId]·불투명 [accessToken]으로 만든다.
+  /// 2026-10-21: [userId]·호칭용 [name]·[sessionId]·불투명 [accessToken]으로 만든다.
   const StoredSession({
     required this.userId,
+    required this.name,
     required this.sessionId,
     required this.accessToken,
   });
 
   final String userId;
+  final String name;
   final String sessionId;
   final String accessToken;
 }

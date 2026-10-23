@@ -12,19 +12,24 @@ import 'package:payse/shared/design/primary_button.dart';
 import '../../app/app_test_utils.dart';
 
 /// 2026-10-21: 테스트 전용 계정. 코드는 테스트 값이며 서버 확정 값이 아니다.
+/// 2026-10-22: userId는 금융 원본을 고르기 위해 개발 데모 alpha와 같게 둔다(이름·번호·코드는 테스트 값).
 const _account = FakeDemoAccount(
-  userId: 'test-user',
-  name: '데모테스트',
+  userId: 'f0a4be6c-01d7-53eb-ab2c-74675b22fd8c',
+  name: '테스트계정',
   phone: '01099990000',
   code: '246810',
 );
 
+/// 2026-10-23: 연결 전 사용자가 첫 화면에서 만나는 연결 흐름(진입 로딩을 마친 '다음' 버튼)을 찾는다.
+Finder _connectEntry({bool skipOffstage = true}) =>
+    find.byKey(const ValueKey('entry-next'), skipOffstage: skipOffstage);
+
 /// 2026-10-21: 가짜 저장소 호출을 세는 감시 구현. 결과는 그대로 넘긴다.
-class _SpyAuthRepository implements AuthRepository {
+class _SpyAuthRepository implements AuthRepository, SessionResolver {
   /// 2026-10-21: 실제로 처리할 [inner]로 만든다.
   _SpyAuthRepository(this.inner);
 
-  final AuthRepository inner;
+  final FakeAuthRepository inner;
   int createCalls = 0;
   int reverifyCalls = 0;
   int endCalls = 0;
@@ -51,6 +56,11 @@ class _SpyAuthRepository implements AuthRepository {
     reverifyCalls++;
     return inner.reverify(accessToken, credentials);
   }
+
+  /// 2026-10-22: 금융 조회의 세션 판정을 [inner]에 넘긴다.
+  @override
+  String? userIdForToken(String accessToken) =>
+      inner.userIdForToken(accessToken);
 
   /// 2026-10-21: 종료 요청 수를 세고 [inner]에 넘긴다.
   @override
@@ -120,6 +130,7 @@ class _Harness {
         sessionStore: sessions,
         pinStore: pins,
         now: clock.now,
+        presentationPolicy: instantPresentation(),
       ),
     );
     await tester.pumpAndSettle();
@@ -182,6 +193,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('다음'));
     await tester.pumpAndSettle();
+    expect(find.text('페이즈'), findsOneWidget, reason: '이름 칸은 예시로 안내');
 
     await fillIdentity(tester, 'ㄱㄴ', '0101');
     expect(find.text('이름을 확인해주세요.'), findsOneWidget);
@@ -230,6 +242,46 @@ void main() {
     expect(find.byKey(const ValueKey('pin-setup-pad')), findsOneWidget);
     expect((await h.sessions.read())?.userId, _account.userId);
   });
+
+  testWidgets(
+    '10-2: a name with an inner space is a name error; 10-2 sends nothing',
+    (tester) async {
+      final h = _Harness();
+      await h.pump(tester);
+      await tester.tap(find.text('시작하기'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('terms-all')));
+      await tester.pump();
+      await tester.tap(find.text('다음'));
+      await tester.pumpAndSettle();
+
+      await fillIdentity(tester, '테스트 계정', '01099990000');
+      expect(find.text('이름을 확인해주세요.'), findsOneWidget);
+      expect(h.spy.createCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'signup with edge spaces and separators stores the account name, not the input',
+    (tester) async {
+      final h = _Harness();
+      await h.pump(tester);
+      await tester.tap(find.text('시작하기'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('terms-all')));
+      await tester.pump();
+      await tester.tap(find.text('다음'));
+      await tester.pumpAndSettle();
+
+      await fillIdentity(tester, '  테스트계정 ', '010-9999 0000');
+      await submitCode(tester, _account.code);
+
+      expect(find.byKey(const ValueKey('pin-setup-pad')), findsOneWidget);
+      final stored = await h.sessions.read();
+      expect(stored?.name, _account.name);
+      expect(stored?.userId, _account.userId);
+    },
+  );
 
   testWidgets('10-3 timer is display-only and restarts only after 0:00', (
     tester,
@@ -291,11 +343,7 @@ void main() {
 
       await enterPin(tester, testPin);
       expect((await h.pins.verify(testPin)).matched, isTrue);
-      expect(
-        find.text('금융사 연결 화면이 들어갈 자리예요.'),
-        findsOneWidget,
-        reason: '첫 가입 후 연결 자리',
-      );
+      expect(_connectEntry(), findsOneWidget, reason: '첫 가입 후 연결 흐름');
     },
   );
 
@@ -331,8 +379,7 @@ void main() {
       await h.reachPinSetup(tester);
       await enterPin(tester, testPin);
       await enterPin(tester, testPin);
-      await tester.tap(find.text('홈으로 가기'));
-      await tester.pumpAndSettle();
+      expect(_connectEntry(), findsOneWidget);
       h.fake.terminateSessionOf(_account.userId);
 
       h.clock.advance(const Duration(minutes: 10));
@@ -370,17 +417,15 @@ void main() {
   );
 
   testWidgets(
-    '09-13: screens opened above home (dev snapshot screen) close on session invalid',
+    '09-13: screens opened above the first screen (dev settings) close on session invalid',
     (tester) async {
       final h = _Harness()..devTools = true;
       await h.reachPinSetup(tester);
       await enterPin(tester, testPin);
       await enterPin(tester, testPin);
-      await tester.tap(find.text('홈으로 가기'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('내 정보').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('개발용: 더미 스냅샷 확인'));
+      await passEntryLoading(tester);
+      await tester.scrollUntilVisible(find.text('개발 설정'), 200);
+      await tester.tap(find.text('개발 설정'));
       await tester.pumpAndSettle();
       expect(find.byType(FixtureDebugScreen), findsOneWidget);
 
@@ -398,6 +443,7 @@ void main() {
         findsNothing,
       );
       expect(find.byType(NavigationBar, skipOffstage: false), findsNothing);
+      expect(_connectEntry(skipOffstage: false), findsNothing);
       expect(find.byKey(const ValueKey('identity-name')), findsOneWidget);
     },
   );
@@ -483,11 +529,7 @@ void main() {
     await enterPin(tester, testPin);
     await enterPin(tester, testPin);
     expect(await h.pins.hasPin(), isFalse, reason: '종료 중 PIN 설정 안 됨');
-    expect(
-      find.text('금융사 연결 화면이 들어갈 자리예요.'),
-      findsNothing,
-      reason: '활성 화면으로 가지 않음',
-    );
+    expect(_connectEntry(), findsNothing, reason: '활성 화면으로 가지 않음');
 
     h.spy.endGate!.complete();
     await tester.pumpAndSettle();
@@ -530,7 +572,7 @@ void main() {
   testWidgets(
     'PIN failure count survives an app restart; 5 failures stay at 09-12',
     (tester) async {
-      final (sessions, pins) = await signedInStores();
+      final (sessions, pins, auth) = await signedInStores();
 
       /// 2026-10-21: 같은 기기 저장소로 앱을 새로 띄워 재시작을 흉내 낸다.
       Future<void> launch() async {
@@ -539,6 +581,7 @@ void main() {
           PayseApp(
             snapshotSource: PreloadedAssetSource(),
             enableDevTools: false,
+            authRepository: auth,
             sessionStore: sessions,
             pinStore: pins,
           ),
@@ -596,8 +639,7 @@ void main() {
       await h.reachPinSetup(tester);
       await enterPin(tester, testPin);
       await enterPin(tester, testPin);
-      await tester.tap(find.text('홈으로 가기'));
-      await tester.pumpAndSettle();
+      expect(_connectEntry(), findsOneWidget);
 
       h.clock.advance(const Duration(minutes: 10));
       await tester.pump(const Duration(minutes: 10));
@@ -642,7 +684,7 @@ void main() {
         reason: '복구로 PIN을 새로 만들면 실패 횟수 초기화',
       );
       expect((await h.pins.verify('246813')).matched, isTrue);
-      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(_connectEntry(), findsOneWidget, reason: '잠금 전 화면(연결 흐름 진입)이 그대로');
     },
   );
 }

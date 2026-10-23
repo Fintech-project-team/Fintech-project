@@ -1,3 +1,5 @@
+import 'connection/access_restriction.dart';
+
 /// 2026-10-20: 더미 JSON 형식이 계약과 맞지 않을 때 던진다. [path]는 문제 필드 위치다.
 class SnapshotFormatException implements Exception {
   /// 2026-10-20: 필드 위치 [path]와 이유 [reason]으로 만든다.
@@ -105,6 +107,43 @@ class _Fields {
     final v = map[key];
     if (v == null) return null;
     return _checkKrw(key, v, allowNegative: true);
+  }
+
+  /// 2026-10-23: 키 [key]가 있으면 값을 반환한다. 키 생략은 미입력(null)이 아니라 형식 오류다.
+  Object? _present(String key, String expected) {
+    if (!map.containsKey(key)) {
+      throw SnapshotFormatException(_at(key), '필드 없음($expected)');
+    }
+    return map[key];
+  }
+
+  /// 2026-10-22: null 허용 0 이상 원 단위 정수 [key]를 반환한다. null은 미입력이며 0으로 바꾸지 않는다.
+  /// 2026-10-23: 키는 반드시 있어야 하며 명시적 null만 미입력으로 받는다.
+  int? nonNegativeKrwOrNull(String key) {
+    final v = _present(key, '원 단위 정수 또는 null');
+    if (v == null) return null;
+    return _checkKrw(key, v, allowNegative: false);
+  }
+
+  /// 2026-10-22: null 허용 매월 날짜 [key](1~31)를 반환한다. null은 미입력이다.
+  /// 2026-10-23: 키는 반드시 있어야 하며 명시적 null만 미입력으로 받는다.
+  int? dayOfMonthOrNull(String key) {
+    final v = _present(key, '1~31 정수 또는 null');
+    if (v == null) return null;
+    if (v is! int) throw _wrong(key, v, '1~31 정수 또는 null');
+    if (v < 1 || v > 31) {
+      throw SnapshotFormatException(_at(key), '1~31 범위가 아님($v)');
+    }
+    return v;
+  }
+
+  /// 2026-10-22: 필수 문자열 [key]가 [allowed] 중 하나인지 검사해 반환한다.
+  String oneOf(String key, Set<String> allowed) {
+    final v = string(key);
+    if (!allowed.contains(v)) {
+      throw SnapshotFormatException(_at(key), '허용 값이 아님("$v")');
+    }
+    return v;
   }
 
   /// 2026-10-20: 필수 0 이상 개수 [key]를 반환한다.
@@ -253,6 +292,8 @@ class PaymentCard {
     required this.maskedNumber,
     required this.cardType,
     required this.withdrawalAccountId,
+    this.withdrawalAccountRestricted = false,
+    this.scheduleEvidence = const [],
   });
 
   final String cardId;
@@ -262,6 +303,12 @@ class PaymentCard {
   final String cardType;
   final String? withdrawalAccountId;
 
+  /// 2026-10-22: 출금 계좌가 미연결이라 응답에서 생략됐으면 true다(원래 미확인인 null과 구분).
+  final bool withdrawalAccountRestricted;
+
+  /// 2026-10-22: 카드사가 확인한 결제 일정. 빈 목록은 일정 미확보이며 반복 주기를 추정하지 않는다.
+  final List<CardSchedule> scheduleEvidence;
+
   static PaymentCard _parse(_Fields f) => PaymentCard(
     cardId: f.string('cardId'),
     institutionCode: f.string('institutionCode'),
@@ -269,6 +316,161 @@ class PaymentCard {
     maskedNumber: f.string('maskedNumber'),
     cardType: f.string('cardType'),
     withdrawalAccountId: f.stringOrNull('withdrawalAccountId'),
+    withdrawalAccountRestricted: !f.map.containsKey('withdrawalAccountId'),
+    scheduleEvidence: f.list('scheduleEvidence', CardSchedule._parse),
+  );
+}
+
+/// 2026-10-22: 카드사가 확인한 결제 일정 하나. 이용기간은 양 끝을 함께 주며, 결제일만 확인되면 기간은 null이다.
+class CardSchedule {
+  /// 2026-10-22: 이용기간 [periodStart]·[periodEnd], 결제일 [dueDate], 근거 [evidenceRef]로 만든다.
+  const CardSchedule({
+    required this.periodStart,
+    required this.periodEnd,
+    required this.dueDate,
+    required this.evidenceRef,
+  });
+
+  final String? periodStart;
+  final String? periodEnd;
+  final String? dueDate;
+  final String evidenceRef;
+
+  /// 2026-10-22: 일정 하나를 읽는다. 기간 한쪽만 있거나 날짜가 모두 없는 빈 일정은 형식 오류다.
+  static CardSchedule _parse(_Fields f) {
+    final start = f.businessDateOrNull('periodStart');
+    final end = f.businessDateOrNull('periodEnd');
+    final due = f.businessDateOrNull('dueDate');
+    if ((start == null) != (end == null)) {
+      throw SnapshotFormatException(f.path, '이용기간은 시작·끝을 함께 제공해야 함');
+    }
+    if (start == null && due == null) {
+      throw SnapshotFormatException(f.path, '날짜가 모두 없는 빈 일정');
+    }
+    return CardSchedule(
+      periodStart: start,
+      periodEnd: end,
+      dueDate: due,
+      evidenceRef: f.string('evidenceRef'),
+    );
+  }
+}
+
+/// 2026-10-22: 월급 설정. 각 값의 null은 사용자 미입력이며 0이나 임의 계좌로 바꾸지 않는다.
+class SalarySetting {
+  /// 2026-10-22: 월급일 [salaryDay], 금액 [salaryAmountKrw], 급여 계좌 [salaryAccountId]와
+  /// 급여 계좌가 미연결로 숨겨졌는지 [salaryAccountRestricted]로 만든다.
+  const SalarySetting({
+    required this.salaryDay,
+    required this.salaryAmountKrw,
+    required this.salaryAccountId,
+    this.salaryAccountRestricted = false,
+  });
+
+  final int? salaryDay;
+  final int? salaryAmountKrw;
+  final String? salaryAccountId;
+
+  /// 2026-10-22: 급여 계좌가 미연결이라 응답에서 생략됐으면 true다(미입력 null과 구분).
+  final bool salaryAccountRestricted;
+
+  static SalarySetting _parse(_Fields f) {
+    final evidence = f.map['receiptEvidence'];
+    if (f.map.containsKey('receiptEvidence') && evidence is! List) {
+      throw f._wrong('receiptEvidence', evidence, '배열');
+    }
+    return SalarySetting(
+      salaryDay: f.dayOfMonthOrNull('salaryDay'),
+      salaryAmountKrw: f.nonNegativeKrwOrNull('salaryAmountKRW'),
+      salaryAccountId: f.stringOrNull('salaryAccountId'),
+      salaryAccountRestricted: !f.map.containsKey('salaryAccountId'),
+    );
+  }
+}
+
+/// 2026-10-22: 카드별 사용자 계획 결제일. [plannedPaymentDay]가 null이면 사용자 설정이 없다.
+class CardPlan {
+  /// 2026-10-22: 카드 [cardId]와 계획 결제일 [plannedPaymentDay]로 만든다.
+  const CardPlan({required this.cardId, required this.plannedPaymentDay});
+
+  final String cardId;
+  final int? plannedPaymentDay;
+
+  static CardPlan _parse(_Fields f) => CardPlan(
+    cardId: f.string('cardId'),
+    plannedPaymentDay: f.dayOfMonthOrNull('plannedPaymentDay'),
+  );
+}
+
+/// 2026-10-22: 확정 사용자 설정(settings). 미연결 카드의 계획은 생략되고 settings 제한 표식으로 알린다.
+class FinancialSettings {
+  /// 2026-10-22: 월급 설정 [salary]와 카드 계획 [cardPlans]로 만든다.
+  const FinancialSettings({required this.salary, required this.cardPlans});
+
+  final SalarySetting salary;
+  final List<CardPlan> cardPlans;
+
+  static FinancialSettings _parse(_Fields f) => FinancialSettings(
+    salary: SalarySetting._parse(
+      _Fields.of(f._required('salary', '객체'), '${f.path}.salary'),
+    ),
+    cardPlans: f.list('cardPlans', CardPlan._parse),
+  );
+}
+
+/// 2026-10-22: 모아둘 돈(보호 설정액) 하나. 실제 적립 거래나 매월 적립액이 아니다.
+class Reserve {
+  /// 2026-10-22: 서버 ID [reserveId], 보호 계좌 [accountId], 이름 [label], 설정액 [amountKrw], 취소 시각 [cancelledAt]으로 만든다.
+  const Reserve({
+    required this.reserveId,
+    required this.accountId,
+    required this.label,
+    required this.amountKrw,
+    required this.cancelledAt,
+  });
+
+  final String reserveId;
+  final String accountId;
+  final String label;
+  final int amountKrw;
+  final String? cancelledAt;
+
+  static Reserve _parse(_Fields f) => Reserve(
+    reserveId: f.string('reserveId'),
+    accountId: f.string('accountId'),
+    label: f.string('label'),
+    amountKrw: f.krw('amountKRW', allowNegative: false),
+    cancelledAt: f.timestampOrNull('cancelledAt'),
+  );
+}
+
+/// 2026-10-22: 예정 지출(의무) 하나. 금액·날짜는 사용자가 확인한 미지급 계획이며 화면에서 계산하지 않는다.
+class Obligation {
+  /// 2026-10-22: 서버 ID [obligationId], 이름 [label], 출금 계좌 [withdrawalAccountId], 금액 [amountKrw],
+  /// 날짜 [dueDate], 상태 [status](active·cancelled)로 만든다.
+  const Obligation({
+    required this.obligationId,
+    required this.label,
+    required this.withdrawalAccountId,
+    required this.amountKrw,
+    required this.dueDate,
+    required this.status,
+  });
+
+  final String obligationId;
+  final String label;
+  final String withdrawalAccountId;
+  final int amountKrw;
+  final String dueDate;
+  final String status;
+
+  static Obligation _parse(_Fields f) => Obligation(
+    obligationId: f.string('obligationId'),
+    label: f.string('label'),
+    withdrawalAccountId: f.string('withdrawalAccountId'),
+    amountKrw: f.krw('amountKRW', allowNegative: false),
+    dueDate: f.businessDate('dueDate'),
+    status: f.oneOf('status', const {'active', 'cancelled'}),
   );
 }
 
@@ -288,11 +490,17 @@ class SourceTransaction {
     required this.purchaseDate,
     required this.withdrawalDate,
     required this.payseTransactionType,
+    this.accountRestricted = false,
+    this.cardRestricted = false,
   });
 
   final String transactionId;
   final String? accountId;
   final String? cardId;
+
+  /// 2026-10-22: 반대쪽 계좌·카드가 미연결이라 응답에서 생략됐으면 true다(원래 미확인인 null과 구분).
+  final bool accountRestricted;
+  final bool cardRestricted;
   final String recordKind;
   final int amountKrw;
   final String direction;
@@ -326,6 +534,8 @@ class SourceTransaction {
       purchaseDate: f.businessDateOrNull('purchaseDate'),
       withdrawalDate: f.businessDateOrNull('withdrawalDate'),
       payseTransactionType: f.stringOrNull('payseTransactionType'),
+      accountRestricted: !f.map.containsKey('accountId'),
+      cardRestricted: !f.map.containsKey('cardId'),
     );
   }
 }
@@ -356,6 +566,46 @@ class Coverage {
   );
 }
 
+/// 2026-10-22: 부분 연결 제한 표식 하나(docs/api-response-models.md §2.1). 숨긴 대상의 ID·개수·금액은 담지 않는다.
+class AccessRestriction {
+  /// 2026-10-22: 공개 위치 [ownerType]·[ownerId]·[field]와 비공개 자원 종류 [targetKind]로 만든다.
+  const AccessRestriction({
+    required this.ownerType,
+    required this.ownerId,
+    required this.field,
+    required this.targetKind,
+  });
+
+  final String ownerType;
+  final String? ownerId;
+  final String field;
+  final String targetKind;
+
+  /// 2026-10-22: 등록 조합·ownerId 규칙을 검사하며 한 표식을 읽는다. 맞지 않으면 형식 오류다.
+  static AccessRestriction _parse(_Fields f) {
+    final ownerType = f.string('ownerType');
+    final ownerId = f.stringOrNull('ownerId');
+    final field = f.string('field');
+    final targetKind = f.string('targetKind');
+    final valid = isValidRestriction(
+      ownerType: ownerType,
+      ownerId: ownerId,
+      field: field,
+      targetKind: targetKind,
+      reason: f.string('reason'),
+    );
+    if (!valid) {
+      throw SnapshotFormatException(f.path, '등록되지 않은 제한 조합');
+    }
+    return AccessRestriction(
+      ownerType: ownerType,
+      ownerId: ownerId,
+      field: field,
+      targetKind: targetKind,
+    );
+  }
+}
+
 /// 2026-10-20: 한 사용자의 불변 금융 스냅샷. 원천 값을 그대로 담고 합계·U를 계산하지 않는다.
 class FinancialSnapshot {
   /// 2026-10-20: 파싱된 필드로 만든다. [accounts]·[cards]·[transactions]가 null이면 원문에 해당 묶음이 없는 것(미노출)이다.
@@ -373,7 +623,17 @@ class FinancialSnapshot {
     required this.accounts,
     required this.cards,
     required this.transactions,
+    this.settings,
+    this.reserves,
+    this.obligations,
+    this.accessRestrictions = const [],
   });
+
+  /// 2026-10-22: 이 앱이 읽는 형식. 원본(PAYSE-DRAFT-2, 개발용 원본 직접 보기)과 HTTP 표현(PAYSE-API-0.6-2).
+  static const Set<String> supportedSchemas = {
+    'PAYSE-DRAFT-2',
+    'PAYSE-API-0.6-2',
+  };
 
   final String userId;
   final String schemaVersion;
@@ -391,6 +651,71 @@ class FinancialSnapshot {
   final List<PaymentCard>? cards;
   final List<SourceTransaction>? transactions;
 
+  /// 2026-10-22: 확정 사용자 설정·모아둘 돈·예정 지출. null이면 원문에 해당 묶음이 없는 것(연결 전)이다.
+  final FinancialSettings? settings;
+  final List<Reserve>? reserves;
+  final List<Obligation>? obligations;
+
+  /// 2026-10-22: 주 계좌가 미연결이라 일부 모아둘 돈이 응답에서 생략됐으면 true다.
+  bool get reservesRestricted => isRestricted('response', null, 'reserves');
+
+  /// 2026-10-22: 주 계좌가 미연결이라 일부 예정 지출이 응답에서 생략됐으면 true다.
+  bool get obligationsRestricted =>
+      isRestricted('response', null, 'obligations');
+
+  /// 2026-10-22: 미연결 카드의 계획 결제일이 응답에서 생략됐으면 true다.
+  bool get cardPlansRestricted => isRestricted('settings', null, 'cardPlans');
+
+  /// 2026-10-22: HTTP 표현(PAYSE-API-0.6-2) 연결 후 응답의 필수 키(docs/api-response-models.md §1).
+  /// 연결 전 응답에는 이 키들이 없어야 한다(머리 7개+institutions·institutionLinks·coverage의 10개만).
+  static const List<String> connectedApiKeys = [
+    'accounts',
+    'cards',
+    'transactions',
+    'statements',
+    'settings',
+    'obligations',
+    'reserves',
+    'allocations',
+    'settlements',
+    'recurringPlans',
+    'recurringDecisions',
+    'recurringPlanRevisions',
+    'occurrenceOverrides',
+    'relatedTransactions',
+    'referenceResolutions',
+    'transactionRelations',
+    'occurrenceLinks',
+    'page',
+    'accessRestrictions',
+  ];
+
+  /// 2026-10-22: 제한 표식 ownerType별로 기준 객체가 들어 있는 응답 배열과 ID 필드.
+  static const Map<String, List<(String, String)>> _ownerSources = {
+    'card': [('cards', 'cardId')],
+    'transaction': [
+      ('transactions', 'transactionId'),
+      ('relatedTransactions', 'transactionId'),
+    ],
+    'statement': [('statements', 'statementId')],
+    'obligation': [('obligations', 'obligationId')],
+    'allocation': [('allocations', 'allocationId')],
+    'recurringPlan': [('recurringPlans', 'planId')],
+    'recurringPlanRevision': [('recurringPlanRevisions', 'revisionId')],
+  };
+
+  /// 2026-10-22: 부분 연결 제한 표식. 연결 권한 때문에 숨긴 위치를 '값 없음'과 구분하는 데 쓴다.
+  final List<AccessRestriction> accessRestrictions;
+
+  /// 2026-10-22: ([ownerType], [ownerId], [field]) 위치에 연결 제한 표식이 있으면 true를 반환한다.
+  bool isRestricted(String ownerType, String? ownerId, String field) =>
+      accessRestrictions.any(
+        (r) =>
+            r.ownerType == ownerType &&
+            r.ownerId == ownerId &&
+            r.field == field,
+      );
+
   /// 2026-10-20: 디코드된 JSON [json]을 스냅샷으로 바꾼다. 형식이 맞지 않으면 SnapshotFormatException을 던진다.
   /// 화면에 필요한 필드만 읽고 나머지 필드는 무시한다. 값은 보정하지 않는다.
   factory FinancialSnapshot.fromJson(Object? json) {
@@ -399,11 +724,154 @@ class FinancialSnapshot {
     if (currency != 'KRW') {
       throw SnapshotFormatException(r'$.currency', 'KRW만 지원(실제: "$currency")');
     }
+    final schema = f.string('schemaVersion');
+    if (!supportedSchemas.contains(schema)) {
+      throw SnapshotFormatException(r'$.schemaVersion', '지원하지 않는 형식');
+    }
     final links = f._required('institutionLinks', '배열');
     if (links is! List) throw f._wrong('institutionLinks', links, '배열');
+    if (schema == 'PAYSE-API-0.6-2') _checkApiShape(f, links.isNotEmpty);
+    final restrictions =
+        f.listOrAbsent('accessRestrictions', AccessRestriction._parse) ??
+        const <AccessRestriction>[];
+    _checkRestrictionOwners(f, restrictions);
+    final cards = f.listOrAbsent('cards', PaymentCard._parse);
+    final transactions = f.listOrAbsent(
+      'transactions',
+      SourceTransaction._parse,
+    );
+    bool marked(String type, String? id, String field) => restrictions.any(
+      (r) => r.ownerType == type && r.ownerId == id && r.field == field,
+    );
+    for (final c in cards ?? const <PaymentCard>[]) {
+      if (c.withdrawalAccountRestricted &&
+          !marked('card', c.cardId, 'withdrawalAccountId')) {
+        throw SnapshotFormatException(
+          r'$.cards',
+          'withdrawalAccountId 생략에 제한 표식이 없음',
+        );
+      }
+    }
+    final accounts = f.listOrAbsent('accounts', Account._parse);
+    final settings = f.map.containsKey('settings')
+        ? FinancialSettings._parse(
+            _Fields.of(f._required('settings', '객체'), r'$.settings'),
+          )
+        : null;
+    final reserves = f.listOrAbsent('reserves', Reserve._parse);
+    final obligations = f.listOrAbsent('obligations', Obligation._parse);
+    _checkSettingsAndPlans(
+      f: f,
+      accounts: accounts,
+      cards: cards,
+      settings: settings,
+      reserves: reserves,
+      obligations: obligations,
+      marked: marked,
+    );
+    for (final t in transactions ?? const <SourceTransaction>[]) {
+      if ((t.accountRestricted &&
+              !marked('transaction', t.transactionId, 'accountId')) ||
+          (t.cardRestricted &&
+              !marked('transaction', t.transactionId, 'cardId'))) {
+        throw SnapshotFormatException(
+          r'$.transactions',
+          '계좌·카드 참조 생략에 제한 표식이 없음',
+        );
+      }
+    }
+    return FinancialSnapshot._fromParts(
+      f: f,
+      schema: schema,
+      currency: currency,
+      links: links,
+      accounts: accounts,
+      cards: cards,
+      transactions: transactions,
+      settings: settings,
+      reserves: reserves,
+      obligations: obligations,
+      restrictions: restrictions,
+    );
+  }
+
+  /// 2026-10-22: 설정·모아둘 돈·예정 지출의 참조와 생략 표식을 검사한다. 참조 대상이 응답에 없거나,
+  /// 생략에 제한 표식이 없으면 형식 오류다(숨긴 정보를 다른 값으로 대신하지 않음).
+  static void _checkSettingsAndPlans({
+    required _Fields f,
+    required List<Account>? accounts,
+    required List<PaymentCard>? cards,
+    required FinancialSettings? settings,
+    required List<Reserve>? reserves,
+    required List<Obligation>? obligations,
+    required bool Function(String type, String? id, String field) marked,
+  }) {
+    final accountIds = {
+      for (final a in accounts ?? const <Account>[]) a.accountId,
+    };
+    final cardIds = {for (final c in cards ?? const <PaymentCard>[]) c.cardId};
+    if (settings != null) {
+      final salary = settings.salary;
+      if (salary.salaryAccountRestricted &&
+          !marked('settings', null, 'salary.salaryAccountId')) {
+        throw const SnapshotFormatException(
+          r'$.settings.salary',
+          'salaryAccountId 생략에 제한 표식이 없음',
+        );
+      }
+      final salaryMap = (f.map['settings']! as Map)['salary']! as Map;
+      if (!salaryMap.containsKey('receiptEvidence') &&
+          !marked('settings', null, 'salary.receiptEvidence')) {
+        throw const SnapshotFormatException(
+          r'$.settings.salary',
+          'receiptEvidence 생략에 제한 표식이 없음',
+        );
+      }
+      final id = salary.salaryAccountId;
+      if (id != null && !accountIds.contains(id)) {
+        throw const SnapshotFormatException(
+          r'$.settings.salary.salaryAccountId',
+          '응답에 없는 계좌',
+        );
+      }
+      for (final plan in settings.cardPlans) {
+        if (!cardIds.contains(plan.cardId)) {
+          throw const SnapshotFormatException(
+            r'$.settings.cardPlans',
+            '응답에 없는 카드',
+          );
+        }
+      }
+    }
+    for (final r in reserves ?? const <Reserve>[]) {
+      if (!accountIds.contains(r.accountId)) {
+        throw const SnapshotFormatException(r'$.reserves', '응답에 없는 계좌');
+      }
+    }
+    for (final o in obligations ?? const <Obligation>[]) {
+      if (!accountIds.contains(o.withdrawalAccountId)) {
+        throw const SnapshotFormatException(r'$.obligations', '응답에 없는 계좌');
+      }
+    }
+  }
+
+  /// 2026-10-22: 읽은 부분들로 스냅샷을 만든다. [fromJson]이 검사를 마친 뒤 부른다.
+  factory FinancialSnapshot._fromParts({
+    required _Fields f,
+    required String schema,
+    required String currency,
+    required List<Object?> links,
+    required List<Account>? accounts,
+    required List<PaymentCard>? cards,
+    required List<SourceTransaction>? transactions,
+    required FinancialSettings? settings,
+    required List<Reserve>? reserves,
+    required List<Obligation>? obligations,
+    required List<AccessRestriction> restrictions,
+  }) {
     return FinancialSnapshot(
       userId: f.string('userId'),
-      schemaVersion: f.string('schemaVersion'),
+      schemaVersion: schema,
       currency: currency,
       dataVersion: f.string('dataVersion'),
       sourceVersion: f.string('sourceVersion'),
@@ -412,9 +880,62 @@ class FinancialSnapshot {
       institutions: f.list('institutions', Institution._parse),
       institutionLinkCount: links.length,
       coverage: f.list('coverage', Coverage._parse),
-      accounts: f.listOrAbsent('accounts', Account._parse),
-      cards: f.listOrAbsent('cards', PaymentCard._parse),
-      transactions: f.listOrAbsent('transactions', SourceTransaction._parse),
+      accounts: accounts,
+      cards: cards,
+      transactions: transactions,
+      settings: settings,
+      reserves: reserves,
+      obligations: obligations,
+      accessRestrictions: restrictions,
     );
+  }
+
+  /// 2026-10-22: HTTP 응답의 연결 전·후 키 구성을 검사한다. 연결 후([connected])에는 필수 배열·settings·page·
+  /// accessRestrictions가 모두 있어야 하고(누락을 '해당 없음'으로 받지 않음), 연결 전에는 금융 키가 없어야 한다.
+  /// 연결 후 settings·page는 객체, 나머지는 배열이어야 하며 null을 허용하지 않는다.
+  static void _checkApiShape(_Fields f, bool connected) {
+    for (final key in connectedApiKeys) {
+      final present = f.map.containsKey(key);
+      if (connected && !present) {
+        throw SnapshotFormatException('\$.$key', '연결 후 응답의 필수 키 없음');
+      }
+      if (connected) {
+        final value = f.map[key];
+        final ok = key == 'settings' || key == 'page'
+            ? value is Map
+            : value is List;
+        if (!ok) {
+          throw SnapshotFormatException('\$.$key', '연결 후 응답의 필수 키 형식이 다름');
+        }
+      }
+      if (!connected && present) {
+        throw SnapshotFormatException('\$.$key', '연결 전 응답에 금융 키가 있음');
+      }
+    }
+  }
+
+  /// 2026-10-22: 일반 객체 제한 표식의 ownerId가 이 응답에 실제로 공개된 객체인지 검사한다(§2.1).
+  /// 다음 페이지가 남은 응답(page.nextCursor가 있음)에서는 아직 받지 않은 거래를 기준으로 한 표식을 허용한다.
+  static void _checkRestrictionOwners(
+    _Fields f,
+    List<AccessRestriction> restrictions,
+  ) {
+    final page = f.map['page'];
+    final morePages = page is Map && page['nextCursor'] != null;
+    for (final r in restrictions) {
+      final sources = _ownerSources[r.ownerType];
+      if (sources == null) continue;
+      final found = sources.any((source) {
+        final rows = f.map[source.$1];
+        return rows is List &&
+            rows.any((row) => row is Map && row[source.$2] == r.ownerId);
+      });
+      if (!found && !(r.ownerType == 'transaction' && morePages)) {
+        throw SnapshotFormatException(
+          r'$.accessRestrictions',
+          '제한 표식의 기준 객체가 응답에 공개되지 않음',
+        );
+      }
+    }
   }
 }

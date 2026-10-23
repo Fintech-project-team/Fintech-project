@@ -4,8 +4,8 @@ import 'auth_input_rules.dart';
 import 'auth_repository.dart';
 import 'random_id.dart';
 
-/// 2026-10-21: 가짜 저장소가 아는 데모 계정. 이름·전화번호는 server-seeds.json의 합성 값,
-/// [code]는 서버 코드가 확정되기 전 호출자가 주는 임시 검증 값이다.
+/// 2026-10-21: 가짜 저장소가 아는 데모 계정. [name]은 docs/api-contract.md §2의 통합 이름,
+/// [userId]·[phone]은 server-seeds.json의 합성 값을 따른다. [code]는 서버 코드가 확정되기 전 호출자가 주는 임시 검증 값이다.
 class FakeDemoAccount {
   /// 2026-10-21: 계정 [userId], 정규화한 [name]·[phone], 임시 [code]로 만든다.
   const FakeDemoAccount({
@@ -24,9 +24,9 @@ class FakeDemoAccount {
 /// 2026-10-21: [AuthRepository]의 메모리 구현. api-contract §2의 서버 동작을 흉내 낸다.
 /// - 이름·전화번호·코드가 모두 맞고 활성 세션이 없을 때만 발급. 불일치·사용 중은 같은 거절.
 /// - 이름+전화번호 조합 기준 최근 5분 실패 5회면 5번째 실패부터 429·5분 차단. 차단 중 시도는 종료 시각을 늘리지 않는다.
-/// - 형식 오류는 422이며 실패로 세지 않는다. 무효 토큰은 401 SESSION_INVALID.
+/// - 입력은 서버 규칙대로 정규화한다. 형식 오류는 422이며 실패로 세지 않는다. 무효 토큰은 401 SESSION_INVALID.
 /// 실제 서버 연동이 아니며 앱을 다시 시작하면 상태가 사라진다.
-class FakeAuthRepository implements AuthRepository {
+class FakeAuthRepository implements AuthRepository, SessionResolver {
   /// 2026-10-21: 계정 목록 [accounts], 시각 [now], 토큰·ID 난수 [random]으로 만든다.
   FakeAuthRepository({
     required List<FakeDemoAccount> accounts,
@@ -48,7 +48,8 @@ class FakeAuthRepository implements AuthRepository {
   final Map<String, DateTime> _blockedUntil = {};
 
   /// 2026-10-21: 세션 발급을 흉내 낸다. 형식 오류는 실패로 세지 않고 422, 그다음 시도 제한·자격 대조 순이다.
-  /// 2026-10-22: 설치 식별값 없이 공유 입력 규칙으로 정규화하며 자격 대조·활성 세션 제한은 유지한다.
+  /// 2026-10-22: 공유 입력 규칙으로 정규화한 값으로 대조·시도 제한을 판정한다. 성공 응답의 name은 제출 문자열이 아닌
+  /// 계정의 저장 이름이다.
   @override
   Future<AuthOutcome<DemoSession>> createSession(
     DemoCredentials credentials,
@@ -72,6 +73,7 @@ class FakeAuthRepository implements AuthRepository {
     return AuthOk(
       DemoSession(
         userId: account.userId,
+        name: account.name,
         sessionId: session.sessionId,
         accessToken: session.accessToken,
         issuedAt: _now(),
@@ -111,6 +113,10 @@ class FakeAuthRepository implements AuthRepository {
     _sessionsByUser.remove(owner);
     return const AuthOk(null);
   }
+
+  /// 2026-10-22: 활성 세션 [accessToken]의 사용자 ID를 반환한다. 종료·모르는 토큰이면 null이다(금융 API의 401 판정용).
+  @override
+  String? userIdForToken(String accessToken) => _ownerOf(accessToken);
 
   /// 2026-10-21: 테스트·운영 흉내용으로 [userId]의 활성 세션을 서버 쪽에서 끝낸다(운영 종료, 09-13).
   void terminateSessionOf(String userId) => _sessionsByUser.remove(userId);

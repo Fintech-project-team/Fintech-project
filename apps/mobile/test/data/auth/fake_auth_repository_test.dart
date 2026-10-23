@@ -47,31 +47,35 @@ void main() {
     expect(session.accessToken, hasLength(64));
   });
 
-  test(
-    'allowed separators normalize before matching and reverification',
-    () async {
-      final (:repo, advance: _) = build();
-      const formatted = DemoCredentials(
-        name: '  김합성 ',
-        phone: ' 010-1111 2222 ',
+  test('allowed separators normalize before matching and reverification in any form', () async {
+    final (:repo, advance: _) = build();
+    const formatted = DemoCredentials(
+      name: '  김합성 ',
+      phone: ' 010-1111 2222 ',
+      code: '246810',
+    );
+    final session =
+        ((await repo.createSession(formatted)) as AuthOk<DemoSession>).value;
+    final reverified = await repo.reverify(
+      session.accessToken,
+      const DemoCredentials(
+        name: '김합성 ',
+        phone: '010-1111-2222',
         code: '246810',
-      );
-      final session =
-          ((await repo.createSession(formatted)) as AuthOk<DemoSession>).value;
-      final reverified = await repo.reverify(session.accessToken, formatted);
-      expect(reverified, isA<AuthOk<ReverifiedSession>>());
-      expect(
-        (reverified as AuthOk<ReverifiedSession>).value.sessionId,
-        session.sessionId,
-      );
-      expect(await repo.createSession(good), isA<AuthRejected<DemoSession>>());
-      expect(
-        await repo.reverify(session.accessToken, good),
-        isA<AuthOk<ReverifiedSession>>(),
-        reason: '새 로그인 거절 뒤에도 기존 세션 유지',
-      );
-    },
-  );
+      ),
+    );
+    expect(reverified, isA<AuthOk<ReverifiedSession>>());
+    expect(
+      (reverified as AuthOk<ReverifiedSession>).value.sessionId,
+      session.sessionId,
+    );
+    expect(await repo.createSession(good), isA<AuthRejected<DemoSession>>());
+    expect(
+      await repo.reverify(session.accessToken, good),
+      isA<AuthOk<ReverifiedSession>>(),
+      reason: '새 로그인 거절 뒤에도 기존 세션 유지',
+    );
+  });
 
   test(
     'well-formed mismatches are 401 and English names remain case sensitive',
@@ -191,23 +195,45 @@ void main() {
     'allowed separators do not bypass the normalized failure limit',
     () async {
       final (:repo, :advance) = build();
-      for (var i = 0; i < 5; i++) {
+      const forms = [
+        (' 김합성 ', '01011112222'),
+        ('김합성', '010-1111-2222'),
+        ('김합성 ', '010 1111 2222'),
+        (' 김합성', '010-1111 2222'),
+        ('김합성', '01011112222'),
+      ];
+      for (var i = 0; i < forms.length; i++) {
         final result = await repo.createSession(
           DemoCredentials(
-            name: i.isEven ? ' 김합성 ' : '김합성',
-            phone: i.isEven ? '010-1111-2222' : '010 1111 2222',
+            name: forms[i].$1,
+            phone: forms[i].$2,
             code: '00000$i',
           ),
         );
         if (i < 4) {
           expect(result, isA<AuthRejected<DemoSession>>());
         } else {
-          expect(result, isA<AuthRateLimited<DemoSession>>());
+          expect(
+            result,
+            isA<AuthRateLimited<DemoSession>>(),
+            reason: '다섯 형태의 실패가 한 조합으로 합산',
+          );
         }
       }
       expect(
         await repo.createSession(good),
         isA<AuthRateLimited<DemoSession>>(),
+      );
+      expect(
+        await repo.createSession(
+          const DemoCredentials(
+            name: ' 김합성 ',
+            phone: '010-1111-2222',
+            code: '246810',
+          ),
+        ),
+        isA<AuthRateLimited<DemoSession>>(),
+        reason: '정규화 전 형태도 같은 차단 대상',
       );
       advance(const Duration(minutes: 5));
       expect(await repo.createSession(good), isA<AuthOk<DemoSession>>());
@@ -219,8 +245,19 @@ void main() {
     for (final bad in [
       const DemoCredentials(name: '김합성', phone: '01011112222', code: '24681'),
       const DemoCredentials(name: '김합성', phone: '01011112222', code: '24681a'),
+      const DemoCredentials(name: '김합성', phone: '01011112222', code: ' 246810'),
       const DemoCredentials(name: '김합성', phone: '0101111222', code: '246810'),
+      const DemoCredentials(
+        name: '김합성',
+        phone: '010\t1111\t2222',
+        code: '246810',
+      ),
       const DemoCredentials(name: '김 합성', phone: '01011112222', code: '246810'),
+      const DemoCredentials(
+        name: '김\t합성',
+        phone: '01011112222',
+        code: '246810',
+      ),
       const DemoCredentials(
         name: '김  합성',
         phone: '01011112222',
@@ -276,13 +313,11 @@ void main() {
       ),
       const DemoCredentials(name: '김', phone: '01011112222', code: '246810'),
     ]) {
-      for (var i = 0; i < 3; i++) {
-        expect(
-          await repo.createSession(bad),
-          isA<AuthInvalidInput<DemoSession>>(),
-          reason: '${bad.name}/${bad.phone}/${bad.code}',
-        );
-      }
+      expect(
+        await repo.createSession(bad),
+        isA<AuthInvalidInput<DemoSession>>(),
+        reason: '${bad.name}/${bad.phone}/${bad.code}',
+      );
     }
     expect(
       await repo.createSession(good),
@@ -316,6 +351,23 @@ void main() {
       reason: '토큰 검사 순서를 입력 형식 검사보다 먼저 유지',
     );
   });
+
+  test(
+    'session issues without installationId and returns the stored name',
+    () async {
+      final (:repo, advance: _) = build();
+      final result = await repo.createSession(
+        const DemoCredentials(
+          name: '  김합성 ',
+          phone: '010-1111-2222',
+          code: '246810',
+        ),
+      );
+      final session = (result as AuthOk<DemoSession>).value;
+      expect(session.name, '김합성', reason: '입력 원문이 아닌 계정의 저장 이름');
+      expect(session.userId, 'u1');
+    },
+  );
 
   test(
     'reverify keeps the same session; invalid token is SESSION_INVALID',
