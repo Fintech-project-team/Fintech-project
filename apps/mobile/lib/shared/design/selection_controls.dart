@@ -162,6 +162,8 @@ class SelectionCheckRow extends StatelessWidget {
 /// 2026-10-21: 목록 선택 행(12-1 금융사·01-1 계좌 등). 이름·보조 줄 … 오른쪽 체크, 아래 dividerRow.
 class SelectionListRow extends StatelessWidget {
   /// 2026-10-21: 이름 [title], 보조 줄 [subtitle], 선택 [selected], 변경 콜백 [onChanged]로 만든다.
+  /// 2026-10-22: 이름 앞 그림 [leading](예: 금융사 표시)과 체크 앞 값 [trailing](예: 잔액)을 선택으로 받는다.
+  /// [trailingLabel]은 화면 읽기 프로그램에 [trailing] 대신 읽힐 문장이다.
   const SelectionListRow({
     super.key,
     required this.title,
@@ -169,6 +171,9 @@ class SelectionListRow extends StatelessWidget {
     required this.onChanged,
     this.subtitle,
     this.enabled = true,
+    this.leading,
+    this.trailing,
+    this.trailingLabel,
   });
 
   static const double minHeight = 64;
@@ -178,6 +183,9 @@ class SelectionListRow extends StatelessWidget {
   final bool selected;
   final ValueChanged<bool>? onChanged;
   final bool enabled;
+  final Widget? leading;
+  final Widget? trailing;
+  final String? trailingLabel;
 
   /// 2026-10-21: 최소 64dp 높이의 선택 행을 반환한다.
   @override
@@ -186,7 +194,7 @@ class SelectionListRow extends StatelessWidget {
     return Semantics(
       checked: selected,
       enabled: active,
-      label: [title, ?subtitle].join(', '),
+      label: [title, ?subtitle, ?trailingLabel].join(', '),
       excludeSemantics: true,
       onTap: active ? () => onChanged!(!selected) : null,
       child: InkWell(
@@ -198,6 +206,10 @@ class SelectionListRow extends StatelessWidget {
           ),
           child: Row(
             children: [
+              if (leading != null) ...[
+                leading!,
+                const SizedBox(width: PayseSpace.x3),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -214,6 +226,10 @@ class SelectionListRow extends StatelessWidget {
                   ],
                 ),
               ),
+              if (trailing != null) ...[
+                const SizedBox(width: PayseSpace.x3),
+                trailing!,
+              ],
               const SizedBox(width: PayseSpace.x3),
               SelectionCheckMark(selected: selected, enabled: enabled),
             ],

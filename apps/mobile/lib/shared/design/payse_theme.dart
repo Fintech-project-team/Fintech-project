@@ -14,6 +14,7 @@ class PayseFinanceColors extends ThemeExtension<PayseFinanceColors> {
     required this.errorBorder,
     required this.warning,
     required this.warningContainer,
+    required this.warningBorder,
     required this.info,
     required this.infoContainer,
     required this.reserve,
@@ -30,6 +31,7 @@ class PayseFinanceColors extends ThemeExtension<PayseFinanceColors> {
     errorBorder: PayseColors.errorBorder,
     warning: PayseColors.warning,
     warningContainer: PayseColors.warningContainer,
+    warningBorder: PayseColors.warningBorder,
     info: PayseColors.info,
     infoContainer: PayseColors.infoContainer,
     reserve: PayseColors.reserve,
@@ -44,6 +46,7 @@ class PayseFinanceColors extends ThemeExtension<PayseFinanceColors> {
   final Color errorBorder;
   final Color warning;
   final Color warningContainer;
+  final Color warningBorder;
   final Color info;
   final Color infoContainer;
   final Color reserve;
@@ -60,6 +63,7 @@ class PayseFinanceColors extends ThemeExtension<PayseFinanceColors> {
     Color? errorBorder,
     Color? warning,
     Color? warningContainer,
+    Color? warningBorder,
     Color? info,
     Color? infoContainer,
     Color? reserve,
@@ -74,6 +78,7 @@ class PayseFinanceColors extends ThemeExtension<PayseFinanceColors> {
       errorBorder: errorBorder ?? this.errorBorder,
       warning: warning ?? this.warning,
       warningContainer: warningContainer ?? this.warningContainer,
+      warningBorder: warningBorder ?? this.warningBorder,
       info: info ?? this.info,
       infoContainer: infoContainer ?? this.infoContainer,
       reserve: reserve ?? this.reserve,
@@ -95,6 +100,7 @@ class PayseFinanceColors extends ThemeExtension<PayseFinanceColors> {
       errorBorder: mix(errorBorder, other.errorBorder),
       warning: mix(warning, other.warning),
       warningContainer: mix(warningContainer, other.warningContainer),
+      warningBorder: mix(warningBorder, other.warningBorder),
       info: mix(info, other.info),
       infoContainer: mix(infoContainer, other.infoContainer),
       reserve: mix(reserve, other.reserve),
