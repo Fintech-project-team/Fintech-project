@@ -128,7 +128,15 @@ class ProjectionInput {
 }
 
 /// 2026-10-23: 가상 소비가 현금 이벤트로 반영된 상태.
-enum ItemPlacementStatus { reflected, outOfRange, scheduleUnknown }
+enum ItemPlacementStatus {
+  /// 2026-10-23: 출금일이 확정됐고 그날이 속한 구간도 정해졌다.
+  reflected,
+
+  /// 2026-10-23: 출금일은 확정됐지만 월급일 정보가 없어 귀속 구간을 정하지 못했다.
+  periodUndetermined,
+  outOfRange,
+  scheduleUnknown,
+}
 
 /// 2026-10-23: 가상 소비 한 건의 현금 출금일과 귀속 구간.
 class ItemPlacement {
@@ -406,7 +414,7 @@ ProjectionResult projectPeriods(ProjectionInput input) {
     start,
     frames,
     baseEvents,
-    _nullFrom(salaryMissingFrom, InsufficientReason.salaryAmountMissing),
+    _reasonsFrom([(salaryMissingFrom, InsufficientReason.salaryAmountMissing)]),
   );
 
   ScenarioResult? allItems;
@@ -416,7 +424,8 @@ ProjectionResult projectPeriods(ProjectionInput input) {
     final itemEvents = <_CashEvent>[...baseEvents];
     for (var i = 0; i < items.length; i++) {
       final placement = placements[i];
-      if (placement.status == ItemPlacementStatus.reflected) {
+      if (placement.status == ItemPlacementStatus.reflected ||
+          placement.status == ItemPlacementStatus.periodUndetermined) {
         itemEvents.add(
           _CashEvent(placement.cashDate!, 0, items[i].amountKrw, 0),
         );
@@ -431,10 +440,15 @@ ProjectionResult projectPeriods(ProjectionInput input) {
         }
       }
     }
-    allItems = _simulate(start, frames, itemEvents, {
-      ..._nullFrom(salaryMissingFrom, InsufficientReason.salaryAmountMissing),
-      ..._nullFrom(unknownFrom, InsufficientReason.cardScheduleUnknown),
-    });
+    allItems = _simulate(
+      start,
+      frames,
+      itemEvents,
+      _reasonsFrom([
+        (salaryMissingFrom, InsufficientReason.salaryAmountMissing),
+        (unknownFrom, InsufficientReason.cardScheduleUnknown),
+      ]),
+    );
     differences = [
       for (var k = 0; k < baseline.periods.length; k++)
         (allItems.periods[k].endA != null && baseline.periods[k].endA != null)
@@ -474,10 +488,20 @@ class _Start {
   final int carriedOverlapKrw;
 }
 
-/// 2026-10-23: 구간 [from] 이후(0부터 센 번호)를 [reason]으로 null 처리하는 표를 만든다.
-Map<int, InsufficientReason> _nullFrom(int from, InsufficientReason reason) => {
-  for (var k = from; k < 3; k++) k: reason,
-};
+/// 2026-10-23: (시작 구간 번호(0부터), 사유) 목록으로 구간별 정보 부족 사유 표를 만든다.
+/// 같은 구간에 여러 사유가 걸리면 모두 보존한다.
+Map<int, List<InsufficientReason>> _reasonsFrom(
+  List<(int, InsufficientReason)> starts,
+) {
+  final table = <int, List<InsufficientReason>>{};
+  for (final (from, reason) in starts) {
+    for (var k = from; k < 3; k++) {
+      final list = table.putIfAbsent(k, () => []);
+      if (!list.contains(reason)) list.add(reason);
+    }
+  }
+  return table;
+}
 
 /// 2026-10-23: t0, 월급일 [pays], 상한 [cap]으로 C1~C3 경계를 만든다. 시작이 상한 이상인 구간은 없다.
 List<_Frame> _frames(
@@ -550,7 +574,9 @@ ItemPlacement _placeItem(
     itemId: item.itemId,
     cashDate: cashDate,
     periodIndex: index,
-    status: ItemPlacementStatus.reflected,
+    status: index == null
+        ? ItemPlacementStatus.periodUndetermined
+        : ItemPlacementStatus.reflected,
   );
 }
 
@@ -559,7 +585,7 @@ ScenarioResult _simulate(
   _Start start,
   List<_Frame> frames,
   List<_CashEvent> events,
-  Map<int, InsufficientReason> nulls,
+  Map<int, List<InsufficientReason>> nulls,
 ) {
   var h = start.h;
   var r = start.r;
@@ -571,7 +597,7 @@ ScenarioResult _simulate(
     final frameStart = f.start;
     final frameEnd = f.end;
     // 앞 구간 H를 모르면 뒤 구간도 이월 값을 알 수 없으므로 앞 사유를 이어받는다.
-    for (final reason in [f.issue, nulls[k]]) {
+    for (final reason in [f.issue, ...?nulls[k]]) {
       if (reason != null && !stopReasons.contains(reason)) {
         stopReasons.add(reason);
       }
