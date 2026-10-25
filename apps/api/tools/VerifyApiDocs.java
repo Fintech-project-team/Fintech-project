@@ -31,6 +31,7 @@ public class VerifyApiDocs {
      * @created 2026-10-20
      * @usedBy Gradle apiDocsCheck, ApiDocRulesTest.check
      * @modified 2026-10-20 - 복수 소스 경로와 구조화된 블록 태그 검증으로 검사 범위 보완
+     * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      * @param args 검사할 소스 디렉터리 목록. 빌드 생성물은 전달하지 않는다.
      * @throws Exception 소스 접근 또는 JDK 구문 분석 준비에 실패한 경우
      */
@@ -42,14 +43,14 @@ public class VerifyApiDocs {
         List<Path> paths = new ArrayList<>();
         for (String argument : args) {
             try (var stream = Files.walk(Path.of(argument))) {
-                paths.addAll(stream.filter(p -> p.toString().endsWith(".java")).toList());
+                paths.addAll(stream.filter(path -> path.toString().endsWith(".java")).toList());
             }
         }
         if (paths.isEmpty()) throw new IllegalStateException("No API Java source");
-        paths = paths.stream().map(p -> p.toAbsolutePath().normalize()).distinct().sorted().toList();
-        try (var manager = compiler.getStandardFileManager(null, null, java.nio.charset.StandardCharsets.UTF_8)) {
-            var units = manager.getJavaFileObjectsFromPaths(paths);
-            var task = (JavacTask) compiler.getTask(null, manager, null, List.of("-proc:none"), null, units);
+        paths = paths.stream().map(path -> path.toAbsolutePath().normalize()).distinct().sorted().toList();
+        try (var fileManager = compiler.getStandardFileManager(null, null, java.nio.charset.StandardCharsets.UTF_8)) {
+            var units = fileManager.getJavaFileObjectsFromPaths(paths);
+            var task = (JavacTask) compiler.getTask(null, fileManager, null, List.of("-proc:none"), null, units);
             var trees = DocTrees.instance(task);
             for (CompilationUnitTree unit : task.parse()) {
                 new TreePathScanner<Void, Void>() {
@@ -105,6 +106,7 @@ public class VerifyApiDocs {
      * 주석의 실제 블록 태그를 읽어 빈 수정 태그와 유효하지 않은 생성·수정 날짜를 거절한다.
      * @created 2026-10-20
      * @usedBy main의 구문 순회기 inspect
+     * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      * @param doc 현재 선언의 Javadoc 또는 null
      * @param location 오류를 표시할 파일과 선언 이름
      * @param errors 발견한 형식 오류를 추가할 목록
@@ -114,15 +116,15 @@ public class VerifyApiDocs {
             errors.add(location + " missing purpose/Javadoc");
             return;
         }
-        List<String> created = tagValues(doc, "created");
-        LocalDate creation = null;
-        if (created.size() != 1) {
+        List<String> createdTags = tagValues(doc, "created");
+        LocalDate createdDate = null;
+        if (createdTags.size() != 1) {
             errors.add(location + " expected exactly one @created");
-        } else if (!UNKNOWN_CREATION.matcher(created.getFirst()).matches()) {
-            String value = created.getFirst();
+        } else if (!UNKNOWN_CREATION.matcher(createdTags.getFirst()).matches()) {
+            String value = createdTags.getFirst();
             try {
                 if (!DATE.matcher(value).matches()) throw new IllegalArgumentException("Invalid date format");
-                creation = LocalDate.parse(value);
+                createdDate = LocalDate.parse(value);
             } catch (RuntimeException ex) {
                 errors.add(location + " invalid @created date or unknown reason");
             }
@@ -132,14 +134,14 @@ public class VerifyApiDocs {
             errors.add(location + " missing or empty @usedBy");
         }
         for (String value : tagValues(doc, "modified")) {
-            var detail = MODIFICATION.matcher(value);
-            if (!detail.matches()) {
+            var match = MODIFICATION.matcher(value);
+            if (!match.matches()) {
                 errors.add(location + " invalid @modified date/reason");
                 continue;
             }
             try {
-                LocalDate date = LocalDate.parse(detail.group(1));
-                if (creation != null && date.isBefore(creation)) {
+                LocalDate date = LocalDate.parse(match.group(1));
+                if (createdDate != null && date.isBefore(createdDate)) {
                     errors.add(location + " modification precedes creation");
                 }
             } catch (RuntimeException ex) {

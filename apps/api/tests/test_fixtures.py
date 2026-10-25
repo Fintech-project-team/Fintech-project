@@ -71,7 +71,7 @@ class FixtureTests(unittest.TestCase):
                         if isinstance(row.get(field),str):
                             self.assertFalse(any(marker in row[field] for marker in ('합성','DEMO','TEST')))
 
-    def test_duplicate_display_names_do_not_choose_transactions(self):
+    def test_transaction_selection_ignores_labels(self):
         """2026-10-23: Equal labels must retain salary, recurring evidence, refund and cancellation identities."""
         with patch.dict(generate.TRANSACTION_NAMES,{key:'같은 거래명' for key in generate.TRANSACTION_NAMES}):
             cases,_,catalog=build()
@@ -88,7 +88,7 @@ class FixtureTests(unittest.TestCase):
                     return {row['transactionId']:{key:value for key,value in row.items() if key not in {'merchantName','description'}} for row in rows}
                 self.assertEqual(facts(snapshot.get(collection,[])),facts(original.get(collection,[])))
 
-    def test_source_transaction_order_does_not_choose_templates(self):
+    def test_template_selection_ignores_order(self):
         """2026-10-23: Reverse source rows to expose accidental first-row scenario selection."""
         original_make=generate.make_snapshot
         def reversed_rows(*args,**kwargs):
@@ -120,7 +120,7 @@ class FixtureTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'Expected one owned'):
                     owned_row(snapshot,'transactions','transactionId',transaction_id)
 
-    def test_reviewed_bank_directory_and_prepared_support_are_separate(self):
+    def test_bank_directory_does_not_create_accounts(self):
         """2026-10-23: The reviewed 20-bank directory must not create 20 banks of user accounts."""
         directory=load_bank_directory()
         self.assertEqual(len(directory['banks']),20)
@@ -187,7 +187,7 @@ class FixtureTests(unittest.TestCase):
             self.assertNotIn('displayName',user)
         validate_server_seeds(self.seeds,self.cases)
 
-    def test_stored_identity_rejects_whitespace_unicode_and_invalid_bounds(self):
+    def test_stored_identity_rejects_invalid_input(self):
         """2026-10-22: Storage accepts canonical values only, without silent normalization."""
         invalid_names=['가','A'*21,' 데모알파','데모 알파','데모알파 ','데모알파\n','데모\t알파','데모\u00a0알파','데모\u200b알파','데모１','ㄱㄴ',None,123]
         for name in invalid_names:
@@ -365,7 +365,7 @@ class FixtureTests(unittest.TestCase):
                     validate_snapshot(s)
                     self.assertEqual((s['transactions'],s['settings']['salary']['receiptEvidence']),source)
 
-    def test_salary_evidence_still_requires_owned_posted_incoming_fact(self):
+    def test_salary_evidence_requires_owned_income(self):
         """2026-10-21: Reject missing, foreign, outgoing and unconfirmed salary evidence after separating settings."""
         for changes in ({'direction':'out'}, {'status':'approved'}, {'status':'cancelled'}, {'status':'unknown'}, {'balanceReflected':False,'reflectionReason':'not_reflected'}):
             with self.subTest(changes=changes):
@@ -429,7 +429,7 @@ class FixtureTests(unittest.TestCase):
                     self.rejects(lambda s:s['recurringPlans'][0].update({key:value}))
         self.rejects(lambda s:s['recurringPlans'][0].update(unknownPlanKey='unexpected'))
 
-    def test_recurring_plan_rejects_duplicate_identity_and_missing_revision(self):
+    def test_plan_rejects_invalid_revision_links(self):
         self.rejects(lambda s:s['recurringPlans'].append(copy.deepcopy(s['recurringPlans'][0])))
         self.rejects(lambda s:s['recurringPlanRevisions'].clear())
         self.rejects(lambda s:s['recurringPlans'][0].update(firstOccurrenceMonth='2026-11'))
@@ -445,7 +445,7 @@ class FixtureTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'plan first month differs from earliest revision'):
             validate_snapshot(s)
 
-    def test_recurring_plan_first_month_preserves_retired_pinned_history(self):
+    def test_plan_preserves_pinned_history(self):
         """2026-10-22: Allow a same-month replacement while old pinned revisions and occurrences remain."""
         s=self.case('gamma-month-end')
         original=copy.deepcopy((s['obligations'],s['occurrenceOverrides']))

@@ -110,7 +110,7 @@ def build_from_snapshots(cases, seed_users):
     partial = by_id(owner['obligations'], 'obligationId', allocation['obligationId'], 'partial obligation')
     evidence = one(allocation['releaseEvidence'], 'release evidence')
     settlement = by_id(owner['settlements'], 'linkId', evidence['settlementLinkId'], 'partial settlement')
-    partial_tx = by_id(owner['transactions'], 'transactionId', settlement['transactionId'], 'partial withdrawal')
+    partial_transaction = by_id(owner['transactions'], 'transactionId', settlement['transactionId'], 'partial withdrawal')
     allocated = {a['obligationId'] for a in owner['allocations']}
     settled = {s['obligationId'] for s in owner['settlements'] if s['invalidatedAt'] is None}
     manual = one((o for o in owner['obligations'] if o['status'] == 'active'
@@ -120,15 +120,15 @@ def build_from_snapshots(cases, seed_users):
     statement = by_id(owner['statements'], 'statementId', bill['statementId'], 'statement')
     card = by_id(owner['cards'], 'cardId', statement['cardId'], 'statement card')
     bill_link = one((s for s in owner['settlements'] if s['obligationId'] == bill['obligationId'] and s['invalidatedAt'] is None), 'statement settlement')
-    bill_tx = by_id(owner['transactions'], 'transactionId', bill_link['transactionId'], 'statement withdrawal')
+    bill_transaction = by_id(owner['transactions'], 'transactionId', bill_link['transactionId'], 'statement withdrawal')
     purchases = [by_id(owner['transactions'], 'transactionId', tid, 'statement purchase') for tid in statement['includedTransactionRefs']]
     recurring = one((o for o in owner['obligations'] if o['recurringPlanId'] is not None), 'recurring obligation')
     revision = by_id(owner['recurringPlanRevisions'], 'revisionId', recurring['planRevisionId'], 'referenced revision')
     plan = by_id(owner['recurringPlans'], 'planId', recurring['recurringPlanId'], 'referenced plan')
     transfer = one((r for r in owner['transactionRelations'] if r['kind'] == 'internal_transfer'), 'internal transfer')
-    transfer_txs = [by_id(owner['transactions'], 'transactionId', transfer[key], 'transfer transaction') for key in ('fromId', 'toId')]
-    transfer_out = one((t for t in transfer_txs if t['direction'] == 'out'), 'transfer out')
-    transfer_in = one((t for t in transfer_txs if t['direction'] == 'in'), 'transfer in')
+    transfer_transactions = [by_id(owner['transactions'], 'transactionId', transfer[key], 'transfer transaction') for key in ('fromId', 'toId')]
+    transfer_out = one((t for t in transfer_transactions if t['direction'] == 'out'), 'transfer out')
+    transfer_in = one((t for t in transfer_transactions if t['direction'] == 'in'), 'transfer in')
     alternate = by_id(owner['accounts'], 'accountId', transfer_in['accountId'], 'alternate account')
     override = one(future['occurrenceOverrides'], 'individual override')
     future_revision = by_id(future['recurringPlanRevisions'], 'revisionId', override['planRevisionId'], 'future revision')
@@ -144,16 +144,16 @@ def build_from_snapshots(cases, seed_users):
 
     # Independent scenario premises; do not infer these boundaries from DB guards.
     require(primary['accountId'] == reserve['accountId'] == partial['withdrawalAccountId']
-            == partial_tx['accountId'] == transfer_out['accountId'], 'primary account relationships differ')
+            == partial_transaction['accountId'] == transfer_out['accountId'], 'primary account relationships differ')
     require(alternate['accountId'] != primary['accountId'], 'alternate account must differ')
     require(reserve['cancelledAt'] is None and partial['status'] == 'active'
             and settlement['invalidatedAt'] is None, 'partial scenario must be active')
-    require((partial['amountKRW'], partial_tx['amountKRW'], settlement['allocatedKRW'],
+    require((partial['amountKRW'], partial_transaction['amountKRW'], settlement['allocatedKRW'],
              allocation['amountKRW'], allocation['releasedKRW'], evidence['amountKRW'], reserve['amountKRW'])
             == (100000, 40000, 40000, 100000, 40000, 40000, 400000), 'partial settlement boundary changed')
     require(len(purchases) == 2 and len({p['transactionId'] for p in purchases}) == 2
             and all(p['recordKind'] == 'card_purchase' and p['cardId'] == card['cardId'] for p in purchases), 'statement purchase premises differ')
-    require(bill_tx['transactionId'] != partial_tx['transactionId'] and bill_tx['accountId'] == primary['accountId'], 'cycle peer must be a different matching withdrawal')
+    require(bill_transaction['transactionId'] != partial_transaction['transactionId'] and bill_transaction['accountId'] == primary['accountId'], 'cycle peer must be a different matching withdrawal')
     require((future_plan['firstOccurrenceMonth'], future_revision['effectiveFromMonth'],
              pinned['recurrenceKey'][-7:], override['recurrenceKey'][-7:])
             == ('2027-01', '2027-03', '2027-03', '2027-04'), 'future month boundary changed')
@@ -170,15 +170,15 @@ def build_from_snapshots(cases, seed_users):
         'reserve_id': reserve['reserveId'], 'allocation_id': allocation['allocationId'],
         'partial_obligation_id': partial['obligationId'], 'other_obligation_id': manual['obligationId'],
         'statement_obligation_id': bill['obligationId'], 'recurring_obligation_id': recurring['obligationId'],
-        'partial_settlement_id': settlement['linkId'], 'partial_transaction_id': partial_tx['transactionId'],
-        'cycle_peer_transaction_id': bill_tx['transactionId'], 'referenced_revision_id': revision['revisionId'],
+        'partial_settlement_id': settlement['linkId'], 'partial_transaction_id': partial_transaction['transactionId'],
+        'cycle_peer_transaction_id': bill_transaction['transactionId'], 'referenced_revision_id': revision['revisionId'],
         'write_receipt_id': evidence['writeReceiptId'], 'relation_from_id': transfer['fromId'],
         'relation_to_id': transfer['toId'], 'relation_kind': transfer['kind'],
         'future_plan_id': future_plan['planId'], 'initial_revision_id': initial_revision['revisionId'],
         'future_revision_id': future_revision['revisionId'], 'pinned_obligation_id': pinned['obligationId'],
         'future_initial_obligation_id': initial_obligation['obligationId'],
         'salary_transaction_id': income['transactionId'], 'other_salary_transaction_id': other_income['transactionId'],
-        'outgoing_transaction_id': partial_tx['transactionId'],
+        'outgoing_transaction_id': partial_transaction['transactionId'],
         'card_transaction_ids': sorted(p['transactionId'] for p in purchases),
         'owner_account_ids': sorted(a['accountId'] for a in owner['accounts']),
         'owner_name': seeds[owner['userId']]['name'], 'owner_phone': seeds[owner['userId']]['phone'],
@@ -212,7 +212,7 @@ def build_from_snapshots(cases, seed_users):
         row('user_attributes', {'user_id': uid, 'salary_account_id': snapshot['settings']['salary']['salaryAccountId']})
         for a in snapshot['accounts']:
             row('financial_accounts', {'id': a['accountId'], 'user_id': uid, 'source_version': a['sourceVersion'], 'included': a['included'], 'product_name': a['productName']})
-    for t in [partial_tx, bill_tx, income, other_income, *purchases, *transfer_txs]:
+    for t in [partial_transaction, bill_transaction, income, other_income, *purchases, *transfer_transactions]:
         row('financial_transactions', {'id': t['transactionId'], 'user_id': t['userId'], 'source_version': t['sourceVersion'],
             'record_kind': t['recordKind'], 'direction': t['direction'], 'status': t['status'],
             'reflection_reason': t['reflectionReason'], 'account_id': t['accountId'], 'card_id': t['cardId'],

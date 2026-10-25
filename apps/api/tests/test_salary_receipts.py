@@ -73,7 +73,7 @@ class SalaryReceiptTests(unittest.TestCase):
         validate_snapshot(self.snapshot)
         self.assertEqual(self.evidence(), before)
 
-    def test_shape_and_scheduled_dates_are_not_silently_repaired(self):
+    def test_invalid_receipts_are_not_repaired(self):
         for replacement in (None, [], 'text', 1):
             with self.subTest(replacement=replacement):
                 probe = copy.deepcopy(self.snapshot)
@@ -89,7 +89,7 @@ class SalaryReceiptTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate_snapshot(probe)
 
-    def test_existing_partial_multiple_receipts_and_foreign_owner_rules(self):
+    def test_receipt_confirmation_and_ownership(self):
         for name in ['salary-partial', 'salary-confirmed']:
             snapshot = json.loads((API / f'fixtures/generated/snapshots/{name}.json').read_text(encoding='utf-8'))
             validate_snapshot(snapshot)

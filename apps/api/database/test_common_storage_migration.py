@@ -48,7 +48,7 @@ class CommonStorageMigrationTests(unittest.TestCase):
     def apply(self,digest):
         return migration.apply_plan(OPTIONS.psql,OPTIONS.database,self.backup,digest,60,3000)
 
-    def test_preserve_rows_archive_events_and_allow_additional_users(self):
+    def test_migration_preserves_rows_and_archive(self):
         self.sql(f"INSERT INTO payse.demo_users VALUES('{uuid4()}','추가사용자','01099999999','disabled',1,now());")
         before=self.state();digest=self.plan();archive=self.backup.read_bytes()
         self.assertEqual(self.apply(digest),'APPLIED')
@@ -67,7 +67,7 @@ class CommonStorageMigrationTests(unittest.TestCase):
         with self.assertRaises(migration.MigrationError):self.apply(digest)
         self.assertEqual(self.state(),before)
 
-    def test_nonempty_v2_salary_proof_survives_common_transition(self):
+    def test_migration_preserves_salary_evidence(self):
         """2026-10-23: The common rename must not require a future salary-format migration."""
         proof=[{'expectedPayDate':self.context['salary_evidence_date'],'confirmation':'confirmed',
                 'transactionIds':[self.context['salary_transaction_id']]}]

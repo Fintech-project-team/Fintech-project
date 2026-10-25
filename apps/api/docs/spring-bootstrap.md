@@ -22,11 +22,36 @@ node scripts/harness/run-api.mjs start
 node scripts/harness/verify-change.mjs --task "docs/tasks/<작업ID>.json"
 ```
 
-check는 Java 컴파일·JUnit HTTP/설정 검사·운영/테스트/개발 도구의 Javadoc 검사·실행 JAR 생성·기존 Python 더미 검사를 수행한다. 실제 PostgreSQL 연결·기존 SQL의 동시성·Flutter 금융 통합을 대신하지 않는다. Gradle 첫 실행에는 공식 배포/의존성 다운로드가 필요하다.
+check는 Java 컴파일·JUnit HTTP/설정 검사·운영/테스트/개발 도구의 Javadoc 검사·실행 JAR 생성·기존 Python 더미 검사를 수행한다. 아래 테스트 DB 설정이 있으면 PostgreSQL 연결·트랜잭션 검사도 실행한다. 기존 SQL의 동시성·인증·Flutter 금융 통합을 대신하지 않는다. Gradle 첫 실행에는 공식 배포/의존성 다운로드가 필요하다.
 
 기본 주소는 `127.0.0.1:8080`이다. 개발용 기기 연결이 필요하면 실행 환경에 PAYSE_BIND_ADDRESS/PAYSE_PORT를 지정한다. 배포 HTTPS와 네트워크 접근 제어는 배포 구성의 책임이다.
 
-DB 연결 시에만 SPRING_PROFILES_ACTIVE=database와 PAYSE_JDBC_URL, PAYSE_DB_USER, PAYSE_DB_PASSWORD를 실행 환경에 지정한다. 비밀값은 Git에 저장하지 않는다. runtime DB 계정은 superuser/BYPASSRLS를 사용하지 않는다. 현재 연결 설정만으로 RLS 사용자 설정/역할 배포까지 완료된 것은 아니다.
+### DB 연결 설정
+
+DB 연결 시에만 `SPRING_PROFILES_ACTIVE=database`와 아래 설정을 실행 환경에 지정한다. 프로필이 비활성이면 DB 설정을 요구하지 않는다. `database` 프로필은 아래 값을 연결 전에 검증하며 누락·빈 값·잘못된 타입·범위를 운영 기본값으로 대체하지 않는다.
+
+| 설정                             | 형식·범위                                                                                |
+| -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `PAYSE_JDBC_URL`                 | 비어 있지 않은 `jdbc:postgresql:` URL                                                    |
+| `PAYSE_DB_USER`                  | 비어 있지 않은 DB 연결 사용자                                                            |
+| `PAYSE_DB_PASSWORD`              | 비어 있지 않은 DB 비밀번호; 원문을 정규화하지 않음                                       |
+| `PAYSE_DB_MAX_POOL_SIZE`         | ASCII 십진 정수, 1~2,147,483,647. 실제 운영값은 DB 연결 예산에 맞춰 지정                 |
+| `PAYSE_DB_CONNECTION_TIMEOUT_MS` | 연결 획득 대기시간(ms), ASCII 십진 정수, 검증 대기시간보다 크고 2,147,483,647 이하       |
+| `PAYSE_DB_VALIDATION_TIMEOUT_MS` | 연결 유효성 검사 대기시간(ms), ASCII 십진 정수, 250 이상이며 연결 획득 대기시간보다 작음 |
+
+숫자 설정은 부호·공백·소수·비ASCII 숫자를 거절한다. 상한은 이 설정 모델의 Java `int` 표현 범위이며 권장 풀 크기나 운영 대기시간이 아니다. HikariCP 7.0.2의 250ms 하한과 `validationTimeout < connectionTimeout` 조건을 적용한다. 기존 `initializationFailTimeout=1ms`는 유지하며, 전체 시작 시간의 상한이 1ms라는 뜻은 아니다. 연결 전 직접 검증에서 발생시키는 오류에는 입력값·파싱 원인을 포함하지 않는다. JDBC URL·자격이 담긴 설정 객체를 직렬화하거나 로그에 출력하지 않는다.
+
+비밀값은 Git·명령 이력·보고서에 저장하지 않는다. runtime DB 계정은 superuser/BYPASSRLS를 사용하지 않는다. 연결 설정만으로 인증, RLS 사용자 설정, 역할 배포가 완료되는 것은 아니다. 스키마·시드 자동 적용은 하지 않는다.
+
+### PostgreSQL 연결·트랜잭션 검사
+
+운영 DB와 분리한 PostgreSQL 및 `CONNECT`·`TEMPORARY` 권한이 있는 비관리자 테스트 계정을 준비한다. 테스트 실행 환경에 `PAYSE_TEST_JDBC_URL`, `PAYSE_TEST_DB_USER`, `PAYSE_TEST_DB_PASSWORD`를 제공한 뒤 저장소 루트에서 `node scripts/harness/run-api.mjs check`를 실행한다. 운영용 `PAYSE_JDBC_URL`·자격을 테스트 값으로 자동 복사하지 않는다.
+
+- 세 설정이 모두 없으면 `PostgresTransactionTest`는 **SKIPPED**이며 실제 DB 검증 통과로 보고하지 않는다. 일부만 있거나 빈 값이면 실패한다.
+- 실제 역할이 superuser 또는 BYPASSRLS이면 실패한다. DB 연결 실패도 건너뛰지 않는다.
+- 테스트가 소유한 임시 테이블만 사용한다. 커밋된 행 유지·명시적 롤백 및 UNIQUE 위반으로 실패한 트랜잭션의 행 취소, 같은 `pg_backend_pid()` 연결 재사용, 커밋·롤백 뒤 transaction-local `payse.user_id` 제거를 확인한다. 임시 테이블은 연결 종료와 함께 사라진다.
+- 풀 크기 1과 테스트 대기시간은 같은 물리 연결 재사용을 확인하기 위한 테스트 입력이며 운영 기본값이 아니다. 사용자 ID는 검사 준비 때 생성해 SQL 인자로 바인딩한다.
+- 이는 JDBC·트랜잭션 문맥의 검사다. 토큰 인증·사용자 RLS 정책·세션 동시성·금융 API의 실제 권한 검증은 포함하지 않는다.
 
 ## 프론트 영향
 
@@ -46,6 +71,8 @@ Java DTO와 Dart 모델은 기존 JSON 이름·날짜 정밀도·금액 단위·
 - [Gradle 호환표](https://docs.gradle.org/current/userguide/compatibility.html): JDK 21 실행 지원.
 - [Spring JDBC](https://docs.spring.io/spring-framework/reference/data-access/jdbc/core.html): JDBC 연결/자원 관리.
 - [DB 초기화](https://docs.spring.io/spring-boot/how-to/data-initialization.html): 스키마 관리 수단 단일화.
+- [HikariCP 7.0.2 설정](https://github.com/brettwooldridge/HikariCP/blob/HikariCP-7.0.2/README.md#configuration-knobs-baby): 시간 단위, 대기시간 하한·관계, 풀 크기 및 초기 연결 실패 설정.
+- [PostgreSQL 설정 함수](https://www.postgresql.org/docs/15/functions-admin.html#FUNCTIONS-ADMIN-SET): `set_config`의 트랜잭션 한정 설정과 `current_setting` 조회.
 - [Spring 요청 검증](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/requestbody.html): 기본 400과 PAYSE 업무 검증 422의 명시적 매핑 필요.
 
 작성·변경·검증 이력은 [API 문서 이력](history/2026-10-22-api-doc-history.md)에 보존한다.
