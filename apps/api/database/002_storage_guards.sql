@@ -16,12 +16,13 @@ BEGIN
       EXISTS (SELECT 1 FROM payse.occurrence_overrides WHERE user_id=owner AND plan_revision_id=(to_jsonb(OLD)->>'id')::uuid)) THEN
     RAISE EXCEPTION 'Pinned revision payload is immutable; insert replacement and retire old authority' USING ERRCODE='23514';
   END IF;
-  PERFORM 1 FROM payse.demo_users WHERE id=owner FOR UPDATE;
+  PERFORM 1 FROM payse.users WHERE id=owner FOR UPDATE;
   IF TG_OP='DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END $$;
 
 CREATE FUNCTION payse.assert_user_storage(owner uuid) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE salary_proof jsonb; proof_date date;
 BEGIN
   -- The first nominal month must equal the earliest revision, including retained history.
   IF EXISTS (
@@ -145,12 +146,46 @@ BEGIN
       (e->>'targetKind'='card' AND EXISTS (SELECT 1 FROM payse.financial_cards a WHERE a.user_id=owner AND a.id=(e->>'targetId')::uuid))
     ) IS TRUE
   ) THEN RAISE EXCEPTION 'Coverage references foreign or missing entity' USING ERRCODE='23514'; END IF;
+  -- Validate each user's small source array before applying array/UUID operations.
+  -- A nominal month is not inferred from the scheduled date or current settings.
+  FOR salary_proof IN SELECT e FROM payse.source_contexts c
+    CROSS JOIN LATERAL jsonb_array_elements(c.salary_evidence) e WHERE c.user_id=owner LOOP
+    IF jsonb_typeof(salary_proof) IS DISTINCT FROM 'object' THEN
+      RAISE EXCEPTION 'Salary evidence must be an object' USING ERRCODE='23514';
+    END IF;
+    IF NOT (salary_proof ?& ARRAY['payMonth','expectedPayDate','confirmation','transactionIds']) OR
+       (salary_proof-ARRAY['payMonth','expectedPayDate','confirmation','transactionIds']::text[]) <> '{}'::jsonb OR
+       jsonb_typeof(salary_proof->'payMonth') IS DISTINCT FROM 'string' OR
+       (salary_proof->>'payMonth') !~ '^[0-9]{4}-(0[1-9]|1[0-2])$' OR
+       left(salary_proof->>'payMonth',4)='0000' OR
+       jsonb_typeof(salary_proof->'expectedPayDate') IS DISTINCT FROM 'string' OR
+       (salary_proof->>'expectedPayDate') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' OR
+       (salary_proof->>'confirmation') IS NULL OR
+       (salary_proof->>'confirmation') NOT IN ('unknown','partial','confirmed') OR
+       jsonb_typeof(salary_proof->'transactionIds') IS DISTINCT FROM 'array' THEN
+      RAISE EXCEPTION 'Invalid salary evidence contract' USING ERRCODE='23514';
+    END IF;
+    BEGIN
+      proof_date := (salary_proof->>'expectedPayDate')::date;
+      IF to_char(proof_date,'YYYY-MM-DD') <> salary_proof->>'expectedPayDate' THEN
+        RAISE EXCEPTION 'Invalid salary scheduled date' USING ERRCODE='23514';
+      END IF;
+    EXCEPTION WHEN invalid_datetime_format OR datetime_field_overflow THEN
+      RAISE EXCEPTION 'Invalid salary scheduled date' USING ERRCODE='23514';
+    END;
+    IF (salary_proof->>'confirmation' IN ('partial','confirmed') AND jsonb_array_length(salary_proof->'transactionIds')=0) OR
+       EXISTS (SELECT 1 FROM jsonb_array_elements(salary_proof->'transactionIds') ref
+         WHERE jsonb_typeof(ref) IS DISTINCT FROM 'string' OR
+           (ref #>> '{}') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') THEN
+      RAISE EXCEPTION 'Invalid salary transaction references' USING ERRCODE='23514';
+    END IF;
+  END LOOP;
   IF EXISTS (
     SELECT 1 FROM payse.source_contexts c CROSS JOIN LATERAL jsonb_array_elements(c.salary_evidence) proof
-    WHERE c.user_id=owner AND (proof->>'confirmation' NOT IN ('unknown','partial','confirmed') OR
-      proof->>'confirmation' IS NULL OR jsonb_typeof(proof->'transactionIds') IS DISTINCT FROM 'array' OR
-      (proof->>'confirmation' IN ('partial','confirmed') AND jsonb_array_length(proof->'transactionIds')=0))
-  ) OR EXISTS (
+    WHERE c.user_id=owner GROUP BY proof->>'payMonth' HAVING count(*)>1
+  ) THEN RAISE EXCEPTION 'Duplicate salary nominal month' USING ERRCODE='23514'; END IF;
+  -- Different nominal months may share a date. Preserve facts; Flutter reports insufficient periods.
+  IF EXISTS (
     -- A past source deposit is independent of the user's current salary-account setting.
     SELECT 1 FROM payse.source_contexts c CROSS JOIN LATERAL jsonb_array_elements(c.salary_evidence) proof
     CROSS JOIN LATERAL jsonb_array_elements_text(proof->'transactionIds') ref
@@ -159,7 +194,7 @@ BEGIN
       t.status<>'posted' OR t.reflection_reason<>'reflected')
   ) THEN RAISE EXCEPTION 'Salary evidence references unconfirmed or foreign deposit' USING ERRCODE='23514'; END IF;
   IF EXISTS (
-    SELECT 1 FROM payse.user_settings s CROSS JOIN LATERAL jsonb_array_elements(s.card_plan_overrides) e
+    SELECT 1 FROM payse.user_attributes s CROSS JOIN LATERAL jsonb_array_elements(s.card_plan_overrides) e
     LEFT JOIN payse.financial_cards c ON c.user_id=owner AND c.id=(e->>'cardId')::uuid
     WHERE s.user_id=owner AND c.id IS NULL
   ) OR EXISTS (
@@ -177,7 +212,7 @@ END $$;
 
 -- Fixed allowlist: checks run against final transaction state, never infer paid state from dates.
 DO $$ DECLARE t text; BEGIN
-  FOREACH t IN ARRAY ARRAY['source_contexts','financial_accounts','financial_cards','transaction_references','financial_transactions','card_statements','statement_items','transaction_relations','user_settings','recurring_plans','recurring_plan_revisions','recurring_decisions','obligations','occurrence_overrides','settlement_links','reserves','reserve_allocations','write_receipts'] LOOP
+  FOREACH t IN ARRAY ARRAY['source_contexts','financial_accounts','financial_cards','transaction_references','financial_transactions','card_statements','statement_items','transaction_relations','user_attributes','recurring_plans','recurring_plan_revisions','recurring_decisions','obligations','occurrence_overrides','settlement_links','reserves','reserve_allocations','write_receipts'] LOOP
     EXECUTE format('CREATE TRIGGER lock_owner BEFORE INSERT OR UPDATE OR DELETE ON payse.%I FOR EACH ROW EXECUTE FUNCTION payse.lock_storage_owner()',t);
     EXECUTE format('CREATE CONSTRAINT TRIGGER verify_owner AFTER INSERT OR UPDATE OR DELETE ON payse.%I DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION payse.check_storage_owner()',t);
   END LOOP;

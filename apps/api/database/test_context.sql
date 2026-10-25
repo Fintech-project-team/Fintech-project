@@ -58,7 +58,7 @@ DECLARE
   context jsonb; table_name text; expected jsonb; matched bigint; actual_ids uuid[];
   owner uuid:=pg_temp.ctx_uuid('owner_id'); other_owner uuid:=pg_temp.ctx_uuid('other_owner_id');
   future_owner uuid:=pg_temp.ctx_uuid('future_owner_id');
-  allowed_tables text[]:=ARRAY['demo_users','source_contexts','user_settings','financial_accounts',
+  allowed_tables text[]:=ARRAY['users','source_contexts','user_attributes','financial_accounts',
     'financial_cards','financial_transactions','obligations','reserves','reserve_allocations',
     'settlement_links','write_receipts','card_statements','statement_items','transaction_relations',
     'recurring_plans','recurring_plan_revisions','occurrence_overrides'];
@@ -90,7 +90,7 @@ BEGIN
       IF matched<>1 THEN RAISE EXCEPTION 'Test row missing, ambiguous, or inconsistent in %',table_name; END IF;
     END LOOP;
   END LOOP;
-  IF (SELECT count(*) FROM payse.demo_users)<>pg_temp.ctx_int('expected_user_count') OR
+  IF (SELECT count(*) FROM payse.users)<>pg_temp.ctx_int('expected_user_count') OR
      (SELECT count(*) FROM payse.financial_accounts)<>pg_temp.ctx_int('expected_account_count') OR
      (SELECT count(*) FROM payse.reserves WHERE user_id=owner)<>pg_temp.ctx_int('owner_reserve_count') OR
      EXISTS (SELECT 1 FROM payse.demo_sessions WHERE user_id=owner AND ended_at IS NULL) THEN
@@ -101,9 +101,9 @@ BEGIN
      cardinality(actual_ids)<>pg_temp.ctx_int('owner_account_count') THEN
     RAISE EXCEPTION 'Owner account set differs';
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM payse.demo_users WHERE id=owner AND name=pg_temp.ctx_text('owner_name') AND synthetic_phone=pg_temp.ctx_text('owner_phone')) OR
-     NOT EXISTS (SELECT 1 FROM payse.user_settings WHERE user_id=owner AND salary_account_id=pg_temp.ctx_uuid('owner_account_id')) OR
-     NOT EXISTS (SELECT 1 FROM payse.user_settings WHERE user_id=other_owner AND salary_account_id=pg_temp.ctx_uuid('other_account_id')) OR
+  IF NOT EXISTS (SELECT 1 FROM payse.users WHERE id=owner AND name=pg_temp.ctx_text('owner_name') AND phone=pg_temp.ctx_text('owner_phone')) OR
+     NOT EXISTS (SELECT 1 FROM payse.user_attributes WHERE user_id=owner AND salary_account_id=pg_temp.ctx_uuid('owner_account_id')) OR
+     NOT EXISTS (SELECT 1 FROM payse.user_attributes WHERE user_id=other_owner AND salary_account_id=pg_temp.ctx_uuid('other_account_id')) OR
      pg_temp.ctx_uuid('spaced_product_account_id')<>pg_temp.ctx_uuid('owner_account_id') OR
      NOT EXISTS (SELECT 1 FROM payse.financial_accounts WHERE id=pg_temp.ctx_uuid('spaced_product_account_id')
        AND user_id=owner AND product_name=pg_temp.ctx_text('spaced_product_name') AND position(' ' in product_name)>0) THEN

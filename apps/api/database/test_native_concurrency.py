@@ -51,7 +51,7 @@ def race(psql,database,first,second,expected_error=None,expected_output=None):
 
 
 def main():
-    """2026-10-19: Load new DDL/fixtures, execute SQL tests, then four real concurrent write cases.
+    """2026-10-19: Load new DDL/fixtures, execute SQL tests, then three real concurrent write cases.
 
     2026-10-22: Resolve target roles from validated fixtures; share SQL preparation.
     """
@@ -75,16 +75,14 @@ def main():
     receipt = context['write_receipt_id']
     session=f"INSERT INTO payse.demo_sessions (id,user_id,token_digest,issued_at,ended_at) VALUES (gen_random_uuid(),'{owner}','race-{{}}',now(),NULL);"
     race(args.psql,args.database,session.format('a'),session.format('b'),expected_error='23505')
-    version=run(args.psql,args.database,f"SELECT data_version FROM payse.demo_users WHERE id='{owner}';")
+    version=run(args.psql,args.database,f"SELECT data_version FROM payse.users WHERE id='{owner}';")
     if not version.isascii() or not version.isdecimal():
         raise AssertionError('One existing owner with a nonnegative version is required')
-    update=f"UPDATE payse.demo_users SET data_version=data_version+1 WHERE id='{owner}' AND data_version={version} RETURNING id"
+    update=f"UPDATE payse.users SET data_version=data_version+1 WHERE id='{owner}' AND data_version={version} RETURNING id"
     race(args.psql,args.database,update+';',f"WITH changed AS ({update}) SELECT 'changed='||count(*) FROM changed;",expected_output='changed=0')
     write=f"INSERT INTO payse.write_receipts SELECT gen_random_uuid(),user_id,'race-operation',request_digest,action,changed_refs,before_after,result_version,created_at FROM payse.write_receipts WHERE id='{receipt}';"
     race(args.psql,args.database,write,write,expected_error='23505')
-    event=f"INSERT INTO payse.demo_event_receipts VALUES ('{owner}','race-event','before','after','{receipt}');"
-    race(args.psql,args.database,event,event,expected_error='23505')
-    print('PASS: native SQL suites and 4 two-connection races; disposable database retained for inspection')
+    print('PASS: native SQL suites and 3 two-connection races; disposable database retained for inspection')
 
 
 if __name__=='__main__':

@@ -204,7 +204,7 @@ def validate_snapshot(snapshot):
     require(len(rows) == len(mapping) and {row['id'] for row in rows} == set(mapping), 'Unknown, missing or duplicate demo identity')
     for row in rows:
         known = mapping[row['id']]
-        require(row['phone'] == known['synthetic_phone'], 'Stored identity does not match reviewed mapping')
+        require(row['phone'] == known['phone'], 'Stored identity does not match reviewed mapping')
         wanted = {'synthetic_name': known['legacy_synthetic_name'], 'display_name': known['legacy_display_name']} if legacy else {'name': known['name']}
         require(row['names'] == wanted, 'Stored identity does not match reviewed mapping')
         validate_stored_identity(known['name'], row['phone'])
@@ -329,7 +329,7 @@ def apply_plan(psql, database, backup, expected_sha256, timeout_seconds, lock_ti
     sql += 'SELECT ' + query + ' INTO before_state;\n'
     sql += 'IF ' + sql_digest('before_state::text') + ' <> ' + sql_literal(plan['stateDigest']) + " THEN RAISE EXCEPTION 'Reviewed database state changed'; END IF;\n"
     sql += '\n'.join(changes) + '\nSELECT ' + query + ' INTO after_state;\n'
-    expected_users = [{'id': row['user_id'], 'phone': row['synthetic_phone'], 'names': {'name': row['name']}} for row in sorted(IDENTITY_USERS, key=lambda value: value['user_id'])]
+    expected_users = [{'id': row['user_id'], 'phone': row['phone'], 'names': {'name': row['name']}} for row in sorted(IDENTITY_USERS, key=lambda value: value['user_id'])]
     sql += "IF after_state->'users' IS DISTINCT FROM " + sql_literal(json.dumps(expected_users, ensure_ascii=False)) + "::jsonb THEN RAISE EXCEPTION 'Target mapping differs'; END IF;\n"
     sql += "IF before_state->'data' IS DISTINCT FROM after_state->'data' THEN RAISE EXCEPTION 'Preserved data changed'; END IF;\nEND $payse_identity$;\nCOMMIT;\nSELECT '" + ('APPLIED' if any(actions.values()) else 'NOOP') + "';"
     require(hashlib.sha256(Path(backup).read_bytes()).hexdigest() == expected_sha256, 'Backup changed before apply')

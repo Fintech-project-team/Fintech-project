@@ -1,37 +1,37 @@
 {
   "userId": "f0a4be6c-01d7-53eb-ab2c-74675b22fd8c",
-  "schemaVersion": "PAYSE-DRAFT-2",
+  "schemaVersion": "PAYSE-DRAFT-3",
   "currency": "KRW",
   "dataVersion": "1",
-  "sourceVersion": "fixture-1:alpha:2026-10-19:base",
+  "sourceVersion": "fixture-3:alpha:2026-10-19:base",
   "ruleVersion": "PAYSE-CALC-1",
   "asOf": "2026-10-19T12:00:00+09:00",
   "institutions": [
     {
       "code": "bank.kb",
       "kind": "bank",
-      "name": "국민",
+      "name": "국민은행",
       "accountCount": 2,
       "cardCount": 0
     },
     {
       "code": "bank.shinhan",
       "kind": "bank",
-      "name": "신한",
+      "name": "신한은행",
       "accountCount": 1,
       "cardCount": 0
     },
     {
       "code": "bank.hana",
       "kind": "bank",
-      "name": "하나",
+      "name": "하나은행",
       "accountCount": 1,
       "cardCount": 0
     },
     {
       "code": "bank.ibk",
       "kind": "bank",
-      "name": "기업",
+      "name": "기업은행",
       "accountCount": 1,
       "cardCount": 0
     },
