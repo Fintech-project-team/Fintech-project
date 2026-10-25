@@ -30,4 +30,6 @@ jobs:
           cache: true
       - run: flutter --no-version-check pub get --enforce-lockfile
         working-directory: apps/mobile
+      - run: flutter --no-version-check pub get --enforce-lockfile
+        working-directory: packages/payse_calculation
       - run: node scripts/harness/run-flutter.mjs check
