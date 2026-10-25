@@ -211,6 +211,18 @@ class _Fields {
     ]);
   }
 
+  /// 2026-10-23: 필수 문자열 배열 [key]를 반환한다. 문자열이 아닌 원소는 형식 오류다.
+  List<String> stringList(String key) {
+    final v = _required(key, '문자열 배열');
+    if (v is! List) throw _wrong(key, v, '문자열 배열');
+    for (var i = 0; i < v.length; i++) {
+      if (v[i] is! String) {
+        throw SnapshotFormatException('$path.$key[$i]', '문자열이어야 함');
+      }
+    }
+    return List.unmodifiable(v.cast<String>());
+  }
+
   /// 2026-10-20: 키가 없으면 null(미노출)을, 있으면 배열로 변환해 반환한다. 빈 배열과 구분한다.
   List<T>? listOrAbsent<T>(String key, T Function(_Fields item) parse) {
     if (!map.containsKey(key)) return null;
@@ -257,6 +269,7 @@ class Account {
     required this.asOf,
     required this.included,
     required this.nickname,
+    this.sourceVersion,
   });
 
   final String accountId;
@@ -269,6 +282,9 @@ class Account {
   final bool included;
   final String? nickname;
 
+  /// 2026-10-23: 이 계좌 원천의 자료 버전. 키가 없으면 null이며 같은 버전이라고 추정하지 않는다.
+  final String? sourceVersion;
+
   static Account _parse(_Fields f) => Account(
     accountId: f.string('accountId'),
     institutionCode: f.string('institutionCode'),
@@ -279,6 +295,7 @@ class Account {
     asOf: f.timestampOrNull('asOf'),
     included: f.boolean('included'),
     nickname: f.stringOrNull('nickname'),
+    sourceVersion: f.stringOrNull('sourceVersion'),
   );
 }
 
@@ -365,6 +382,7 @@ class SalarySetting {
     required this.salaryAmountKrw,
     required this.salaryAccountId,
     this.salaryAccountRestricted = false,
+    this.receiptEvidence,
   });
 
   final int? salaryDay;
@@ -374,18 +392,47 @@ class SalarySetting {
   /// 2026-10-22: 급여 계좌가 미연결이라 응답에서 생략됐으면 true다(미입력 null과 구분).
   final bool salaryAccountRestricted;
 
+  /// 2026-10-23: 월별 급여 입금 근거. null은 키가 생략된 것(접근 제한)이며 []는 확인된 근거 없음이다.
+  final List<SalaryReceiptRecord>? receiptEvidence;
+
   static SalarySetting _parse(_Fields f) {
-    final evidence = f.map['receiptEvidence'];
-    if (f.map.containsKey('receiptEvidence') && evidence is! List) {
-      throw f._wrong('receiptEvidence', evidence, '배열');
-    }
     return SalarySetting(
       salaryDay: f.dayOfMonthOrNull('salaryDay'),
       salaryAmountKrw: f.nonNegativeKrwOrNull('salaryAmountKRW'),
       salaryAccountId: f.stringOrNull('salaryAccountId'),
       salaryAccountRestricted: !f.map.containsKey('salaryAccountId'),
+      receiptEvidence: f.listOrAbsent(
+        'receiptEvidence',
+        SalaryReceiptRecord._parse,
+      ),
     );
   }
+}
+
+/// 2026-10-23: 월급 회차 하나의 입금 근거. 확인 상태를 바꾸거나 금액으로 추정하지 않는다.
+class SalaryReceiptRecord {
+  /// 2026-10-23: 예정일 [expectedPayDate], 근거 거래 [transactionIds], 확인 상태 [confirmation]으로 만든다.
+  const SalaryReceiptRecord({
+    required this.expectedPayDate,
+    required this.transactionIds,
+    required this.confirmation,
+  });
+
+  final String expectedPayDate;
+  final List<String> transactionIds;
+
+  /// 2026-10-23: unknown·partial·confirmed 중 하나다.
+  final String confirmation;
+
+  static SalaryReceiptRecord _parse(_Fields f) => SalaryReceiptRecord(
+    expectedPayDate: f.businessDate('expectedPayDate'),
+    transactionIds: f.stringList('transactionIds'),
+    confirmation: f.oneOf('confirmation', const {
+      'unknown',
+      'partial',
+      'confirmed',
+    }),
+  );
 }
 
 /// 2026-10-22: 카드별 사용자 계획 결제일. [plannedPaymentDay]가 null이면 사용자 설정이 없다.
@@ -474,6 +521,87 @@ class Obligation {
   );
 }
 
+/// 2026-10-23: 응답에 포함되지 않은 거래 참조의 확보 상태(data-model §9).
+/// unavailable은 원거래가 없다는 뜻이 아니라 권한은 있으나 원천을 확보하지 못한 것이다.
+class ReferenceResolution {
+  /// 2026-10-23: 거래 [transactionId], 상태 [status](resolved·unavailable), 이유 [reason]으로 만든다.
+  const ReferenceResolution({
+    required this.transactionId,
+    required this.status,
+    required this.reason,
+  });
+
+  final String transactionId;
+  final String status;
+  final String? reason;
+
+  static ReferenceResolution _parse(_Fields f) => ReferenceResolution(
+    transactionId: f.string('transactionId'),
+    status: f.oneOf('status', const {'resolved', 'unavailable'}),
+    reason: f.stringOrNull('reason'),
+  );
+}
+
+/// 2026-10-23: 모아둘 돈을 예정 지출에 명시 배정한 기록(O의 근거). 배정은 계좌 이체가 아니다.
+class Allocation {
+  /// 2026-10-23: [allocationId], [reserveId], [obligationId], 배정 총액 [amountKrw](해제 누계 포함),
+  /// 해제 누계 [releasedKrw]로 만든다.
+  const Allocation({
+    required this.allocationId,
+    required this.reserveId,
+    required this.obligationId,
+    required this.amountKrw,
+    required this.releasedKrw,
+  });
+
+  final String allocationId;
+  final String reserveId;
+  final String obligationId;
+  final int amountKrw;
+  final int releasedKrw;
+
+  static Allocation _parse(_Fields f) => Allocation(
+    allocationId: f.string('allocationId'),
+    reserveId: f.string('reserveId'),
+    obligationId: f.string('obligationId'),
+    amountKrw: f.krw('amountKRW', allowNegative: false),
+    releasedKrw: f.krw('releasedKRW', allowNegative: false),
+  );
+}
+
+/// 2026-10-23: 확인된 실제 출금과 예정 지출의 지급 연결. 원천 거래를 고치지 않는다.
+class Settlement {
+  /// 2026-10-23: [linkId], [obligationId], 출금 거래 [transactionId], 배분액 [allocatedKrw], 방식 [method],
+  /// 근거 [evidenceRefs], 무효 시각 [invalidatedAt](null 유효)으로 만든다.
+  const Settlement({
+    required this.linkId,
+    required this.obligationId,
+    required this.transactionId,
+    required this.allocatedKrw,
+    required this.method,
+    required this.evidenceRefs,
+    required this.invalidatedAt,
+  });
+
+  final String linkId;
+  final String obligationId;
+  final String transactionId;
+  final int allocatedKrw;
+  final String method;
+  final List<String> evidenceRefs;
+  final String? invalidatedAt;
+
+  static Settlement _parse(_Fields f) => Settlement(
+    linkId: f.string('linkId'),
+    obligationId: f.string('obligationId'),
+    transactionId: f.string('transactionId'),
+    allocatedKrw: f.krw('allocatedKRW', allowNegative: false),
+    method: f.oneOf('method', const {'automatic', 'manual'}),
+    evidenceRefs: f.stringList('evidenceRefs'),
+    invalidatedAt: f.timestampOrNull('invalidatedAt'),
+  );
+}
+
 /// 2026-10-20: 거래 한 건. [amountKrw]는 비음수 크기이고 방향은 [direction]으로 해석한다.
 class SourceTransaction {
   /// 2026-10-20: 원천 필드로 만든다. 날짜 필드의 null은 값 미확인이다.
@@ -490,6 +618,8 @@ class SourceTransaction {
     required this.purchaseDate,
     required this.withdrawalDate,
     required this.payseTransactionType,
+    this.reflectionReason,
+    this.sourceVersion,
     this.accountRestricted = false,
     this.cardRestricted = false,
   });
@@ -510,6 +640,13 @@ class SourceTransaction {
   final String? purchaseDate;
   final String? withdrawalDate;
   final String? payseTransactionType;
+
+  /// 2026-10-23: 같은 sourceVersion·잔액 asOf에 반영됐는지(reflected·not_reflected·not_applicable·unknown).
+  /// 키가 없으면 null이며 반영 여부를 추정하지 않는다.
+  final String? reflectionReason;
+
+  /// 2026-10-23: 이 거래 원천의 자료 버전. 키가 없으면 null이며 같은 버전이라고 추정하지 않는다.
+  final String? sourceVersion;
 
   /// 2026-10-20: 거래 한 건을 읽는다. 계좌·카드 ID가 모두 null이면 계약 위반(적어도 하나 필요)이다.
   static SourceTransaction _parse(_Fields f) {
@@ -534,6 +671,15 @@ class SourceTransaction {
       purchaseDate: f.businessDateOrNull('purchaseDate'),
       withdrawalDate: f.businessDateOrNull('withdrawalDate'),
       payseTransactionType: f.stringOrNull('payseTransactionType'),
+      reflectionReason: f.map.containsKey('reflectionReason')
+          ? f.oneOf('reflectionReason', const {
+              'reflected',
+              'not_reflected',
+              'not_applicable',
+              'unknown',
+            })
+          : null,
+      sourceVersion: f.stringOrNull('sourceVersion'),
       accountRestricted: !f.map.containsKey('accountId'),
       cardRestricted: !f.map.containsKey('cardId'),
     );
@@ -626,6 +772,11 @@ class FinancialSnapshot {
     this.settings,
     this.reserves,
     this.obligations,
+    this.allocations,
+    this.settlements,
+    this.relatedTransactions,
+    this.referenceResolutions,
+    this.hasMoreTransactions = false,
     this.accessRestrictions = const [],
   });
 
@@ -655,6 +806,19 @@ class FinancialSnapshot {
   final FinancialSettings? settings;
   final List<Reserve>? reserves;
   final List<Obligation>? obligations;
+
+  /// 2026-10-23: 보호액 배정·지급 연결. null이면 원문에 해당 묶음이 없는 것(연결 전)이다.
+  final List<Allocation>? allocations;
+  final List<Settlement>? settlements;
+
+  /// 2026-10-23: 조회 기간 밖 원거래·정산 근거. 분석 대상 거래로 다시 세지 않는다.
+  final List<SourceTransaction>? relatedTransactions;
+
+  /// 2026-10-23: 응답에 없는 거래 참조의 확보 상태. 미확보(unavailable)를 계약 위반과 구분하는 데 쓴다.
+  final List<ReferenceResolution>? referenceResolutions;
+
+  /// 2026-10-23: 거래 다음 페이지가 남아 있으면 true다. 받지 못한 거래를 '없음'으로 판단하지 않는다.
+  final bool hasMoreTransactions;
 
   /// 2026-10-22: 주 계좌가 미연결이라 일부 모아둘 돈이 응답에서 생략됐으면 true다.
   bool get reservesRestricted => isRestricted('response', null, 'reserves');
@@ -760,6 +924,9 @@ class FinancialSnapshot {
         : null;
     final reserves = f.listOrAbsent('reserves', Reserve._parse);
     final obligations = f.listOrAbsent('obligations', Obligation._parse);
+    final allocations = f.listOrAbsent('allocations', Allocation._parse);
+    final settlements = f.listOrAbsent('settlements', Settlement._parse);
+    _checkLinks(reserves, obligations, allocations, settlements);
     _checkSettingsAndPlans(
       f: f,
       accounts: accounts,
@@ -791,8 +958,40 @@ class FinancialSnapshot {
       settings: settings,
       reserves: reserves,
       obligations: obligations,
+      allocations: allocations,
+      settlements: settlements,
       restrictions: restrictions,
     );
+  }
+
+  /// 2026-10-23: 배정·지급 연결이 응답에 공개된 보호액·의무만 가리키는지 검사한다.
+  /// 부모가 숨겨지면 자식 행도 숨기는 계약(api-response-models §2.3)이라 고아 참조는 형식 오류다.
+  static void _checkLinks(
+    List<Reserve>? reserves,
+    List<Obligation>? obligations,
+    List<Allocation>? allocations,
+    List<Settlement>? settlements,
+  ) {
+    final reserveIds = {
+      for (final r in reserves ?? const <Reserve>[]) r.reserveId,
+    };
+    final obligationIds = {
+      for (final o in obligations ?? const <Obligation>[]) o.obligationId,
+    };
+    for (final a in allocations ?? const <Allocation>[]) {
+      if (!reserveIds.contains(a.reserveId) ||
+          !obligationIds.contains(a.obligationId)) {
+        throw const SnapshotFormatException(
+          r'$.allocations',
+          '응답에 없는 보호액·의무를 가리킴',
+        );
+      }
+    }
+    for (final link in settlements ?? const <Settlement>[]) {
+      if (!obligationIds.contains(link.obligationId)) {
+        throw const SnapshotFormatException(r'$.settlements', '응답에 없는 의무를 가리킴');
+      }
+    }
   }
 
   /// 2026-10-22: 설정·모아둘 돈·예정 지출의 참조와 생략 표식을 검사한다. 참조 대상이 응답에 없거나,
@@ -867,8 +1066,11 @@ class FinancialSnapshot {
     required FinancialSettings? settings,
     required List<Reserve>? reserves,
     required List<Obligation>? obligations,
+    required List<Allocation>? allocations,
+    required List<Settlement>? settlements,
     required List<AccessRestriction> restrictions,
   }) {
+    final page = f.map['page'];
     return FinancialSnapshot(
       userId: f.string('userId'),
       schemaVersion: schema,
@@ -886,6 +1088,17 @@ class FinancialSnapshot {
       settings: settings,
       reserves: reserves,
       obligations: obligations,
+      allocations: allocations,
+      settlements: settlements,
+      relatedTransactions: f.listOrAbsent(
+        'relatedTransactions',
+        SourceTransaction._parse,
+      ),
+      referenceResolutions: f.listOrAbsent(
+        'referenceResolutions',
+        ReferenceResolution._parse,
+      ),
+      hasMoreTransactions: page is Map && page['nextCursor'] != null,
       accessRestrictions: restrictions,
     );
   }
