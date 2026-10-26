@@ -66,6 +66,61 @@ void main() {
     expect(find.text('예정 지출'), findsNothing);
   });
 
+  testWidgets('정보 부족: 같은 예정일 회차를 구분해야 하면 계산하지 못한 이유를 보이고 0원이 없다', (
+    tester,
+  ) async {
+    final json = alphaWithReceipt();
+    (salaryOf(json)['receiptEvidence']! as List).add({
+      'payMonth': '2026-10',
+      'expectedPayDate': '2026-09-25',
+      'transactionIds': <String>[],
+      'confirmation': 'unknown',
+    });
+    await tester.pumpWidget(home(calculate(json)));
+    expect(find.text(AmountHero.unavailableText), findsOneWidget);
+    expect(
+      find.text('월급 예정일이 겹쳐 다음 월급일까지 쓸 수 있는 돈을 계산하지 못했어요.'),
+      findsOneWidget,
+    );
+    expect(find.text('0원'), findsNothing);
+  });
+
+  // 2026-10-26: 8월분은 9월분과 다른 별도 입금 거래를 참조한다(테스트 입력 사본, 원천 자산은 그대로).
+  Map<String, Object?> withAugustOnSameDate(String confirmation) {
+    const augustTx = 'test-august-salary-on-0925';
+    final json = alphaWithReceipt();
+    final september = rows(
+      json,
+      'transactions',
+    ).firstWhere((t) => t['transactionId'] == septemberSalaryTx);
+    (json['transactions']! as List).add({
+      ...september,
+      'transactionId': augustTx,
+    });
+    (salaryOf(json)['receiptEvidence']! as List).add({
+      'payMonth': '2026-08',
+      'expectedPayDate': '2026-09-25',
+      'transactionIds': confirmation == 'unknown' ? <String>[] : [augustTx],
+      'confirmation': confirmation,
+    });
+    return json;
+  }
+
+  testWidgets('같은 예정일이어도 회차가 각자 입금 거래로 모두 확인되면 겹침 안내가 없다', (tester) async {
+    await tester.pumpWidget(home(calculate(withAugustOnSameDate('confirmed'))));
+    expect(find.text(AmountHero.unavailableText), findsNothing);
+    expect(find.textContaining('월급 예정일이 겹쳐'), findsNothing);
+  });
+
+  testWidgets('같은 예정일의 앞 회차만 미확인이면 계산을 제한하고 겹침 안내를 보인다', (tester) async {
+    await tester.pumpWidget(home(calculate(withAugustOnSameDate('unknown'))));
+    expect(find.text(AmountHero.unavailableText), findsOneWidget);
+    expect(
+      find.text('월급 예정일이 겹쳐 다음 월급일까지 쓸 수 있는 돈을 계산하지 못했어요.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('입금 대기 09-14: 월급일 당일 입금 전, 반영 대기 의무를 경고로 알린다', (tester) async {
     await tester.pumpWidget(home(calculate(readSource('salary-wait'))));
     expect(find.text('오늘은 월급일 · 입금 확인 전'), findsOneWidget);
@@ -88,6 +143,7 @@ void main() {
     final json = alphaWithReceipt();
     salaryOf(json)['receiptEvidence'] = [
       {
+        'payMonth': '2026-09',
         'expectedPayDate': '2026-09-25',
         'transactionIds': ['missing-tx'],
         'confirmation': 'confirmed',
@@ -112,12 +168,18 @@ void main() {
   testWidgets('예상하지 못한 오류는 데이터 오류·정보 부족과 구분해 보고한다', (tester) async {
     final reported = <FlutterErrorDetails>[];
     final original = FlutterError.onError;
+    final snapshot = FinancialSnapshot.fromJson(alphaWithReceipt());
+    final HomeCalculation calculation;
+    // 실패해도 원래 처리기를 되돌려야 테스트가 시간 초과로 멈추지 않는다.
     FlutterError.onError = reported.add;
-    final calculation = computeHomeCalculation(
-      FinancialSnapshot.fromJson(alphaWithReceipt()),
-      toInputs: (_) => throw StateError('bug'),
-    );
-    FlutterError.onError = original;
+    try {
+      calculation = computeHomeCalculation(
+        snapshot,
+        toInputs: (_) => throw StateError('bug'),
+      );
+    } finally {
+      FlutterError.onError = original;
+    }
     expect(calculation, isA<HomeCalculationUnexpectedError>());
     expect(reported.single.exception, isA<StateError>());
     await tester.pumpWidget(home(calculation));

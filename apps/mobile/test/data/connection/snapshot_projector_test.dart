@@ -60,7 +60,7 @@ void main() {
             'institutionLinks',
             'coverage',
           });
-          expect(out['schemaVersion'], 'PAYSE-API-0.6-2');
+          expect(out['schemaVersion'], 'PAYSE-API-0.6-3');
           expect(out['userId'], source['userId']);
           expect(out['institutionLinks'], isEmpty);
           expect(out['coverage'], isEmpty);
@@ -264,12 +264,15 @@ void main() {
         reason: '표식 없는 생략은 형식 오류',
       );
 
-      final oldSchema = projectWith(readSource('alpha-ready'), _banks)
-        ..['schemaVersion'] = 'PAYSE-API-0.6-1';
-      expect(
-        () => FinancialSnapshot.fromJson(oldSchema),
-        throwsA(isA<SnapshotFormatException>()),
-      );
+      for (final old in ['PAYSE-API-0.6-1', 'PAYSE-API-0.6-2']) {
+        final oldSchema = projectWith(readSource('alpha-ready'), _banks)
+          ..['schemaVersion'] = old;
+        expect(
+          () => FinancialSnapshot.fromJson(oldSchema),
+          throwsA(isA<SnapshotFormatException>()),
+          reason: old,
+        );
+      }
     });
 
     test('mixed: card kept with its bank; other card pair relations restricted on the public side', () {
@@ -431,13 +434,77 @@ void main() {
       );
     });
 
-    test('unsupported source schema and unknown record kind are refused', () {
-      final old = readSource('alpha-ready')
-        ..['schemaVersion'] = 'PAYSE-DRAFT-1';
+    test('salary evidence needs one exact YYYY-MM payMonth per month', () {
+      Map<String, Object?> withEvidence(List<Map<String, Object?>> evidence) {
+        final source = readSource('salary-wait');
+        ((source['settings']! as Map)['salary']! as Map)['receiptEvidence'] =
+            evidence;
+        return source;
+      }
+
+      final ok =
+          (((readSource('salary-wait')['settings']! as Map)['salary']!
+                      as Map)['receiptEvidence']!
+                  as List)
+              .first;
+      final proof = (ok as Map).cast<String, Object?>();
+      expect(proof['payMonth'], '2026-10');
       expect(
-        () => projectWith(old, _banks),
-        throwsA(isA<SnapshotContractException>()),
+        () => SnapshotProjector.validate(withEvidence([proof])),
+        returnsNormally,
       );
+      for (final bad in <Object?>[null, '2026-10-25', '2026-00', 202610]) {
+        expect(
+          () => SnapshotProjector.validate(
+            withEvidence([
+              {...proof, 'payMonth': bad},
+            ]),
+          ),
+          throwsA(isA<SnapshotContractException>()),
+          reason: '$bad',
+        );
+      }
+      expect(
+        () => SnapshotProjector.validate(
+          withEvidence([
+            proof,
+            {...proof, 'expectedPayDate': '2026-10-26'},
+          ]),
+        ),
+        throwsA(isA<SnapshotContractException>()),
+        reason: '같은 회차 중복',
+      );
+      expect(
+        () => SnapshotProjector.validate(
+          withEvidence([
+            proof,
+            {...proof, 'payMonth': '2026-11'},
+          ]),
+        ),
+        returnsNormally,
+        reason: '다른 회차·같은 예정일은 원천 보존',
+      );
+      expect(
+        () => SnapshotProjector.validate(
+          withEvidence([
+            proof,
+            {...proof, 'payMonth': '2026-11', 'expectedPayDate': '2027-03-02'},
+          ]),
+        ),
+        returnsNormally,
+        reason: '회차와 예정일의 기간 차이는 제한하지 않음',
+      );
+    });
+
+    test('unsupported source schema and unknown record kind are refused', () {
+      for (final version in ['PAYSE-DRAFT-1', 'PAYSE-DRAFT-2']) {
+        final old = readSource('alpha-ready')..['schemaVersion'] = version;
+        expect(
+          () => projectWith(old, _banks),
+          throwsA(isA<SnapshotContractException>()),
+          reason: version,
+        );
+      }
 
       final odd = readSource('alpha-ready');
       rows(odd, 'transactions').first['recordKind'] = 'mystery';

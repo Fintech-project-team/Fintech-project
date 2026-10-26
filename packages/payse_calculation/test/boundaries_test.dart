@@ -474,14 +474,18 @@ void main() {
       expect(r.salaryCycle!.previousReceipt, isNull);
     });
 
-    test('Q2-1 규칙 날짜와 다른 근거(휴일 이동)는 회차를 확인할 수 없어 정보 부족, 월급일 규칙은 그대로', () {
+    test('Q2-1 해결: 회차 근거의 이동 예정일은 그 회차 월급일이며 정보 부족이 아니다', () {
       final r = current(
         simple(t1019),
-        salary(25, [('2026-09-24', SalaryConfirmation.confirmed)]),
+        salaryOf(25, [
+          receipt('2026-09', '2026-09-24', SalaryConfirmation.confirmed),
+        ]),
       );
-      expect(r.insufficient, [InsufficientReason.receiptScheduleMismatch]);
-      expect(r.salaryCycle!.previousPayDate!.date.toString(), '2026-09-25');
+      expect(r.insufficient, isEmpty);
+      expect(r.salaryCycle!.previousPayDate!.date.toString(), '2026-09-24');
+      expect(r.salaryCycle!.previousPayDate!.fromEvidence, isTrue);
       expect(r.salaryCycle!.nextPayDate!.date.toString(), '2026-10-25');
+      expect(r.salaryCycle!.nextPayDate!.fromEvidence, isFalse);
     });
 
     // Q2-2 테스트는 confirmation 값별 동작 검증이다. 계산은 확인 시각을 읽지 않으므로
@@ -600,13 +604,13 @@ void main() {
       });
     });
 
-    test('같은 예정일 근거가 둘이면 오류, 월급 설정 미수신·월급일 미입력은 정보 부족', () {
+    test('같은 회차 근거가 둘이면 오류, 월급 설정 미수신·월급일 미입력은 정보 부족', () {
       expect(
         () => current(
           simple(t1019),
-          salary(25, [
-            ('2026-09-25', SalaryConfirmation.confirmed),
-            ('2026-09-25', SalaryConfirmation.unknown),
+          salaryOf(25, [
+            receipt('2026-09', '2026-09-25', SalaryConfirmation.confirmed),
+            receipt('2026-09', '2026-09-26', SalaryConfirmation.unknown),
           ]),
         ),
         inputError(InputErrorCode.duplicateId),

@@ -18,7 +18,7 @@
 
 ```text
 lib/data/connection/financial_api.dart          UserFinancialRepository 계약 · W(쓰기 공통 필드) · S(영수증·replayed·snapshot) · 결과 타입
-lib/data/connection/snapshot_projector.dart     원본(PAYSE-DRAFT-2) + 사용자 상태 → HTTP Snapshot(PAYSE-API-0.6-2) 순수 변환
+lib/data/connection/snapshot_projector.dart     원본(PAYSE-DRAFT-3) + 사용자 상태 → HTTP Snapshot(PAYSE-API-0.6-3) 순수 변환
 lib/data/connection/fake_financial_server.dart  FakeFinancialServer(앱 수명 장부) · FakeUserFinancialRepository(세션 단위)
 lib/data/connection/user_snapshot_repository.dart  Snapshot JSON → FinancialSnapshot 어댑터(첫 화면용)
 lib/app/dev/dev_user_fixtures.dart              개발 데모 계정 userId → 불변 원본(alpha-ready·beta-ready·gamma-month-end)
@@ -57,7 +57,7 @@ lib/app/dev/dev_user_fixtures.dart              개발 데모 계정 userId → 
 ## 5. 미확정·후속
 
 - beta·gamma 금융사 구성 변경은 A와 논의 중이다. 원본이 바뀌면 원본 일치 테스트가 알려 주며 사람이 에셋을 동기화한다. 기관 개수를 코드에 고정하지 않는다.
-- 화면 모델(`FinancialSnapshot`)은 제한 표식(`accessRestrictions`)을 보존하고 지원 형식(PAYSE-DRAFT-2·PAYSE-API-0.6-2)·등록 조합을 검사한다. 카드 출금 계좌·거래 계좌/카드는 '연결 제한으로 생략'과 '원래 미확인 null'을 구분한다(표식 없는 생략은 형식 오류). 연결 정보가 필요하다는 화면 문구는 UI 단계에서 정한다.
+- 화면 모델(`FinancialSnapshot`)은 제한 표식(`accessRestrictions`)을 보존하고 지원 형식(PAYSE-DRAFT-3·PAYSE-API-0.6-3, payMonth가 없는 v2는 받지 않음)·등록 조합을 검사한다. 카드 출금 계좌·거래 계좌/카드는 '연결 제한으로 생략'과 '원래 미확인 null'을 구분한다(표식 없는 생략은 형식 오류). 연결 정보가 필요하다는 화면 문구는 UI 단계에서 정한다.
 - `GET /transactions` 페이지 조회와 cursor 폐기는 화면이 페이지를 쓰기 시작할 때 구현한다(지금 Snapshot은 page.nextCursor=null).
 - 개발용 스냅샷은 3단계부터 개발 설정 안의 읽기 전용 미리보기로만 쓴다. 첫 화면 판단·저장 대상을 바꾸지 않는다(7절).
 - 별도 점검: 화면 모델의 `stringOrNull`·`krwOrNull` 등 기존 null 허용 읽기는 키 생략도 null로 받는다. 필드마다 허용되는 생략 조건(제한 표식·연결 전 키 구성)이 달라 일괄 변경하지 않고 계약별로 확인한다. 월급 일·금액과 카드 계획 결제일은 2단계에서 키 생략을 형식 오류로 바꿨다.

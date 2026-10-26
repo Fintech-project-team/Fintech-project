@@ -210,19 +210,26 @@ class SettlementLink {
 /// 2026-10-23: 급여 입금 확인 상태. confirmed만 입금 완료이며 partial 합계로 전환하지 않는다.
 enum SalaryConfirmation { unknown, partial, confirmed }
 
-/// 2026-10-23: 월별 급여 입금 근거 하나.
+/// 2026-10-23: 회차별 급여 입금 근거 하나.
 class SalaryReceipt {
-  /// 2026-10-23: 예정일 [expectedPayDate](YYYY-MM-DD), 근거 거래 [transactionIds], 확인 상태 [confirmation]으로 만든다.
+  /// 2026-10-26: 명목 회차 [payMonth](YYYY-MM), 그 회차의 확인 예정일 [expectedPayDate](YYYY-MM-DD, 휴일 이동 반영),
+  /// 근거 거래 [transactionIds], 확인 상태 [confirmation]으로 만든다.
   SalaryReceipt({
+    required String payMonth,
     required String expectedPayDate,
     required List<String> transactionIds,
     required this.confirmation,
-  }) : expectedPayDate = BusinessDate.parse(
+  }) : payMonth = PayMonth.parse(payMonth, 'receiptEvidence.payMonth'),
+       expectedPayDate = BusinessDate.parse(
          expectedPayDate,
          'receiptEvidence.expectedPayDate',
        ),
        transactionIds = List.unmodifiable(transactionIds);
 
+  /// 2026-10-26: 명목 급여 회차. 입금월과 다를 수 있다(예: 11월분을 10-30에 지급).
+  final PayMonth payMonth;
+
+  /// 2026-10-26: 이 회차의 확인 예정일. 계획에 없던 조기 입금은 이 날짜를 바꾸지 않는다.
   final BusinessDate expectedPayDate;
   final List<String> transactionIds;
   final SalaryConfirmation confirmation;

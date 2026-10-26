@@ -214,7 +214,7 @@ void main() {
         ),
       );
       expect(find.text('1곳의 정보를\n불러오지 못했어요'), findsOneWidget);
-      expect(find.text('신한 제외하고 계속하기'), findsOneWidget);
+      expect(find.text('신한은행 제외하고 계속하기'), findsOneWidget);
       expect(find.text('불러오지 못했어요'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('retry-bank.shinhan')));
       await tester.pump();
@@ -259,7 +259,7 @@ void main() {
         expect(find.byKey(retryKey), findsOneWidget);
         final link = Completer<FinancialOutcome<WriteSuccess>>();
         repo.link = link;
-        await tester.tap(find.text('신한 제외하고 계속하기'));
+        await tester.tap(find.text('신한은행 제외하고 계속하기'));
         await tester.pump();
         expect(find.byKey(retryKey), findsNothing, reason: '저장 중 다시 시도 없음');
         expect(find.text('제외'), findsOneWidget);
@@ -300,8 +300,8 @@ void main() {
           onRestart: () {},
         ),
       );
-      expect(find.text('국민 제외하고 계속하기'), findsOneWidget);
-      expect(_enabled(tester, '국민 제외하고 계속하기'), isFalse);
+      expect(find.text('국민은행 제외하고 계속하기'), findsOneWidget);
+      expect(_enabled(tester, '국민은행 제외하고 계속하기'), isFalse);
       expect(find.text('계산할 은행 계좌가 없어요. 은행을 다시 시도해주세요.'), findsOneWidget);
     });
 
@@ -375,7 +375,7 @@ void main() {
       await tester.pump();
       expect(find.text('모아둘 돈이 있는 계좌예요'), findsOneWidget);
       expect(
-        find.textContaining('국민 입출금 ····0001을 빼면 이 계좌의 모아둘 돈(현재 비상금)도'),
+        find.textContaining('국민은행 입출금 ····0001을 빼면 이 계좌의 모아둘 돈(현재 비상금)도'),
         findsOneWidget,
       );
       for (final a in c.accounts) {

@@ -4,12 +4,13 @@ import 'ledger.dart';
 import 'money.dart';
 import 'salary_cycle.dart';
 
-/// 2026-10-23: 미래 월급일의 근거. 확인된 일정인지 사용자가 가정했는지 결과에 남긴다.
-enum PayDateBasis { confirmed, assumed }
+/// 2026-10-26: 미래 월급일의 날짜 출처. 원천 근거의 예정일인지 반복 설정으로 예상했는지 결과에 남긴다.
+/// 입금 상태(confirmation)와 별개다. 원천 근거도 입금 전(unknown)일 수 있다.
+enum PayDateBasis { sourceEvidence, recurringSetting }
 
 /// 2026-10-23: 구간 경계 p1~p3 하나와 그날 입금될 월급.
 class PlannedPayDate {
-  /// 2026-10-23: 날짜 [date](YYYY-MM-DD), 금액 [amountKrw](Money, null 미입력), 근거 [basis],
+  /// 2026-10-23: 날짜 [date](YYYY-MM-DD), 금액 [amountKrw](Money, null 미입력), 날짜 출처 [basis],
   /// 말일 보정 여부 [monthEndAdjusted]로 만든다.
   PlannedPayDate({
     required String date,
@@ -54,13 +55,124 @@ List<PlannedPayDate> assumedPayDates({
       PlannedPayDate(
         date: pay.date.toString(),
         amountKrw: amountKrw,
-        basis: PayDateBasis.assumed,
+        basis: PayDateBasis.recurringSetting,
         monthEndAdjusted: pay.monthEndAdjusted,
       ),
     );
     offset += 1;
   }
   return List.unmodifiable(result);
+}
+
+/// 2026-10-26: [scheduledPayDates] 결과. [uncertainFrom]이 있으면 그날 이후 예상 급여 입금의 금액·시점을 알 수 없다.
+class ScheduledPayDates {
+  /// 2026-10-26: 월급일 [payDates](최대 count개), 불확실해지는 날짜 [uncertainFrom]과 사유 [uncertainReason]으로 만든다.
+  ScheduledPayDates(
+    List<PlannedPayDate> payDates,
+    this.uncertainFrom,
+    this.uncertainReason,
+  ) : payDates = List.unmodifiable(payDates);
+
+  final List<PlannedPayDate> payDates;
+  final BusinessDate? uncertainFrom;
+  final InsufficientReason? uncertainReason;
+}
+
+/// 2026-10-26: [after](t0) 이후 월급일 경계 [count]개와 예상 입금이 불확실해지는 날짜를 만든다.
+/// 경계는 홈과 같은 규칙으로, 앞 경계 회차보다 뒤 회차의 예정일 중 앞 경계 이후 가장 먼저 도래하는 날짜다.
+/// 날짜 출처는 원천 근거면 sourceEvidence, 반복 설정이면 recurringSetting이며 입금 상태와 별개다.
+/// 단일 경계 회차에는 설정 월급 [amountKrw](S)를 예상 금액으로 넣는다(회차별 실제 금액 확인이 아님).
+/// 예정일 전에 confirmed인 회차는 이미 잔액에 있어 경계·입금으로 넣지 않는다.
+/// 불확실 날짜: 현재 회차가 confirmed가 아니면 [after], 같은 날 여러 회차·partial 경계는 그 경계일,
+/// 경계로 쓰이지 않고 남은 미확인 회차는 그 예정일(이미 지났으면 [after])이다. 경계 선택은 근거를 바꾸지 않는다.
+/// 근거 목록을 받지 못했으면 이 함수를 쓰지 않는다.
+ScheduledPayDates scheduledPayDates({
+  required BusinessDate after,
+  required int salaryDay,
+  required List<SalaryReceipt> receiptEvidence,
+  required int? amountKrw,
+  int count = 3,
+}) {
+  if (salaryDay < 1 || salaryDay > 31) {
+    throw CalculationInputException(
+      InputErrorCode.invalidValue,
+      'salaryDay',
+      '1~31이어야 함($salaryDay)',
+    );
+  }
+  final schedule = SalarySchedule(salaryDay, receiptEvidence);
+  BusinessDate? uncertainFrom;
+  InsufficientReason? uncertainReason;
+  void uncertain(BusinessDate date, InsufficientReason reason) {
+    final from = date.isBefore(after) ? after : date;
+    if (uncertainFrom == null || from.isBefore(uncertainFrom!)) {
+      uncertainFrom = from;
+      uncertainReason = reason;
+    }
+  }
+
+  bool confirmed(PayMonth m) =>
+      schedule.receiptOf(m)?.confirmation == SalaryConfirmation.confirmed;
+
+  final current = schedule.latestOnOrBefore(after);
+  // 선행조건: 현재 회차 급여가 잔액에 반영됐는지 모르면 새 급여 가정 없이 미래 구간을 계산할 수 없다.
+  if (!confirmed(current)) {
+    uncertain(
+      after,
+      schedule.receiptOf(current) == null
+          ? InsufficientReason.receiptEvidenceAbsent
+          : InsufficientReason.salaryInflowUncertain,
+    );
+  }
+
+  final used = <PayMonth>{current};
+  final result = <PlannedPayDate>[];
+  var month = current;
+  var date = after;
+  while (result.length < count) {
+    final next = schedule.earliestAfter(month, date);
+    month = next.month;
+    date = next.pay.date;
+    used.add(month);
+    // 예정일 전에 입금 확인된 회차는 이미 잔액에 있으므로 경계·입금으로 다시 넣지 않는다(홈의 조기 전환과 같음).
+    if (confirmed(month)) continue;
+    if (next.tied ||
+        schedule.receiptOf(month)?.confirmation == SalaryConfirmation.partial) {
+      uncertain(date, InsufficientReason.salaryInflowUncertain);
+    }
+    result.add(
+      PlannedPayDate(
+        date: date.toString(),
+        amountKrw: amountKrw,
+        basis: next.pay.fromEvidence
+            ? PayDateBasis.sourceEvidence
+            : PayDateBasis.recurringSetting,
+        monthEndAdjusted: next.pay.monthEndAdjusted,
+      ),
+    );
+  }
+
+  // 경계로 쓰이지 않고 남은 미확인 회차: 원천 근거가 있으면 그 예정일, 근거가 없으면 아직 오지 않은 반복 설정 날짜.
+  for (final receipt in receiptEvidence) {
+    final m = receipt.payMonth;
+    if (used.contains(m) || m.compareTo(month) > 0 || confirmed(m)) continue;
+    uncertain(
+      receipt.expectedPayDate,
+      InsufficientReason.salaryInflowUncertain,
+    );
+  }
+  for (
+    var m = PayMonth(after.year, after.month);
+    m.compareTo(month) < 0;
+    m = m.shift(1)
+  ) {
+    if (used.contains(m) || schedule.receiptOf(m) != null) continue;
+    final pay = schedule.payDateOf(m);
+    if (pay.date.isAfter(after)) {
+      uncertain(pay.date, InsufficientReason.salaryInflowUncertain);
+    }
+  }
+  return ScheduledPayDates(result, uncertainFrom, uncertainReason);
 }
 
 /// 2026-10-23: 가상 소비 결제 방식.
@@ -115,16 +227,21 @@ class VirtualPurchase {
 /// 2026-10-23: 구간 계산 입력. [payDates]는 p1~p3(최대 3개), [items]는 가상 소비 0~5건이다.
 class ProjectionInput {
   /// 2026-10-23: 장부 [ledger], 월급일 [payDates], 가상 소비 [items]로 만든다. 목록은 복사해 보관한다.
+  /// 2026-10-26: [salaryUncertainFrom]이 있으면 그날이 든 구간부터 [salaryUncertainReason]으로 값을 두지 않는다.
   ProjectionInput({
     required this.ledger,
     required List<PlannedPayDate> payDates,
     required List<VirtualPurchase> items,
+    this.salaryUncertainFrom,
+    this.salaryUncertainReason = InsufficientReason.salaryInflowUncertain,
   }) : payDates = List.unmodifiable(payDates),
        items = List.unmodifiable(items);
 
   final LedgerInput ledger;
   final List<PlannedPayDate> payDates;
   final List<VirtualPurchase> items;
+  final BusinessDate? salaryUncertainFrom;
+  final InsufficientReason salaryUncertainReason;
 }
 
 /// 2026-10-23: 가상 소비가 현금 이벤트로 반영된 상태.
@@ -386,6 +503,23 @@ ProjectionResult projectPeriods(ProjectionInput input) {
     baseEvents.add(_CashEvent(pay.date, amount, 0, 0));
   }
 
+  // 예상 급여 입금이 불확실해지는 날짜가 든 구간부터 값을 두지 않는다(상한 이후면 영향 없음).
+  var uncertainFrom = frames.length;
+  final uncertainDate = input.salaryUncertainFrom;
+  if (uncertainDate != null) {
+    for (var k = 0; k < frames.length; k++) {
+      final end = frames[k].end;
+      if (end == null || uncertainDate.isBefore(end)) {
+        uncertainFrom = k;
+        break;
+      }
+    }
+  }
+  final salaryReasons = [
+    (salaryMissingFrom, InsufficientReason.salaryAmountMissing),
+    (uncertainFrom, input.salaryUncertainReason),
+  ];
+
   final dedupedIssues = <InsufficientReason>[];
   for (final reason in issues) {
     if (!dedupedIssues.contains(reason)) dedupedIssues.add(reason);
@@ -414,7 +548,7 @@ ProjectionResult projectPeriods(ProjectionInput input) {
     start,
     frames,
     baseEvents,
-    _reasonsFrom([(salaryMissingFrom, InsufficientReason.salaryAmountMissing)]),
+    _reasonsFrom(salaryReasons),
   );
 
   ScenarioResult? allItems;
@@ -445,7 +579,7 @@ ProjectionResult projectPeriods(ProjectionInput input) {
       frames,
       itemEvents,
       _reasonsFrom([
-        (salaryMissingFrom, InsufficientReason.salaryAmountMissing),
+        ...salaryReasons,
         (unknownFrom, InsufficientReason.cardScheduleUnknown),
       ]),
     );

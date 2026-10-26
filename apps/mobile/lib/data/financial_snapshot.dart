@@ -26,6 +26,7 @@ class _Fields {
   final String path;
 
   static final RegExp _businessDate = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+  static final RegExp _payMonth = RegExp(r'^(\d{4})-(0[1-9]|1[0-2])$');
   static final RegExp _offsetTimestamp = RegExp(
     r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$',
   );
@@ -178,6 +179,16 @@ class _Fields {
 
   /// 2026-10-20: 필수 업무 날짜 [key]를 원문 그대로 반환한다. 시각을 붙이지 않는다.
   String businessDate(String key) => _checkBusinessDate(key, string(key));
+
+  /// 2026-10-26: 필수 명목 급여 회차 [key](정확한 YYYY-MM, 0001~9999년)를 원문 그대로 반환한다.
+  String payMonth(String key) {
+    final v = string(key);
+    final m = _payMonth.firstMatch(v);
+    if (m == null || m.group(1) == '0000') {
+      throw SnapshotFormatException(_at(key), 'YYYY-MM 급여 회차가 아님("$v")');
+    }
+    return v;
+  }
 
   /// 2026-10-20: null 허용 업무 날짜 [key]를 반환한다. null은 날짜 미확인으로 그대로 둔다.
   String? businessDateOrNull(String key) {
@@ -411,13 +422,17 @@ class SalarySetting {
 
 /// 2026-10-23: 월급 회차 하나의 입금 근거. 확인 상태를 바꾸거나 금액으로 추정하지 않는다.
 class SalaryReceiptRecord {
-  /// 2026-10-23: 예정일 [expectedPayDate], 근거 거래 [transactionIds], 확인 상태 [confirmation]으로 만든다.
+  /// 2026-10-26: 명목 회차 [payMonth], 그 회차의 확인 예정일 [expectedPayDate], 근거 거래 [transactionIds],
+  /// 확인 상태 [confirmation]으로 만든다.
   const SalaryReceiptRecord({
+    required this.payMonth,
     required this.expectedPayDate,
     required this.transactionIds,
     required this.confirmation,
   });
 
+  /// 2026-10-26: 명목 급여 회차(YYYY-MM). 입금월이 아니며 날짜로 채우지 않는다.
+  final String payMonth;
   final String expectedPayDate;
   final List<String> transactionIds;
 
@@ -425,6 +440,7 @@ class SalaryReceiptRecord {
   final String confirmation;
 
   static SalaryReceiptRecord _parse(_Fields f) => SalaryReceiptRecord(
+    payMonth: f.payMonth('payMonth'),
     expectedPayDate: f.businessDate('expectedPayDate'),
     transactionIds: f.stringList('transactionIds'),
     confirmation: f.oneOf('confirmation', const {
@@ -780,10 +796,11 @@ class FinancialSnapshot {
     this.accessRestrictions = const [],
   });
 
-  /// 2026-10-22: 이 앱이 읽는 형식. 원본(PAYSE-DRAFT-2, 개발용 원본 직접 보기)과 HTTP 표현(PAYSE-API-0.6-2).
+  /// 2026-10-26: 이 앱이 읽는 형식. 원본(PAYSE-DRAFT-3, 개발용 원본 직접 보기)과 HTTP 표현(PAYSE-API-0.6-3).
+  /// v2에는 필수 payMonth가 없어 받지 않는다(날짜로 회차를 채우는 변환 없음).
   static const Set<String> supportedSchemas = {
-    'PAYSE-DRAFT-2',
-    'PAYSE-API-0.6-2',
+    'PAYSE-DRAFT-3',
+    'PAYSE-API-0.6-3',
   };
 
   final String userId;
@@ -830,7 +847,7 @@ class FinancialSnapshot {
   /// 2026-10-22: 미연결 카드의 계획 결제일이 응답에서 생략됐으면 true다.
   bool get cardPlansRestricted => isRestricted('settings', null, 'cardPlans');
 
-  /// 2026-10-22: HTTP 표현(PAYSE-API-0.6-2) 연결 후 응답의 필수 키(docs/api-response-models.md §1).
+  /// 2026-10-22: HTTP 표현(PAYSE-API-0.6-3) 연결 후 응답의 필수 키(docs/api-response-models.md §1).
   /// 연결 전 응답에는 이 키들이 없어야 한다(머리 7개+institutions·institutionLinks·coverage의 10개만).
   static const List<String> connectedApiKeys = [
     'accounts',
@@ -894,7 +911,7 @@ class FinancialSnapshot {
     }
     final links = f._required('institutionLinks', '배열');
     if (links is! List) throw f._wrong('institutionLinks', links, '배열');
-    if (schema == 'PAYSE-API-0.6-2') _checkApiShape(f, links.isNotEmpty);
+    if (schema == 'PAYSE-API-0.6-3') _checkApiShape(f, links.isNotEmpty);
     final restrictions =
         f.listOrAbsent('accessRestrictions', AccessRestriction._parse) ??
         const <AccessRestriction>[];
