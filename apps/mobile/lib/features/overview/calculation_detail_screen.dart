@@ -72,9 +72,7 @@ class CalculationDetailScreen extends StatelessWidget {
                       ),
                       top: PayseSpace.x6,
                     ),
-                    _padded(
-                      _Groups(result: result, names: names, awaiting: awaiting),
-                    ),
+                    _padded(_Groups(result: result, names: names)),
                     _padded(
                       const Text(footnote, style: DetailTypography.secondary),
                       top: PayseSpace.x6,
@@ -279,10 +277,17 @@ class _Timeline extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(md(start), style: DetailTypography.timeline),
-                  Text('${md(end)} 월급일', style: DetailTypography.timeline),
+                  const SizedBox(width: PayseSpace.x2),
+                  Expanded(
+                    child: Text(
+                      '${md(end)} 월급일',
+                      textAlign: TextAlign.right,
+                      style: DetailTypography.timeline,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -524,7 +529,8 @@ class _Receipt extends StatelessWidget {
                 gap: PayseSpace.x1,
                 children: [
                   _ItemRow(
-                    name: '설정한 ${names.reserveLabel(l.reserveId)}',
+                    name: names.reserveLabel(l.reserveId),
+                    secondary: '설정한 금액',
                     amount: formatKrw(l.amountKrw),
                   ),
                   const Text(
@@ -540,16 +546,11 @@ class _Receipt extends StatelessWidget {
     ];
   }
 
-  /// 2026-10-26: '○○ N원 중 N원은 ○○로 사용할 예정이에요.' 문장. 금액은 계산 결과 값이다.
-  String _overlapSummary(calc.ReserveLine line) {
-    final label = names.reserveLabel(line.reserveId);
-    final overlaps = line.overlaps!;
-    final target = overlaps.length == 1
-        ? withRo(names.obligationLabel(overlaps.single.obligationId))
-        : '예정 지출 ${overlaps.length}건에';
-    return '$label ${formatKrw(line.amountKrw)} 중 ${formatKrw(line.usedKrw!)}은 '
-        '$target 사용할 예정이에요.';
-  }
+  /// 2026-10-26: '○○ N원 중 N원은 예정 지출에 쓸 예정이에요.' 문장. 원천 이름에 조사를 붙이지 않고
+  /// 어느 지출인지는 펼침 내역에 둔다. 금액은 계산 결과 값이다.
+  String _overlapSummary(calc.ReserveLine line) =>
+      '${names.reserveLabel(line.reserveId)} ${formatKrw(line.amountKrw)} 중 '
+      '${formatKrw(line.usedKrw!)}은 예정 지출에 쓸 예정이에요.';
 }
 
 /// 2026-10-26: 차감 금액 표기. 0원이 아니면 앞에 −를 붙이고, 값이 없으면 null(계산 불가)이다.
@@ -565,7 +566,8 @@ int _byDue(calc.ObligationLine a, calc.ObligationLine b) {
   return byDate != 0 ? byDate : a.obligationId.compareTo(b.obligationId);
 }
 
-/// 2026-10-26: 보호액 한 건의 펼침 내역. 배정이 없으면 설정 금액 한 줄, 있으면 설정·배정·남겨둘 금액이다.
+/// 2026-10-26: 보호액 한 건의 펼침 내역. 배정이 없으면 이름(원천 그대로)과 '쓰지 않고 남겨둘 금액' 한 줄,
+/// 있으면 설정 금액·예정 지출에 쓸 금액·쓰지 않고 남겨둘 금액이다. 원천 이름을 문장에 끼워 넣지 않는다.
 class _ReserveDetail extends StatelessWidget {
   /// 2026-10-26: 계산 결과의 보호액 근거 [line]과 이름 조회 [names]로 만든다.
   const _ReserveDetail({required this.line, required this.names});
@@ -581,8 +583,9 @@ class _ReserveDetail extends StatelessWidget {
     final overlaps = line.overlaps!;
     if (overlaps.isEmpty) {
       return _ItemRow(
-        name: '${withRo(label)} 설정한 금액',
+        name: label,
         inlineSecondary: account,
+        secondary: '쓰지 않고 남겨둘 금액',
         amount: formatKrw(line.amountKrw),
       );
     }
@@ -601,16 +604,12 @@ class _ReserveDetail extends StatelessWidget {
         const SizedBox(height: PayseSpace.x3),
         _Nested(
           children: [
-            _ItemRow(
-              name: '${withRo(label)} 설정한 금액',
-              amount: formatKrw(line.amountKrw),
-            ),
+            _ItemRow(name: '설정한 금액', amount: formatKrw(line.amountKrw)),
             for (final o in overlaps)
               _ItemRow(
-                name:
-                    '${withRo(names.obligationLabel(o.obligationId))} 쓰기로 한 금액',
+                name: names.obligationLabel(o.obligationId),
                 secondary:
-                    '${names.obligationLabel(o.obligationId)} · 예정일 ${names.obligationDue(o.obligationId)}',
+                    '예정 지출에 쓸 금액 · 예정일 ${names.obligationDue(o.obligationId)}',
                 amount: formatKrw(-o.unreleasedKrw),
               ),
             const Divider(
@@ -619,7 +618,7 @@ class _ReserveDetail extends StatelessWidget {
               color: PayseColors.dividerSection,
             ),
             _ItemRow(
-              name: '${withRo(label)} 남겨둘 금액',
+              name: '쓰지 않고 남겨둘 금액',
               amount: formatKrw(line.effectiveKrw!),
               strong: true,
             ),
@@ -728,16 +727,11 @@ class _ScheduledItemState extends State<_ScheduledItem> {
 
 /// 2026-10-26: 영수증 아래 묶음(입금 확인 후 반영할 지출·출금 완료 내역·다음 기간 지출·제외 계좌 지출). 0건이면 그리지 않는다.
 class _Groups extends StatelessWidget {
-  /// 2026-10-26: 계산 결과 [result], 이름 조회 [names], 입금 대기 여부 [awaiting]로 만든다.
-  const _Groups({
-    required this.result,
-    required this.names,
-    required this.awaiting,
-  });
+  /// 2026-10-26: 계산 결과 [result]와 이름 조회 [names]로 만든다.
+  const _Groups({required this.result, required this.names});
 
   final calc.CurrentAmountResult result;
   final _SnapshotNames names;
-  final bool awaiting;
 
   /// 2026-10-26: 묶음 목록을 반환한다.
   @override
@@ -754,7 +748,6 @@ class _Groups extends StatelessWidget {
     final settled = result.settledTotal;
     final next = totals[calc.ObligationPlacement.outsidePeriod];
     final excluded = totals[calc.ObligationPlacement.excludedAccount];
-    final periodEnd = result.salaryCycle?.periodEnd;
     final paidLines = [
       for (final l in lines)
         if (l.settledKrw > 0 && names.isIncludedObligation(l.obligationId)) l,
@@ -801,9 +794,7 @@ class _Groups extends StatelessWidget {
           title: '다음 기간 지출',
           count: '${next.count}건',
           amount: formatKrw(next.totalKrw),
-          subtitle: !awaiting && periodEnd != null
-              ? '${md(periodEnd)}부터의 지출로, 이번 계산에는 포함하지 않아요.'
-              : '다음 계산 기간의 지출로, 이번 계산에는 포함하지 않아요.',
+          subtitle: '다음 계산 기간에 나갈 돈이라, 이번 계산에서는 빼지 않아요.',
           weight: FontWeight.w600,
           children: [
             for (final l in at(calc.ObligationPlacement.outsidePeriod))
@@ -1264,21 +1255,28 @@ class _SnapshotNames {
     return o != null && (_accounts[o.withdrawalAccountId]?.included ?? false);
   }
 
-  /// 2026-10-26: 의무의 유효 정산 거래 날짜와 계좌('10/16 출금 · 국민은행 ····0001'). 날짜를 모르면 '출금'만 쓴다.
-  String settlementCaption(String obligationId) {
+  /// 2026-10-26: 의무의 유효 정산 거래에서 확인되는 실제 출금일과 출금 계좌('10/16 출금 · 국민은행 ····0001').
+  /// 원천 거래의 withdrawalDate·accountId만 쓰고 예정일·의무 계좌·기장일로 채우지 않는다. 둘 다 모르면 null이다.
+  String? settlementCaption(String obligationId) {
     final dates = <String>[];
-    String? account;
+    final accounts = <String>[];
     for (final s in snapshot.settlements ?? <Settlement>[]) {
       if (s.obligationId != obligationId || s.invalidatedAt != null) continue;
       final tx = _transactions[s.transactionId];
-      final date = tx?.withdrawalDate ?? tx?.bookingDate;
+      final date = tx?.withdrawalDate;
       if (date != null && !dates.contains(mdText(date))) {
         dates.add(mdText(date));
       }
-      account ??= tx?.accountId;
+      final account = tx?.accountId;
+      if (account != null && !accounts.contains(account)) {
+        accounts.add(account);
+      }
     }
-    final when = dates.isEmpty ? '출금' : '${dates.join(', ')} 출금';
-    return account == null ? when : '$when · ${accountShort(account)}';
+    final parts = [
+      if (dates.isNotEmpty) '${dates.join(', ')} 출금',
+      for (final a in accounts) accountShort(a),
+    ];
+    return parts.isEmpty ? null : parts.join(' · ');
   }
 }
 
@@ -1312,13 +1310,4 @@ String financialAsOfLabel(String asOf) {
   final hh = seoul.hour.toString().padLeft(2, '0');
   final mm = seoul.minute.toString().padLeft(2, '0');
   return '${seoul.month}/${seoul.day} $hh:$mm';
-}
-
-/// 2026-10-26: 이름 [word] 뒤에 받침에 맞는 '로'·'으로'를 붙인다(ㄹ 받침은 '로'). 한글이 아니면 '(으)로'.
-String withRo(String word) {
-  if (word.isEmpty) return word;
-  final last = word.runes.last;
-  if (last < 0xAC00 || last > 0xD7A3) return '$word(으)로';
-  final jong = (last - 0xAC00) % 28;
-  return jong == 0 || jong == 8 ? '$word로' : '$word으로';
 }
