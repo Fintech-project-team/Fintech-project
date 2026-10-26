@@ -3,7 +3,15 @@ import 'package:payse/features/auth/auth_validation.dart';
 
 void main() {
   test('name: Korean syllables or English, 2-20 chars, no inner spaces', () {
-    for (final ok in ['홍길동', 'Kim', 'kim', '데모알파', '가힣', '가' * 20]) {
+    for (final ok in [
+      '홍길동',
+      'Kim',
+      'kim',
+      '데모알파',
+      '가힣',
+      '가' * 20,
+      'abcdefghijklmnopqrst',
+    ]) {
       expect(isValidName(normalizeName(ok)), isTrue, reason: ok);
     }
     for (final bad in [

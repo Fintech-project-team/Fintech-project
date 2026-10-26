@@ -1,6 +1,6 @@
 {
-  "fixtureVersion": "PAYSE-FIXTURE-1",
-  "schemaVersion": "PAYSE-DRAFT-2",
+  "fixtureVersion": "PAYSE-FIXTURE-3",
+  "schemaVersion": "PAYSE-DRAFT-3",
   "ruleVersion": "PAYSE-CALC-1",
   "cases": [
     {
@@ -548,8 +548,8 @@
       "userId": "f0a4be6c-01d7-53eb-ab2c-74675b22fd8c",
       "beforeCase": "alpha-ready",
       "afterCase": "alpha-shock",
-      "sourceVersionBefore": "fixture-1:alpha:2026-10-19:base",
-      "sourceVersionAfter": "fixture-1:alpha:2026-10-19:base:shock"
+      "sourceVersionBefore": "fixture-3:alpha:2026-10-19:base",
+      "sourceVersionAfter": "fixture-3:alpha:2026-10-19:base:shock"
     }
   ],
   "localVectors": [

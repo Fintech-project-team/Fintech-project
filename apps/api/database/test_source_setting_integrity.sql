@@ -127,15 +127,15 @@ BEGIN
     OR EXISTS(SELECT 1 FROM payse.transaction_references WHERE transaction_id=missing_tx) THEN
     RAISE EXCEPTION 'Missing-transaction probe already exists';
   END IF;
-  proof:=jsonb_build_array(jsonb_build_object('expectedPayDate',pg_temp.ctx_text('salary_evidence_date'),'confirmation','confirmed','transactionIds',jsonb_build_array(salary_tx)));
+  proof:=jsonb_build_array(jsonb_build_object('payMonth',pg_temp.ctx_text('salary_evidence_month'),'expectedPayDate',pg_temp.ctx_text('salary_evidence_date'),'confirmation','confirmed','transactionIds',jsonb_build_array(salary_tx)));
   UPDATE payse.source_contexts SET salary_evidence=proof WHERE user_id=u RETURNING user_id INTO STRICT changed_id;
   SET CONSTRAINTS ALL IMMEDIATE;
   SELECT to_jsonb(s) INTO STRICT source_before FROM payse.source_contexts s WHERE user_id=u;
   SELECT jsonb_agg(to_jsonb(t) ORDER BY id) INTO transactions_before FROM payse.financial_transactions t WHERE user_id=u;
 
-  UPDATE payse.user_settings SET salary_account_id=next_account WHERE user_id=u RETURNING user_id INTO STRICT changed_id;
+  UPDATE payse.user_attributes SET salary_account_id=next_account WHERE user_id=u RETURNING user_id INTO STRICT changed_id;
   SET CONSTRAINTS ALL IMMEDIATE;
-  UPDATE payse.user_settings SET salary_account_id=NULL WHERE user_id=u RETURNING user_id INTO STRICT changed_id;
+  UPDATE payse.user_attributes SET salary_account_id=NULL WHERE user_id=u RETURNING user_id INTO STRICT changed_id;
   SET CONSTRAINTS ALL IMMEDIATE;
   IF (SELECT to_jsonb(s) FROM payse.source_contexts s WHERE user_id=u) IS DISTINCT FROM source_before OR
     (SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM payse.financial_transactions t WHERE user_id=u) IS DISTINCT FROM transactions_before THEN
@@ -151,11 +151,11 @@ BEGIN
     'UPDATE payse.financial_transactions SET reflection_reason=%L WHERE id=%L','not_reflected',salary_tx),'23514');
   FOREACH invalid_tx IN ARRAY ARRAY[other_tx,outgoing_tx] || pg_temp.ctx_uuid_array('card_transaction_ids') || ARRAY[missing_tx] LOOP
     PERFORM pg_temp.expect_integrity_rejection(format(
-      'UPDATE payse.source_contexts SET salary_evidence=jsonb_build_array(jsonb_build_object(%L,%L,%L,%L,%L,jsonb_build_array(%L::uuid))) WHERE user_id=%L',
-      'expectedPayDate',pg_temp.ctx_text('salary_evidence_date'),'confirmation','confirmed','transactionIds',invalid_tx,u),'23514');
+      'UPDATE payse.source_contexts SET salary_evidence=jsonb_build_array(jsonb_build_object(%L,%L,%L,%L,%L,%L,%L,jsonb_build_array(%L::uuid))) WHERE user_id=%L',
+      'payMonth',pg_temp.ctx_text('salary_evidence_month'),'expectedPayDate',pg_temp.ctx_text('salary_evidence_date'),'confirmation','confirmed','transactionIds',invalid_tx,u),'23514');
     invalid_proof_count:=invalid_proof_count+1;
   END LOOP;
-  UPDATE payse.user_settings SET salary_account_id=account WHERE user_id=u RETURNING user_id INTO STRICT changed_id;
+  UPDATE payse.user_attributes SET salary_account_id=account WHERE user_id=u RETURNING user_id INTO STRICT changed_id;
   SET CONSTRAINTS ALL IMMEDIATE;
   RAISE NOTICE 'PASS salary source independence: 2 setting changes accepted; % invalid proofs rejected',4+invalid_proof_count;
 END $$;

@@ -7,18 +7,22 @@ import 'package:payse/data/auth/credential_stores.dart';
 import 'app_test_utils.dart';
 
 /// 2026-10-21: 세션·PIN이 있는 기기로 앱을 띄우고 11-1에서 PIN을 넣어 하단 탭 홈까지 연다.
+/// 2026-10-23: 연결 전 사용자이므로 연결 흐름을 마쳐야 홈이 열린다.
 Future<void> openSignedIn(WidgetTester tester, {bool devTools = false}) async {
-  final (sessions, pins) = await signedInStores();
+  final (sessions, pins, auth) = await signedInStores();
   await tester.pumpWidget(
     PayseApp(
       snapshotSource: PreloadedAssetSource(),
       enableDevTools: devTools,
+      authRepository: auth,
       sessionStore: sessions,
       pinStore: pins,
+      presentationPolicy: instantPresentation(),
     ),
   );
   await tester.pumpAndSettle();
   await enterPin(tester, testPin);
+  await connectAndChooseAccounts(tester);
 }
 
 void main() {
@@ -34,7 +38,12 @@ void main() {
   testWidgets('session without PIN resumes at 10-4', (tester) async {
     final sessions = MemorySessionStore();
     await sessions.save(
-      const StoredSession(userId: 'u', sessionId: 's', accessToken: 't'),
+      const StoredSession(
+        userId: 'u',
+        name: '데모알파',
+        sessionId: 's',
+        accessToken: 't',
+      ),
     );
     await tester.pumpWidget(
       PayseApp(enableDevTools: false, sessionStore: sessions),
@@ -45,38 +54,47 @@ void main() {
     expect(find.text('앱 비밀번호 6자리를\n만들어주세요'), findsOneWidget);
   });
 
-  testWidgets('relaunch asks 11-1 PIN, then opens the connected home shell', (
-    tester,
-  ) async {
-    final (sessions, pins) = await signedInStores();
-    await tester.pumpWidget(
-      PayseApp(
-        snapshotSource: PreloadedAssetSource(),
-        enableDevTools: false,
-        sessionStore: sessions,
-        pinStore: pins,
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('pin-login-pad')), findsOneWidget);
-    expect(find.byType(NavigationBar), findsNothing);
-
-    await enterPin(tester, testPin);
-
-    for (final label in ['홈', '계좌', '계획', '내 정보']) {
-      expect(
-        find.descendant(
-          of: find.byType(NavigationBar),
-          matching: find.text(label),
+  testWidgets(
+    'relaunch asks 11-1 PIN, then follows the user\'s stored connection state',
+    (tester) async {
+      final (sessions, pins, auth) = await signedInStores();
+      await tester.pumpWidget(
+        PayseApp(
+          snapshotSource: PreloadedAssetSource(),
+          enableDevTools: false,
+          authRepository: auth,
+          sessionStore: sessions,
+          pinStore: pins,
+          presentationPolicy: instantPresentation(),
         ),
-        findsOneWidget,
       );
-    }
-    await tester.tap(find.text('계획').last);
-    await tester.pumpAndSettle();
-    final navBar = tester.widget<NavigationBar>(find.byType(NavigationBar));
-    expect(navBar.selectedIndex, 2);
-  });
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('pin-login-pad')), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
+
+      await enterPin(tester, testPin);
+      expect(
+        find.byKey(const ValueKey('entry-next')),
+        findsOneWidget,
+        reason: '처음 로그인한 사용자는 연결 전 상태(연결 흐름 진입)',
+      );
+      await connectAndChooseAccounts(tester);
+
+      for (final label in ['홈', '계좌', '계획', '내 정보']) {
+        expect(
+          find.descendant(
+            of: find.byType(NavigationBar),
+            matching: find.text(label),
+          ),
+          findsOneWidget,
+        );
+      }
+      await tester.tap(find.text('계획').last);
+      await tester.pumpAndSettle();
+      final navBar = tester.widget<NavigationBar>(find.byType(NavigationBar));
+      expect(navBar.selectedIndex, 2);
+    },
+  );
 
   testWidgets('shell stays readable on the PAYSE light theme', (tester) async {
     await openSignedIn(tester);
@@ -87,30 +105,59 @@ void main() {
   });
 
   testWidgets('release-like build has no dev entry anywhere', (tester) async {
-    await openSignedIn(tester);
+    final (sessions, pins, auth) = await signedInStores();
+    await tester.pumpWidget(
+      PayseApp(
+        snapshotSource: PreloadedAssetSource(),
+        enableDevTools: false,
+        authRepository: auth,
+        sessionStore: sessions,
+        pinStore: pins,
+        presentationPolicy: instantPresentation(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await enterPin(tester, testPin);
+    expect(
+      find.byKey(const ValueKey('dev-entry')),
+      findsNothing,
+      reason: '12-1',
+    );
+
+    await connectAndChooseAccounts(tester);
     await tester.tap(find.text('내 정보').last);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('dev-entry')), findsNothing);
-    expect(find.textContaining('개발용'), findsNothing);
+    expect(find.textContaining('개발 설정'), findsNothing);
   });
 
-  testWidgets('dev build: debug screen shows alpha-ready counts and switches', (
+  testWidgets('dev settings preview shows alpha-ready counts and switches', (
     tester,
   ) async {
     await openSignedIn(tester, devTools: true);
     await tester.tap(find.text('내 정보').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('개발용: 더미 스냅샷 확인'));
+    await tester.tap(find.text('개발 설정'));
     await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('failure-presentation-toggle')),
+      findsOneWidget,
+    );
 
+    await tester.scrollUntilVisible(find.text('계좌 6개'), 200);
     expect(find.text('계좌 6개'), findsOneWidget);
     expect(find.text('카드 4장'), findsOneWidget);
     expect(find.text('거래 193건'), findsOneWidget);
     expect(find.text('기준 시각 2026-10-19T12:00:00+09:00'), findsOneWidget);
 
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('scenario-alpha-unconnected')),
+      -200,
+    );
     await tester.tap(find.byKey(const ValueKey('scenario-alpha-unconnected')));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('계좌 자료 없음(미노출)'), 200);
     expect(find.text('계좌 자료 없음(미노출)'), findsOneWidget);
     expect(find.text('계좌 0개'), findsNothing);
   });

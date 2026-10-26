@@ -26,12 +26,12 @@ outgoing_transaction_id'''.split())
 ARRAY_KEYS = frozenset({'card_transaction_ids', 'owner_account_ids'})
 TEXT_KEYS = frozenset('''relation_kind owner_name owner_phone spaced_product_name
 future_first_month future_revision_month pinned_occurrence_month
-override_occurrence_month salary_evidence_date'''.split())
+override_occurrence_month salary_evidence_date salary_evidence_month'''.split())
 INT_KEYS = frozenset({'expected_user_count', 'expected_account_count',
                       'owner_account_count', 'owner_reserve_count'})
 ROW_KEYS = {
-    'demo_users': ('id',), 'source_contexts': ('user_id',),
-    'user_settings': ('user_id',), 'financial_accounts': ('id',),
+    'users': ('id',), 'source_contexts': ('user_id',),
+    'user_attributes': ('user_id',), 'financial_accounts': ('id',),
     'financial_cards': ('id',), 'financial_transactions': ('id',),
     'obligations': ('id',), 'reserves': ('id',), 'reserve_allocations': ('id',),
     'settlement_links': ('id',), 'write_receipts': ('id',),
@@ -181,13 +181,15 @@ def build_from_snapshots(cases, seed_users):
         'outgoing_transaction_id': partial_tx['transactionId'],
         'card_transaction_ids': sorted(p['transactionId'] for p in purchases),
         'owner_account_ids': sorted(a['accountId'] for a in owner['accounts']),
-        'owner_name': seeds[owner['userId']]['name'], 'owner_phone': seeds[owner['userId']]['syntheticPhone'],
+        'owner_name': seeds[owner['userId']]['name'], 'owner_phone': seeds[owner['userId']]['phone'],
         'spaced_product_name': primary['productName'],
         'future_first_month': future_plan['firstOccurrenceMonth'] + '-01',
         'future_revision_month': future_revision['effectiveFromMonth'] + '-01',
         'pinned_occurrence_month': pinned['recurrenceKey'][-7:] + '-01',
         'override_occurrence_month': override['recurrenceKey'][-7:] + '-01',
         'salary_evidence_date': income['bookingDate'],
+        # Independent synthetic proof premise; never infer a payroll cycle from an incoming date.
+        'salary_evidence_month': '2026-09',
         'expected_user_count': len(owners), 'expected_account_count': sum(len(s['accounts']) for s in cases.values()),
         'owner_account_count': len(owner['accounts']), 'owner_reserve_count': len(owner['reserves']),
         '_meta': {'format': 'PAYSE-SQL-CONTEXT-1', 'seedMode': 'ready', 'cases': list(CASES),
@@ -205,9 +207,9 @@ def build_from_snapshots(cases, seed_users):
 
     for snapshot in cases.values():
         uid = snapshot['userId']
-        row('demo_users', {'id': uid, 'name': seeds[uid]['name'], 'synthetic_phone': seeds[uid]['syntheticPhone'], 'data_version': int(snapshot['dataVersion'])})
+        row('users', {'id': uid, 'name': seeds[uid]['name'], 'phone': seeds[uid]['phone'], 'data_version': int(snapshot['dataVersion'])})
         row('source_contexts', {'user_id': uid, 'source_version': snapshot['sourceVersion'], 'schema_version': snapshot['schemaVersion'], 'rule_version': snapshot['ruleVersion']})
-        row('user_settings', {'user_id': uid, 'salary_account_id': snapshot['settings']['salary']['salaryAccountId']})
+        row('user_attributes', {'user_id': uid, 'salary_account_id': snapshot['settings']['salary']['salaryAccountId']})
         for a in snapshot['accounts']:
             row('financial_accounts', {'id': a['accountId'], 'user_id': uid, 'source_version': a['sourceVersion'], 'included': a['included'], 'product_name': a['productName']})
     for t in [partial_tx, bill_tx, income, other_income, *purchases, *transfer_txs]:
@@ -225,7 +227,7 @@ def build_from_snapshots(cases, seed_users):
     for link in [settlement, bill_link]:
         row('settlement_links', {'id': link['linkId'], 'user_id': owner['userId'], 'obligation_id': link['obligationId'],
             'transaction_id': link['transactionId'], 'allocated_krw': link['allocatedKRW'], 'invalidated_at': None})
-    row('write_receipts', {'id': evidence['writeReceiptId'], 'user_id': owner['userId'], 'action': 'fixture_initial_state', 'request_digest': 'fixture-seed-not-api-request'})
+    row('write_receipts', {'id': evidence['writeReceiptId'], 'user_id': owner['userId'], 'action': 'import_user_state'})
     row('financial_cards', {'id': card['cardId'], 'user_id': owner['userId'], 'withdrawal_account_id': card['withdrawalAccountId']})
     row('card_statements', {'id': statement['statementId'], 'user_id': owner['userId'], 'card_id': card['cardId'], 'amount_krw': statement['amountKRW']})
     for purchase in purchases:

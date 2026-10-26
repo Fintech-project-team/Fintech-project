@@ -6,7 +6,6 @@ import '../../data/auth/session_cleanup.dart';
 class AuthServices {
   /// 2026-10-21: 인증 저장소 [repository], 기기 저장소 [sessionStore]·[pinStore]·[consentStore],
   /// 시각 [now], 저장하지 않을 세션의 종료 담당 [cleanup]으로 만든다.
-  /// 2026-10-22: 인증 계약에서 제거한 설치 식별값을 보관하지 않는다.
   const AuthServices({
     required this.repository,
     required this.sessionStore,

@@ -29,6 +29,7 @@ abstract final class PayseColors {
   static const Color errorBorder = Color(0xFFFECDCA);
   static const Color warning = Color(0xFFB54708);
   static const Color warningContainer = Color(0xFFFFFAEB);
+  static const Color warningBorder = Color(0xFFFEDF89);
   static const Color info = Color(0xFF175CD3);
   static const Color infoContainer = Color(0xFFEFF8FF);
 }
@@ -108,9 +109,16 @@ abstract final class PayseTypography {
     fontFeatures: tabular,
   );
 
+  static const TextStyle sectionTitle = TextStyle(
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.w600,
+    color: PayseColors.textSecondary,
+  );
+
   static const TextStyle caption = TextStyle(
-    fontSize: 12,
-    height: 1.5,
+    fontSize: 13,
+    height: 19 / 13,
     fontWeight: FontWeight.w400,
     color: PayseColors.textSecondary,
   );
@@ -127,4 +135,92 @@ abstract final class PayseTypography {
     height: 1.5,
     fontWeight: FontWeight.w600,
   );
+}
+
+/// 2026-10-22: 금융사 표시(InstitutionMark) 색. 실제 로고 대신 금융사 키 컬러의 채도를 낮춘 기본·어두운·밝은 면과 이름표 색이다.
+/// 등록되지 않은 기관은 [fallback]을 쓴다. 이름 글자와 함께 표시하며 색만으로 기관을 구분하지 않는다.
+abstract final class InstitutionTones {
+  static const Color bookLeaf = Color(0xFFB8BCC3);
+  static const Color cardStripe = Color(0xFF4A4D57);
+  static const Color cardStripeOnDark = Color(0xFF9EA3AA);
+  static const Color cardChip = Color(0xFFEBCB78);
+  static const Color bookLabel = Color(0xFFEBB45E);
+
+  static const InstitutionTone fallback = InstitutionTone(
+    base: Color(0xFF9EA3AA),
+    dark: Color(0xFF62676F),
+    light: Color(0xFFC9CCD1),
+  );
+
+  static const Map<String, InstitutionTone> byCode = {
+    'bank.kb': InstitutionTone(
+      base: Color(0xFFE0B04F),
+      dark: Color(0xFF6E675E),
+      light: Color(0xFFEBCC8D),
+      label: Color(0xFF6E675E),
+    ),
+    'bank.shinhan': InstitutionTone(
+      base: Color(0xFF5774D6),
+      dark: Color(0xFF3A54A8),
+      light: Color(0xFF92A5E4),
+    ),
+    'bank.hana': InstitutionTone(
+      base: Color(0xFF3E9E97),
+      dark: Color(0xFF26736D),
+      light: Color(0xFF82C0BB),
+    ),
+    'bank.ibk': InstitutionTone(
+      base: Color(0xFF4D8FBF),
+      dark: Color(0xFF356A90),
+      light: Color(0xFF8BB6D5),
+    ),
+    'bank.kakao': InstitutionTone(
+      base: Color(0xFFF5DA3F),
+      dark: Color(0xFF4A3A36),
+      light: Color(0xFFF9E88A),
+      label: Color(0xFF4A3A36),
+    ),
+    'card.hyundai': InstitutionTone(
+      base: Color(0xFF5E5F63),
+      dark: Color(0xFF3E3F42),
+      light: Color(0xFF5E5F63),
+      stripe: cardStripeOnDark,
+    ),
+    'card.samsung': InstitutionTone(
+      base: Color(0xFF4A58A8),
+      dark: Color(0xFF333D78),
+      light: Color(0xFF4A58A8),
+    ),
+    'card.woori': InstitutionTone(
+      base: Color(0xFF5BA3CC),
+      dark: Color(0xFF3F7A9C),
+      light: Color(0xFF5BA3CC),
+    ),
+    'card.kb': InstitutionTone(
+      base: Color(0xFFE0B04F),
+      dark: Color(0xFF6E675E),
+      light: Color(0xFFE0B04F),
+    ),
+  };
+
+  /// 2026-10-22: 기관 코드 [code]의 색 묶음을 반환한다. 없으면 [fallback]이다.
+  static InstitutionTone of(String code) => byCode[code] ?? fallback;
+}
+
+/// 2026-10-22: 한 금융사의 표시 색 묶음. 기본 면 [base], 그늘 [dark], 밝은 면 [light], 통장 이름표 [label], 카드 자기띠 [stripe].
+class InstitutionTone {
+  /// 2026-10-22: 면 색과 선택 색으로 만든다. 이름표·자기띠를 생략하면 공통 색을 쓴다.
+  const InstitutionTone({
+    required this.base,
+    required this.dark,
+    required this.light,
+    this.label = InstitutionTones.bookLabel,
+    this.stripe = InstitutionTones.cardStripe,
+  });
+
+  final Color base;
+  final Color dark;
+  final Color light;
+  final Color label;
+  final Color stripe;
 }

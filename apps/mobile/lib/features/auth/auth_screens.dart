@@ -294,7 +294,7 @@ class _IdentityScreenState extends State<IdentityScreen> {
             PayseTextField(
               key: const ValueKey('identity-name'),
               label: '이름',
-              hintText: '이름 입력',
+              hintText: '페이즈',
               controller: _vm.name,
               textInputAction: TextInputAction.next,
               errorText: _vm.error == IdentityError.name ? '이름을 확인해주세요.' : null,

@@ -1,0 +1,34 @@
+{
+  "id": "PAYSE-MOBILE-DEVELOP-SYNC-20261023",
+  "role": "integration",
+  "baseCommit": "c1189bd73c8318fdc324ece9309f43c5e92dfca8",
+  "branch": "chore/integration/develop-sync-auth-foundation",
+  "allowedPaths": [
+    "docs/tasks/PAYSE-MOBILE-DEVELOP-SYNC-20261023.json",
+    "apps/api/docs/auth-foundation.md",
+    "apps/api/docs/history/2026-10-22-issue-completion-review.md",
+    "apps/api/docs/history/2026-10-22-issue21-review-issue22-start.md",
+    "apps/api/src/AGENTS.md",
+    "apps/api/src/main/java/com/payse/api/auth/AuthCredentials.java",
+    "apps/api/src/main/java/com/payse/api/auth/AuthCrypto.java",
+    "apps/api/src/main/java/com/payse/api/auth/AuthCryptoConfiguration.java",
+    "apps/api/src/main/java/com/payse/api/auth/AuthSecrets.java",
+    "apps/api/src/main/java/com/payse/api/auth/IssuedToken.java",
+    "apps/api/src/test/java/com/payse/api/auth/AuthCredentialsTest.java",
+    "apps/api/src/test/java/com/payse/api/auth/AuthCryptoConfigurationTest.java",
+    "apps/api/src/test/java/com/payse/api/auth/AuthCryptoTest.java",
+    "docs/tasks/PAYSE-AUTH-FOUNDATION-22-20261022.json"
+  ],
+  "acceptance": [
+    "목적: develop의 #86·#87(인증 입력·암호 기반과 프론트 인계 규칙)을 hyeyeon-dev에 반영해 #26 3단계 기준 커밋이 develop 최신을 포함하게 한다. #26 3단계 구현은 포함하지 않는다",
+    "역할 근거: develop 반영은 공통 브랜치 동기화라 integration으로 진행한다. 들어오는 변경은 apps/api 인증 코드·테스트·문서와 작업 명세뿐이며 hyeyeon-dev 변경과 겹치는 파일이 없어 충돌 해결이 없다",
+    "병합 후 develop에서 들어온 13개 파일은 origin/develop(06e47e5)과 같아야 하며 수정하지 않는다. hyeyeon-dev의 기존 변경(#80·#84·#88)은 그대로 둔다",
+    "Flutter 분석·전체 테스트와 API 검사를 포함한 verify-change 본 검사를 통과한다. API 검사는 JDK 21이 필요하다. 커밋·PR은 사용자 승인으로 진행하고 merge 방식은 develop → 개인 브랜치 규칙(Create a merge commit)을 따른다"
+  ],
+  "readBefore": [
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/AGENT_REVIEW.md",
+    "docs/harness/COMMIT_PR_POLICY.md"
+  ]
+}

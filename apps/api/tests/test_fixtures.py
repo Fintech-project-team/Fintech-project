@@ -9,13 +9,20 @@ import unittest
 from contextlib import contextmanager
 from pathlib import Path
 from uuid import uuid4
+from unittest.mock import patch
 
 FIXTURES=Path(__file__).resolve().parents[1]/'fixtures'
 sys.path.insert(0,str(FIXTURES))
-from generate import build, uid, write_files
+sys.path.insert(0,str(FIXTURES.parent))
+import generate
+from generate import build, uid, write_files, owned_row
 from validate import validate_snapshot, validate_directory
 from export_sql import literal, export
+from testing.scenarios.export_state import export as export_scenario
+from reference_data.export_sql import export as export_reference
 from identity_contract import validate_server_seeds, validate_stored_identity
+sys.path.insert(0,str(FIXTURES.parent))
+from reference_data.banks import load_bank_directory, validate_bank_directory
 
 
 @contextmanager
@@ -54,6 +61,110 @@ class FixtureTests(unittest.TestCase):
         for name,s in self.cases.items():
             with self.subTest(name=name):
                 validate_snapshot(s)
+
+    def test_financial_labels_are_not_test_markers(self):
+        """2026-10-23: Keep technical provenance while financial display values read naturally."""
+        for snapshot in self.cases.values():
+            for collection in ('accounts','cards','transactions','relatedTransactions','recurringPlanRevisions','recurringDecisions'):
+                for row in snapshot.get(collection,[]):
+                    for field in ('productName','maskedNumber','merchantName','description','label','normalizedName'):
+                        if isinstance(row.get(field),str):
+                            self.assertFalse(any(marker in row[field] for marker in ('합성','DEMO','TEST')))
+
+    def test_duplicate_display_names_do_not_choose_transactions(self):
+        """2026-10-23: Equal labels must retain salary, recurring evidence, refund and cancellation identities."""
+        with patch.dict(generate.TRANSACTION_NAMES,{key:'같은 거래명' for key in generate.TRANSACTION_NAMES}):
+            cases,_,catalog=build()
+        self.assertEqual(catalog,self.catalog)
+        for name, snapshot in cases.items():
+            validate_snapshot(snapshot)
+            original=self.cases[name]
+            self.assertEqual(snapshot.get('settings'),original.get('settings'))
+            self.assertEqual(snapshot.get('transactionRelations'),original.get('transactionRelations'))
+            self.assertEqual([x['evidenceTransactionIds'] for x in snapshot.get('recurringDecisions',[])],
+                             [x['evidenceTransactionIds'] for x in original.get('recurringDecisions',[])])
+            for collection in ('transactions','relatedTransactions'):
+                def facts(rows):
+                    return {row['transactionId']:{key:value for key,value in row.items() if key not in {'merchantName','description'}} for row in rows}
+                self.assertEqual(facts(snapshot.get(collection,[])),facts(original.get(collection,[])))
+
+    def test_source_transaction_order_does_not_choose_templates(self):
+        """2026-10-23: Reverse source rows to expose accidental first-row scenario selection."""
+        original_make=generate.make_snapshot
+        def reversed_rows(*args,**kwargs):
+            snapshot=original_make(*args,**kwargs)
+            snapshot['transactions'].reverse()
+            return snapshot
+        with patch.object(generate,'make_snapshot',side_effect=reversed_rows):
+            cases,_,catalog=build()
+        self.assertEqual(catalog,self.catalog)
+        for name,snapshot in cases.items():
+            validate_snapshot(snapshot)
+            self.assertEqual({row['transactionId']:row for row in snapshot.get('transactions',[])},
+                             {row['transactionId']:row for row in self.cases[name].get('transactions',[])})
+
+    def test_owned_lookup_rejects_missing_duplicate_foreign_rows(self):
+        """2026-10-23: Stop preparation before ambiguous/missing/foreign source facts can be cloned."""
+        source=self.case('salary-partial')
+        transaction_id=source['settings']['salary']['receiptEvidence'][0]['transactionIds'][0]
+        row=owned_row(source,'transactions','transactionId',transaction_id)
+        for change in ('missing','duplicate','foreign'):
+            with self.subTest(change=change):
+                snapshot=copy.deepcopy(source)
+                if change=='missing':
+                    snapshot['transactions']=[x for x in snapshot['transactions'] if x['transactionId']!=transaction_id]
+                elif change=='duplicate':
+                    snapshot['transactions'].append(copy.deepcopy(row))
+                else:
+                    owned_row(snapshot,'transactions','transactionId',transaction_id)['userId']=self.cases['beta-ready']['userId']
+                with self.assertRaisesRegex(ValueError,'Expected one owned'):
+                    owned_row(snapshot,'transactions','transactionId',transaction_id)
+
+    def test_reviewed_bank_directory_and_prepared_support_are_separate(self):
+        """2026-10-23: The reviewed 20-bank directory must not create 20 banks of user accounts."""
+        directory=load_bank_directory()
+        self.assertEqual(len(directory['banks']),20)
+        for category,count in {'commercial':7,'regional':5,'internet':3,'special':5}.items():
+            self.assertEqual(sum(bank['category']==category for bank in directory['banks']),count)
+        for snapshot in self.cases.values():
+            self.assertEqual(sum(bank['kind']=='bank' for bank in snapshot['institutions']),5)
+            if 'accounts' in snapshot:
+                self.assertEqual(len(snapshot['accounts']),6)
+                self.assertEqual(len(snapshot['cards']),4)
+        with temporary_directory() as temp:
+            folder=temp/'new';write_files(folder)
+            seed=export(folder)
+            self.assertEqual(seed.count('INSERT INTO payse.institutions '),0)
+            self.assertEqual(seed.count('INSERT INTO payse.financial_accounts '),18)
+            self.assertEqual(seed.count('INSERT INTO payse.financial_cards '),12)
+            self.assertNotIn('INSERT INTO payse.institution_links ',seed)
+
+    def test_bank_directory_rejects_unverified_or_conflicting_rows(self):
+        """2026-10-23: Reject duplicate keys, unsupported classes, fake evidence and provider-code drift."""
+        directory=load_bank_directory()
+        mutations=(
+            lambda d:d['banks'].append(copy.deepcopy(d['banks'][0])),
+            lambda d:d['banks'][0].update(kind='card'),
+            lambda d:d['banks'][0].update(category='savings_bank'),
+            lambda d:d['banks'][0].update(sourceRefs=['missing']),
+            lambda d:d['banks'][0].update(providerCode='guessed'),
+            lambda d:d['banks'][0].update(code='004'),
+            lambda d:d.update(countryCode='US'),
+            lambda d:d['sources'].update(bok='http://example.invalid'),
+        )
+        for index,mutate in enumerate(mutations):
+            with self.subTest(index=index):
+                bad=copy.deepcopy(directory);mutate(bad)
+                with self.assertRaises(ValueError):
+                    validate_bank_directory(bad)
+
+    def test_published_bundle_matches_generator(self):
+        """2026-10-23: Check tracked JSON semantic values after formatting and manifest validation."""
+        self.assertEqual(validate_directory(FIXTURES/'generated'),15)
+        for name,snapshot in self.cases.items():
+            stored=json.loads((FIXTURES/'generated'/'snapshots'/f'{name}.json').read_text(encoding='utf-8'))
+            self.assertEqual(stored,snapshot)
+        self.assertEqual(load_bank_directory(FIXTURES/'generated'/'bank-directory.json'),load_bank_directory())
 
     def test_deterministic_bytes_and_manifest(self):
         with temporary_directory() as temp:
@@ -97,7 +208,7 @@ class FixtureTests(unittest.TestCase):
             lambda s:s['users'].append(copy.deepcopy(s['users'][0])),
             lambda s:s['users'][0].update(userId=str(uuid4())),
             lambda s:s['users'][0].update(name='다른이름'),
-            lambda s:s['users'][0].update(syntheticPhone='01000000009'),
+            lambda s:s['users'][0].update(phone='01000000009'),
             lambda s:s['users'][0].update(initialCase='beta-ready'),
             lambda s:s['users'][0].update(codeVerifier='000001'),
             lambda s:s['users'][0].update(codeVerifier='enabled-digest'),
@@ -299,7 +410,7 @@ class FixtureTests(unittest.TestCase):
     def test_recurring_plan_has_one_value_authority(self):
         for name,s in self.cases.items():
             with self.subTest(name=name):
-                self.assertEqual(s['schemaVersion'],'PAYSE-DRAFT-2')
+                self.assertEqual(s['schemaVersion'],'PAYSE-DRAFT-3')
                 for plan in s.get('recurringPlans',[]):
                     self.assertEqual(set(plan),{'userId','planId','firstOccurrenceMonth'})
         self.rejects(lambda s:s.update(schemaVersion='PAYSE-DRAFT-1'))
@@ -381,8 +492,8 @@ class FixtureTests(unittest.TestCase):
     def test_export_initial_vs_ready_and_no_destruction(self):
         with temporary_directory() as temp:
             p=Path(temp)/'fixtures';write_files(p)
-            initial=export(p);ready=export(p,ready=True)
-            self.assertIn('INSERT INTO payse.demo_users (id, name, synthetic_phone,',initial)
+            initial=export(p);ready=export_scenario(p,['alpha-ready','beta-ready','gamma-month-end'])
+            self.assertIn('INSERT INTO payse.users (id, name, phone,',initial)
             self.assertNotIn('synthetic_name',initial)
             self.assertNotIn('display_name',initial)
             self.assertNotIn('INSERT INTO payse.institution_links',initial)

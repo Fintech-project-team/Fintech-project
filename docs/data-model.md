@@ -2,7 +2,7 @@
 
 v1.0 논리 필드·타입·관계·수정 권한의 단일 기준이다. [#17 데이터 명세서](https://github.com/Fintech-project-team/Fintech-project/issues/17)에 대응한다. 이 문서의 모델을 API와 Flutter가 함께 사용한다. 실제 HTTP 생략/페이지 규칙은 [응답 계약](api-response-models.md), 요청·오류·인증은 [API 계약](api-contract.md), 물리 저장은 [DB 사전](database-schema.md)을 따른다.
 
-PAYSE-DRAFT-2 원본 fixture·초기 SQL·단일 name 생성/검증 도구는 구현돼 있다. 실제 HTTP 응답·인증 기능은 미구현이며 기존 사용자 DB의 이름 전환도 별도 실행이다. JSON Schema/OpenAPI 완성본을 대신하지 않는다. 공동 변경은 [문서 공유 기준](development-notes.md)에 따라 영향받는 담당자가 확인한다.
+PAYSE-DRAFT-3 원본 fixture·초기 SQL·단일 name 생성/검증 도구는 구현돼 있다. 실제 HTTP 응답·인증 기능은 미구현이며 기존 사용자 DB의 이름 전환도 별도 실행이다. JSON Schema/OpenAPI 완성본을 대신하지 않는다. 공동 변경은 [문서 공유 기준](development-notes.md)에 따라 영향받는 담당자가 확인한다.
 
 ## 1. 읽는 방법과 공통 규칙
 
@@ -29,9 +29,9 @@ PAYSE-DRAFT-2 원본 fixture·초기 SQL·단일 name 생성/검증 도구는 �
 
 | 객체/필드                                                                               | 타입                                | 필수 여부   | 수정 권한·의미                                                      | 저장 대응                             |
 | --------------------------------------------------------------------------------------- | ----------------------------------- | ----------- | ------------------------------------------------------------------- | ------------------------------------- |
-| Snapshot.userId                                                                         | ID                                  | 필수        | 서버: 인증 사용자                                                   | demo_users.id                         |
+| Snapshot.userId                                                                         | ID                                  | 필수        | 서버: 인증 사용자                                                   | users.id                              |
 | schemaVersion / currency                                                                | 문자열 / KRW                        | 필수        | PAYSE 전달 형식 버전/통화. dataVersion·ruleVersion과 별개           | 계약 배포·manifest                    |
-| dataVersion                                                                             | 10진 정수 문자열                    | 필수        | 서버: 원천·연결·확정 설정 변경 버전. 전달 시 정수 정밀도 손실 방지  | demo_users.data_version bigint        |
+| dataVersion                                                                             | 10진 정수 문자열                    | 필수        | 서버: 원천·연결·확정 설정 변경 버전. 전달 시 정수 정밀도 손실 방지  | users.data_version bigint             |
 | sourceVersion / ruleVersion                                                             | 문자열 각각                         | 필수        | 준비 자료/로컬 계산 규칙 버전. 서로 대체 불가                       | manifest / 배포 규칙                  |
 | asOf                                                                                    | 시각                                | 필수        | 합성 자료의 계산 기준. 수집 시각으로 대체 금지                      | manifest                              |
 | coverage                                                                                | Coverage[]                          | 필수        | 조회 대상별 실제 확보 상태. 빈 결과와 누락 구분                     | manifest·조회 구성                    |
@@ -99,12 +99,13 @@ Snapshot의 `institutions: Institution[]`, `institutionLinks: InstitutionLink[]`
 
 | 객체/필드                                          | 타입                                    | 필수 여부   | 수정 권한·의미                                                                                                        | 저장 대응                                        |
 | -------------------------------------------------- | --------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| Salary.salaryDay / salaryAmountKRW                 | 정수 1~31 / 금액                        | null 각각   | 사용자: 월급 예정일/금액. 미입력을 0으로 바꾸지 않음                                                                  | user_settings.salary_day/salary_amount_krw       |
+| Salary.salaryDay / salaryAmountKRW                 | 정수 1~31 / 금액                        | null 각각   | 사용자: 월급 예정일/금액. 미입력을 0으로 바꾸지 않음                                                                  | user_attributes.salary_day/salary_amount_krw     |
 | salaryAccountId                                    | ID → Account                            | null        | 사용자: 선택한 급여 계좌. 미완료 상태에서 임의 계좌 지정 금지                                                         | salary_account_id                                |
 | receiptEvidence                                    | SalaryReceipt[]                         | 필수        | 확인된 월별 입금 근거; []면 근거 없음                                                                                 | source_contexts.salary_evidence                  |
-| SalaryReceipt.expectedPayDate / transactionIds     | 날짜 / ID → Transaction 배열            | 필수        | 원천 또는 확인된 명시 연결. 임의 금액 일치로 급여 확정 금지                                                           | source_contexts.salary_evidence 내부             |
+| SalaryReceipt.payMonth                             | YYYY-MM 문자열                          | 필수        | 원천 명목 급여 회차. 입금월로 추정하지 않으며 동일 사용자·스냅샷에서 유일                                             | source_contexts.salary_evidence 내부             |
+| SalaryReceipt.expectedPayDate / transactionIds     | 날짜 / ID → Transaction 배열            | 필수        | 해당 회차의 확인 예정일(휴일 이동 반영) / 명시 거래 연결. 실제 입금일과 구분                                          | source_contexts.salary_evidence 내부             |
 | SalaryReceipt.confirmation                         | unknown/partial/confirmed               | 필수        | 입금 확인 상태. v1.0 임시: 더미의 명시 confirmed 사건에서만 입금 완료. 부분 합계로 임의 전환 금지                     | source_contexts.salary_evidence 내부             |
-| CardPlan.cardId / plannedPaymentDay                | ID → Card / 정수 1~31                   | 필수 / null | 사용자: 카드별 계획 결제일. null이면 override 없음                                                                    | user_settings.card_plan_overrides                |
+| CardPlan.cardId / plannedPaymentDay                | ID → Card / 정수 1~31                   | 필수 / null | 사용자: 카드별 계획 결제일. null이면 override 없음                                                                    | user_attributes.card_plan_overrides              |
 | Obligation.obligationId / label                    | ID / 문자열                             | 필수        | 서버 ID / 사용자 예정 지출명                                                                                          | obligations.id / 신규 표시 항목                  |
 | withdrawalAccountId                                | ID → Account                            | 필수        | 사용자 확정 출금 계좌. 청구 연결 의무는 확인된 실제 출금 계좌와 일치                                                  | withdrawal_account_id                            |
 | amountKRW / dueDate                                | 금액 / 날짜                             | 필수        | 사용자 확인 미지급 계획. 청구 의무 금액은 원천 총액에 종속, 자유 수정 금지                                            | amount_krw/due_date                              |
@@ -121,6 +122,18 @@ Snapshot의 `institutions: Institution[]`, `institutionLinks: InstitutionLink[]`
 | releaseEvidence                                    | 해제 근거 배열                          | 필수        | settlement linkId·해제 금액·정정 작업 참조. 미해제는 []                                                               | release_evidence                                 |
 
 청구 일자나 실제 출금 계좌가 미상이면 정상 Obligation을 임의로 완성하지 않는다. 청구 원천은 조회하고 해당 예정 계산의 정보 부족을 표시한다. 카드 결제일 사용자 계획과 실제 청구 예정일을 한 컬럼에 덮어쓰지 않는다. 할부 원문 조회는 가상 신규 할부·이자 계산을 추가한 것이 아니다.
+
+### 급여 회차와 예정일
+
+`SalaryReceipt`는 `payMonth`, `expectedPayDate`, `transactionIds`, `confirmation` 네 필드로 구성한다. payMonth는 0001~9999년·01~12월의 정확한 `YYYY-MM` 문자열이다. 객체의 필수값 누락·null·다른 타입·동일 회차 중복은 계약 오류다. 근거 없음 `[]`와 접근 제한으로 미수신된 근거는 구분하며, 현재 설정이나 가까운 입금일로 없는 회차를 채우지 않는다.
+
+명목 회차는 입금월과 다를 수 있다. 11월 1일 예정 급여를 10월 30일로 이동하면 `(payMonth=2026-11, expectedPayDate=2026-10-30)`, 10월 31일을 11월 2일로 이동하면 `(2026-10, 2026-11-02)`다. 계획에 없던 10월 24일 조기 입금은 `(2026-10, 2026-10-25)`의 예정일을 유지하고 실제 거래 연결·confirmed로 표현한다. 공휴일 이동은 확인된 월별 원천 일정만 사용하며 자동 추정하지 않는다.
+
+한 회차의 여러 부분 입금은 하나의 근거 객체의 transactionIds로 연결한다. 서로 다른 회차의 expectedPayDate가 같아도 원천을 삭제·병합·수정하거나 저장 거절하지 않는다. 해당 회차를 구분해야 하는 Flutter 계산은 정보 부족으로 처리하며 임의 순서나 길이 0인 구간을 만들지 않는다.
+
+명시된 변경 예정일을 해당 회차의 구간 경계로 사용하고 D5의 당일 출금 귀속도 그 날짜에 적용한다. 홈의 입금 확인 전 유지·confirmed 후 전환은 [계산 기준](calculation-rules.md)을 따른다. 다음 회차는 **payMonth의 다음 달**로 식별하고 그 회차의 명시 예정일을 우선한다. 이동한 expectedPayDate의 달에 1을 더하지 않는다. 원천 일정이 없는 미래 회차는 기존 사용자 반복 가정·말일 보정 기준을 따르며, 그 가정을 원천 근거로 저장하지 않는다.
+
+현재 salaryDay·salaryAccountId 변경은 과거 payMonth·expectedPayDate·거래 연결을 다시 쓰는 근거가 아니다. confirmation과 연결 거래는 동일 sourceVersion·asOf 스냅샷에서 읽고, 나중의 confirmed 상태를 과거 기준시각에 섞지 않는다. 계약은 정확한 입금 확인 시각을 새로 만들지 않는다. 서버는 필드·소유권·저장 제약만 검증하며 회차별 금액과 구간은 Flutter가 계산한다.
 
 ## 5. 월간 반복 계획
 
@@ -165,8 +178,8 @@ Snapshot은 `recurringPlanRevisions: RecurringPlanRevision[]`, `occurrenceOverri
 
 | 객체/필드                                                       | 타입                                       | 필수 여부          | 수정 권한·의미                                                                                           | 저장 대응                              |
 | --------------------------------------------------------------- | ------------------------------------------ | ------------------ | -------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| DemoUser.userId                                                 | ID                                         | 필수               | 서버: 재로그인해도 동일 ID                                                                               | demo_users.id                          |
-| name / syntheticPhone                                           | 문자열 각각                                | 필수               | 사전 합성 시드. name은 인증·호칭 공통 값, phone 단독 인증 금지. 이름/전화번호는 정규화 후 공백 없이 저장 | demo_users.name / synthetic_phone      |
+| User.userId                                                     | ID                                         | 필수               | 서버: 재로그인해도 동일 ID                                                                               | users.id                               |
+| name / phone                                                    | 문자열 각각                                | 필수               | 공통 사용자 값. name은 인증·호칭 공통 값, phone 단독 인증 금지. 이름/전화번호는 정규화 후 공백 없이 저장 | users.name / phone                     |
 | codeVerifier / createdAt                                        | 검증 문자열 / 시각                         | 필수               | 서버 전용: 별도 데모 코드 검증값/시드 생성 시각                                                          | code_verifier/created_at               |
 | Session.sessionId / userId                                      | ID 각각                                    | 필수               | 서버: 사용자별 활성 세션 1개; 기존 로그인 유지·새 로그인 거절                                            | demo_sessions.id/user_id               |
 | tokenDigest / issuedAt / endedAt                                | 검증 문자열 / 시각 / 시각                  | 필수 / 필수 / null | 서버 전용: 무작위 토큰 검증/발급/명시 종료. 자동 만료 정책 추가 안 함                                    | 대응 세션 컬럼                         |
@@ -185,7 +198,7 @@ v1.0 급여 확인은 **임시 결정**이다. 합성 시나리오가 같은 자
 
 | 관계/조건                                                                 | 검증                                                                             |
 | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| User 1:N 계좌·카드·거래·설정, User 1:0..1 활성 Session                    | 동일 사용자 관계·활성 세션 유일성. user_settings는 사용자당 1개                  |
+| User 1:N 계좌·카드·거래·설정, User 1:0..1 활성 Session                    | 동일 사용자 관계·활성 세션 유일성. user_attributes는 사용자당 1개                |
 | Account/Card 1:N Transaction, Card 1:N Statement                          | transaction은 계좌/카드 적어도 하나. 카드 청구 참조는 같은 카드                  |
 | Account 1:N Obligation/Reserve, Obligation N:M Transaction via Settlement | 실제 출금과 의무의 유효 배정 합계 한도, 출금 계좌 일치                           |
 | Reserve N:M Obligation via Allocation                                     | 같은 사용자·미해제 배정 합계 한도. 명시 배정을 계좌 간 자동 이체로 해석하지 않음 |
@@ -247,7 +260,7 @@ v1.0 급여 확인은 **임시 결정**이다. 합성 시나리오가 같은 자
 
 ## 11. 산출물과 미구현 경계
 
-- [DB 사전](database-schema.md): 23개 테이블의 초기 DDL·FK·인덱스·저장 제약을 설명한다. 기존 DB 이름 이행과 인증/탈퇴 후속 DDL은 구분한다.
+- [DB 사전](database-schema.md): 22개 테이블의 초기 DDL·FK·인덱스·저장 제약을 설명한다. 기존 DB 이름 이행과 인증/탈퇴 후속 DDL은 구분한다.
 - [HTTP 계약](api-contract.md)·[응답 모델](api-response-models.md): v0.6 경로·오류·페이지·접근 제한의 문서 규격이다. 실제 API 구현·실행 테스트 완료를 뜻하지 않는다.
 - [더미 사용 기준](../apps/api/fixtures/docs/dummy-data.md): 현재 합성 사용자 3명·시나리오·생성 및 검증 절차를 설명한다. 계정 수를 영구 제품 한도로 고정하지 않는다.
 - 실행 가능한 전체 JSON Schema/OpenAPI, 실제 API mapper, 기존 DB 전환·인증/조회/저장 통합은 별도 구현 결과와 검증 근거가 필요하다.
@@ -266,7 +279,7 @@ DemoUser의 이름 필드는 §6의 `name` 하나다. 인증 입력·저장 공�
 
 ## 원본 모델과 API 투영의 구분
 
-위 필드 표는 `PAYSE-DRAFT-2` 원본의 정상 객체를 설명한다. HTTP/FakeRepository의 `PAYSE-API-0.6-2`는 [응답 모델](api-response-models.md)에 따라 접근 제한 필드를 생략하고 accessRestrictions를 함께 제공한다. 정상 모델의 필수 FK를 임의 null로 채워 원본 검증기에 통과시키지 않는다. API 표현 검증은 별도로 필요하며 원본 검증기 성공이 API 계약 통과를 뜻하지 않는다.
+위 필드 표는 `PAYSE-DRAFT-3` 원본의 정상 객체를 설명한다. HTTP/FakeRepository의 `PAYSE-API-0.6-3`는 [응답 모델](api-response-models.md)에 따라 접근 제한 필드를 생략하고 accessRestrictions를 함께 제공한다. 정상 모델의 필수 FK를 임의 null로 채워 원본 검증기에 통과시키지 않는다. API 표현 검증은 별도로 필요하며 원본 검증기 성공이 API 계약 통과를 뜻하지 않는다.
 
 최초 상태·재로그인·접근 제한·원천 미상/null/빈 배열/미수신 구분은 [응답 계약](api-response-models.md)의 단일 정의를 따른다. 이 문서의 정상 원본 모델을 부분 연결 HTTP 응답에 그대로 강제하지 않는다.
 

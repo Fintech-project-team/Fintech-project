@@ -16,11 +16,16 @@ import unittest
 from uuid import uuid4
 
 import migrate_identity as migration
-from test_context import build_context, context_sql
+from test_context import build_context
 from run_sql_tests import require_disposable_database
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'fixtures'))
-from export_sql import export
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from testing.scenarios.export_state import export
+from reference_data.export_sql import export as export_reference
+
+def legacy_sql(sql):
+    return sql.replace("payse.users", "payse.demo_users").replace("user_attributes", "user_settings").replace("phone", "synthetic_phone")
 
 OPTIONS = None
 DATABASE = Path(__file__).parent
@@ -46,10 +51,11 @@ class IdentityMigrationTests(unittest.TestCase):
         self.backup = Path(self.temp.name) / 'identity-plan.json'
         migration.require(OPTIONS.database.startswith('payse_fixture_identity_'), 'Identity test database required')
         self.sql("DO $$ BEGIN IF current_database() NOT LIKE 'payse_fixture_identity_%' THEN RAISE EXCEPTION 'Test database required'; END IF; END $$; DROP SCHEMA IF EXISTS payse CASCADE;")
-        self.sql((DATABASE/'001_initial.sql').read_text(encoding='utf-8'))
-        self.sql((DATABASE/'002_storage_guards.sql').read_text(encoding='utf-8'))
-        self.sql(export(FIXTURES, ready=True))
-        self.sql(context_sql(self.context) + '\nSELECT pg_temp.assert_test_context();')
+        self.sql((DATABASE.parent/'tests/legacy/001_initial.sql').read_text(encoding='utf-8'))
+        self.sql((DATABASE.parent/'tests/legacy/002_storage_guards.sql').read_text(encoding='utf-8'))
+        self.sql(export_reference())
+        self.sql(legacy_sql(export(FIXTURES,['alpha-ready','beta-ready','gamma-month-end'])))
+        # Current context resolves IDs; the historical schema is verified by migration assertions.
         self.owner_id = self.context['owner_id']
         self.other_owner_id = self.context['other_owner_id']
         owner = self.owner_id

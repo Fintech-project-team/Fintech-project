@@ -84,18 +84,21 @@ void main() {
     /// 2026-10-21: 가짜 시계로 로그인된 앱을 띄워 하단 탭의 계획 탭까지 연다.
     Future<FakeClock> openOnPlanTab(WidgetTester tester) async {
       final clock = FakeClock();
-      final (sessions, pins) = await signedInStores();
+      final (sessions, pins, auth) = await signedInStores();
       await tester.pumpWidget(
         PayseApp(
           snapshotSource: PreloadedAssetSource(),
           enableDevTools: false,
+          authRepository: auth,
           sessionStore: sessions,
           pinStore: pins,
           now: clock.now,
+          presentationPolicy: instantPresentation(),
         ),
       );
       await tester.pumpAndSettle();
       await enterPin(tester, testPin);
+      await connectAndChooseAccounts(tester);
       await tester.tap(find.text('계획').last);
       await tester.pumpAndSettle();
       return clock;

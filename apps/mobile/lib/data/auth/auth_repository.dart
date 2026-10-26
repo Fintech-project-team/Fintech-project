@@ -13,16 +13,19 @@ class DemoCredentials {
 }
 
 /// 2026-10-21: POST /demo-sessions 201 응답(api-contract §2). 토큰 원문은 이 응답에서만 받는다.
+/// [name]은 검증된 계정의 저장 이름으로 인증 이름과 호칭의 공통 값이다(제출 문자열이 아님). 소유권은 userId로 판단한다.
 class DemoSession {
-  /// 2026-10-21: 응답의 [userId]·[sessionId]·[accessToken]·[issuedAt]으로 만든다. tokenType은 항상 Bearer다.
+  /// 2026-10-21: 응답의 [userId]·[name]·[sessionId]·[accessToken]·[issuedAt]으로 만든다. tokenType은 항상 Bearer다.
   const DemoSession({
     required this.userId,
+    required this.name,
     required this.sessionId,
     required this.accessToken,
     required this.issuedAt,
   });
 
   final String userId;
+  final String name;
   final String sessionId;
   final String accessToken;
   final DateTime issuedAt;
@@ -95,8 +98,7 @@ final class AuthNetworkFailure<T> extends AuthOutcome<T> {
 /// 2026-10-21: 데모 세션 인증 계약(api-contract §2). 가짜 구현과 실제 API 구현이 같은 의미를 지킨다.
 /// 화면·ViewModel은 이 인터페이스만 쓰고 예외 대신 [AuthOutcome]을 받는다.
 abstract interface class AuthRepository {
-  /// 2026-10-21: POST /demo-sessions. [credentials]로 세션 발급을 요청한다.
-  /// 2026-10-22: 최신 계약에 따라 설치 식별값 입력을 제거했다.
+  /// 2026-10-21: POST /demo-sessions. [credentials](name·phone·code)로 세션 발급을 요청한다.
   Future<AuthOutcome<DemoSession>> createSession(DemoCredentials credentials);
 
   /// 2026-10-21: POST /demo-sessions/current/reverify. 유효한 [accessToken]의 소유자가 [credentials]와
@@ -116,7 +118,6 @@ class UnavailableAuthRepository implements AuthRepository {
   const UnavailableAuthRepository();
 
   /// 2026-10-21: 세션을 만들지 않고 서비스 불가를 반환한다.
-  /// 2026-10-22: 설치 식별값 없는 인증 인터페이스에 맞췄다.
   @override
   Future<AuthOutcome<DemoSession>> createSession(
     DemoCredentials credentials,
@@ -133,4 +134,10 @@ class UnavailableAuthRepository implements AuthRepository {
   @override
   Future<AuthOutcome<void>> endSession(String accessToken) async =>
       const AuthUnavailable();
+}
+
+/// 2026-10-22: 서버가 Bearer 토큰으로 현재 세션의 사용자를 정하는 경계. 요청 본문의 userId를 믿지 않기 위해 쓴다.
+abstract interface class SessionResolver {
+  /// 2026-10-22: 활성 세션 [accessToken]의 사용자 ID를 반환한다. 무효면 null이다.
+  String? userIdForToken(String accessToken);
 }

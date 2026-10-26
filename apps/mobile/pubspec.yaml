@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  payse_calculation:
+    path: ../../packages/payse_calculation
 
 dev_dependencies:
   flutter_test:
@@ -24,6 +26,8 @@ flutter:
     - assets/fixtures/alpha-shock.json
     - assets/fixtures/salary-wait.json
     - assets/fixtures/alpha-unconnected.json
+    - assets/fixtures/beta-ready.json
+    - assets/fixtures/gamma-month-end.json
   fonts:
     - family: Pretendard
       fonts:

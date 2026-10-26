@@ -1,5 +1,6 @@
 import 'package:flutter/semantics.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:payse/shared/design/code_timer_field.dart';
 import 'package:payse/shared/design/payse_text_field.dart';
@@ -313,6 +314,97 @@ void main() {
     /// 2026-10-21: 높이가 정해진 화면에 [pad]를 넣어 띄운다.
     Future<void> pumpPad(WidgetTester tester, PinPad pad) =>
         tester.pumpWidget(themed(SizedBox(height: 500, child: pad)));
+
+    /// 2026-10-23: 오류 문구 [error]가 있는 PinPad를 띄운다. [reduceMotion]이면 기기의 움직임 줄이기를 켠다.
+    Future<void> pumpErrorPad(
+      WidgetTester tester,
+      String? error, {
+      bool reduceMotion = false,
+    }) => tester.pumpWidget(
+      themed(
+        MediaQuery(
+          data: MediaQueryData(disableAnimations: reduceMotion),
+          child: SizedBox(
+            height: 500,
+            child: PinPad(
+              title: '앱 비밀번호 6자리를\n만들어주세요',
+              filled: 0,
+              message: error,
+              isError: error != null,
+              onDigit: (_) {},
+              onBackspace: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    /// 2026-10-23: 첫 번째 점의 가로 위치를 반환한다.
+    double dotX(WidgetTester tester) =>
+        tester.getTopLeft(find.byKey(const ValueKey('pin-dot-0'))).dx;
+
+    testWidgets(
+      'a new error shakes the dots and vibrates; the same error does not repeat',
+      (tester) async {
+        final haptics = <String>[];
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          (call) async {
+            if (call.method == 'HapticFeedback.vibrate') haptics.add('$call');
+            return null;
+          },
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            SystemChannels.platform,
+            null,
+          ),
+        );
+        await pumpErrorPad(tester, null);
+        final rest = dotX(tester);
+
+        await pumpErrorPad(tester, '같은 숫자나 연속된 숫자는 쓸 수 없어요');
+        await tester.pump(const Duration(milliseconds: 30));
+        expect(dotX(tester), isNot(rest), reason: '흔들리는 중');
+        await tester.pumpAndSettle();
+        expect(dotX(tester), rest, reason: '0.4초 뒤 제자리');
+        expect(haptics, hasLength(1));
+
+        await pumpErrorPad(tester, '같은 숫자나 연속된 숫자는 쓸 수 없어요');
+        await tester.pump(const Duration(milliseconds: 30));
+        expect(dotX(tester), rest, reason: '같은 오류 유지는 다시 흔들지 않음');
+        expect(haptics, hasLength(1));
+      },
+    );
+
+    testWidgets('reduced motion keeps the dots still but still vibrates', (
+      tester,
+    ) async {
+      var vibrations = 0;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'HapticFeedback.vibrate') vibrations++;
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await pumpErrorPad(tester, null, reduceMotion: true);
+      final rest = dotX(tester);
+      await pumpErrorPad(
+        tester,
+        '비밀번호가 일치하지 않아요. 다시 입력해주세요',
+        reduceMotion: true,
+      );
+      await tester.pump(const Duration(milliseconds: 30));
+      expect(dotX(tester), rest);
+      expect(vibrations, 1);
+    });
 
     testWidgets(
       'dots 14dp/16dp gap, message under the dots, keys 64dp in fixed order',

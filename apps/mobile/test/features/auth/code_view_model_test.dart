@@ -47,7 +47,7 @@ class _ScriptedAuthRepository implements AuthRepository {
   }
 }
 
-const _draft = IdentityDraft(name: '데모테스트', phone: '01099990000');
+const _draft = IdentityDraft(name: '테스트계정', phone: '01099990000');
 
 /// 2026-10-21: 테스트용 의존성 묶음.
 class _Env {
@@ -74,6 +74,7 @@ class _Env {
 
 final _session = DemoSession(
   userId: 'u',
+  name: '테스트계정',
   sessionId: 's',
   accessToken: 'tok',
   issuedAt: DateTime(2026, 10, 21, 9),
@@ -160,7 +161,12 @@ void main() {
   ) async {
     final env = _Env();
     await env.sessions.save(
-      const StoredSession(userId: 'u', sessionId: 's', accessToken: 'tok'),
+      const StoredSession(
+        userId: 'u',
+        name: '테스트계정',
+        sessionId: 's',
+        accessToken: 'tok',
+      ),
     );
     await env.pins.setPin(testPin);
     env.repo.reverifyResult = const AuthSessionInvalid();
