@@ -20,6 +20,7 @@ SUITES = (
     'test_extremes.sql',
     'test_source_setting_integrity.sql',
     'test_identity_storage.sql',
+    'test_salary_receipts.sql',
 )
 
 

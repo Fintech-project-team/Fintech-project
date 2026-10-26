@@ -12,34 +12,34 @@ CREATE DOMAIN payse.nonnegative_money AS bigint CHECK (VALUE BETWEEN 0 AND 90000
 
 CREATE DOMAIN payse.positive_money AS bigint CHECK (VALUE BETWEEN 1 AND 9000000000000);
 
-CREATE TABLE payse.demo_users (
+CREATE TABLE payse.users (
   id uuid NOT NULL,
   name text NOT NULL,
-  synthetic_phone text NOT NULL,
+  phone text NOT NULL,
   code_verifier text NOT NULL,
   data_version bigint NOT NULL,
   created_at timestamptz NOT NULL,
   PRIMARY KEY (id),
-  UNIQUE (name, synthetic_phone),
+  UNIQUE (name, phone),
   CHECK (data_version >= 1),
   CHECK (created_at IS NULL OR isfinite(created_at)),
   CONSTRAINT identity_name_format CHECK (name COLLATE "C" ~ '^[가-힣A-Za-z]{2,20}$'),
-  CONSTRAINT identity_phone_format CHECK (synthetic_phone COLLATE "C" ~ '^010[0-9]{8}$'),
+  CONSTRAINT identity_phone_format CHECK (phone COLLATE "C" ~ '^010[0-9]{8}$'),
 
   CHECK (code_verifier IS NULL OR length(btrim(code_verifier)) > 0)
 );
 
-COMMENT ON COLUMN payse.demo_users.id IS '안정된 내부 식별자; 원천 버전·날짜 변경에도 유지';
+COMMENT ON COLUMN payse.users.id IS '안정된 내부 식별자; 원천 버전·날짜 변경에도 유지';
 
-COMMENT ON COLUMN payse.demo_users.name IS '합성 인증·허용 호칭의 단일 이름; 제출 원문 저장소가 아님';
+COMMENT ON COLUMN payse.users.name IS '인증·허용 호칭의 단일 이름; 제출 원문 저장소가 아님';
 
-COMMENT ON COLUMN payse.demo_users.synthetic_phone IS '합성 조회 전화번호; 단독 인증 불가';
+COMMENT ON COLUMN payse.users.phone IS '조회 전화번호; 단독 인증 불가';
 
-COMMENT ON COLUMN payse.demo_users.code_verifier IS '서버 전용 코드 검증값; 준비 시드는 DISABLED로 인증 불가';
+COMMENT ON COLUMN payse.users.code_verifier IS '서버 전용 코드 검증값; 준비 시드는 DISABLED로 인증 불가';
 
-COMMENT ON COLUMN payse.demo_users.data_version IS '원천/확정 설정 변경마다 한 트랜잭션에서 증가';
+COMMENT ON COLUMN payse.users.data_version IS '원천/확정 설정 변경마다 한 트랜잭션에서 증가';
 
-COMMENT ON COLUMN payse.demo_users.created_at IS '사전 사용자 생성 시각';
+COMMENT ON COLUMN payse.users.created_at IS '사전 사용자 생성 시각';
 
 CREATE TABLE payse.demo_sessions (
   id uuid NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE payse.demo_sessions (
   ended_at timestamptz,
   PRIMARY KEY (id),
   UNIQUE (user_id, id),
-  FOREIGN KEY (user_id) REFERENCES payse.demo_users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   UNIQUE (token_digest),
   CHECK (ended_at IS NULL OR ended_at >= issued_at),
   CHECK (issued_at IS NULL OR isfinite(issued_at)),
@@ -94,7 +94,7 @@ CREATE TABLE payse.source_contexts (
   salary_evidence jsonb NOT NULL,
   occurrence_links jsonb NOT NULL,
   PRIMARY KEY (user_id),
-  FOREIGN KEY (user_id) REFERENCES payse.demo_users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   UNIQUE (user_id, source_version),
   CHECK (jsonb_typeof(coverage) = 'array' AND jsonb_typeof(salary_evidence) = 'array' AND jsonb_typeof(occurrence_links) = 'array'),
   CHECK (as_of IS NULL OR isfinite(as_of)),
@@ -115,7 +115,7 @@ COMMENT ON COLUMN payse.source_contexts.as_of IS '잔액·자료의 업무 기�
 
 COMMENT ON COLUMN payse.source_contexts.coverage IS '계좌/카드별 요청/확보/누락 구간; 참조는 loader/API 검증';
 
-COMMENT ON COLUMN payse.source_contexts.salary_evidence IS '명시 거래 ID와 partial/confirmed; 원천 근거';
+COMMENT ON COLUMN payse.source_contexts.salary_evidence IS 'payMonth 명목 회차·확인 예정일·명시 거래 ID·입금 상태; 원천 근거';
 
 COMMENT ON COLUMN payse.source_contexts.occurrence_links IS '확인된 구매/청구/회차 연결; 참조·중복은 loader/API 검증';
 
@@ -127,7 +127,7 @@ CREATE TABLE payse.institution_links (
   disconnected_at timestamptz,
   PRIMARY KEY (id),
   UNIQUE (user_id, id),
-  FOREIGN KEY (user_id) REFERENCES payse.demo_users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   FOREIGN KEY (institution_code) REFERENCES payse.institutions(code) ON DELETE RESTRICT,
   CHECK (disconnected_at IS NULL OR disconnected_at >= consented_at),
   CHECK (consented_at IS NULL OR isfinite(consented_at)),
@@ -160,7 +160,7 @@ CREATE TABLE payse.financial_accounts (
   nickname text,
   PRIMARY KEY (id),
   UNIQUE (user_id, id),
-  FOREIGN KEY (user_id) REFERENCES payse.demo_users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   FOREIGN KEY (institution_code) REFERENCES payse.institutions(code) ON DELETE RESTRICT,
   FOREIGN KEY (user_id, source_version) REFERENCES payse.source_contexts(user_id, source_version) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   UNIQUE (user_id, source_ref),
@@ -181,7 +181,7 @@ COMMENT ON COLUMN payse.financial_accounts.user_id IS '인증 세션에서 정�
 
 COMMENT ON COLUMN payse.financial_accounts.institution_code IS '은행 내부 코드';
 
-COMMENT ON COLUMN payse.financial_accounts.source_ref IS '객체별 이름 공간을 가진 합성 원천 키';
+COMMENT ON COLUMN payse.financial_accounts.source_ref IS '객체별 이름 공간을 가진 원천 키';
 
 COMMENT ON COLUMN payse.financial_accounts.source_version IS '같은 사용자 현재 원천 묶음에 속함';
 
@@ -212,7 +212,7 @@ CREATE TABLE payse.financial_cards (
   schedule_evidence jsonb NOT NULL,
   PRIMARY KEY (id),
   UNIQUE (user_id, id),
-  FOREIGN KEY (user_id) REFERENCES payse.demo_users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   FOREIGN KEY (institution_code) REFERENCES payse.institutions(code) ON DELETE RESTRICT,
   FOREIGN KEY (user_id, source_version) REFERENCES payse.source_contexts(user_id, source_version) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   FOREIGN KEY (user_id, withdrawal_account_id) REFERENCES payse.financial_accounts(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
@@ -233,7 +233,7 @@ COMMENT ON COLUMN payse.financial_cards.user_id IS '인증 세션에서 정한 �
 
 COMMENT ON COLUMN payse.financial_cards.institution_code IS '카드사 내부 코드';
 
-COMMENT ON COLUMN payse.financial_cards.source_ref IS '객체별 이름 공간을 가진 합성 원천 키';
+COMMENT ON COLUMN payse.financial_cards.source_ref IS '객체별 이름 공간을 가진 원천 키';
 
 COMMENT ON COLUMN payse.financial_cards.source_version IS '같은 사용자 현재 원천 묶음에 속함';
 
@@ -253,7 +253,7 @@ CREATE TABLE payse.transaction_references (
   resolution text NOT NULL,
   reason text,
   PRIMARY KEY (user_id, transaction_id),
-  FOREIGN KEY (user_id) REFERENCES payse.demo_users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   CHECK ((resolution = 'resolved' AND reason IS NULL) OR (resolution = 'unavailable' AND reason IS NOT NULL AND reason IN ('outside_retention','not_provided','not_connected'))),
   CHECK (resolution IS NULL OR length(btrim(resolution)) > 0),
   CHECK (reason IS NULL OR length(btrim(reason)) > 0)
@@ -293,7 +293,7 @@ CREATE TABLE payse.financial_transactions (
   installment_total integer,
   PRIMARY KEY (id),
   UNIQUE (user_id, id),
-  FOREIGN KEY (user_id) REFERENCES payse.demo_users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   FOREIGN KEY (user_id, source_version) REFERENCES payse.source_contexts(user_id, source_version) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   FOREIGN KEY (user_id, account_id) REFERENCES payse.financial_accounts(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   FOREIGN KEY (user_id, card_id) REFERENCES payse.financial_cards(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
@@ -335,7 +335,7 @@ COMMENT ON COLUMN payse.financial_transactions.id IS '안정된 내부 식별자
 
 COMMENT ON COLUMN payse.financial_transactions.user_id IS '인증 세션에서 정한 소유자; 다른 사용자 참조 차단';
 
-COMMENT ON COLUMN payse.financial_transactions.source_ref IS '객체별 이름 공간을 가진 합성 원천 키';
+COMMENT ON COLUMN payse.financial_transactions.source_ref IS '객체별 이름 공간을 가진 원천 키';
 
 COMMENT ON COLUMN payse.financial_transactions.source_version IS '같은 사용자 현재 원천 묶음에 속함';
 
@@ -390,7 +390,7 @@ CREATE TABLE payse.card_statements (
   detail_completeness text NOT NULL,
   PRIMARY KEY (id),
   UNIQUE (user_id, id),
-  FOREIGN KEY (user_id) REFERENCES payse.demo_users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   FOREIGN KEY (user_id, source_version) REFERENCES payse.source_contexts(user_id, source_version) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   FOREIGN KEY (user_id, card_id) REFERENCES payse.financial_cards(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   UNIQUE (user_id, source_ref),
@@ -409,7 +409,7 @@ COMMENT ON COLUMN payse.card_statements.id IS '안정된 내부 식별자; 원�
 
 COMMENT ON COLUMN payse.card_statements.user_id IS '인증 세션에서 정한 소유자; 다른 사용자 참조 차단';
 
-COMMENT ON COLUMN payse.card_statements.source_ref IS '객체별 이름 공간을 가진 합성 원천 키';
+COMMENT ON COLUMN payse.card_statements.source_ref IS '객체별 이름 공간을 가진 원천 키';
 
 COMMENT ON COLUMN payse.card_statements.source_version IS '같은 사용자 현재 원천 묶음에 속함';
 
@@ -468,28 +468,28 @@ COMMENT ON COLUMN payse.transaction_relations.to_id IS '근거 있는 둘째 거
 
 COMMENT ON COLUMN payse.transaction_relations.evidence_ref IS '자동 병합을 허용하는 명시 근거';
 
-CREATE TABLE payse.user_settings (
+CREATE TABLE payse.user_attributes (
   user_id uuid NOT NULL,
   salary_day smallint,
   salary_amount_krw payse.nonnegative_money,
   salary_account_id uuid,
   card_plan_overrides jsonb NOT NULL,
   PRIMARY KEY (user_id),
-  FOREIGN KEY (user_id) REFERENCES payse.demo_users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   FOREIGN KEY (user_id, salary_account_id) REFERENCES payse.financial_accounts(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   CHECK (salary_day IS NULL OR salary_day BETWEEN 1 AND 31),
   CHECK (jsonb_typeof(card_plan_overrides) = 'array')
 );
 
-COMMENT ON COLUMN payse.user_settings.user_id IS '인증 세션에서 정한 소유자; 다른 사용자 참조 차단';
+COMMENT ON COLUMN payse.user_attributes.user_id IS '인증 세션에서 정한 소유자; 다른 사용자 참조 차단';
 
-COMMENT ON COLUMN payse.user_settings.salary_day IS '1~31 또는 미입력 null';
+COMMENT ON COLUMN payse.user_attributes.salary_day IS '1~31 또는 미입력 null';
 
-COMMENT ON COLUMN payse.user_settings.salary_amount_krw IS '확정 예상 급여; 미입력을 0으로 대체 금지';
+COMMENT ON COLUMN payse.user_attributes.salary_amount_krw IS '확정 예상 급여; 미입력을 0으로 대체 금지';
 
-COMMENT ON COLUMN payse.user_settings.salary_account_id IS '급여 수령 계좌; 미입력 null';
+COMMENT ON COLUMN payse.user_attributes.salary_account_id IS '급여 수령 계좌; 미입력 null';
 
-COMMENT ON COLUMN payse.user_settings.card_plan_overrides IS 'cardId/사용자 계획 결제일; 원천 일정과 분리';
+COMMENT ON COLUMN payse.user_attributes.card_plan_overrides IS 'cardId/사용자 계획 결제일; 원천 일정과 분리';
 
 CREATE TABLE payse.recurring_plans (
   id uuid NOT NULL,
@@ -497,7 +497,7 @@ CREATE TABLE payse.recurring_plans (
   first_occurrence_month date NOT NULL,
   PRIMARY KEY (id),
   UNIQUE (user_id, id),
-  FOREIGN KEY (user_id) REFERENCES payse.demo_users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   CHECK (EXTRACT(DAY FROM first_occurrence_month) = 1),
   CHECK (first_occurrence_month IS NULL OR isfinite(first_occurrence_month))
 );
@@ -525,7 +525,7 @@ CREATE TABLE payse.recurring_plan_revisions (
   is_current boolean DEFAULT true NOT NULL,
   PRIMARY KEY (id),
   UNIQUE (user_id, id),
-  FOREIGN KEY (user_id) REFERENCES payse.demo_users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   FOREIGN KEY (user_id, plan_id) REFERENCES payse.recurring_plans(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   FOREIGN KEY (user_id, withdrawal_account_id) REFERENCES payse.financial_accounts(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   FOREIGN KEY (user_id, card_id) REFERENCES payse.financial_cards(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
@@ -584,7 +584,7 @@ CREATE TABLE payse.obligations (
   occurrence_month date,
   PRIMARY KEY (id),
   UNIQUE (user_id, id),
-  FOREIGN KEY (user_id) REFERENCES payse.demo_users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   FOREIGN KEY (user_id, withdrawal_account_id) REFERENCES payse.financial_accounts(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   FOREIGN KEY (user_id, statement_id) REFERENCES payse.card_statements(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   FOREIGN KEY (user_id, plan_revision_id, plan_id) REFERENCES payse.recurring_plan_revisions(user_id, id, plan_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
@@ -667,7 +667,7 @@ CREATE TABLE payse.recurring_decisions (
   plan_id uuid,
   PRIMARY KEY (id),
   UNIQUE (user_id, id),
-  FOREIGN KEY (user_id) REFERENCES payse.demo_users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   FOREIGN KEY (user_id, plan_id) REFERENCES payse.recurring_plans(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   UNIQUE (user_id, candidate_key, rule_version),
   CHECK ((decision = 'approved' AND plan_id IS NOT NULL) OR (decision = 'excluded' AND plan_id IS NULL)),
@@ -708,7 +708,7 @@ CREATE TABLE payse.settlement_links (
   invalidated_at timestamptz,
   PRIMARY KEY (id),
   UNIQUE (user_id, id),
-  FOREIGN KEY (user_id) REFERENCES payse.demo_users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   FOREIGN KEY (user_id, obligation_id) REFERENCES payse.obligations(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   FOREIGN KEY (user_id, transaction_id) REFERENCES payse.financial_transactions(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   CHECK (method IN ('automatic','manual')),
@@ -742,7 +742,7 @@ CREATE TABLE payse.reserves (
   cancelled_at timestamptz,
   PRIMARY KEY (id),
   UNIQUE (user_id, id),
-  FOREIGN KEY (user_id) REFERENCES payse.demo_users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   FOREIGN KEY (user_id, account_id) REFERENCES payse.financial_accounts(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   CHECK (cancelled_at IS NULL OR isfinite(cancelled_at)),
   CHECK (label IS NULL OR length(btrim(label)) > 0)
@@ -770,7 +770,7 @@ CREATE TABLE payse.reserve_allocations (
   release_evidence jsonb NOT NULL,
   PRIMARY KEY (id),
   UNIQUE (user_id, id),
-  FOREIGN KEY (user_id) REFERENCES payse.demo_users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   FOREIGN KEY (user_id, reserve_id) REFERENCES payse.reserves(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   FOREIGN KEY (user_id, obligation_id) REFERENCES payse.obligations(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   CHECK (released_krw <= amount_krw),
@@ -803,7 +803,7 @@ CREATE TABLE payse.write_receipts (
   created_at timestamptz NOT NULL,
   PRIMARY KEY (id),
   UNIQUE (user_id, id),
-  FOREIGN KEY (user_id) REFERENCES payse.demo_users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   UNIQUE (user_id, operation_key),
   CHECK (result_version >= 1),
   CHECK (jsonb_typeof(changed_refs) = 'array' AND jsonb_typeof(before_after) = 'object'),
@@ -831,30 +831,6 @@ COMMENT ON COLUMN payse.write_receipts.result_version IS '커밋 결과 dataVers
 
 COMMENT ON COLUMN payse.write_receipts.created_at IS '커밋 기록 시각';
 
-CREATE TABLE payse.demo_event_receipts (
-  user_id uuid NOT NULL,
-  event_id text NOT NULL,
-  source_version_before text NOT NULL,
-  source_version_after text NOT NULL,
-  receipt_id uuid NOT NULL,
-  PRIMARY KEY (user_id, event_id),
-  FOREIGN KEY (user_id, receipt_id) REFERENCES payse.write_receipts(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
-  CHECK (source_version_before <> source_version_after),
-  CHECK (event_id IS NULL OR length(btrim(event_id)) > 0),
-  CHECK (source_version_before IS NULL OR length(btrim(source_version_before)) > 0),
-  CHECK (source_version_after IS NULL OR length(btrim(source_version_after)) > 0)
-);
-
-COMMENT ON COLUMN payse.demo_event_receipts.user_id IS '인증 세션에서 정한 소유자; 다른 사용자 참조 차단';
-
-COMMENT ON COLUMN payse.demo_event_receipts.event_id IS '버전 있는 fixture 사건 ID; 새 요청키로도 재적용 불가';
-
-COMMENT ON COLUMN payse.demo_event_receipts.source_version_before IS '적용 전 원천 버전';
-
-COMMENT ON COLUMN payse.demo_event_receipts.source_version_after IS '적용 후 원천 버전';
-
-COMMENT ON COLUMN payse.demo_event_receipts.receipt_id IS '같은 트랜잭션의 확정 쓰기 영수증';
-
 CREATE UNIQUE INDEX current_plan_revision_per_month ON payse.recurring_plan_revisions(user_id, plan_id, effective_from_month) WHERE is_current;
 
 CREATE UNIQUE INDEX active_session_per_user ON payse.demo_sessions(user_id) WHERE ended_at IS NULL;
@@ -877,11 +853,11 @@ CREATE INDEX allocations_by_obligation ON payse.reserve_allocations(user_id, obl
 
 CREATE INDEX reserves_by_account ON payse.reserves(user_id, account_id) WHERE cancelled_at IS NULL;
 
-ALTER TABLE payse.demo_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payse.users ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE payse.demo_users FORCE ROW LEVEL SECURITY;
+ALTER TABLE payse.users FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.demo_users USING (id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows ON payse.users USING (id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.demo_sessions ENABLE ROW LEVEL SECURITY;
 
@@ -943,11 +919,11 @@ ALTER TABLE payse.transaction_relations FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY own_rows ON payse.transaction_relations USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
-ALTER TABLE payse.user_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payse.user_attributes ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE payse.user_settings FORCE ROW LEVEL SECURITY;
+ALTER TABLE payse.user_attributes FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.user_settings USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows ON payse.user_attributes USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.recurring_plans ENABLE ROW LEVEL SECURITY;
 
@@ -1003,10 +979,7 @@ ALTER TABLE payse.write_receipts FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY own_rows ON payse.write_receipts USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
-ALTER TABLE payse.demo_event_receipts ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE payse.demo_event_receipts FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.demo_event_receipts USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 COMMIT;

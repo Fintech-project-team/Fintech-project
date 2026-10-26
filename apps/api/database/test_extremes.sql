@@ -56,8 +56,8 @@ BEGIN
   PERFORM pg_temp.expect_rejected(format('UPDATE payse.reserves SET amount_krw=%L WHERE id=%L','9223372036854775808',reserve),'22003');
   PERFORM pg_temp.expect_rejected(format('UPDATE payse.reserves SET user_id=%L,account_id=%L WHERE id=%L',other_user,other_account,reserve),'23514');
   PERFORM pg_temp.expect_rejected(format('UPDATE payse.source_contexts SET coverage=jsonb_build_array(jsonb_build_object(%L,%L,%L,%L)) WHERE user_id=%L','targetKind','account','targetId',other_account,u),'23514');
-  PERFORM pg_temp.expect_rejected(format('UPDATE payse.source_contexts SET salary_evidence=%L::jsonb WHERE user_id=%L',jsonb_build_array(jsonb_build_object('expectedPayDate',pg_temp.ctx_text('salary_evidence_date'),'confirmation','confirmed','transactionIds','[]'::jsonb))::text,u),'23514');
-  PERFORM pg_temp.expect_rejected(format('UPDATE payse.user_settings SET card_plan_overrides=jsonb_build_array(jsonb_build_object(%L,%L::uuid,%L,25)) WHERE user_id=%L','cardId',missing_card,'plannedPaymentDay',u),'23514');
+  PERFORM pg_temp.expect_rejected(format('UPDATE payse.source_contexts SET salary_evidence=%L::jsonb WHERE user_id=%L',jsonb_build_array(jsonb_build_object('payMonth',pg_temp.ctx_text('salary_evidence_month'),'expectedPayDate',pg_temp.ctx_text('salary_evidence_date'),'confirmation','confirmed','transactionIds','[]'::jsonb))::text,u),'23514');
+  PERFORM pg_temp.expect_rejected(format('UPDATE payse.user_attributes SET card_plan_overrides=jsonb_build_array(jsonb_build_object(%L,%L::uuid,%L,25)) WHERE user_id=%L','cardId',missing_card,'plannedPaymentDay',u),'23514');
 
   -- A changed source version without all dependent records must roll back both edits.
   SELECT balance_krw INTO STRICT old_balance FROM payse.financial_accounts WHERE id=account;
