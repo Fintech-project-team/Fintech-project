@@ -145,3 +145,64 @@ DateTime parseOffsetTimestamp(String text, String path) {
   BusinessDate.parse(m.group(1)!, path);
   return DateTime.parse(text).toUtc();
 }
+
+/// 2026-10-26: 명목 급여 회차(YYYY-MM). '몇 월분 월급'이며 입금월이 아니다.
+class PayMonth implements Comparable<PayMonth> {
+  const PayMonth._(this.year, this.month);
+
+  /// 2026-10-26: [year](1~9999)년 [month](1~12)월 회차로 만든다. 범위 밖은 invalidValue 오류다.
+  factory PayMonth(int year, int month) {
+    if (year < 1 || year > 9999 || month < 1 || month > 12) {
+      throw CalculationInputException(
+        InputErrorCode.invalidValue,
+        'PayMonth',
+        '없는 회차($year-$month)',
+      );
+    }
+    return PayMonth._(year, month);
+  }
+
+  final int year;
+  final int month;
+
+  static final RegExp _pattern = RegExp(r'^(\d{4})-(\d{2})$');
+
+  /// 2026-10-26: 정확한 YYYY-MM [text]를 읽는다. 형식·범위 오류는 [path] 위치의 invalidValue 오류다.
+  static PayMonth parse(String text, String path) {
+    final m = _pattern.firstMatch(text);
+    final year = m == null ? 0 : int.parse(m.group(1)!);
+    final month = m == null ? 0 : int.parse(m.group(2)!);
+    if (year < 1 || month < 1 || month > 12) {
+      throw CalculationInputException(
+        InputErrorCode.invalidValue,
+        path,
+        'YYYY-MM 회차가 아님($text)',
+      );
+    }
+    return PayMonth._(year, month);
+  }
+
+  /// 2026-10-26: 앞(음수)·뒤 [months]번째 회차를 반환한다.
+  PayMonth shift(int months) {
+    final index = year * 12 + (month - 1) + months;
+    return PayMonth(index ~/ 12, index % 12 + 1);
+  }
+
+  /// 2026-10-26: 회차 순서를 비교한다.
+  @override
+  int compareTo(PayMonth other) => year != other.year
+      ? year.compareTo(other.year)
+      : month.compareTo(other.month);
+
+  @override
+  bool operator ==(Object other) =>
+      other is PayMonth && other.year == year && other.month == month;
+
+  @override
+  int get hashCode => Object.hash(year, month);
+
+  /// 2026-10-26: YYYY-MM 문자열을 반환한다.
+  @override
+  String toString() =>
+      '${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}';
+}

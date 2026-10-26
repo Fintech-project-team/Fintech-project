@@ -13,7 +13,7 @@
 | 오류                | [API §6](../../../../docs/api-contract.md)                      | 공통 오류 형식·상태 코드·호출부 처리·비밀 미노출                                   |
 | 동시성              | [API §5](../../../../docs/api-contract.md)                      | expectedDataVersion·ruleVersion·409·원자 쓰기                                      |
 | 멱등                | [API §5](../../../../docs/api-contract.md)                      | 같은 키/요청 replay·다른 요청 거절·응답 유실 시 동일 키                            |
-| B의 fake repository | [응답 §1](../../../../docs/api-response-models.md) 및 아래 인계 | PAYSE-DRAFT-2 원천과 PAYSE-API-0.6-2 표현 구분                                     |
+| B의 fake repository | [응답 §1](../../../../docs/api-response-models.md) 및 아래 인계 | PAYSE-DRAFT-3 원천과 PAYSE-API-0.6-3 표현 구분                                     |
 
 ## B에게 전달할 내용
 

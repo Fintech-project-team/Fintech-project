@@ -159,6 +159,21 @@ class _Evidence {
       );
     }
   }
+
+  /// 2026-10-26: 급여 근거 거래 [tx]의 입금일이 스냅샷 기준 날짜(asOf의 서울 날짜)보다 늦으면 계약 위반이다.
+  /// 나중 시점의 confirmed·partial 상태를 과거 스냅샷에 섞은 입력을 받지 않는다. 입금일이 없으면 검사하지 않는다.
+  void requireNotAfterAsOf(SourceTransaction tx, String path) {
+    final booked = tx.bookingDate;
+    if (booked == null) return;
+    final seoul = _asOf.toUtc().add(const Duration(hours: 9));
+    final today =
+        '${seoul.year.toString().padLeft(4, '0')}-'
+        '${seoul.month.toString().padLeft(2, '0')}-'
+        '${seoul.day.toString().padLeft(2, '0')}';
+    if (booked.compareTo(today) > 0) {
+      throw CalculationContractException(path, '근거 거래 입금일이 스냅샷 기준 날짜보다 늦음');
+    }
+  }
 }
 
 /// 2026-10-23: 계획 버전이 숨겨져 포함 계좌의 의무가 빠졌을 수 있으면 true다.
@@ -248,7 +263,7 @@ List<calc.SettlementLink>? _settlements(
 }
 
 /// 2026-10-23: 월급 설정과 입금 근거를 계산 입력으로 바꾼다. partial·confirmed 근거의 거래는
-/// 같은 스냅샷 원천의 posted 계좌 입금이며 잔액에 반영돼야 한다. 받은 근거는 모두 검사한 뒤,
+/// 같은 스냅샷 원천의 posted 계좌 입금이며 잔액에 반영돼야 하고, 입금일이 기준 날짜보다 늦지 않아야 한다. 받은 근거는 모두 검사한 뒤,
 /// 근거 키가 접근 제한으로 생략됐거나 근거 거래가 미수신·미확보면 근거를 null(미수신)로 넘긴다.
 calc.SalaryInput? _salary(FinancialSnapshot snapshot, _Evidence evidence) {
   final settings = snapshot.settings;
@@ -264,7 +279,7 @@ calc.SalaryInput? _salary(FinancialSnapshot snapshot, _Evidence evidence) {
     if (receipt.confirmation == 'unknown') continue;
     final path =
         r'$.settings.salary.receiptEvidence'
-        '[${receipt.expectedPayDate}]';
+        '[${receipt.payMonth}]';
     if (receipt.transactionIds.isEmpty) {
       throw CalculationContractException(path, '입금 확인 근거에 거래가 없음');
     }
@@ -281,6 +296,7 @@ calc.SalaryInput? _salary(FinancialSnapshot snapshot, _Evidence evidence) {
         throw CalculationContractException(path, '근거 거래가 잔액에 반영된 확정 계좌 입금이 아님');
       }
       evidence.requireSameSource(tx, path);
+      evidence.requireNotAfterAsOf(tx, path);
     }
   }
 
@@ -291,6 +307,7 @@ calc.SalaryInput? _salary(FinancialSnapshot snapshot, _Evidence evidence) {
         : [
             for (final r in receipts)
               calc.SalaryReceipt(
+                payMonth: r.payMonth,
                 expectedPayDate: r.expectedPayDate,
                 transactionIds: r.transactionIds,
                 confirmation: switch (r.confirmation) {

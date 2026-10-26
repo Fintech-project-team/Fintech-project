@@ -15,6 +15,9 @@ from pathlib import Path
 from uuid import UUID
 
 from identity_contract import validate_server_seeds
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from reference_data.banks import load_bank_directory, check_fixture_banks
 
 LIMIT=9_000_000_000_000
 SEOUL=timezone(timedelta(hours=9))
@@ -65,7 +68,7 @@ def validate_snapshot(s: dict) -> None:
     require(ROOT_KEYS<=s.keys(),'missing snapshot keys')
     require(not(set(s)-ROOT_KEYS-FINANCIAL_KEYS),'unknown snapshot keys')
     uuid(s['userId']);owner=s['userId']
-    require(s['schemaVersion']=='PAYSE-DRAFT-2' and s['ruleVersion']=='PAYSE-CALC-1' and s['currency']=='KRW','unsupported contract')
+    require(s['schemaVersion']=='PAYSE-DRAFT-3' and s['ruleVersion']=='PAYSE-CALC-1' and s['currency']=='KRW','unsupported contract')
     require(isinstance(s['dataVersion'],str) and re.fullmatch('[1-9][0-9]*',s['dataVersion']) and int(s['dataVersion'])<=9223372036854775807,'bad dataVersion')
     asof=instant(s['asOf']);today=asof.astimezone(SEOUL).date()
     institutions={i['code']:i for i in s['institutions']}
@@ -260,8 +263,16 @@ def validate_snapshot(s: dict) -> None:
     require(salary['salaryDay'] is None or type(salary['salaryDay']) is int and 1<=salary['salaryDay']<=31,'salary day')
     if salary['salaryAmountKRW'] is not None:
         money(salary['salaryAmountKRW'])
+    require(type(salary['receiptEvidence']) is list,'salary evidence array')
+    pay_months=set()
     for proof in salary['receiptEvidence']:
-        day(proof['expectedPayDate']);require(proof['confirmation'] in ('unknown','partial','confirmed'),'salary confirmation')
+        require(type(proof) is dict and set(proof)=={'payMonth','expectedPayDate','transactionIds','confirmation'},'salary evidence fields')
+        month(proof['payMonth'])
+        require(proof['payMonth'] not in pay_months,'duplicate salary payMonth')
+        pay_months.add(proof['payMonth'])
+        day(proof['expectedPayDate'])
+        require(type(proof['transactionIds']) is list and all(type(tid) is str for tid in proof['transactionIds']),'salary transaction IDs')
+        require(proof['confirmation'] in ('unknown','partial','confirmed'),'salary confirmation')
         require(proof['confirmation']=='unknown' or bool(proof['transactionIds']),'salary evidence missing')
         for tid in proof['transactionIds']:
             require(tid in txs and txs[tid]['recordKind']=='account_entry' and txs[tid]['direction']=='in' and txs[tid]['status']=='posted' and txs[tid]['balanceReflected'] is True,'salary proof invalid')
@@ -307,18 +318,22 @@ def validate_directory(path: Path) -> int:
     """
     manifest=json.loads((path/'manifest.json').read_text(encoding='utf-8'))
     require(manifest['hashMode']=='canonical-json-utf8','unsupported fixture hash mode')
-    require({'server-seeds.json', 'catalog.json'} <= set(manifest['sha256']), 'required fixture manifest entry missing')
+    require({'server-seeds.json', 'catalog.json', 'bank-directory.json'} <= set(manifest['sha256']), 'required fixture manifest entry missing')
     for name,digest in manifest['sha256'].items():
         require(not Path(name).is_absolute() and '..' not in Path(name).parts,'unsafe manifest path')
         obj=json.loads((path/name).read_text(encoding='utf-8'))
         canonical=json.dumps(obj,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode('utf-8')
         require(hashlib.sha256(canonical).hexdigest()==digest,'fixture manifest mismatch: '+name)
+    catalog=json.loads((path/'catalog.json').read_text(encoding='utf-8'))
+    require(manifest['fixtureVersion']==catalog['fixtureVersion']=='PAYSE-FIXTURE-3','unsupported fixture release')
+    directory=load_bank_directory(path/'bank-directory.json')
     snapshots = {}
-    for entry in json.loads((path/'catalog.json').read_text(encoding='utf-8'))['cases']:
+    for entry in catalog['cases']:
         require(entry['file'] in manifest['sha256'], 'catalog case missing from manifest')
         require(entry['id'] not in snapshots, 'duplicate catalog case ID')
         snapshot = json.loads((path/entry['file']).read_text(encoding='utf-8'))
         validate_snapshot(snapshot)
+        check_fixture_banks(snapshot,directory)
         snapshots[entry['id']] = snapshot
     seeds = json.loads((path/'server-seeds.json').read_text(encoding='utf-8'))
     validate_server_seeds(seeds, snapshots)

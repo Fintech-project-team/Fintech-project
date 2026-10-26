@@ -145,7 +145,10 @@ void main() {
         ['2027-02-28', '2027-03-31', '2027-04-30'],
       );
       expect([for (final d in dates) d.monthEndAdjusted], [true, false, true]);
-      expect(dates.every((d) => d.basis == PayDateBasis.assumed), isTrue);
+      expect(
+        dates.every((d) => d.basis == PayDateBasis.recurringSetting),
+        isTrue,
+      );
     });
 
     test('카드일 불명 가상 소비는 영향 구간 비교를 null로 두고 기존 결과는 유지', () {

@@ -29,7 +29,7 @@ DECLARE
   prior_user jsonb; prior_session_count bigint; prior_account_count bigint;
   deletion_rejected boolean := false;
 BEGIN
-  IF (SELECT count(*) FROM payse.demo_users) <> pg_temp.ctx_int('expected_user_count') THEN RAISE EXCEPTION 'seed user count'; END IF;
+  IF (SELECT count(*) FROM payse.users) <> pg_temp.ctx_int('expected_user_count') THEN RAISE EXCEPTION 'seed user count'; END IF;
   IF (SELECT count(*) FROM payse.financial_accounts) <> pg_temp.ctx_int('expected_account_count') THEN RAISE EXCEPTION 'seed account count'; END IF;
 
   PERFORM pg_temp.expect_failure(format('INSERT INTO payse.reserves VALUES (%L,%L,%L,%L,100,NULL)',gen_random_uuid(),owner,other_account,'foreign-owner'),'23503');
@@ -52,25 +52,23 @@ BEGIN
   PERFORM pg_temp.expect_failure(format('UPDATE payse.financial_accounts SET source_version=%L WHERE id=%L','nonexistent-version',owner_account),'23503');
   PERFORM pg_temp.expect_failure(format('UPDATE payse.reserve_allocations SET released_krw=amount_krw+1 WHERE id=%L',allocation_id),'23514');
   PERFORM pg_temp.expect_failure(format('UPDATE payse.financial_transactions SET original_transaction_id=id WHERE id=%L',pg_temp.ctx_uuid('partial_transaction_id')),'23514');
-  SELECT to_jsonb(u) INTO STRICT prior_user FROM payse.demo_users u WHERE id=owner;
+  SELECT to_jsonb(u) INTO STRICT prior_user FROM payse.users u WHERE id=owner;
   SELECT count(*) INTO prior_session_count FROM payse.demo_sessions WHERE user_id=owner;
   SELECT count(*) INTO prior_account_count FROM payse.financial_accounts WHERE user_id=owner;
   BEGIN
-    DELETE FROM payse.demo_users WHERE id=owner;
+    DELETE FROM payse.users WHERE id=owner;
   EXCEPTION WHEN foreign_key_violation OR restrict_violation THEN
     -- PostgreSQL may report 23503 or 23001 according to the first referencing FK.
     deletion_rejected := true;
   END;
   IF NOT deletion_rejected OR
-     (SELECT to_jsonb(u) FROM payse.demo_users u WHERE id=owner) IS DISTINCT FROM prior_user OR
+     (SELECT to_jsonb(u) FROM payse.users u WHERE id=owner) IS DISTINCT FROM prior_user OR
      (SELECT count(*) FROM payse.demo_sessions WHERE user_id=owner) <> prior_session_count OR
      (SELECT count(*) FROM payse.financial_accounts WHERE user_id=owner) <> prior_account_count THEN
     RAISE EXCEPTION 'Referenced user deletion must fail without changing user/session/accounts';
   END IF;
   PERFORM pg_temp.expect_failure(format('INSERT INTO payse.write_receipts SELECT gen_random_uuid(),user_id,operation_key,request_digest,action,changed_refs,before_after,result_version,created_at FROM payse.write_receipts WHERE id=%L',receipt_id),'23505');
-  INSERT INTO payse.demo_event_receipts VALUES(owner,'event-once','before','after',receipt_id);
-  PERFORM pg_temp.expect_failure(format('INSERT INTO payse.demo_event_receipts SELECT user_id,event_id,source_version_before,source_version_after,receipt_id FROM payse.demo_event_receipts WHERE user_id=%L AND event_id=%L',owner,'event-once'),'23505');
-  RAISE NOTICE 'PASS row/fk/unique checks: 14 rejection cases + seed/session/source invariants';
+  RAISE NOTICE 'PASS row/fk/unique checks: 13 rejection cases + seed/session/source invariants';
 END $$;
 
 -- Roles are cluster-wide, so parallel test databases need distinct probe roles.
@@ -81,7 +79,7 @@ BEGIN
   EXECUTE format('GRANT USAGE ON SCHEMA payse TO %I',probe_role);
   EXECUTE format('GRANT SELECT ON ALL TABLES IN SCHEMA payse TO %I',probe_role);
   EXECUTE format('GRANT INSERT ON payse.reserves TO %I',probe_role);
-  EXECUTE format('GRANT UPDATE ON payse.demo_users TO %I',probe_role);
+  EXECUTE format('GRANT UPDATE ON payse.users TO %I',probe_role);
   EXECUTE format('GRANT EXECUTE ON FUNCTION payse.assert_user_storage(uuid) TO %I',probe_role);
   PERFORM set_config('payse.test_probe_role',probe_role,true);
 END $$;
@@ -101,7 +99,7 @@ BEGIN
   SELECT array_agg(value::uuid ORDER BY value::uuid) INTO expected_ids
     FROM jsonb_array_elements_text(current_setting('payse.test_owner_accounts')::jsonb);
   IF actual_ids IS DISTINCT FROM expected_ids THEN RAISE EXCEPTION 'RLS owner account set differs'; END IF;
-  SELECT id INTO STRICT visible_user FROM payse.demo_users;
+  SELECT id INTO STRICT visible_user FROM payse.users;
   IF visible_user IS DISTINCT FROM current_setting('payse.user_id')::uuid THEN RAISE EXCEPTION 'RLS leaked other user'; END IF;
   INSERT INTO payse.reserves VALUES(gen_random_uuid(),visible_user,current_setting('payse.test_owner_account')::uuid,'RLS own write',1,NULL);
   PERFORM pg_temp.expect_failure(format('INSERT INTO payse.reserves VALUES (gen_random_uuid(),%L,%L,%L,1,NULL)',current_setting('payse.test_other_user'),current_setting('payse.test_other_account'),'foreign write'),'42501');

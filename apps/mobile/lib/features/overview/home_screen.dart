@@ -203,8 +203,8 @@ String insufficientMessage(calc.InsufficientReason? reason) => switch (reason) {
     '지난 월급 입금 정보를 확인할 수 없어 계산하지 않았어요.',
   calc.InsufficientReason.receiptEvidenceUnavailable =>
     '월급 입금 정보를 받지 못해 계산하지 않았어요.',
-  calc.InsufficientReason.receiptScheduleMismatch =>
-    '월급 입금일이 설정한 월급일과 달라 확인이 필요해요.',
+  calc.InsufficientReason.payDateConflict =>
+    '월급 예정일이 겹쳐 다음 월급일까지 쓸 수 있는 돈을 계산하지 못했어요.',
   calc.InsufficientReason.salaryDayMissing ||
   calc.InsufficientReason.salarySettingsMissing => '월급일을 알 수 없어 계산하지 않았어요.',
   calc.InsufficientReason.balanceMissing => '일부 계좌 잔액을 불러오지 못해 계산하지 않았어요.',

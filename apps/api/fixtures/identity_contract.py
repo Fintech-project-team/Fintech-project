@@ -15,7 +15,7 @@ IDENTITY_USERS = tuple(MappingProxyType(row) for row in (
     {
         'user_id': 'f0a4be6c-01d7-53eb-ab2c-74675b22fd8c',
         'name': '데모알파',
-        'synthetic_phone': '01000000001',
+        'phone': '01000000001',
         'legacy_synthetic_name': 'PAYSE 합성 alpha',
         'legacy_display_name': '데모 1',
         'initial_case': 'alpha-ready',
@@ -23,7 +23,7 @@ IDENTITY_USERS = tuple(MappingProxyType(row) for row in (
     {
         'user_id': '87f7bbf9-2355-5210-9325-f25d83a8ff35',
         'name': '데모베타',
-        'synthetic_phone': '01000000002',
+        'phone': '01000000002',
         'legacy_synthetic_name': 'PAYSE 합성 beta',
         'legacy_display_name': '데모 2',
         'initial_case': 'beta-ready',
@@ -31,7 +31,7 @@ IDENTITY_USERS = tuple(MappingProxyType(row) for row in (
     {
         'user_id': 'd04073fd-f7ab-518d-8938-f2920d593db2',
         'name': '데모감마',
-        'synthetic_phone': '01000000003',
+        'phone': '01000000003',
         'legacy_synthetic_name': 'PAYSE 합성 gamma',
         'legacy_display_name': '데모 3',
         'initial_case': 'gamma-month-end',
@@ -40,7 +40,7 @@ IDENTITY_USERS = tuple(MappingProxyType(row) for row in (
 
 DISABLED_CODE_VERIFIER = 'DISABLED:auth-design-pending'
 SEED_USER_KEYS = frozenset({
-    'userId', 'name', 'syntheticPhone', 'codeVerifier', 'createdAt', 'initialCase',
+    'userId', 'name', 'phone', 'codeVerifier', 'createdAt', 'initialCase',
 })
 
 
@@ -81,13 +81,13 @@ def validate_server_seeds(seeds: dict, snapshots: dict[str, dict]) -> None:
             raise ValueError('invalid server seed user ID') from error
         if canonical_id != user_id or user_id not in known or user_id in seen_ids:
             raise ValueError('unknown or duplicate server seed user ID')
-        validate_stored_identity(user['name'], user['syntheticPhone'])
-        credentials = (user['name'], user['syntheticPhone'])
+        validate_stored_identity(user['name'], user['phone'])
+        credentials = (user['name'], user['phone'])
         if credentials in seen_credentials:
             raise ValueError('duplicate server seed credentials')
         expected = known[user_id]
-        if (user['name'], user['syntheticPhone'], user['initialCase']) != (
-            expected['name'], expected['synthetic_phone'], expected['initial_case']
+        if (user['name'], user['phone'], user['initialCase']) != (
+            expected['name'], expected['phone'], expected['initial_case']
         ):
             raise ValueError('server seed identity mapping mismatch')
         if user['codeVerifier'] != DISABLED_CODE_VERIFIER:

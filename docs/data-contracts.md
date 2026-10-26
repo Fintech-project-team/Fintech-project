@@ -81,7 +81,6 @@ v0.6 경로·요청·오류는 [HTTP 계약](api-contract.md)에만 정의한다
 | `POST /recommendations/{id}/approve` 또는 `exclude` | 근거·허용 설정·참조 검증 후 사용자 승인/제외 저장                  |
 | `PATCH /transactions/{id}/classification`           | PAYSE 네 거래 분류 변경; 원천 사실 변경 없음                       |
 | `POST /settlement-links/corrections`                | 유효 연결 해제/재연결과 관련 배정·이력·버전을 원자 저장            |
-| `POST /demo-events/{id}/apply`                      | 준비된 경제적 사건을 한 번 반영; 임의 원천 금액 편집 아님          |
 | `POST /reserve-adjustments/confirm`                 | 한 보호 설정 확정; 가상 items/결과 영속 저장 없음                  |
 | `POST /plan-explanations`                           | P1 설명; 최소 근거만 전달하며 금융 쓰기 없음                       |
 
@@ -100,3 +99,5 @@ v0.6 경로·요청·오류는 [HTTP 계약](api-contract.md)에만 정의한다
 ## 연결 상태·표현 기준
 
 [응답 모델](api-response-models.md)이 세 계정 최초 상태·재로그인·부분 연결·접근 제한의 단일 기준이다. 구현 상태는 각 앱의 문서와 검사 결과에서 확인한다.
+
+테스트 사건은 `apps/api/testing/scenarios/` 준비 도구에서 선택한다. 일반 서비스에 시나리오 실행 API 또는 테스트 전용 저장 필드를 추가하지 않는다. 공통 사용자 구조에서도 `/demo-sessions` 주소와 세션 정책은 유지한다.

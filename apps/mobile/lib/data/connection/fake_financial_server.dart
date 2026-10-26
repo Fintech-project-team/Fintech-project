@@ -6,7 +6,7 @@ import '../auth/random_id.dart';
 import 'financial_api.dart';
 import 'snapshot_projector.dart';
 
-/// 2026-10-22: 사용자 ID에 해당하는 불변 원본(PAYSE-DRAFT-2) JSON을 읽는 경계. 실제 API 도입 시 서버 쪽 책임이다.
+/// 2026-10-22: 사용자 ID에 해당하는 불변 원본(PAYSE-DRAFT-3) JSON을 읽는 경계. 실제 API 도입 시 서버 쪽 책임이다.
 typedef UserSourceLoader = Future<Map<String, Object?>> Function(String userId);
 
 /// 2026-10-22: 금융 조회·연결 쓰기를 흉내 내는 앱 수명 가짜 서버(서버 장부 역할). 사용자별 불변 원본과 가변 상태
