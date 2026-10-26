@@ -322,7 +322,7 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Duplicate salary nominal month' USING ERRCODE = '23514';
   END IF;
-  -- Different nominal months may share a date. Preserve facts; Flutter reports insufficient periods.
+  -- Preserve distant, reversed, or shared dates. Flutter limits only incalculable intervals.
   IF EXISTS (
     -- A past source deposit is independent of the user's current salary-account setting.
     SELECT 1

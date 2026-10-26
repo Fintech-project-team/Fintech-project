@@ -173,6 +173,7 @@ def build() -> tuple[dict, dict, dict]:
     """2026-10-19: Return named full snapshots, server-only synthetic seed metadata, and test catalog.
 
     2026-10-23: Resolve templates by owned IDs/relations, preserving scenario facts.
+    2026-10-26: Add a manually supplied future schedule and an otherwise equal absent-source case.
     """
     cases={};catalog={'fixtureVersion':FIXTURE_VERSION,'schemaVersion':SCHEMA,'ruleVersion':RULE,'cases':[],'events':[],'localVectors':[]}
     def add_case(name,snapshot,goal,expected):
@@ -251,6 +252,29 @@ def build() -> tuple[dict, dict, dict]:
     gamma['obligations'] += [february,march]
     gamma['occurrenceOverrides']=[{'userId':gamma['userId'],'recurrenceKey':f"{plan['planId']}:2027-04",'planRevisionId':future['revisionId'],'amountKRW':120000,'dueDate':'2027-04-30','withdrawalAccountId':gamma['accounts'][0]['accountId'],'status':'active'}]
     add_case('gamma-month-end',gamma,'말일·확인 일정 우선·미래 이력·기존 회차 보존',{'withoutOverrideFebruary':'2027-02-28','confirmedFebruary':'2027-02-26','marchPinnedAmountKRW':100000,'futureRevisionAmountKRW':110000,'aprilIndividualAmountKRW':120000})
+    # Explicit preparation inputs only: Flutter chooses dates; this tool does not infer a salary proof.
+    schedule_base = make_snapshot('alpha', '2026-10-29T12:00:00+09:00')
+    provided = copy.deepcopy(schedule_base)
+    provided['settings']['salary']['receiptEvidence'] = [{
+        'payMonth': '2026-11',
+        'expectedPayDate': '2026-10-30',
+        'transactionIds': [],
+        'confirmation': 'unknown',
+    }]
+    update_versions(provided, schedule_base['sourceVersion'] + ':schedule-provided', '1')
+    add_case(
+        'salary-schedule-provided', provided,
+        '동일 기준시각 비교: 수동 준비한 미래 급여 원천 일정 제공, 입금 확인 없음',
+        {'compareTo': 'salary-schedule-absent', 'payMonth': '2026-11',
+         'expectedPayDate': '2026-10-30', 'confirmation': 'unknown', 'transactionIds': []},
+    )
+    absent = copy.deepcopy(schedule_base)
+    update_versions(absent, schedule_base['sourceVersion'] + ':schedule-absent', '1')
+    add_case(
+        'salary-schedule-absent', absent,
+        '동일 기준시각 비교: 미래 급여 원천 일정 미제공, 반복일 판단은 Flutter 담당',
+        {'compareTo': 'salary-schedule-provided', 'receiptEvidence': []},
+    )
     for entry in catalog['cases']:
         snapshot=cases[entry['id']]
         if 'accounts' in snapshot and all(coverage_row['status']=='complete' for coverage_row in snapshot['coverage']):

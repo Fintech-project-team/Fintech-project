@@ -127,7 +127,7 @@ class SalaryEvidenceMigrationTests(unittest.TestCase):
             self.assertFalse(self.archive.exists())
 
     def test_salary_cycle_identity_uses_pay_month(self):
-        """2026-10-23: Preserve source schedule ties; only Flutter decides their insufficient-data result."""
+        """2026-10-23: Preserve schedule ties; calculation eligibility belongs to Flutter."""
         unknown = {**self.proof, 'confirmation': 'unknown', 'transactionIds': []}
         self.set_evidence([self.proof, unknown])
         self.mapping = self.make_mapping()

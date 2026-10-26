@@ -160,7 +160,7 @@ class FixtureTests(unittest.TestCase):
 
     def test_published_bundle_matches_generator(self):
         """2026-10-23: Check tracked JSON semantic values after formatting and manifest validation."""
-        self.assertEqual(validate_directory(FIXTURES/'generated'),15)
+        self.assertEqual(validate_directory(FIXTURES/'generated'),17)
         for name,snapshot in self.cases.items():
             stored=json.loads((FIXTURES/'generated'/'snapshots'/f'{name}.json').read_text(encoding='utf-8'))
             self.assertEqual(stored,snapshot)
@@ -169,7 +169,7 @@ class FixtureTests(unittest.TestCase):
     def test_deterministic_bytes_and_manifest(self):
         with temporary_directory() as temp:
             a,b=Path(temp)/'a',Path(temp)/'b';write_files(a);write_files(b)
-            self.assertEqual(validate_directory(a),15)
+            self.assertEqual(validate_directory(a),17)
             for p in a.rglob('*.json'):
                 self.assertEqual(p.read_bytes(),(b/p.relative_to(a)).read_bytes())
 
