@@ -32,6 +32,13 @@ abstract final class PayseColors {
   static const Color warningBorder = Color(0xFFFEDF89);
   static const Color info = Color(0xFF175CD3);
   static const Color infoContainer = Color(0xFFEFF8FF);
+
+  /// 2026-10-26: 02-2 입금 확인 전 안내 띠의 옅은 노란 바탕·경계. 경고가 아닌 상태 설명이며 글자는 textPrimary다.
+  static const Color awaitingNoticeSurface = Color(0xFFFFFCF2);
+  static const Color awaitingNoticeBorder = Color(0xFFF6E7B8);
+
+  /// 2026-10-26: 02-2 정보 부족 안내 띠 바탕. 경계는 borderStrong이다.
+  static const Color insufficientNoticeSurface = Color(0xFFF7F8FA);
 }
 
 /// 2026-10-20: 간격 토큰(dp). 화면 좌우 여백은 상위 화면 레이아웃이 적용하며 확정 홈 기준 24dp다.
