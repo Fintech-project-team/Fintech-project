@@ -490,10 +490,11 @@ class FixtureTests(unittest.TestCase):
                 self.assertGreaterEqual(opening['balanceKRW'],0)
 
     def test_export_initial_vs_ready_and_no_destruction(self):
+        """2026-10-26: 생성 SQL 형식과 무관하게 초기/연결 자료 및 파괴 명령 배제를 검사한다. 사용: unittest."""
         with temporary_directory() as temp:
             p=Path(temp)/'fixtures';write_files(p)
             initial=export(p);ready=export_scenario(p,['alpha-ready','beta-ready','gamma-month-end'])
-            self.assertIn('INSERT INTO payse.users (id, name, phone,',initial)
+            self.assertRegex(initial,r'INSERT INTO payse\.users\s*\(\s*id,\s*name,\s*phone,')
             self.assertNotIn('synthetic_name',initial)
             self.assertNotIn('display_name',initial)
             self.assertNotIn('INSERT INTO payse.institution_links',initial)

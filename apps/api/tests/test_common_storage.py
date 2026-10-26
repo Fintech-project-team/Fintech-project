@@ -1,5 +1,6 @@
 """Common storage preparation rules; no database or HTTP service is started."""
 import sys
+import re
 from pathlib import Path
 import unittest
 
@@ -27,8 +28,9 @@ class CommonStorageTests(unittest.TestCase):
                 self.assertFalse(any(key.startswith(('demo_','test_','fixture_','synthetic_')) for key in row))
 
     def test_reference_seed_has_no_user_data(self):
+        """2026-10-26: 줄바꿈과 무관하게 기관 수와 사용자 자료의 분리를 검사한다. 사용: unittest."""
         sql=reference_sql()
-        self.assertEqual(sql.count('INSERT INTO payse.institutions('),24)
+        self.assertEqual(len(re.findall(r'INSERT\s+INTO\s+payse\.institutions\s*\(',sql)),24)
         self.assertNotIn('payse.users',sql)
         self.assertNotIn('INSERT INTO payse.institutions',export(API/'fixtures/generated'))
         self.assertEqual(len({row['code'] for row in institution_rows()}),24)

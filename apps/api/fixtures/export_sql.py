@@ -71,14 +71,25 @@ def financial_rows(snapshot, seed, connected=False):
 
 
 def render(rows):
-    """2026-10-23: Render trusted fixed-mapping rows and require preloaded reference identities."""
+    """2026-10-23: 검토된 행을 기관 기준 확인 뒤 적재할 SQL로 만든다.
+
+    2026-10-26: 열·값·조건을 줄별로 분리하며 리터럴과 명령 순서는 유지한다.
+    사용: export, testing.scenarios.export_state.export.
+    """
     commands=['-- Ordinary initial user data; execute once in an empty owner scope.','BEGIN;','SET CONSTRAINTS ALL DEFERRED;']
     for institution in institution_rows():
-        conditions=' AND '.join(k+'='+literal(v) for k,v in institution.items())
-        commands.append("DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM payse.institutions WHERE "+conditions+") THEN RAISE EXCEPTION 'Load matching institution reference data first'; END IF; END $$;")
+        conditions='\n      AND '.join(k+' = '+literal(v) for k,v in institution.items())
+        commands.append(
+            "DO $$\nBEGIN\n  IF NOT EXISTS (\n"
+            "    SELECT 1\n    FROM payse.institutions\n    WHERE "+conditions+"\n"
+            "  ) THEN\n    RAISE EXCEPTION 'Load matching institution reference data first';\n"
+            "  END IF;\nEND $$;"
+        )
     for table,row in rows:
-        commands.append(f"INSERT INTO payse.{table} ({', '.join(row)}) VALUES ({', '.join(literal(v) for v in row.values())});")
-    return '\n'.join(commands+['SET CONSTRAINTS ALL IMMEDIATE;','COMMIT;'])+'\n'
+        columns=',\n'.join('  '+column for column in row)
+        values=',\n'.join('  '+literal(value) for value in row.values())
+        commands.append(f"INSERT INTO payse.{table} (\n{columns}\n) VALUES (\n{values}\n);")
+    return '\n\n'.join(commands+['SET CONSTRAINTS ALL IMMEDIATE;','COMMIT;'])+'\n'
 
 
 def export(directory: Path, cases=None) -> str:
