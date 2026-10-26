@@ -19,8 +19,12 @@ enum InsufficientReason {
   /// 2026-10-23: 직전 월급일 회차의 입금 근거 항목이 없어 입금 여부를 알 수 없다(unknown과 다름).
   receiptEvidenceAbsent,
 
-  /// 2026-10-23: 근거 예정일이 월급일 규칙 날짜와 달라 어느 회차인지 계약으로 확인할 수 없다.
-  receiptScheduleMismatch,
+  /// 2026-10-26: 서로 다른 회차의 예정일이 같아 회차를 구분해야 하거나 길이 0 구간이 되는 홈 계산. 원천은 보존한다.
+  payDateConflict,
+
+  /// 2026-10-26: 남은 미확인 회차·같은 날 여러 회차·partial 잔여분 때문에 예상 급여 입금의 금액·시점을 알 수 없다.
+  /// 그 날짜가 든 구간부터 시뮬레이션 값을 두지 않는다.
+  salaryInflowUncertain,
   payDateMissing,
   salaryAmountMissing,
   cardScheduleUnknown,

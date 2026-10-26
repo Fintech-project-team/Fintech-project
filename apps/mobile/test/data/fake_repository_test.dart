@@ -33,7 +33,7 @@ class _MissingAssetBundle extends CachingAssetBundle {
 /// 2026-10-20: 계약 최소 필드를 갖춘 정상 스냅샷 맵을 반환한다. 테스트마다 일부를 바꿔 쓴다.
 Map<String, Object?> _minimalSnapshot() => {
   'userId': 'u-1',
-  'schemaVersion': 'PAYSE-DRAFT-2',
+  'schemaVersion': 'PAYSE-DRAFT-3',
   'currency': 'KRW',
   'dataVersion': '7',
   'sourceVersion': 'src-7',
@@ -77,7 +77,7 @@ void main() {
       final snapshot = (result as SnapshotLoaded).snapshot;
       expect(snapshot.asOf, '2026-10-19T12:00:00+09:00');
       expect(snapshot.dataVersion, '1');
-      expect(snapshot.sourceVersion, 'fixture-1:alpha:2026-10-19:base');
+      expect(snapshot.sourceVersion, 'fixture-3:alpha:2026-10-19:base');
       expect(snapshot.ruleVersion, 'PAYSE-CALC-1');
       expect(snapshot.accounts, hasLength(6));
       expect(snapshot.cards, hasLength(4));

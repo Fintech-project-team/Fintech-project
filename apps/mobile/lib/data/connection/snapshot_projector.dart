@@ -35,11 +35,11 @@ class ProjectionState {
   };
 }
 
-/// 2026-10-22: 원본 fixture(PAYSE-DRAFT-2)와 사용자 상태로 HTTP Snapshot(PAYSE-API-0.6-2)을 만든다
+/// 2026-10-22: 원본 fixture(PAYSE-DRAFT-3)와 사용자 상태로 HTTP Snapshot(PAYSE-API-0.6-3)을 만든다
 /// (docs/api-response-models.md §1.1·§2). 원본은 바꾸지 않고 새 객체를 만든다. 상태·화면 전역값을 읽지 않는다.
 abstract final class SnapshotProjector {
-  static const String sourceSchema = 'PAYSE-DRAFT-2';
-  static const String apiSchema = 'PAYSE-API-0.6-2';
+  static const String sourceSchema = 'PAYSE-DRAFT-3';
+  static const String apiSchema = 'PAYSE-API-0.6-3';
 
   static const List<String> _headerKeys = [
     'userId',
@@ -415,13 +415,27 @@ class _Partial {
       }
       field(salary.cast(), 'salaryAccountId', 'id?', 'settings.salary');
       field(salary.cast(), 'receiptEvidence', 'maps?', 'settings.salary');
+      final payMonths = <Object?>{};
       for (final e in (salary['receiptEvidence'] as List?) ?? const []) {
-        field(
-          (e as Map).cast(),
-          'transactionIds',
-          'ids',
-          'settings.salary.receiptEvidence',
-        );
+        final proof = (e as Map).cast<String, Object?>();
+        const where = 'settings.salary.receiptEvidence';
+        field(proof, 'transactionIds', 'ids', where);
+        field(proof, 'payMonth', 'id', where);
+        // 명목 회차는 정확한 YYYY-MM이고 사용자·스냅샷에서 유일하다(data-model '급여 회차와 예정일').
+        final month = proof['payMonth'] as String;
+        if (!RegExp(r'^\d{4}-(0[1-9]|1[0-2])$').hasMatch(month) ||
+            month.startsWith('0000')) {
+          throw const SnapshotContractException(
+            r'$.settings.salary.receiptEvidence.payMonth',
+            'YYYY-MM 급여 회차가 아님',
+          );
+        }
+        if (!payMonths.add(month)) {
+          throw const SnapshotContractException(
+            r'$.settings.salary.receiptEvidence.payMonth',
+            '같은 회차 근거 중복',
+          );
+        }
       }
     }
     field(settings.cast(), 'cardPlans', 'maps?', 'settings');

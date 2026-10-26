@@ -158,7 +158,7 @@ void main() {
   test('account label uses institution, product kind and last four', () {
     final snapshot = betaSnapshot({...betaBanks});
     final kb = snapshot.accounts!.first;
-    expect(accountLabel(snapshot, kb), '국민 입출금 ····0001');
+    expect(accountLabel(snapshot, kb), '국민은행 입출금 ····0001');
     expect(productTypeLabel('time_deposit'), '예금');
     expect(productTypeLabel('savings'), '적금');
   });

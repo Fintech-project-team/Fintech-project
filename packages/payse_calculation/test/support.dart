@@ -70,21 +70,28 @@ LedgerInput ledger(
   settlements: settlements,
 );
 
-/// 2026-10-23: [day]일 월급과 [receipts]((예정일, 상태)) 근거로 월급 설정을 만든다.
-SalaryInput salary(int? day, List<(String, SalaryConfirmation)> receipts) =>
-    SalaryInput(
-      salaryDay: day,
-      receiptEvidence: [
-        for (final (date, state) in receipts)
-          SalaryReceipt(
-            expectedPayDate: date,
-            transactionIds: state == SalaryConfirmation.unknown
-                ? []
-                : ['salary-$date'],
-            confirmation: state,
-          ),
-      ],
+/// 2026-10-26: [payMonth] 회차, 예정일 [date], 상태 [state]의 근거를 만든다.
+SalaryReceipt receipt(String payMonth, String date, SalaryConfirmation state) =>
+    SalaryReceipt(
+      payMonth: payMonth,
+      expectedPayDate: date,
+      transactionIds: state == SalaryConfirmation.unknown
+          ? []
+          : ['salary-$payMonth'],
+      confirmation: state,
     );
+
+/// 2026-10-23: [day]일 월급과 [receipts]((예정일, 상태)) 근거로 월급 설정을 만든다.
+/// 2026-10-26: 이동하지 않은 예정일 사례용이라 회차는 예정일의 연월로 둔다. 이동 사례는 [salaryOf]를 쓴다.
+SalaryInput salary(int? day, List<(String, SalaryConfirmation)> receipts) =>
+    salaryOf(day, [
+      for (final (date, state) in receipts)
+        receipt(date.substring(0, 7), date, state),
+    ]);
+
+/// 2026-10-26: [day]일 월급과 회차 근거 [receipts]로 월급 설정을 만든다.
+SalaryInput salaryOf(int? day, List<SalaryReceipt> receipts) =>
+    SalaryInput(salaryDay: day, receiptEvidence: receipts);
 
 /// 2026-10-23: 장부 [l]과 월급 [s]로 홈 금액을 계산한다.
 CurrentAmountResult current(LedgerInput l, SalaryInput? s) =>
@@ -95,5 +102,8 @@ ObligationLine line(CurrentAmountResult r, String id) =>
     r.obligationLines!.firstWhere((l) => l.obligationId == id);
 
 /// 2026-10-23: 사용자가 가정한 월급일 [date]와 금액 [amount]를 만든다.
-PlannedPayDate pay(String date, int? amount) =>
-    PlannedPayDate(date: date, amountKrw: amount, basis: PayDateBasis.assumed);
+PlannedPayDate pay(String date, int? amount) => PlannedPayDate(
+  date: date,
+  amountKrw: amount,
+  basis: PayDateBasis.recurringSetting,
+);

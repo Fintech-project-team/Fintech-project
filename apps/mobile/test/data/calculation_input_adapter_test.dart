@@ -32,6 +32,7 @@ Map<String, Object?> alphaWithReceipt({
   final json = readSource('alpha-ready');
   salaryOf(json)['receiptEvidence'] = [
     {
+      'payMonth': '2026-09',
       'expectedPayDate': '2026-09-25',
       'transactionIds': ids,
       'confirmation': confirmation,
@@ -469,6 +470,128 @@ void main() {
       ]);
       expect(r.u, isNull);
       expect([r.b, r.e, r.r], [500000, null, 0]);
+      final salary = salaryOf(projected);
+      expect(salary.containsKey('receiptEvidence'), isFalse);
+      expect(salary.values.whereType<List<Object?>>(), isEmpty);
+      expect(
+        (projected['accessRestrictions']! as List).where(
+          (e) => (e as Map)['field'] == 'salary.receiptEvidence',
+        ),
+        hasLength(1),
+        reason: '근거 부모만 생략·표식하고 payMonth·confirmation을 따로 공개하지 않는다',
+      );
+    });
+  });
+
+  group('급여 명목 회차(payMonth, #92)', () {
+    Map<Object?, Object?> receiptOf(Map<String, Object?> json) =>
+        (salaryOf(json)['receiptEvidence']! as List).first as Map;
+
+    test('이동한 예정일(9/25→9/24)도 그 회차 월급일이며 정보 부족으로 분류하지 않는다', () {
+      final json = alphaWithReceipt();
+      receiptOf(json)['expectedPayDate'] = '2026-09-24';
+      final r = run(json);
+      expect(r.insufficient, isEmpty);
+      expect(r.salaryCycle!.previousPayDate!.payMonth.toString(), '2026-09');
+      expect(r.salaryCycle!.previousPayDate!.date.toString(), '2026-09-24');
+      expect(r.salaryCycle!.nextPayDate!.date.toString(), '2026-10-25');
+    });
+
+    test('같은 날 앞 회차는 확인됐고 현재 회차가 입금 전이면 원천을 보존하고 현재 구간만 제한한다', () {
+      final json = alphaWithReceipt();
+      (salaryOf(json)['receiptEvidence']! as List).add({
+        'payMonth': '2026-10',
+        'expectedPayDate': '2026-09-25',
+        'transactionIds': <String>[],
+        'confirmation': 'unknown',
+      });
+      final snapshot = FinancialSnapshot.fromJson(json);
+      expect(snapshot.settings!.salary.receiptEvidence, hasLength(2));
+      final r = run(json);
+      expect(r.insufficient, [calc.InsufficientReason.payDateConflict]);
+      expect(r.u, isNull);
+      expect(r.b, 2000000);
+    });
+
+    test('입금 전 이동 예정일(unknown, 거래 없음)은 경계로만 쓰고 입금 완료로 보지 않는다', () {
+      final json = alphaWithReceipt();
+      (salaryOf(json)['receiptEvidence']! as List).add({
+        'payMonth': '2026-10',
+        'expectedPayDate': '2026-10-23',
+        'transactionIds': <String>[],
+        'confirmation': 'unknown',
+      });
+      final r = run(json);
+      expect(r.insufficient, isEmpty);
+      expect(r.salaryCycle!.state, calc.SalaryCycleState.normal);
+      expect(r.salaryCycle!.periodEnd.toString(), '2026-10-23');
+      expect(r.salaryCycle!.nextReceipt, calc.SalaryReceiptStatus.unknown);
+      expect(r.b, 2000000);
+      expectLedgerIdentity(r);
+    });
+
+    test('payMonth와 예정일의 기간 차이만으로 거절하지 않는다', () {
+      final json = alphaWithReceipt();
+      (salaryOf(json)['receiptEvidence']! as List).add({
+        'payMonth': '2026-10',
+        'expectedPayDate': '2027-03-02',
+        'transactionIds': <String>[],
+        'confirmation': 'unknown',
+      });
+      expect(() => FinancialSnapshot.fromJson(json), returnsNormally);
+      expect(() => run(json), returnsNormally);
+    });
+
+    test('같은 회차 근거가 둘이면 계산 입력 오류', () {
+      final json = alphaWithReceipt();
+      (salaryOf(json)['receiptEvidence']! as List).add({
+        'payMonth': '2026-09',
+        'expectedPayDate': '2026-09-26',
+        'transactionIds': <String>[],
+        'confirmation': 'unknown',
+      });
+      expect(
+        () => run(json),
+        throwsA(
+          isA<calc.CalculationInputException>().having(
+            (e) => e.code,
+            'code',
+            calc.InputErrorCode.duplicateId,
+          ),
+        ),
+      );
+    });
+
+    test('payMonth 누락·null·다른 타입·형식 오류는 형식 오류이며 날짜로 채우지 않는다', () {
+      for (final bad in <Object?>[
+        null,
+        202609,
+        '2026-9',
+        '2026-13',
+        '0000-09',
+      ]) {
+        final json = alphaWithReceipt();
+        salaryOf(json)['receiptEvidence'] = [
+          <String, Object?>{...receiptOf(json).cast(), 'payMonth': bad},
+        ];
+        expect(
+          () => FinancialSnapshot.fromJson(json),
+          throwsA(isA<SnapshotFormatException>()),
+          reason: '$bad',
+        );
+      }
+      final missing = alphaWithReceipt();
+      receiptOf(missing).remove('payMonth');
+      expect(
+        () => FinancialSnapshot.fromJson(missing),
+        throwsA(isA<SnapshotFormatException>()),
+      );
+    });
+
+    test('기준 날짜 이후 입금으로 만든 confirmed를 과거 스냅샷에 섞으면 계약 위반', () {
+      final json = alphaWithReceipt();
+      txById(json, septemberSalaryTx)['bookingDate'] = '2026-10-25';
+      expect(() => run(json), contractError());
     });
   });
 }

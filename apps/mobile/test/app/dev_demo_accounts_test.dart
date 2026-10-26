@@ -32,7 +32,7 @@ void main() {
       final account = devDemoAccounts.singleWhere((a) => a.userId == userId);
       expect(user['name'], _designNames[userId], reason: userId);
       expect(account.name, user['name'], reason: userId);
-      expect(account.phone, user['syntheticPhone'], reason: userId);
+      expect(account.phone, user['phone'], reason: userId);
       expect(user.containsKey('syntheticName'), isFalse, reason: userId);
       expect(user.containsKey('displayName'), isFalse, reason: userId);
       expect(
