@@ -8,6 +8,7 @@ import '../features/connection/connection_flow.dart';
 import '../features/connection/connection_illustration.dart';
 import '../features/connection/connection_page.dart';
 import '../features/connection/connection_presentation_policy.dart';
+import '../features/overview/home_screen.dart' show HomeRefresh;
 import '../shared/design/payse_tokens.dart';
 import '../shared/design/primary_button.dart';
 import 'app_shell.dart';
@@ -59,9 +60,15 @@ EntryDestination entryDestination(FinancialSnapshot snapshot) {
 
 /// 2026-10-21: 스냅샷 조회 결과를 보관한다.
 /// 2026-10-23: 조회할 때마다 연결 흐름을 새로 만들어 이전 흐름의 상태·늦은 응답을 버린다.
+/// 2026-10-26: 홈 새로고침은 진입 조회와 따로 관리한다. 새로고침 중에도 홈(탭)을 유지하고, 성공하면 새 스냅샷,
+/// 실패하면 이전 스냅샷을 그대로 둔다. 세션 무효·다른 진입 화면이면 그 결과를 따른다.
 class _MainEntryState extends State<MainEntry> {
   late Future<SnapshotLoadResult> _result = _load();
   int _loads = 0;
+  FinancialSnapshot? _refreshed;
+  HomeRefresh _refresh = HomeRefresh.idle;
+  SnapshotLoadResult? _override;
+  int _refreshes = 0;
 
   /// 2026-10-21: 현재 스냅샷을 조회한다.
   /// 2026-10-22: 예상하지 못한 예외는 Flutter 오류로 보고한 뒤 다시 던져 다시 시도 화면을 보인다.
@@ -82,14 +89,67 @@ class _MainEntryState extends State<MainEntry> {
   @override
   void didUpdateWidget(covariant MainEntry oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.reloadKey != widget.reloadKey) _result = _load();
+    if (oldWidget.reloadKey != widget.reloadKey) {
+      _resetRefresh();
+      _result = _load();
+    }
   }
 
   /// 2026-10-23: 다시 조회한다. 다시 시도와 01-2 확인 뒤 재조회에 쓴다.
   void _reload() {
     setState(() {
+      _resetRefresh();
       _result = _load();
     });
+  }
+
+  /// 2026-10-26: 홈 새로고침 상태를 비우고 진행 중인 새로고침 응답을 버린다.
+  void _resetRefresh() {
+    _refreshes++;
+    _refreshed = null;
+    _override = null;
+    _refresh = HomeRefresh.idle;
+  }
+
+  /// 2026-10-26: 홈 새로고침. 진행 중이면 중복 요청하지 않는다. 늦게 온 이전 응답은 버린다.
+  void _refreshHome() {
+    if (_refresh == HomeRefresh.loading) return;
+    final id = ++_refreshes;
+    setState(() => _refresh = HomeRefresh.loading);
+    _load().then(
+      (result) {
+        if (!mounted || id != _refreshes) return;
+        setState(() => _applyRefresh(result));
+      },
+      onError: (Object _) {
+        if (!mounted || id != _refreshes) return;
+        setState(() => _refresh = HomeRefresh.failed);
+      },
+    );
+  }
+
+  /// 2026-10-26: 새로고침 결과 [result]를 반영한다. 홈 스냅샷이면 바꾸고, 조회 실패·형식 오류·계좌 묶음 누락이면
+  /// 이전 스냅샷을 유지한 채 실패로 표시한다. 세션 무효나 홈이 아닌 진입 화면이면 그 결과로 화면을 바꾼다.
+  void _applyRefresh(SnapshotLoadResult result) {
+    switch (result) {
+      case SnapshotLoaded(:final snapshot):
+        switch (entryDestination(snapshot)) {
+          case EntryDestination.home:
+            _refreshed = snapshot;
+            _refresh = HomeRefresh.idle;
+          case EntryDestination.unreadable:
+            _refresh = HomeRefresh.failed;
+          case EntryDestination.connect || EntryDestination.chooseAccounts:
+            _override = result;
+            _refresh = HomeRefresh.idle;
+        }
+      case SnapshotLoadFailed(:final error)
+          when error is FinancialLoadError && error.sessionInvalid:
+        _override = result;
+        _refresh = HomeRefresh.idle;
+      case SnapshotLoadFailed() || SnapshotFormatInvalid():
+        _refresh = HomeRefresh.failed;
+    }
   }
 
   /// 2026-10-21: 조회 중·실패·미연결·연결됨에 맞는 화면을 반환한다. 실패를 빈 자료로 바꾸지 않는다.
@@ -97,8 +157,11 @@ class _MainEntryState extends State<MainEntry> {
   /// 2026-10-23: 성공한 Snapshot만 [entryDestination]으로 나눈다. 01-2 확인 뒤에는 응답 Snapshot을 쓰지 않고
   /// 다시 조회해 판단하며, 재조회가 실패하면 홈 대신 다시 시도 화면을 보인다. 다시 조회하는 동안에는 이전 결과
   /// (이전 세션 Snapshot 포함)로 화면을 만들지 않고 로딩을 보인다.
+  /// 2026-10-26: 홈에 들어온 뒤의 새로고침 결과([_override])가 있으면 그것을 먼저 보인다.
   @override
   Widget build(BuildContext context) {
+    final override = _override;
+    if (override != null) return _fromResult(context, override);
     return FutureBuilder<SnapshotLoadResult>(
       future: _result,
       builder: (context, snapshot) {
@@ -108,45 +171,48 @@ class _MainEntryState extends State<MainEntry> {
           );
         }
         if (snapshot.hasError) return _LoadError(onRetry: _reload);
-        return switch (snapshot.requireData) {
-          SnapshotLoaded(:final snapshot) => switch (entryDestination(
-            snapshot,
-          )) {
-            EntryDestination.home => Builder(
-              builder: (context) => AppShell(
-                snapshot: snapshot,
-                onReload: _reload,
-                devEntry: widget.devEntryBuilder(context),
-              ),
-            ),
-            EntryDestination.connect ||
-            EntryDestination.chooseAccounts => Builder(
-              builder: (context) => ConnectionFlow(
-                key: ValueKey(('connection-flow', _loads)),
-                repository: widget.financial,
-                snapshot: snapshot,
-                policy: widget.policy,
-                onFinished: _reload,
-                onSessionInvalid: widget.onSessionInvalid,
-                devEntry: widget.devEntryBuilder(context),
-                userName: widget.userName,
-              ),
-            ),
-            EntryDestination.unreadable => _LoadError(onRetry: _reload),
-          },
-          SnapshotLoadFailed(:final error)
-              when error is FinancialLoadError && error.sessionInvalid =>
-            _SessionEnded(onContinue: widget.onSessionInvalid),
-          SnapshotLoadFailed(:final error) => _LoadError(
-            onRetry: _reload,
-            offline:
-                error is FinancialLoadError &&
-                error.outcome is FinancialNetworkFailure,
-          ),
-          SnapshotFormatInvalid() => _LoadError(onRetry: _reload),
-        };
+        return _fromResult(context, snapshot.requireData);
       },
     );
+  }
+
+  /// 2026-10-26: 조회 결과 [result]에 맞는 화면을 반환한다. 홈은 새로고침으로 받은 스냅샷이 있으면 그것을 쓴다.
+  Widget _fromResult(BuildContext context, SnapshotLoadResult result) {
+    return switch (result) {
+      SnapshotLoaded(:final snapshot) => switch (entryDestination(snapshot)) {
+        EntryDestination.home => Builder(
+          builder: (context) => AppShell(
+            snapshot: _refreshed ?? snapshot,
+            onReload: _refreshHome,
+            refresh: _refresh,
+            devEntry: widget.devEntryBuilder(context),
+          ),
+        ),
+        EntryDestination.connect || EntryDestination.chooseAccounts => Builder(
+          builder: (context) => ConnectionFlow(
+            key: ValueKey(('connection-flow', _loads)),
+            repository: widget.financial,
+            snapshot: snapshot,
+            policy: widget.policy,
+            onFinished: _reload,
+            onSessionInvalid: widget.onSessionInvalid,
+            devEntry: widget.devEntryBuilder(context),
+            userName: widget.userName,
+          ),
+        ),
+        EntryDestination.unreadable => _LoadError(onRetry: _reload),
+      },
+      SnapshotLoadFailed(:final error)
+          when error is FinancialLoadError && error.sessionInvalid =>
+        _SessionEnded(onContinue: widget.onSessionInvalid),
+      SnapshotLoadFailed(:final error) => _LoadError(
+        onRetry: _reload,
+        offline:
+            error is FinancialLoadError &&
+            error.outcome is FinancialNetworkFailure,
+      ),
+      SnapshotFormatInvalid() => _LoadError(onRetry: _reload),
+    };
   }
 }
 

@@ -11,16 +11,19 @@ import 'placeholder_screens.dart';
 class AppShell extends StatefulWidget {
   /// 2026-10-20: [devEntry]는 개발 환경에서만 내 정보 탭 아래에 붙는 진입 위젯이며 릴리스에서는 null이다.
   /// 2026-10-23: [snapshot]은 진입 조회에 성공한 스냅샷, [onReload]는 진입 조회를 다시 실행한다.
+  /// 2026-10-26: [refresh]는 홈 새로고침 진행 상태이며 앱 진입 화면이 정한다.
   const AppShell({
     super.key,
     required this.snapshot,
     required this.onReload,
     this.devEntry,
+    this.refresh = HomeRefresh.idle,
   });
 
   final FinancialSnapshot snapshot;
   final VoidCallback onReload;
   final Widget? devEntry;
+  final HomeRefresh refresh;
 
   static const List<String> tabTitles = ['홈', '계좌', '계획', '내 정보'];
 
@@ -51,7 +54,11 @@ class _AppShellState extends State<AppShell> {
       body: IndexedStack(
         index: _index,
         children: [
-          HomeScreen(calculation: _calculation, onReload: widget.onReload),
+          HomeScreen(
+            calculation: _calculation,
+            onReload: widget.onReload,
+            refresh: widget.refresh,
+          ),
           const TabPlaceholder(title: '계좌'),
           const TabPlaceholder(title: '계획'),
           TabPlaceholder(title: '내 정보', footer: widget.devEntry),

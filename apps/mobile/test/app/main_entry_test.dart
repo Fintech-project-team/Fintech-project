@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:payse/app/main_entry.dart';
@@ -51,6 +53,48 @@ class _ThrowingRepository extends ScriptedRepository {
   @override
   Future<FinancialOutcome<Map<String, Object?>>> loadSnapshot() async =>
       throw StateError('boom');
+}
+
+/// 2026-10-26: 조회를 [results] 순서로 돌려주되 [hold]가 있으면 그 결과가 끝날 때까지 기다리는 저장소. 조회 수를 센다.
+class _CountingRepository extends ScriptedRepository {
+  int loads = 0;
+  Completer<FinancialOutcome<Map<String, Object?>>>? hold;
+
+  /// 2026-10-26: 조회 수를 세고 보류 중이면 기다린다.
+  @override
+  Future<FinancialOutcome<Map<String, Object?>>> loadSnapshot() async {
+    loads++;
+    final pending = hold;
+    if (pending != null) {
+      hold = null;
+      return pending.future;
+    }
+    return super.loadSnapshot();
+  }
+}
+
+/// 2026-10-26: 선택 계좌가 있는 홈 스냅샷 JSON. [balance]로 첫 포함 계좌 잔액을 바꿔 새 스냅샷임을 구분한다.
+Map<String, Object?> _homeJson({int? balance, String version = '1'}) {
+  final kb = betaSnapshot({...betaBanks}).accounts!.first.accountId;
+  return betaJson(
+    {...betaBanks},
+    selected: {kb},
+    version: version,
+    mutate: balance == null
+        ? null
+        : (source) {
+            for (final a in source['accounts']! as List) {
+              final account = a as Map<String, Object?>;
+              if (account['accountId'] == kb) account['balanceKRW'] = balance;
+            }
+          },
+  );
+}
+
+/// 2026-10-26: 홈 머리의 새로고침 버튼을 누르고 한 프레임 진행한다.
+Future<void> _tapRefresh(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('home-reload')));
+  await tester.pump();
 }
 
 void main() {
@@ -185,4 +229,104 @@ void main() {
       expect(repo.selectCalls.single.$1, [kb]);
     },
   );
+
+  group('home refresh keeps the home and its previous snapshot', () {
+    testWidgets(
+      'loading shows the home skeleton, success shows the new snapshot',
+      (tester) async {
+        final repo = _CountingRepository()
+          ..loadResults.addAll([
+            FinancialOk(_homeJson()),
+            FinancialOk(_homeJson(balance: 1234567, version: '2')),
+          ]);
+        await pumpEntry(tester, repo);
+        final hold = Completer<FinancialOutcome<Map<String, Object?>>>();
+        repo.hold = hold;
+
+        await _tapRefresh(tester);
+        expect(find.byKey(const ValueKey('home-loading')), findsOneWidget);
+        expect(find.byType(NavigationBar), findsOneWidget, reason: '탭은 유지');
+        expect(find.byKey(const ValueKey('home-reload')), findsNothing);
+
+        hold.complete(repo.loadResults.removeFirst());
+        await tester.pump();
+        await tester.pump();
+        expect(find.byKey(const ValueKey('home-loading')), findsNothing);
+        expect(find.text('1,234,567원'), findsOneWidget);
+        expect(find.byKey(const ValueKey('home-refresh-failed')), findsNothing);
+        expect(repo.loads, 2);
+      },
+    );
+
+    testWidgets(
+      'a failed refresh restores the previous snapshot; retry clears the notice',
+      (tester) async {
+        final repo = _CountingRepository()
+          ..loadResults.addAll([
+            FinancialOk(_homeJson(balance: 777000)),
+            const FinancialUnavailable(),
+            FinancialOk(_homeJson(balance: 888000, version: '2')),
+          ]);
+        await pumpEntry(tester, repo);
+        expect(find.text('777,000원'), findsOneWidget);
+
+        await _tapRefresh(tester);
+        await tester.pump();
+        await tester.pump();
+        expect(find.text('새 정보를 불러오지 못했어요'), findsOneWidget);
+        expect(find.text('777,000원'), findsOneWidget, reason: '이전 스냅샷 복원');
+
+        await tester.tap(find.byKey(const ValueKey('home-refresh-retry')));
+        await tester.pump();
+        expect(
+          find.byKey(const ValueKey('home-refresh-failed')),
+          findsNothing,
+          reason: '다시 시도하면 로딩으로',
+        );
+        await tester.pump();
+        await tester.pump();
+        expect(find.text('888,000원'), findsOneWidget);
+        expect(find.byKey(const ValueKey('home-refresh-failed')), findsNothing);
+        expect(repo.loads, 3);
+      },
+    );
+
+    testWidgets('a refresh in progress ignores repeated requests', (
+      tester,
+    ) async {
+      final repo = _CountingRepository()
+        ..loadResults.addAll([
+          FinancialOk(_homeJson()),
+          FinancialOk(_homeJson()),
+        ]);
+      await pumpEntry(tester, repo);
+      final hold = Completer<FinancialOutcome<Map<String, Object?>>>();
+      repo.hold = hold;
+      await _tapRefresh(tester);
+      await tester.tap(find.byType(NavigationBar).first, warnIfMissed: false);
+      await tester.pump();
+      expect(repo.loads, 2);
+      hold.complete(repo.loadResults.removeFirst());
+      await tester.pump();
+      await tester.pump();
+      expect(repo.loads, 2);
+    });
+
+    testWidgets('session invalid during refresh hands over to a new login', (
+      tester,
+    ) async {
+      var handedOver = 0;
+      final repo = _CountingRepository()
+        ..loadResults.addAll([
+          FinancialOk(_homeJson()),
+          const FinancialSessionInvalid(),
+        ]);
+      await pumpEntry(tester, repo, onSessionInvalid: () => handedOver++);
+      await _tapRefresh(tester);
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+      expect(handedOver, 1);
+    });
+  });
 }

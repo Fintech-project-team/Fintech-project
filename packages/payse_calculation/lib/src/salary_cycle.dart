@@ -293,3 +293,27 @@ SalaryCycle resolveSalaryCycle(BusinessDate today, SalaryInput salary) {
       );
   }
 }
+
+/// 2026-10-26: [cycle]에서 [today]가 정상 주기의 어디쯤인지(0~1)를 반환한다. 홈 달 표시용 진행 정보이며
+/// 금액·주기 전환 계산에는 쓰지 않는다. 입금 대기·정보 부족이면 null이다.
+/// 기준 시작일은 실제 주기 시작일이고, 다음 회차 조기 입금 확인으로 시작일을 모르면 그 회차 예정일을 쓴다.
+/// 진행률 = (오늘 − 기준 시작일) ÷ (주기 마지막 날 − 기준 시작일)이며 기준 시작일 전은 0, 마지막 날은 1이다.
+double? cycleProgress(SalaryCycle cycle, BusinessDate today) {
+  if (cycle.state != SalaryCycleState.normal) return null;
+  final basis = cycle.periodStart ?? cycle.nextPayDate?.date;
+  final end = cycle.periodEnd;
+  if (basis == null || end == null) return null;
+  final span = _daysBetween(basis, end.addDays(-1));
+  if (span <= 0) return 1;
+  final elapsed = _daysBetween(basis, today);
+  if (elapsed <= 0) return 0;
+  if (elapsed >= span) return 1;
+  return elapsed / span;
+}
+
+/// 2026-10-26: [from]에서 [to]까지의 날짜 수(음수 가능).
+int _daysBetween(BusinessDate from, BusinessDate to) => DateTime.utc(
+  to.year,
+  to.month,
+  to.day,
+).difference(DateTime.utc(from.year, from.month, from.day)).inDays;

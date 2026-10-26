@@ -44,10 +44,15 @@ bool showsCompositionBar(CompositionBarState state) => switch (state) {
 /// 2026-10-26: 02-2 금액 구성 바와 범례. 높이 6·간격 3·양 끝 반경 3dp, 테두리·그림자 없음.
 /// 구간 길이는 계산 결과의 R−O·E·U를 그대로 비율로 쓰며 0원 구간과 그 범례는 생략한다.
 class CompositionBar extends StatelessWidget {
-  /// 2026-10-26: U가 있고 B>0인 계산 결과 [result]로 만든다.
-  const CompositionBar({super.key, required this.result});
+  /// 2026-10-26: U가 있고 B>0인 계산 결과 [result]로 만든다. 홈은 [showLegend]를 false로 넘겨 바만 보인다.
+  const CompositionBar({
+    super.key,
+    required this.result,
+    this.showLegend = true,
+  });
 
   final calc.CurrentAmountResult result;
+  final bool showLegend;
 
   /// 2026-10-26: 상태에 맞는 바·범례를 반환한다. 바를 그리지 않는 상태면 빈 상자다.
   @override
@@ -81,21 +86,23 @@ class CompositionBar extends StatelessWidget {
               child: bar,
             ),
           ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: PayseSpace.x4,
-          runSpacing: PayseSpace.x1,
-          children: [
-            for (final s in segments)
-              ExcludeSemantics(
-                child: ColorChipLabel(
-                  label: s.$1,
-                  color: s.$2,
-                  style: DetailTypography.secondary,
+        if (showLegend) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: PayseSpace.x4,
+            runSpacing: PayseSpace.x1,
+            children: [
+              for (final s in segments)
+                ExcludeSemantics(
+                  child: ColorChipLabel(
+                    label: s.$1,
+                    color: s.$2,
+                    style: DetailTypography.secondary,
+                  ),
                 ),
-              ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ],
     );
   }

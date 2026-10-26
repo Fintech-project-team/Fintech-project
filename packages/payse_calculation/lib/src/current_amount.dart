@@ -124,6 +124,7 @@ class CurrentAmountResult {
     required this.deductionKrw,
     required Map<ObligationPlacement, ObligationTotal>? placementTotals,
     required this.settledTotal,
+    required this.cycleProgress,
   }) : insufficient = List.unmodifiable(insufficient),
        obligationLines = obligationLines == null
            ? null
@@ -164,6 +165,9 @@ class CurrentAmountResult {
 
   /// 2026-10-26: 포함 계좌 의무의 유효 정산액(이미 나간 돈) 합계와 정산액이 있는 의무 건수. B에 이미 반영된 출금이다.
   final ObligationTotal? settledTotal;
+
+  /// 2026-10-26: 정상 월급 주기의 진행률(0~1, 홈 달 표시용). 입금 대기·정보 부족이면 null이다([cycleProgress]).
+  final double? cycleProgress;
 
   /// 2026-10-23: U를 계산했으면 true. false면 insufficient에 이유가 있다.
   bool get calculated => u != null;
@@ -307,6 +311,7 @@ CurrentAmountResult calculateCurrentAmount(CurrentAmountInput input) {
     deductionKrw: u == null ? null : addKrw(e!, rEff!, 'E+(R-O)'),
     placementTotals: placementTotals,
     settledTotal: settledTotal,
+    cycleProgress: cycle == null ? null : cycleProgress(cycle, today),
   );
 }
 
