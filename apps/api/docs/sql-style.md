@@ -14,23 +14,25 @@
 
 ## 파일의 책임
 
-| 경로                                                | 책임                                                      |
-| --------------------------------------------------- | --------------------------------------------------------- |
-| `database/001_initial.sql`                          | 빈 DB의 공통 테이블·기본 제약·인덱스·RLS 정의             |
-| `database/002_storage_guards.sql`                   | 저장 관계·금액 상한·불변 조건의 함수·트리거 정의          |
-| `database/003_auth_access.sql`                      | 인증 SQL의 실행 순서와 하나의 적용 트랜잭션 관리          |
-| `database/auth/preflight.sql`                       | 기존 스키마·RLS·역할·권한 사전 검사와 권한 역할 준비      |
-| `database/auth/storage.sql`                         | 비활성 시각·요청 제한 저장 구조·RLS·테이블 권한           |
-| `database/auth/limits.sql`                          | 실행 환경 검사·행 잠금·IP/자격 조합 제한 함수             |
-| `database/auth/sessions.sql`                        | 자격 후보 조회와 활성 세션·사용자 확인 함수               |
-| `database/auth/permissions.sql`                     | 함수 소유권·PUBLIC 회수·runtime 실행 권한                 |
-| `database/test_*.sql`                               | 준비 자료 대조 또는 주제별 DB 검증. 제품 초기화와 분리    |
-| `reference_data/export_sql.py`                      | 기관 기준정보 적재 SQL 생성                               |
-| `fixtures/export_sql.py`                            | 일반 사용자·금융 원천 적재 SQL 생성                       |
-| `testing/scenarios/`                                | 명시 선택한 검증 사례의 설정·이력 준비                    |
-| `tests/legacy/*.sql`, `database/migrations/*v2.sql` | 과거 DB 구조·함수 본문 대조 기준. 일반 포맷 대상에서 제외 |
+| 경로                                                | 책임                                                                   |
+| --------------------------------------------------- | ---------------------------------------------------------------------- |
+| `database/001_initial.sql`                          | 빈 DB의 공통 테이블·기본 제약·인덱스·RLS 정의                          |
+| `database/002_storage_guards.sql`                   | 저장 관계·금액 상한·불변 조건의 함수·트리거 정의                       |
+| `database/003_auth_access.sql`                      | 인증 SQL의 실행 순서와 하나의 적용 트랜잭션 관리                       |
+| `database/auth/preflight.sql`                       | 기존 스키마·RLS·역할·권한 사전 검사와 권한 역할 준비                   |
+| `database/auth/storage.sql`                         | 비활성 시각·요청 제한 저장 구조·RLS·테이블 권한                        |
+| `database/auth/limits.sql`                          | 실행 환경 검사·행 잠금·IP/자격 조합 제한 함수                          |
+| `database/auth/sessions.sql`                        | 자격 후보 조회와 활성 세션·사용자 확인 함수                            |
+| `database/auth/permissions.sql`                     | 함수 소유권·PUBLIC 회수·runtime 실행 권한                              |
+| `database/004_auth_sessions.sql`                    | 003 이후 세션 전이 추가의 사전 검사·함수·권한을 단일 트랜잭션으로 실행 |
+| `database/auth_sessions/`                           | 004 전용 사전 검사·세션 생성/종료·최소 권한 정의                       |
+| `database/test_*.sql`                               | 준비 자료 대조 또는 주제별 DB 검증. 제품 초기화와 분리                 |
+| `reference_data/export_sql.py`                      | 기관 기준정보 적재 SQL 생성                                            |
+| `fixtures/export_sql.py`                            | 일반 사용자·금융 원천 적재 SQL 생성                                    |
+| `testing/scenarios/`                                | 명시 선택한 검증 사례의 설정·이력 준비                                 |
+| `tests/legacy/*.sql`, `database/migrations/*v2.sql` | 과거 DB 구조·함수 본문 대조 기준. 일반 포맷 대상에서 제외              |
 
-`auth/`의 파일은 `003_auth_access.sql` 내부에서만 순서대로 실행한다. 트랜잭션 제어용 `BEGIN`/`COMMIT`은 진입점에만 두고 하위 파일은 단독 실행하지 않는다. 함수 내부의 `BEGIN`/`END` 블록은 유지한다. 초기 테이블 정의와 저장 제약은 기존 이행 도구의 입력이므로 파일을 옮길 때 해당 도구도 함께 검증한다. 같은 정의를 편집 가능한 복사본 두 곳에 보관하지 않는다.
+`auth/`의 파일은 `003_auth_access.sql`, `auth_sessions/`의 파일은 `004_auth_sessions.sql` 내부에서만 순서대로 실행한다. 004를 적용하려고 기존 001/002/003을 재실행하지 않는다. 트랜잭션 제어용 `BEGIN`/`COMMIT`은 진입점에만 두고 하위 파일은 단독 실행하지 않는다. 함수 내부의 `BEGIN`/`END` 블록은 유지한다. 초기 테이블 정의와 저장 제약은 기존 이행 도구의 입력이므로 파일을 옮길 때 해당 도구도 함께 검증한다. 같은 정의를 편집 가능한 복사본 두 곳에 보관하지 않는다.
 
 ## 실행 경로와 분리 파일
 

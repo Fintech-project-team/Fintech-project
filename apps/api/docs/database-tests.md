@@ -81,3 +81,16 @@ python -B apps/api/database/test_auth_jdbc.py `
 기존 서버 주소·운영 DB 자격을 입력받지 않는다. 전체 Java 검사와 Java 주석 검사를 실행하며 DB 접속/관계 입력은 파일·명령 인자에 저장하지 않는다. 결과 JSON·JUnit 요약으로 실패·건너뜀을 구분하고 인증 제한 행을 제외한 공통 테이블이 그대로인지 대조한다. 종료 시 새 클러스터와 임시 접속 자격을 정리한다.
 
 실제 검증 범위는 최소 권한 함수 호출, 같은 연결의 역할/소유자 문맥 제거, 풀 크기 1의 IP 선행 커밋→후속 롤백, 실패 5회·IP 60회 경계, 동시 호출, SQL 오류를 잡은 콜백의 거짓 성공 방지다. 기본 Gradle 검사에서 전용 `PAYSE_AUTH_TEST_*` 환경이 없으면 실제 DB 검사는 SKIPPED다. 이 실행기의 실제 PostgreSQL 결과를 함께 기록해야 하며 HTTP 로그인·세션 발급·모바일 검증 완료로 보고하지 않는다.
+
+## 세션 전이·인증 서비스 검사
+
+신규 세션 함수·권한·경합은 `test_auth_sessions.py`, 서비스와 실제 JDBC 연결은 `test_session_service.py`로 검사한다. 두 실행기 모두 새 폐기용 PostgreSQL 클러스터만 사용하고 기존 서버 주소·서비스 DB 자격을 받지 않는다.
+
+```powershell
+python -B apps/api/database/test_auth_sessions.py --pg-bin "C:\Program Files\PostgreSQL\15\bin" --work-dir "$env:TEMP\payse-session-sql-$([guid]::NewGuid().ToString('N'))"
+python -B apps/api/database/test_session_service.py --pg-bin "C:\Program Files\PostgreSQL\15\bin" --work-dir "$env:TEMP\payse-session-service-$([guid]::NewGuid().ToString('N'))"
+```
+
+검증은 세션 한 개만 생성되는 동시 로그인, 기존 세션 우선, 동일 세션 재확인, 다른 사용자 자격 거절, 로그아웃·조회 경합, IP 선행 커밋·실패 누적과 전체 롤백, 권한·원천 보존을 구분한다. 테스트 준비는 새 UUID와 검증된 관계를 사용하며 제품 더미의 표시명이나 첫 행에 의존하지 않는다.
+
+일반 Gradle 검사에서 전용 DB 환경이 없으면 실제 JDBC 검사는 SKIPPED다. 네이티브 실행기의 결과를 함께 확인하며 HTTP API·모바일 통합이 통과한 것으로 기록하지 않는다. 운영 시드의 인증 코드를 자동 활성화하지 않는다.

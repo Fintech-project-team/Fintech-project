@@ -12,6 +12,8 @@
 
 DB의 `source_contexts.salary_evidence`는 필드 의미와 값을 유지해 `settings.salary.receiptEvidence`에 매핑한다. `unknown`·`transactionIds=[]`인 미래 예정 원천도 공개 권한이 있으면 포함한다. 해당 회차 원천이 없으면 생성하지 않는다. 반복 설정을 이용한 예상 예정일은 Flutter에서 계산하며, 원천 배열이나 서버 응답의 새 계산 필드로 추가하지 않는다. 기존 부모 키 생략·접근 제한 표식은 유지한다.
 
+다음 명목 회차와 다음 계산 경계의 구분은 [급여 데이터 모델](data-model.md#급여-회차와-예정일)을 따른다. 서버는 다음 명목 회차의 원천만 남기거나 Flutter가 고른 경계에 맞춰 원천 날짜·회차를 다시 쓰지 않는다. 같은 회차의 원천 우선, 원천이 없는 회차의 반복 예상, 이후 회차 중 먼저 도래하는 유효 예정일 선택은 Flutter 책임이며 응답 스키마·sourceVersion·receiptEvidence의 원천 값 변경을 요구하지 않는다.
+
 Snapshot 및 TransactionPage의 공통 JSON 필드 H(HTTP 헤더가 아님):
 
 ```text

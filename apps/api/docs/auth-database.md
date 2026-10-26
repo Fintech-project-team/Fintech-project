@@ -1,6 +1,6 @@
 # 인증 DB 접근과 요청 제한 저장
 
-담당은 A다. [인증 설계](v0.6/auth-design.md)의 DB 부분을 [003_auth_access.sql](../database/003_auth_access.sql)로 구현한다. 외부 요청·오류·제한 수치의 단일 기준은 [HTTP 계약](../../../docs/api-contract.md)이다. Java Repository와 트랜잭션 실행 기반은 구현돼 있다. Service·HTTP 연결, 세션 발급/종료·재확인, 탈퇴/파쇄는 후속 구현이다.
+담당은 A다. [인증 설계](v0.6/auth-design.md)의 DB 부분을 [003_auth_access.sql](../database/003_auth_access.sql)로 구현한다. 외부 요청·오류·제한 수치의 단일 기준은 [HTTP 계약](../../../docs/api-contract.md)이다. Java Repository·트랜잭션 기반과 AuthService의 세션 생성·종료·재확인을 구현한다. 세션 전이는 별도 [004_auth_sessions.sql](../database/004_auth_sessions.sql)에서 제공한다. 실제 HTTP 연결·탈퇴·파쇄는 미구현이다.
 
 ## 적용과 보존
 
@@ -9,6 +9,7 @@
 - 새 역할은 클러스터 전체에 적용되므로 DB와 역할의 기존 권한을 함께 검토한다. 이름 전환·공통 저장·급여 v3 이행이 필요한 구 DB에 이 파일을 바로 실행하지 않는다.
 - 기존 사용자/세션/금융 행·ID·금액·날짜·버전은 변경하지 않는다. `users`에 nullable `deactivated_at`·`purge_after`만 추가한다. 두 값은 함께 null 또는 함께 유한한 시각이고 파쇄 시각이 비활성 시각보다 늦어야 한다. 서울 달력상 1년 산정·탈퇴 원자 처리·파쇄는 이 SQL의 구현 범위가 아니다.
 - `auth_rate_limits`는 서버 인증 제한 상태이며 더미 전용 저장소가 아니다. 종류·HMAC 키·시각 배열·차단 종료 시각만 저장한다. 이름·전화번호·IP·코드 원문, 세션 토큰 원문은 저장하지 않는다.
+- `004_auth_sessions.sql`은 003 적용을 확인한 DB에 명시적으로 한 번 적용하는 별도 진입점이다. 기존 001/002/003을 다시 실행하지 않는다. 신규 테이블·컬럼이나 기존 행 변경 없이 세션 전이 함수·최소 열 권한·정책만 추가한다. 중복 적용·사전 조건 불일치·하위 파일 실패는 전체 롤백한다.
 - 배치 적용 도구는 저장소 파일만 적용한다. DB 접속·역할 생성·DDL 실행·시드 활성화·Git 변경은 수행하지 않는다.
 
 ## 역할과 신뢰 경계
@@ -17,7 +18,7 @@
 
 runtime은 사용자 id/data_version과 소유자 RLS가 적용된 금융 자료를 조회한다. 기존 저장 트리거를 위해 data_version UPDATE와 `assert_user_storage` 실행만 추가 허용한다. 원천 금융 쓰기·세션/인증 비밀/제한 테이블 직접 접근·비활성 컬럼 수정은 허용하지 않는다. 실제 설정 쓰기 권한은 해당 저장 기능에서 필요한 컬럼·경로만 추가한다.
 
-auth_owner에는 사용자 인증 조회·사용자 행 잠금·세션 조회·제한 상태 갱신 권한만 준다. FORCE RLS를 유지하면서 인증 테이블에만 해당 역할 정책을 추가하며 금융 테이블의 기존 정책은 바꾸지 않는다. 신규 함수는 고정 `search_path`를 사용하고 PUBLIC 실행 권한을 회수한다. private 보조 함수는 runtime이 호출할 수 없다. 기존 소유자 정책·RLS/FORCE 상태, 역할 속성/멤버십/소유 함수, 테이블·컬럼·기본 권한, 스키마 쓰기 권한이 맞지 않으면 자동 수정하지 않고 적용을 거절한다.
+003의 auth_owner에는 사용자 인증 조회·사용자 행 잠금·세션 조회·제한 상태 갱신 권한을 준다. 004는 세션의 id/user_id/token_digest/issued_at INSERT와 ended_at UPDATE 및 해당 RLS 정책만 추가한다. runtime의 세션 직접 읽기·쓰기 권한은 늘리지 않는다. FORCE RLS를 유지하면서 인증 테이블에만 해당 역할 정책을 추가하며 금융 테이블의 기존 정책은 바꾸지 않는다. 신규 함수는 고정 `search_path`를 사용하고 PUBLIC 실행 권한을 회수한다. private 보조 함수는 runtime이 호출할 수 없다. 기존 소유자 정책·RLS/FORCE 상태, 역할 속성/멤버십/소유 함수, 테이블·컬럼·기본 권한, 스키마 쓰기 권한이 맞지 않으면 자동 수정하지 않고 적용을 거절한다.
 
 runtime은 신뢰된 서버 역할이다. PostgreSQL의 사용자 설정값은 임의 SQL을 실행할 수 있는 runtime도 바꿀 수 있으므로, 기존 `payse.user_id` RLS가 탈취된 DB 자격이나 임의 SQL 실행까지 막는다고 주장하지 않는다. 앱에는 DB 자격을 배포하지 않으며 Repository는 바인딩과 아래 토큰 경로를 강제해야 한다.
 
@@ -48,13 +49,13 @@ runtime은 신뢰된 서버 역할이다. PostgreSQL의 사용자 설정값은 �
 
 ## Java 호출 기반
 
-`auth.AuthRepository`는 위 함수 5개만 `JdbcTemplate` 파라미터로 호출한다. `recordIp`는 허용 여부/재시도 시각, `retryAt`·`recordFailure`는 nullable 재시도 시각, `findCode`는 코드 대조용 `StoredCode` 후보, `authorize`는 현재 트랜잭션의 `Session` 소유자를 반환한다. 이 객체들은 서버 내부 자료이며 외부 JSON 응답이 아니다. `StoredCode.toString()`은 verifier와 사용자 ID를 숨긴다.
+`auth.AuthRepository`는 위 기반 함수 5개와 아래 세션 함수 3개를 `JdbcTemplate` 파라미터로 호출한다. `recordIp`는 허용 여부/재시도 시각, `retryAt`·`recordFailure`는 nullable 재시도 시각, `findCode`는 코드 대조용 `StoredCode` 후보, `authorize`는 현재 트랜잭션의 `Session` 소유자를 반환한다. 이 객체들은 서버 내부 자료이며 외부 JSON 응답이 아니다. `StoredCode.toString()`은 verifier와 사용자 ID를 숨긴다.
 
 `auth.AuthTransactions.run`은 같은 DataSource의 JDBC 트랜잭션 관리자를 사용한다. 기존 트랜잭션·동기화·바인딩된 연결 안에서의 중첩 실행을 거절하고 READ COMMITTED·읽기/쓰기·`SET LOCAL ROLE payse_runtime`을 적용한다. 콜백 후 같은 연결의 `SELECT 1`로 DB가 오류 상태인지 확인하고 커밋·연결 반환까지 성공해야 결과를 돌려준다. 요청별 상태는 콜백 지역값에 둔다. SQL/트랜잭션 장애는 원문·원인 체인이 없는 `AuthStoreException`이며 인증 불일치나 빈 결과로 바꾸지 않는다. Repository가 DB 조회/결과 해석 장애를 발견하면 rollback-only를 표시하므로 호출자가 예외를 잡아도 정상 커밋할 수 없다.
 
-호출 예시는 `transactions.run(() -> repository.recordIp(ipKey))`를 끝낸 뒤 별도 `run`에서 조합 제한→자격 비교→실패 기록을 처리하는 순서다. 실패 대조는 결과값을 반환해 커밋하고, 이후 HTTP 오류로 변환한다. 토큰 확인 후 금융 조회는 하나의 `run` 안에서 수행한다. 콜백에서 외부 API/LLM 호출·비동기 스레드 전환·직접 COMMIT/ROLLBACK/SET ROLE·예외를 잡은 뒤 금융 작업 계속하기는 허용하지 않는다. 콜백 내부 업무 정책과 HTTP 순서 집행은 후속 서비스 구현·검증 대상이다.
+호출 예시는 `transactions.run(() -> repository.recordIp(ipKey))`를 끝낸 뒤 별도 `run`에서 조합 제한→자격 비교→실패 기록을 처리하는 순서다. 실패 대조는 결과값을 반환해 커밋하고, 이후 HTTP 오류로 변환한다. 토큰 확인 후 금융 조회는 하나의 `run` 안에서 수행한다. 콜백에서 외부 API/LLM 호출·비동기 스레드 전환·직접 COMMIT/ROLLBACK/SET ROLE·예외를 잡은 뒤 금융 작업 계속하기는 허용하지 않는다. 인증 서비스의 순서는 아래 구현 절을 따르며 HTTP 경계의 순서 집행은 후속 검증 대상이다.
 
-Spring의 `database` 프로필에서만 두 bean을 등록한다. 기존 무DB 시작·생존 확인과 업무 HTTP 차단을 유지하며, 등록 자체가 로그인 API 개방이나 시드 활성화를 의미하지 않는다. `findCode`는 계정 활성/기존 세션/사용자 잠금 뒤 재검사를 완료하지 않으므로 자격 후보를 로그인 성공으로 반환하면 안 된다. 서버 저장 name을 포함한 실제 세션 발급에는 별도 전이 함수·권한·서비스가 필요하다.
+Spring의 `database` 프로필에서만 Repository·Transactions 두 bean을 등록한다. 기존 무DB 시작·생존 확인과 업무 HTTP 차단을 유지하며, 등록 자체가 로그인 API 개방이나 시드 활성화를 의미하지 않는다. `findCode`는 계정 활성/기존 세션/사용자 잠금 뒤 재검사를 완료하지 않으므로 자격 후보를 로그인 성공으로 반환하면 안 된다. 서버 저장 name을 포함한 세션 발급은 아래 004 전이와 AuthService에서 처리한다.
 
 트랜잭션 실행 방식은 [Spring TransactionTemplate](https://docs.spring.io/spring-framework/reference/data-access/transaction/programmatic.html), 파라미터 바인딩·동일 연결 사용은 [Spring JDBC](https://docs.spring.io/spring-framework/reference/data-access/jdbc/core.html)를 따른다. 운영에서 JDBC 파라미터/DB 원문 오류를 출력하는 추적 로그를 켜지 않는다. `toString` 숨김만으로 임의 직렬화나 추적 로그까지 차단되는 것은 아니다.
 
@@ -65,3 +66,23 @@ Spring의 `database` 프로필에서만 두 bean을 등록한다. 기존 무DB �
 제한 행 정리·키 교체·실제 시드 verifier 활성화는 자동 실행하지 않는다. 만료 행 정리는 유효 이벤트·차단을 보존하는 별도 작업으로 추가해야 한다. DB 함수 검증은 실제 HTTP 인증, 프론트 연결, v3 모바일 동기화 완료를 뜻하지 않는다.
 
 공식 근거: [PostgreSQL 15 RLS](https://www.postgresql.org/docs/15/ddl-rowsecurity.html), [SECURITY DEFINER와 함수 설정](https://www.postgresql.org/docs/15/sql-createfunction.html#SQL-CREATEFUNCTION-SECURITY), [행 잠금](https://www.postgresql.org/docs/15/explicit-locking.html). 제한 횟수·시간은 공식 의무값이 아니라 상위 계약의 사용자 결정이다.
+
+## 세션 전이와 인증 서비스
+
+| 함수                               | 결과와 책임                                                                                                                       |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `auth_login_account(name,phone)`   | 사용자 행 잠금 뒤 같은 ID·조합의 현재 이름/verifier 0~1행. 비활성·DISABLED도 코드 비교 후보로 유지하며 인증 성공을 뜻하지 않는다. |
+| `auth_open_session(userId,digest)` | 활성 계정·활성 세션 부재를 재검사하고 저장된 사용자/세션/이름/발급 시각을 반환. 기존 세션은 종료하지 않는다.                      |
+| `auth_end_session(digest)`         | 기존 authorize로 사용자·세션을 잠금 재확인한 후 현재 세션의 ended_at만 저장하고 사용자 문맥을 비움. 무효 토큰은 false.            |
+
+`AuthService`는 `database`와 `auth` 프로필이 모두 있을 때 등록된다. 실제 HTTP 경로는 계속 차단돼 있으며 이 서비스 등록만으로 로그인 API를 개방하지 않는다. 필요한 서버 비밀은 기존 auth 프로필 설정으로 주입한다. 기존 DISABLED 시드를 자동 활성화하거나 새 사용자·금융 자료를 생성하지 않는다.
+
+- `login`: IP 기록을 먼저 커밋·연결 반환 → 입력 검증 → 조합 잠금·차단 확인 → 사용자 잠금·현재 코드 대조 → 세션 생성. 이름과 issuedAt은 DB 저장 결과이며 토큰은 커밋이 성공한 뒤에만 반환한다.
+- `reverify`: IP 기록·조합 제한 뒤 현재 토큰의 소유자 한 명만 잠근다. 입력 자격의 소유자와 코드를 비교하며 다른 사용자를 추가로 잠그지 않는다. 실패 시 기존 세션은 유지하며 성공에도 새 토큰·세션을 만들지 않는다.
+- `logout`: 현재 세션만 명시 종료한다. 이미 무효인 토큰은 SESSION_INVALID이고 금융 자료·설정은 유지한다.
+- 자격 실패는 `AuthResult.Failure`로 반환하여 제한 기록을 커밋한다. 기존 세션/비활성 때문에 거절된 정확한 자격은 실패 횟수를 늘리지 않는다. 저장·커밋 장애는 `AuthStoreException`이며 HTTP 어댑터가 503으로 변환해야 한다.
+- `rejectMalformed`는 해석할 수 없는 인증 본문도 IP에 한 번 세기 위한 서비스 진입점이다. 후속 HTTP 어댑터는 동일 요청에서 이 메서드와 login/reverify를 중복 호출하지 않아야 한다. 본문 제한·JSON 파싱·신뢰 프록시·Bearer 해석·Retry-After·no-store 처리는 HTTP 구현에서 검증한다.
+
+`AuthResult`는 HTTP DTO가 아닌 내부 결과다. Login에는 최초 성공에 필요한 토큰만, Verified에는 기존 userId/sessionId만, Failure에는 오류 종류와 제한 시각만 둔다. 토큰·코드·이름 원문을 예외나 자동 문자열 표현에 포함하지 않는다. 인증 함수에 금융 dataVersion 변경이나 급여 계산을 추가하지 않는다.
+
+검사는 [DB 테스트](database-tests.md)의 실제 PostgreSQL 실행기를 사용한다. SQL 전이·서비스 통과와 실제 HTTP 로그인·Flutter 통합·배포 완료는 별도다.

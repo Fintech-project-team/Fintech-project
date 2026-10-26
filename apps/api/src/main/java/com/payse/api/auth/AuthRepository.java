@@ -17,9 +17,10 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * 기존 인증 함수 5개만 바인딩 호출한다. 자격 후보 조회는 로그인 성공이나 세션 발급이 아니다.
+ * 인증 함수에 입력을 바인딩하고 내부 결과를 검증한다. 후보 조회만으로 인증을 승인하지 않는다.
  * @created 2026-10-25
- * @usedBy AuthJdbcTest, 미연결: 예정 인증 application service
+ * @usedBy AuthService, AuthJdbcTest, SessionJdbcTest
+ * @modified 2026-10-26 - 잠금 자격 조회와 세션 생성·종료 함수 연결
  */
 @Repository
 @Profile("database")
@@ -113,6 +114,56 @@ public class AuthRepository {
             UUID sessionId = row.getObject("session_id", UUID.class);
             if (userId == null || sessionId == null) throw new AuthStoreException();
             return new Session(userId, sessionId);
+        }, tokenDigest));
+    }
+
+    /**
+     * 로그인 조합의 사용자 행을 잠근 뒤 현재 코드·저장 이름을 읽는다. 비활성도 코드 비교 대상으로 유지한다.
+     * @created 2026-10-26
+     * @usedBy AuthService.signIn
+     * @return 잠긴 현재 사용자 또는 후보 없음; 인증 성공 결과가 아님
+     */
+    public Optional<LoginAccount> lockCode(String name, String phone) {
+        return optional(query("SELECT user_id,name,code_verifier FROM payse.auth_login_account(?,?)", (row, index) -> {
+            UUID userId = row.getObject("user_id", UUID.class);
+            String storedName = row.getString("name");
+            String verifier = row.getString("code_verifier");
+            if (userId == null || storedName == null || verifier == null
+                    || !storedName.equals(AuthCredentials.normalizeName(storedName))) throw new AuthStoreException();
+            return new LoginAccount(userId, storedName, verifier);
+        }, AuthCredentials.normalizeName(name), AuthCredentials.normalizePhone(phone)));
+    }
+
+    /**
+     * 코드 대조가 끝난 사용자에만 활성 상태를 재검사하고 세션을 저장한다. 호출자는 사용자 잠금을 유지한다.
+     * @created 2026-10-26
+     * @usedBy AuthService.signIn
+     * @param userId 서버에서 잠금·코드 대조를 마친 사용자
+     * @param tokenDigest 새 토큰의 저장용 검증값; 원문 아님
+     * @return 저장된 세션 또는 기존 세션/비활성으로 인한 거절
+     */
+    public Optional<OpenedSession> openSession(UUID userId, String tokenDigest) {
+        return optional(query("SELECT user_id,session_id,name,issued_at FROM payse.auth_open_session(?,?)", (row, index) -> {
+            UUID owner = row.getObject("user_id", UUID.class);
+            UUID sessionId = row.getObject("session_id", UUID.class);
+            String name = row.getString("name");
+            Instant issuedAt = instant(row, "issued_at");
+            if (owner == null || !owner.equals(userId) || sessionId == null || issuedAt == null || name == null
+                    || !name.equals(AuthCredentials.normalizeName(name))) throw new AuthStoreException();
+            return new OpenedSession(owner, sessionId, name, issuedAt);
+        }, userId, tokenDigest));
+    }
+
+    /**
+     * 현재 토큰 소유자의 세션만 종료하고 RLS 문맥을 비운다. false는 이미 종료됐거나 무효라는 뜻이다.
+     * @created 2026-10-26
+     * @usedBy AuthService.logout
+     */
+    public boolean endSession(String tokenDigest) {
+        return one(query("SELECT payse.auth_end_session(?) AS ended", (row, index) -> {
+            Boolean ended = row.getObject("ended", Boolean.class);
+            if (ended == null) throw new AuthStoreException();
+            return ended;
         }, tokenDigest));
     }
 
@@ -233,4 +284,34 @@ public class AuthRepository {
      * @usedBy AuthRepository.authorize, AuthJdbcTest
      */
     public record Session(UUID userId, UUID sessionId) {}
+
+    /**
+     * 사용자 잠금 뒤 확보한 내부 코드 비교 자료다. 외부 응답으로 직렬화하지 않는다.
+     * @created 2026-10-26
+     * @usedBy AuthRepository.lockCode, AuthService.signIn
+     */
+    public record LoginAccount(UUID userId, String name, String verifier) {
+        /**
+         * 합성 자격과 verifier가 문자열 표현으로 기록되는 것을 막는다.
+         * @created 2026-10-26
+         * @usedBy Java 문자열 변환, AuthServiceTest
+         */
+        @Override
+        public String toString() { return "LoginAccount[REDACTED]"; }
+    }
+
+    /**
+     * 세션 INSERT의 실제 반환값이다. token 원문·digest를 담지 않는다.
+     * @created 2026-10-26
+     * @usedBy AuthRepository.openSession, AuthService.signIn
+     */
+    public record OpenedSession(UUID userId, UUID sessionId, String name, Instant issuedAt) {
+        /**
+         * 내부 저장 이름이 자동 문자열 표현으로 로그에 남지 않게 한다.
+         * @created 2026-10-26
+         * @usedBy Java 문자열 변환
+         */
+        @Override
+        public String toString() { return "OpenedSession[REDACTED]"; }
+    }
 }
