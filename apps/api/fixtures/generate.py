@@ -169,11 +169,88 @@ def update_versions(snapshot: dict, source_version: str, data_version: str, as_o
     snapshot['page']={'nextCursor':None,'dataVersion':data_version,'sourceVersion':source_version}
 
 
+def make_demo_snapshot(base: dict) -> dict:
+    """2026-10-26: 일상 지출 시연을 독립 원천으로 준비한다. 사용: build.
+
+    새 월세 이력은 명시한 합성 작성값이며 기존 주거비에서 추정하지 않는다.
+    기존 거래·잔액의 값은 유지하고 새 사례의 원천 버전만 구분한다.
+    """
+    snapshot = copy.deepcopy(base)
+    if snapshot['userId'] != uid('alpha') or snapshot['asOf'] != '2026-10-19T12:00:00+09:00':
+        raise ValueError('Demo preparation requires the reviewed alpha source date')
+    update_versions(snapshot, base['sourceVersion'] + ':demo-ready', '1')
+    rent = owned_row(snapshot, 'obligations', 'obligationId', uid('alpha/obligation/rent'))
+    repair = owned_row(snapshot, 'obligations', 'obligationId', uid('alpha/obligation/repair'))
+    repair_link = owned_row(snapshot, 'settlements', 'linkId', uid('alpha/settlement/repair'))
+    if repair_link['obligationId'] != repair['obligationId']:
+        raise ValueError('Repair settlement relationship changed')
+    snapshot['obligations'] = [row for row in snapshot['obligations'] if row['obligationId'] != repair['obligationId']]
+    snapshot['settlements'] = [row for row in snapshot['settlements'] if row['linkId'] != repair_link['linkId']]
+    snapshot['allocations'] = []
+
+    template = owned_row(snapshot, 'transactions', 'transactionId', uid('alpha/transaction/rent-history/2026-09'))
+    if (template['accountId'] != rent['withdrawalAccountId'] or template['recordKind'] != 'account_entry'
+            or template['direction'] != 'out' or template['status'] != 'posted'
+            or template['reflectionReason'] != 'reflected'):
+        raise ValueError('Rent template must be an owned, reflected account withdrawal')
+    rent_evidence = []
+    # 합성 시연의 명시 작성 날짜다. 실행 중 반복 회차 생성 서비스를 대신하지 않는다.
+    for paid_date in ('2026-07-22', '2026-08-22', '2026-09-22'):
+        transaction = copy.deepcopy(template)
+        key = f'demo-ready/rent/{paid_date}'
+        transaction.update(
+            transactionId=uid(f'alpha/transaction/{key}'),
+            sourceRef=f'fixture/alpha/transaction/{key}',
+            amountKRW=300000, bookingDate=paid_date, withdrawalDate=paid_date,
+        )
+        snapshot['transactions'].append(transaction)
+        rent_evidence.append(transaction['transactionId'])
+    snapshot['transactions'].sort(key=lambda row: row['transactionId'])
+
+    plan_id = uid('alpha/demo-ready/plan/rent')
+    revision_id = uid('alpha/demo-ready/revision/rent-v1')
+    recurrence_key = f'{plan_id}:2026-10'
+    snapshot['recurringPlans'].append({
+        'userId': snapshot['userId'], 'planId': plan_id, 'firstOccurrenceMonth': '2026-10',
+    })
+    snapshot['recurringPlanRevisions'].append({
+        'userId': snapshot['userId'], 'revisionId': revision_id, 'planId': plan_id,
+        'effectiveFromMonth': '2026-10', 'label': TRANSACTION_NAMES['rent'],
+        'amountKRW': 300000, 'monthlyDay': 22, 'paymentTiming': 'immediate',
+        'scheduleBasis': 'withdrawal', 'withdrawalAccountId': rent['withdrawalAccountId'],
+        'cardId': None, 'status': 'active', 'scheduleOverrides': [], 'isCurrent': True,
+    })
+    snapshot['recurringDecisions'].append({
+        'userId': snapshot['userId'], 'decisionId': uid('alpha/demo-ready/decision/rent'),
+        'candidateKey': 'fixture/demo-ready/rent/three-months', 'ruleVersion': RULE,
+        'sourceVersion': snapshot['sourceVersion'], 'evidenceTransactionIds': rent_evidence,
+        'normalizedName': TRANSACTION_NAMES['rent'], 'decision': 'approved', 'planId': plan_id,
+    })
+    rent.update(recurringPlanId=plan_id, recurrenceKey=recurrence_key, planRevisionId=revision_id)
+    snapshot['occurrenceLinks'].append({
+        'recurrenceKey': recurrence_key, 'purchaseTransactionId': None, 'statementId': None,
+        'obligationId': rent['obligationId'], 'evidenceRef': 'fixture/demo-ready/materialized-rent',
+    })
+
+    salary = owned_row(snapshot, 'transactions', 'transactionId', uid('alpha/transaction/salary/2026-09'))
+    if (salary['accountId'] != snapshot['settings']['salary']['salaryAccountId']
+            or salary['recordKind'] != 'account_entry' or salary['direction'] != 'in'
+            or salary['status'] != 'posted' or salary['balanceReflected'] is not True
+            or salary['reflectionReason'] != 'reflected' or salary['bookingDate'] != '2026-09-25'):
+        raise ValueError('Demo salary requires the reviewed reflected September receipt')
+    snapshot['settings']['salary']['receiptEvidence'] = [{
+        'payMonth': '2026-09', 'expectedPayDate': '2026-09-25',
+        'transactionIds': [salary['transactionId']], 'confirmation': 'confirmed',
+    }]
+    return snapshot
+
+
 def build() -> tuple[dict, dict, dict]:
     """2026-10-19: Return named full snapshots, server-only synthetic seed metadata, and test catalog.
 
     2026-10-23: Resolve templates by owned IDs/relations, preserving scenario facts.
     2026-10-26: Add a manually supplied future schedule and an otherwise equal absent-source case.
+    2026-10-26: Add an independent everyday-spending demo without changing existing cases.
     """
     cases={};catalog={'fixtureVersion':FIXTURE_VERSION,'schemaVersion':SCHEMA,'ruleVersion':RULE,'cases':[],'events':[],'localVectors':[]}
     def add_case(name,snapshot,goal,expected):
@@ -274,6 +351,17 @@ def build() -> tuple[dict, dict, dict]:
         'salary-schedule-absent', absent,
         '동일 기준시각 비교: 미래 급여 원천 일정 미제공, 반복일 판단은 Flutter 담당',
         {'compareTo': 'salary-schedule-provided', 'receiptEvidence': []},
+    )
+    add_case(
+        'demo-ready', make_demo_snapshot(base),
+        '일상 지출 시연: 월세 반복 근거·완료 카드값·다음 기간 등록 통신비·배정 없는 비상금',
+        {'asOf': '2026-10-19T12:00:00+09:00', 'salaryPayMonth': '2026-09',
+         'salaryConfirmation': 'confirmed', 'rentKRW': 300000, 'rentDueDate': '2026-10-22',
+         'rentEvidenceDates': ['2026-07-22', '2026-08-22', '2026-09-22'],
+         'paidCardKRW': 110000, 'registeredTelecomKRW': 50000, 'telecomDueDate': '2026-10-25',
+         'selectedBalanceKRW': 2000000, 'reserveKRW': 400000, 'allocationCount': 0,
+         'flutterExpected': {'b': 2000000, 'e': 300000, 'r': 400000, 'o': 0, 'u': 1300000},
+         'expectationScope': '독립 Flutter 검사 기대값; 서버 응답·서버 계산 결과가 아님'},
     )
     for entry in catalog['cases']:
         snapshot=cases[entry['id']]

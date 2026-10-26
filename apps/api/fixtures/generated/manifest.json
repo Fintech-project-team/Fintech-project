@@ -19,8 +19,9 @@
     "snapshots/gamma-month-end.json": "200c61ef41bf756601d4ab6a19cb78d8a766dce680247456e11fe4223e9acf2e",
     "snapshots/salary-schedule-provided.json": "0341ce4142ef424d9bbacea8e75345fe0b524bfb82d6abb8a8d2e42e1cbf6cae",
     "snapshots/salary-schedule-absent.json": "1c276ee6779d839abd547780dcf8f0d96ace8b3493d23a2d255a63c23666b008",
-    "server-seeds.json": "786f791449c8c54597628d09c30f59a7f7a6e29927f497bac16a72221aa58414",
-    "catalog.json": "153421f7c9efc2b7123706013843dd4bb6fd79aa865335180c46cfca15040e7e",
+    "snapshots/demo-ready.json": "f2ab4cb7c0a4841a78b07b22f1485ed98a691688e24168832dbb26c23e71df83",
+    "server-seeds.json": "5b0b3401930cbe794606df5bcf42693bc6556aa861d0daa2ed6d37924172e617",
+    "catalog.json": "e5997c3eb244015096d1a52007384eb8dfcc52d6ba7769c4ce2c3bc1e6d7d439",
     "bank-directory.json": "097a9a5100f4d6a19c37b60f49ba5f6fc8075bb3fc00456433000294b7513640"
   }
 }

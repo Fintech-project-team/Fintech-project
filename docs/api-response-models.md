@@ -35,7 +35,7 @@ settings만 객체이고 나머지 금융 복수 키는 배열이다. page는 `{
 
 변환 입력은 인증된 userId, **그 사용자의** 선택된 불변 원본, 하나의 일관된 저장 상태에서 읽은 연결·계좌 선택·사용자 설정, 요청 페이지 문맥이다. 이름·화면 전역 변수로 원본을 선택하지 않는다. userId·원천 선택·종속 소유자 또는 현재 요청의 버전 문맥이 맞지 않으면 오류로 처리하며 다른 계정 원본으로 대체하지 않는다. sourceVersion·asOf는 선택한 원본 기준이고, dataVersion은 현재 저장 상태의 버전이다. 최초 상태는 원본의 초기 dataVersion으로 시작하되 설정 저장으로 증가한 현재 dataVersion이 원본 fixture의 초기 값과 같을 필요는 없다. 불변 fixture의 초기 값으로 현재 버전을 되돌리지 않는다.
 
-최초 연결 전은 현재 연결된 기관이 없는 준비 상태다. alpha-ready/beta-ready/gamma-month-end 원본 각각에서 H와 institutions를 구성하되, schemaVersion은 PAYSE-API-0.6-3로, dataVersion은 위 현재 저장 상태 값으로 설정한다. 반환 키는 H 7개+institutions+institutionLinks+coverage **10개뿐**이다. institutionLinks와 coverage는 []다. settings·accounts·cards·transactions·page·accessRestrictions 등 나머지 키를 null·[]로 채우지 않고 생략한다. 기관별 확인된 개수 메타데이터는 그 사용자 원본 값을 유지한다.
+최초 연결 전은 현재 연결된 기관이 없는 준비 상태다. 계정별 준비 원본은 `server-seeds.json`의 `initialCase`를 따른다(알파 demo-ready, 베타 beta-ready, 감마 gamma-month-end). 각 원본에서 H와 institutions를 구성하되, schemaVersion은 PAYSE-API-0.6-3로, dataVersion은 위 현재 저장 상태 값으로 설정한다. 반환 키는 H 7개+institutions+institutionLinks+coverage **10개뿐**이다. institutionLinks와 coverage는 []다. settings·accounts·cards·transactions·page·accessRestrictions 등 나머지 키를 null·[]로 채우지 않고 생략한다. 기관별 확인된 개수 메타데이터는 그 사용자 원본 값을 유지한다. initialCase는 준비 도구 전용이며 공개 응답 필드나 DB 사용자 속성이 아니다. alpha-ready는 별도 검증 사례로 보존한다.
 
 세 계정에 같은 변환 책임을 적용하며 연결 전 JSON 파일을 각 계정마다 추가하는 것은 필수가 아니다. 기존 alpha-unconnected는 예시 원본이며 beta/gamma의 대체 원본이 아니다. 원본 fixture를 수정·초기화하지 않고 새 응답 객체를 만든다. 구조 공유는 가능하지만 사용자별 가변 상태를 공유하지 않는다.
 

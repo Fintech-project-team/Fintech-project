@@ -625,6 +625,65 @@
           "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
         }
       ]
+    },
+    {
+      "id": "demo-ready",
+      "file": "snapshots/demo-ready.json",
+      "goal": "일상 지출 시연: 월세 반복 근거·완료 카드값·다음 기간 등록 통신비·배정 없는 비상금",
+      "expected": {
+        "asOf": "2026-10-19T12:00:00+09:00",
+        "salaryPayMonth": "2026-09",
+        "salaryConfirmation": "confirmed",
+        "rentKRW": 300000,
+        "rentDueDate": "2026-10-22",
+        "rentEvidenceDates": ["2026-07-22", "2026-08-22", "2026-09-22"],
+        "paidCardKRW": 110000,
+        "registeredTelecomKRW": 50000,
+        "telecomDueDate": "2026-10-25",
+        "selectedBalanceKRW": 2000000,
+        "reserveKRW": 400000,
+        "allocationCount": 0,
+        "flutterExpected": {
+          "b": 2000000,
+          "e": 300000,
+          "r": 400000,
+          "o": 0,
+          "u": 1300000
+        },
+        "expectationScope": "독립 Flutter 검사 기대값; 서버 응답·서버 계산 결과가 아님"
+      },
+      "ledgerOpeningBalances": [
+        {
+          "accountId": "6069b37a-abf5-56fc-8bf0-153f5301fd1c",
+          "balanceKRW": 3850000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "67521b1b-de86-54cf-98ba-91bb04d0a256",
+          "balanceKRW": 438000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "48feba1a-c98e-5d0e-91e1-23d8e1ef00fc",
+          "balanceKRW": 1140000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "4021635f-1b2c-534d-b5b6-9680b3c8d5f2",
+          "balanceKRW": 440000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "1ce9128d-d667-5bfc-bed0-949a571c78f5",
+          "balanceKRW": 0,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "2c56e23d-2e82-59ed-8fce-21459e226167",
+          "balanceKRW": 988000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        }
+      ]
     }
   ],
   "events": [
