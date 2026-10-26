@@ -1,0 +1,61 @@
+{
+  "id": "PAYSE-DEMO-100-20261026",
+  "role": "integration",
+  "branch": "feat/api/issue-100-demo-ready",
+  "baseCommit": "d0e814b0756142a7d61e0b68f186f396600eaa7e",
+  "allowedPaths": [
+    "apps/api/fixtures/generate.py",
+    "apps/api/fixtures/identity_contract.py",
+    "apps/api/fixtures/generated/catalog.json",
+    "apps/api/fixtures/generated/manifest.json",
+    "apps/api/fixtures/generated/server-seeds.json",
+    "apps/api/fixtures/generated/snapshots/demo-ready.json",
+    "apps/api/tests/test_fixtures.py",
+    "apps/api/tests/test_demo_ready.py",
+    "apps/api/database/test_demo_ready.py",
+    "apps/api/fixtures/docs/dummy-data.md",
+    "apps/api/docs/history/2026-10-26-demo-ready-handoff.md",
+    "docs/api-response-models.md",
+    "docs/tasks/PAYSE-DEMO-100-20261026.json"
+  ],
+  "changePaths": [
+    "apps/api/fixtures/generate.py",
+    "apps/api/fixtures/identity_contract.py",
+    "apps/api/fixtures/generated/catalog.json",
+    "apps/api/fixtures/generated/manifest.json",
+    "apps/api/fixtures/generated/server-seeds.json",
+    "apps/api/fixtures/generated/snapshots/demo-ready.json",
+    "apps/api/tests/test_fixtures.py",
+    "apps/api/tests/test_demo_ready.py",
+    "apps/api/database/test_demo_ready.py",
+    "apps/api/fixtures/docs/dummy-data.md",
+    "apps/api/docs/history/2026-10-26-demo-ready-handoff.md",
+    "docs/api-response-models.md",
+    "docs/tasks/PAYSE-DEMO-100-20261026.json"
+  ],
+  "readBefore": [
+    "apps/api/AGENT.md",
+    "apps/api/src/AGENTS.md",
+    "apps/api/fixtures/docs/dummy-data.md",
+    "apps/api/testing/scenarios/README.md",
+    "docs/data-model.md",
+    "docs/data-contracts.md",
+    "docs/database-schema.md",
+    "docs/api-response-models.md",
+    "docs/calculation-rules.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/ownership.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/EXTENSION_POINTS.md"
+  ],
+  "acceptance": [
+    "관련 이슈 #100: 기존 일정 중심의 독립 demo-ready 추가. 월세 300000원 10/22에 새 300000원 22일 근거 거래·승인·반복 계획·저장 회차를 연결한다. 기존 1200000원 주거비와 임의 연결하지 않는다.",
+    "10/10 카드값 110000원은 완료로 유지하고 통신비 50000원 10/25는 다음 기간 등록 예정으로 둔다. 10/15 출금과 계획의 관계를 추정하거나 정산 링크를 추가하지 않는다. 비상금 400000원에 지출 배정을 두지 않는다.",
+    "demo-ready에만 2026-09 회차·09/25 명시 confirmed 급여 근거를 기존 소유자·posted·reflected 입금 ID로 연결한다. 잔액에 급여를 재가산하지 않는다. #96 기존 시나리오 보완은 제외한다.",
+    "기존 17개 snapshot 바이트·ID·금액·날짜·catalog 항목과 기존 금융 원천 관계를 보존한다. 신규 사례는 별도 sourceVersion을 사용하며 v3 공개 필드·schemaVersion은 유지한다.",
+    "데모알파 initialCase만 demo-ready로 변경한다. 기본 SQL은 사용자 설정 없는 초기 상태, 별도 시나리오 SQL은 명시 선택한 일반 사용자/금융/설정 테이블에만 적재한다. 신규DDL·전용DB컬럼·운영API는 추가하지 않는다.",
+    "API Python·실제 폐기용 PostgreSQL 적재·제약·롤백·중복 거절 및 외부 Dart probe로 기존 파서/어댑터/계산 호환을 검증한다. 모바일·계산 파일은 수정하지 않고 반영 사항을 인계한다.",
+    "검토한 sunghyun-dev 기준에서 새 feat/api/issue-100-demo-ready 브랜치를 생성해 적용한다. 브랜치 충돌·기존 변경 차단, 파일 보존·재실행·실패 복원을 검증한다. 원본 브랜치 커밋·GitHub·실제 DB는 변경하지 않는다."
+  ],
+  "scopeNote": "사용자가 승인한 #100 새 시연과 초기 매핑을 반영한다. 공통 응답 문서의 초기 원본 참조만 같은 매핑으로 맞추므로 integration 역할이며 스키마·계산 규칙·HTTP 동작 변경은 없다. 독립 작업 사본에서 구현하고 적용 배치로 전달한다."
+}

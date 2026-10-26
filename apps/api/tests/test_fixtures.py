@@ -159,17 +159,21 @@ class FixtureTests(unittest.TestCase):
                     validate_bank_directory(bad)
 
     def test_published_bundle_matches_generator(self):
-        """2026-10-23: Check tracked JSON semantic values after formatting and manifest validation."""
-        self.assertEqual(validate_directory(FIXTURES/'generated'),17)
+        """2026-10-23: Check tracked JSON semantic values after formatting and manifest validation.
+
+        2026-10-26: Include the independent eighteenth demo case; used by unittest.
+        """
+        self.assertEqual(validate_directory(FIXTURES/'generated'),18)
         for name,snapshot in self.cases.items():
             stored=json.loads((FIXTURES/'generated'/'snapshots'/f'{name}.json').read_text(encoding='utf-8'))
             self.assertEqual(stored,snapshot)
         self.assertEqual(load_bank_directory(FIXTURES/'generated'/'bank-directory.json'),load_bank_directory())
 
     def test_deterministic_bytes_and_manifest(self):
+        """2026-10-26: Verify the expanded bundle remains deterministic; used by unittest."""
         with temporary_directory() as temp:
             a,b=Path(temp)/'a',Path(temp)/'b';write_files(a);write_files(b)
-            self.assertEqual(validate_directory(a),17)
+            self.assertEqual(validate_directory(a),18)
             for p in a.rglob('*.json'):
                 self.assertEqual(p.read_bytes(),(b/p.relative_to(a)).read_bytes())
 
@@ -222,16 +226,20 @@ class FixtureTests(unittest.TestCase):
                     validate_server_seeds(seeds,self.cases)
 
     def test_seed_creation_timestamp_and_snapshot_owner_required(self):
-        """2026-10-22: A valid seed must point to its own dated initial snapshot."""
+        """2026-10-22: A valid seed must point to its own dated initial snapshot.
+
+        2026-10-26: Resolve the initial case from the seed mapping; used by unittest.
+        """
         for value in [None,'invalid','2026-10-19','2026-10-19T00:00:00',123]:
             with self.subTest(value=value):
                 seeds=copy.deepcopy(self.seeds);seeds['users'][0]['createdAt']=value
                 with self.assertRaises(ValueError):
                     validate_server_seeds(seeds,self.cases)
-        snapshots=copy.deepcopy(self.cases);snapshots.pop('alpha-ready')
+        initial_case=self.seeds['users'][0]['initialCase']
+        snapshots=copy.deepcopy(self.cases);snapshots.pop(initial_case)
         with self.assertRaises(ValueError):
             validate_server_seeds(self.seeds,snapshots)
-        snapshots=copy.deepcopy(self.cases);snapshots['alpha-ready']['userId']=uid('beta')
+        snapshots=copy.deepcopy(self.cases);snapshots[initial_case]['userId']=uid('beta')
         with self.assertRaises(ValueError):
             validate_server_seeds(self.seeds,snapshots)
 
