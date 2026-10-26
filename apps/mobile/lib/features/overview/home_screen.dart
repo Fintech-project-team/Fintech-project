@@ -8,6 +8,7 @@ import '../../shared/design/moon_glyph.dart';
 import '../../shared/design/primary_button.dart';
 import '../../shared/design/status_notice.dart';
 import '../../shared/design/payse_tokens.dart';
+import 'calculation_detail_screen.dart';
 import 'home_calculation.dart';
 
 /// 2026-10-23: 02-1 홈. 공유 계산 결과 [calculation]만 표시하며 금액을 직접 계산하지 않는다.
@@ -29,7 +30,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (calculation) {
-      HomeCalculationReady(:final result) => _HomeReady(result: result),
+      final HomeCalculationReady ready => _HomeReady(calculation: ready),
       HomeCalculationDataError() => _HomeError(
         key: const ValueKey('home-data-error'),
         title: '받은 금융 정보로는 계산할 수 없어요',
@@ -48,15 +49,19 @@ class HomeScreen extends StatelessWidget {
 }
 
 /// 2026-10-23: 계산을 마친 홈. 정상·음수·정보 부족·입금 대기를 같은 틀에서 구분해 보인다.
+/// 2026-10-26: '계산 내역 보기'로 같은 계산 결과의 02-2를 연다.
 class _HomeReady extends StatelessWidget {
-  /// 2026-10-23: 계산 결과 [result]로 만든다.
-  const _HomeReady({required this.result});
+  /// 2026-10-23: 계산 결과로 만든다.
+  /// 2026-10-26: 02-2에 그대로 넘기도록 스냅샷과 결과를 함께 담은 [calculation]을 받는다.
+  const _HomeReady({required this.calculation});
 
-  final calc.CurrentAmountResult result;
+  final HomeCalculationReady calculation;
 
   /// 2026-10-23: 주기 줄·금액·안내·장부를 세로로 반환한다.
+  /// 2026-10-26: 장부 아래 '계산 내역 보기' 버튼을 붙인다.
   @override
   Widget build(BuildContext context) {
+    final result = calculation.result;
     final awaiting = [
       for (final line
           in result.obligationLines ?? const <calc.ObligationLine>[])
@@ -112,6 +117,18 @@ class _HomeReady extends StatelessWidget {
               color: PayseColors.dividerSection,
             ),
             ..._ledger(result),
+            const SizedBox(height: 22),
+            PrimaryButton(
+              key: const ValueKey('home-detail-button'),
+              label: '계산 내역 보기',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      CalculationDetailScreen(calculation: calculation),
+                ),
+              ),
+            ),
+            const SizedBox(height: PayseSpace.x6),
           ],
         ),
       ),
