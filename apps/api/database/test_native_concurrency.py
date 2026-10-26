@@ -22,32 +22,32 @@ def run(psql, database, text):
 def race(psql,database,first,second,expected_error=None,expected_output=None):
     """2026-10-19: Hold a real connection lock, then submit a competing write on a second connection."""
     command=[psql,'-X','--no-password','-A','-t','-v','ON_ERROR_STOP=1','-d',database]
-    proc=subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8')
+    first_writer=subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8')
     try:
-        proc.stdin.write('BEGIN;\n'+first+'\n\\echo OWNER_LOCKED\nSELECT pg_sleep(2);\nCOMMIT;\n')
-        proc.stdin.close()
+        first_writer.stdin.write('BEGIN;\n'+first+'\n\\echo OWNER_LOCKED\nSELECT pg_sleep(2);\nCOMMIT;\n')
+        first_writer.stdin.close()
         while True:
-            line=proc.stdout.readline()
+            line=first_writer.stdout.readline()
             if line.strip()=='OWNER_LOCKED':
                 break
             if not line:
-                raise RuntimeError('First writer failed: '+proc.stderr.read())
+                raise RuntimeError('First writer failed: '+first_writer.stderr.read())
         started=time.monotonic()
-        other=subprocess.run(command,input='\\set VERBOSITY verbose\n'+second,text=True,encoding='utf-8',capture_output=True,timeout=20)
-        waited=time.monotonic()-started
-        code=proc.wait(timeout=20)
-        if code:
-            raise RuntimeError('First writer commit failed: '+proc.stderr.read())
+        second_writer=subprocess.run(command,input='\\set VERBOSITY verbose\n'+second,text=True,encoding='utf-8',capture_output=True,timeout=20)
+        wait_seconds=time.monotonic()-started
+        exit_code=first_writer.wait(timeout=20)
+        if exit_code:
+            raise RuntimeError('First writer commit failed: '+first_writer.stderr.read())
         if expected_error:
-            if other.returncode==0 or expected_error not in other.stderr:
-                raise AssertionError('Expected competing write rejection: '+other.stderr)
-        elif other.returncode or expected_output not in other.stdout:
-            raise AssertionError('Wrong competing write result: '+other.stdout+other.stderr)
-        if waited<1:
+            if second_writer.returncode==0 or expected_error not in second_writer.stderr:
+                raise AssertionError('Expected competing write rejection: '+second_writer.stderr)
+        elif second_writer.returncode or expected_output not in second_writer.stdout:
+            raise AssertionError('Wrong competing write result: '+second_writer.stdout+second_writer.stderr)
+        if wait_seconds<1:
             raise AssertionError('Second connection did not encounter the held lock')
     finally:
-        if proc.poll() is None:
-            proc.terminate();proc.wait(timeout=10)
+        if first_writer.poll() is None:
+            first_writer.terminate();first_writer.wait(timeout=10)
 
 
 def main():

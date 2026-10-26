@@ -52,9 +52,10 @@ class BootstrapHttpTest {
      * 공개 생존 응답에 금융 자료·DB 세부 정보·로그인 쿠키가 없는지 검사한다.
      * @created 2026-10-20
      * @usedBy JUnit test
+     * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      */
     @Test
-    void livenessHasNoFinancialOrDatabaseDetails() throws Exception {
+    void exposesOnlyHealthStatus() throws Exception {
         var response = get("/internal/health/live", null);
         assertEquals(200, response.statusCode());
         assertEquals("{\"status\":\"UP\"}", response.body());
@@ -66,9 +67,10 @@ class BootstrapHttpTest {
      * 인증 구현 전 금융 경로가 공개되지 않는지 검사한다.
      * @created 2026-10-20
      * @usedBy JUnit test
+     * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      */
     @Test
-    void financialRoutesAreNotExposedBeforeAuthenticationImplementation() throws Exception {
+    void blocksBusinessRoutes() throws Exception {
         for (String route : new String[]{"/snapshot", "/transactions", "/demo-sessions", "/actuator/env"}) {
             var response = get(route, null);
             assertEquals(401, response.statusCode(), route);
@@ -81,9 +83,10 @@ class BootstrapHttpTest {
      * 임의 토큰·기본 인증 헤더가 접근을 허용하지 않는지 검사한다.
      * @created 2026-10-20
      * @usedBy JUnit test
+     * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      */
     @Test
-    void inventedTokenCannotAuthenticate() throws Exception {
+    void rejectsInvalidCredentials() throws Exception {
         assertEquals(401, get("/snapshot", "Bearer demo-token").statusCode());
         assertEquals(401, get("/snapshot", "Basic dXNlcjpwYXNz").statusCode());
     }
@@ -92,9 +95,10 @@ class BootstrapHttpTest {
      * 쓰기 시도와 사용자 사칭 입력을 차단하고 로그인 쿠키를 만들지 않는지 검사한다.
      * @created 2026-10-20
      * @usedBy JUnit test
+     * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      */
     @Test
-    void writeAttemptIsBlockedAndDoesNotCreateSession() throws Exception {
+    void blocksUnauthenticatedWrites() throws Exception {
         var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/snapshot"))
             .timeout(Duration.ofSeconds(5))
             .header("Content-Type", "application/json")

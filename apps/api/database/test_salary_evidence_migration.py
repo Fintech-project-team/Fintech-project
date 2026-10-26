@@ -83,7 +83,7 @@ class SalaryEvidenceMigrationTests(unittest.TestCase):
         """2026-10-23: Apply only the reviewed archive and its exact SHA-256."""
         return migration.apply_plan(OPTIONS.psql, OPTIONS.database, self.archive, digest, 60, 3000)
 
-    def test_preserves_every_nonversion_fact_and_historical_decision(self):
+    def test_migration_preserves_source_facts(self):
         """2026-10-23: All old IDs, dates, amounts, user versions and historical source versions survive."""
         before = self.state()
         digest = self.plan()
@@ -100,7 +100,7 @@ class SalaryEvidenceMigrationTests(unittest.TestCase):
             self.assertEqual(self.sql('SELECT count(*) FROM payse.' + table +
                                      ' t JOIN payse.source_contexts c USING(user_id) WHERE t.source_version<>c.source_version;'), '0')
 
-    def test_every_owner_even_empty_evidence_requires_explicit_version_mapping(self):
+    def test_all_owners_require_version_mapping(self):
         """2026-10-23: An empty-evidence owner cannot be silently left on the old schema."""
         self.mapping['users'] = [row for row in self.mapping['users'] if row['userId'] == self.owner]
         before = self.state()
@@ -109,7 +109,7 @@ class SalaryEvidenceMigrationTests(unittest.TestCase):
         self.assertFalse(self.archive.exists())
         self.assertEqual(self.state(), before)
 
-    def test_missing_changed_duplicate_and_invalid_month_mapping_rejected(self):
+    def test_invalid_month_mapping_is_rejected(self):
         """2026-10-23: Require one exact proof hash and one valid nominal month for every source proof."""
         baseline = copy.deepcopy(self.mapping)
         for mutation in ('missing', 'hash', 'duplicate', 'month', 'year', 'unchanged_version', 'wrong_source'):
@@ -126,8 +126,8 @@ class SalaryEvidenceMigrationTests(unittest.TestCase):
                 self.plan()
             self.assertFalse(self.archive.exists())
 
-    def test_same_date_distinct_cycles_preserved_duplicate_cycle_rejected(self):
-        """2026-10-23: Preserve source schedule ties; only Flutter decides their insufficient-data result."""
+    def test_salary_cycle_identity_uses_pay_month(self):
+        """2026-10-23: Preserve schedule ties; calculation eligibility belongs to Flutter."""
         unknown = {**self.proof, 'confirmation': 'unknown', 'transactionIds': []}
         self.set_evidence([self.proof, unknown])
         self.mapping = self.make_mapping()
@@ -146,7 +146,7 @@ class SalaryEvidenceMigrationTests(unittest.TestCase):
         self.assertEqual(len({p['expectedPayDate'] for p in source['salary_evidence']}), 1)
         self.assertEqual({p['payMonth'] for p in source['salary_evidence']}, {'2026-09', '2026-10'})
 
-    def test_cross_month_schedule_mapping_does_not_infer_from_the_date(self):
+    def test_cross_month_schedule_uses_explicit_mapping(self):
         """2026-10-23: Keep the original date when an explicitly reviewed nominal month crosses it."""
         self.owner_mapping()['evidence'][0]['payMonth'] = '2026-10'
         before = self.state()
@@ -156,7 +156,7 @@ class SalaryEvidenceMigrationTests(unittest.TestCase):
         self.assertEqual(next(row for row in after['sourceRows'] if row['user_id'] == self.owner)['salary_evidence'][0],
                          {**self.proof, 'payMonth': '2026-10'})
 
-    def test_source_change_after_plan_rejected_without_any_transition(self):
+    def test_stale_plan_is_rejected_without_writes(self):
         """2026-10-23: A settings write after review invalidates the complete archived source state."""
         digest = self.plan()
         self.sql('UPDATE payse.users SET data_version=data_version+1 WHERE id=' + migration.sql_literal(self.owner) + '::uuid;')
@@ -176,7 +176,7 @@ class SalaryEvidenceMigrationTests(unittest.TestCase):
         with self.assertRaises(migration.MigrationError): self.apply(digest)
         self.assertEqual(self.state(), after)
 
-    def test_new_source_version_is_data_even_with_sql_delimiters(self):
+    def test_source_version_is_escaped_as_data(self):
         """2026-10-23: Quotes, backslashes and dollar delimiters cannot become executable SQL."""
         self.owner_mapping()['newSourceVersion'] += "'\\$salary_migration$; SELECT 'literal'"
         self.assertEqual(self.apply(self.plan()), 'APPLIED')
@@ -200,7 +200,7 @@ class SalaryEvidenceMigrationTests(unittest.TestCase):
             with self.assertRaises(migration.MigrationError): self.apply(digest)
         self.assertEqual(self.state(), before)
 
-    def test_transaction_failure_rolls_back_guard_and_all_rows(self):
+    def test_failure_rolls_back_guards_and_rows(self):
         """2026-10-23: A write failure restores both the original guard and every data row."""
         self.sql("CREATE FUNCTION payse.reject_salary_transition() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.schema_version='PAYSE-DRAFT-3' THEN RAISE EXCEPTION 'forced migration rollback'; END IF; RETURN NEW; END $$; CREATE TRIGGER reject_salary_transition BEFORE UPDATE ON payse.source_contexts FOR EACH ROW EXECUTE FUNCTION payse.reject_salary_transition();")
         digest = self.plan()
