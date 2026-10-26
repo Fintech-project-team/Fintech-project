@@ -92,7 +92,7 @@ PAYSE-DRAFT-3/PAYSE-API-0.6-3의 `SalaryReceipt.payMonth`로 Q2-1을 풀었다(d
 
 - 회차 예정일은 원천 근거가 있으면 그 expectedPayDate(입금 전 unknown 근거 포함), 없으면 salaryDay 반복 설정으로 예상한 날짜다. 예상 날짜를 근거로 만들거나 입금 완료로 보거나 잔액에 더하지 않는다. 휴일 보정은 하지 않는다. payMonth와 예정일 사이 기간은 제한하지 않는다.
 - 현재(직전) 회차는 예정일 ≤ t0인 회차 중 가장 큰 payMonth다. 늦게 입금된 과거 회차 때문에 되돌리지 않는다.
-- 다음 경계는 현재 회차보다 뒤 회차의 예정일 중 기준 시점 이후 가장 먼저 도래하는 날짜다(`SalarySchedule.earliestAfter`). 홈(`resolveSalaryCycle`)과 구간 계산(`scheduledPayDates`→`projectPeriods`)이 같은 규칙을 쓰고 D5도 그 날짜에 적용한다.
+- 다음 경계는 현재 회차보다 뒤 회차의 예정일 중 기준 시점 이후 가장 먼저 도래하는 날짜다(`SalarySchedule.earliestAfter`). 홈(`resolveSalaryCycle`)과 구간 계산(`scheduledPayDates`→`projectPeriods`)이 같은 규칙을 쓰고 D5도 그 날짜에 적용한다. 명목상 다음 회차(payMonth+1)와 다음 계산 경계는 구분한다. `SalaryCycle.nextPayDate`는 계산 경계 회차이며 날짜 역전 때는 payMonth+1이 아닐 수 있다.
 - `PayDateBasis`는 날짜 출처(`sourceEvidence`·`recurringSetting`)이고 입금 상태는 `confirmation`이다. 원천 근거도 unknown일 수 있다.
 - 같은 payMonth 근거 중복은 `duplicateId` 오류다. 서로 다른 회차의 예정일이 같으면 그날 회차의 입금이 모두 확인된 경우만 홈을 계산하고, 길이 0 구간이나 회차 구분이 필요한 현재 구간만 `payDateConflict`로 제한한다.
 - 예정일 전에 confirmed인 회차는 이미 잔액에 있어 경계·입금으로 다시 넣지 않는다(Q2-2 조기 전환과 같은 의미). 근거 예정일이 말일 보정한 규칙 날짜와 같으면 말일 보정 표시를 유지한다.
@@ -121,7 +121,7 @@ PAYSE-DRAFT-3/PAYSE-API-0.6-3의 `SalaryReceipt.payMonth`로 Q2-1을 풀었다(d
 - 같은 예정일·날짜 역전·기간이 먼 지연 사례의 공동 fixture와 API 검증기·DB 저장 동작 대조.
 - 정상 ready 사례 세 개의 직전 회차 급여 근거 보완(#96). 반영 전 공통 더미 홈은 입금 정보 부족이 정상이다.
 - 회차별 금액 계약 추가 여부(미결 정책 6).
-- 다음 회차 정의 차이: docs/data-model.md '급여 회차와 예정일'은 '다음 회차는 payMonth의 다음 달'인데, 로컬 계산은 2026-10-26 혜연 결정으로 '현재 회차보다 뒤 회차의 예정일 중 기준 시점 이후 가장 먼저 도래하는 날짜'를 쓴다. 평소에는 같고 날짜 역전 때만 다르다. 루트 계약 문서 정리는 A와 협의한다.
+- 다음 회차 정의: 2026-10-26 A와 정책 합의 완료. 명목상 다음 회차는 payMonth+1, 다음 계산 경계는 이후 회차 중 기준 시점보다 늦고 가장 먼저 도래하는 유효한 예정일(같은 회차는 원천 예정일 우선, 없으면 반복 설정 예상)이며, 원천 근거 보존과 예정 급여의 현재 잔액 선가산 금지는 유지한다. 상태: A의 공통 계약 문서(docs/data-model.md '급여 회차와 예정일') 반영 및 정합성 확인 대기. 문서 변경이 오면 현재 구현·테스트와 대조한다.
 
 ## 범위 밖
 
