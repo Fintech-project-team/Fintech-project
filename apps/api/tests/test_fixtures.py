@@ -71,7 +71,7 @@ class FixtureTests(unittest.TestCase):
                         if isinstance(row.get(field),str):
                             self.assertFalse(any(marker in row[field] for marker in ('합성','DEMO','TEST')))
 
-    def test_duplicate_display_names_do_not_choose_transactions(self):
+    def test_transaction_selection_ignores_labels(self):
         """2026-10-23: Equal labels must retain salary, recurring evidence, refund and cancellation identities."""
         with patch.dict(generate.TRANSACTION_NAMES,{key:'같은 거래명' for key in generate.TRANSACTION_NAMES}):
             cases,_,catalog=build()
@@ -88,7 +88,7 @@ class FixtureTests(unittest.TestCase):
                     return {row['transactionId']:{key:value for key,value in row.items() if key not in {'merchantName','description'}} for row in rows}
                 self.assertEqual(facts(snapshot.get(collection,[])),facts(original.get(collection,[])))
 
-    def test_source_transaction_order_does_not_choose_templates(self):
+    def test_template_selection_ignores_order(self):
         """2026-10-23: Reverse source rows to expose accidental first-row scenario selection."""
         original_make=generate.make_snapshot
         def reversed_rows(*args,**kwargs):
@@ -120,7 +120,7 @@ class FixtureTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'Expected one owned'):
                     owned_row(snapshot,'transactions','transactionId',transaction_id)
 
-    def test_reviewed_bank_directory_and_prepared_support_are_separate(self):
+    def test_bank_directory_does_not_create_accounts(self):
         """2026-10-23: The reviewed 20-bank directory must not create 20 banks of user accounts."""
         directory=load_bank_directory()
         self.assertEqual(len(directory['banks']),20)
@@ -159,17 +159,21 @@ class FixtureTests(unittest.TestCase):
                     validate_bank_directory(bad)
 
     def test_published_bundle_matches_generator(self):
-        """2026-10-23: Check tracked JSON semantic values after formatting and manifest validation."""
-        self.assertEqual(validate_directory(FIXTURES/'generated'),15)
+        """2026-10-23: Check tracked JSON semantic values after formatting and manifest validation.
+
+        2026-10-26: Include the independent eighteenth demo case; used by unittest.
+        """
+        self.assertEqual(validate_directory(FIXTURES/'generated'),18)
         for name,snapshot in self.cases.items():
             stored=json.loads((FIXTURES/'generated'/'snapshots'/f'{name}.json').read_text(encoding='utf-8'))
             self.assertEqual(stored,snapshot)
         self.assertEqual(load_bank_directory(FIXTURES/'generated'/'bank-directory.json'),load_bank_directory())
 
     def test_deterministic_bytes_and_manifest(self):
+        """2026-10-26: Verify the expanded bundle remains deterministic; used by unittest."""
         with temporary_directory() as temp:
             a,b=Path(temp)/'a',Path(temp)/'b';write_files(a);write_files(b)
-            self.assertEqual(validate_directory(a),15)
+            self.assertEqual(validate_directory(a),18)
             for p in a.rglob('*.json'):
                 self.assertEqual(p.read_bytes(),(b/p.relative_to(a)).read_bytes())
 
@@ -187,7 +191,7 @@ class FixtureTests(unittest.TestCase):
             self.assertNotIn('displayName',user)
         validate_server_seeds(self.seeds,self.cases)
 
-    def test_stored_identity_rejects_whitespace_unicode_and_invalid_bounds(self):
+    def test_stored_identity_rejects_invalid_input(self):
         """2026-10-22: Storage accepts canonical values only, without silent normalization."""
         invalid_names=['가','A'*21,' 데모알파','데모 알파','데모알파 ','데모알파\n','데모\t알파','데모\u00a0알파','데모\u200b알파','데모１','ㄱㄴ',None,123]
         for name in invalid_names:
@@ -222,16 +226,20 @@ class FixtureTests(unittest.TestCase):
                     validate_server_seeds(seeds,self.cases)
 
     def test_seed_creation_timestamp_and_snapshot_owner_required(self):
-        """2026-10-22: A valid seed must point to its own dated initial snapshot."""
+        """2026-10-22: A valid seed must point to its own dated initial snapshot.
+
+        2026-10-26: Resolve the initial case from the seed mapping; used by unittest.
+        """
         for value in [None,'invalid','2026-10-19','2026-10-19T00:00:00',123]:
             with self.subTest(value=value):
                 seeds=copy.deepcopy(self.seeds);seeds['users'][0]['createdAt']=value
                 with self.assertRaises(ValueError):
                     validate_server_seeds(seeds,self.cases)
-        snapshots=copy.deepcopy(self.cases);snapshots.pop('alpha-ready')
+        initial_case=self.seeds['users'][0]['initialCase']
+        snapshots=copy.deepcopy(self.cases);snapshots.pop(initial_case)
         with self.assertRaises(ValueError):
             validate_server_seeds(self.seeds,snapshots)
-        snapshots=copy.deepcopy(self.cases);snapshots['alpha-ready']['userId']=uid('beta')
+        snapshots=copy.deepcopy(self.cases);snapshots[initial_case]['userId']=uid('beta')
         with self.assertRaises(ValueError):
             validate_server_seeds(self.seeds,snapshots)
 
@@ -365,7 +373,7 @@ class FixtureTests(unittest.TestCase):
                     validate_snapshot(s)
                     self.assertEqual((s['transactions'],s['settings']['salary']['receiptEvidence']),source)
 
-    def test_salary_evidence_still_requires_owned_posted_incoming_fact(self):
+    def test_salary_evidence_requires_owned_income(self):
         """2026-10-21: Reject missing, foreign, outgoing and unconfirmed salary evidence after separating settings."""
         for changes in ({'direction':'out'}, {'status':'approved'}, {'status':'cancelled'}, {'status':'unknown'}, {'balanceReflected':False,'reflectionReason':'not_reflected'}):
             with self.subTest(changes=changes):
@@ -429,7 +437,7 @@ class FixtureTests(unittest.TestCase):
                     self.rejects(lambda s:s['recurringPlans'][0].update({key:value}))
         self.rejects(lambda s:s['recurringPlans'][0].update(unknownPlanKey='unexpected'))
 
-    def test_recurring_plan_rejects_duplicate_identity_and_missing_revision(self):
+    def test_plan_rejects_invalid_revision_links(self):
         self.rejects(lambda s:s['recurringPlans'].append(copy.deepcopy(s['recurringPlans'][0])))
         self.rejects(lambda s:s['recurringPlanRevisions'].clear())
         self.rejects(lambda s:s['recurringPlans'][0].update(firstOccurrenceMonth='2026-11'))
@@ -445,7 +453,7 @@ class FixtureTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'plan first month differs from earliest revision'):
             validate_snapshot(s)
 
-    def test_recurring_plan_first_month_preserves_retired_pinned_history(self):
+    def test_plan_preserves_pinned_history(self):
         """2026-10-22: Allow a same-month replacement while old pinned revisions and occurrences remain."""
         s=self.case('gamma-month-end')
         original=copy.deepcopy((s['obligations'],s['occurrenceOverrides']))
@@ -490,10 +498,11 @@ class FixtureTests(unittest.TestCase):
                 self.assertGreaterEqual(opening['balanceKRW'],0)
 
     def test_export_initial_vs_ready_and_no_destruction(self):
+        """2026-10-26: 생성 SQL 형식과 무관하게 초기/연결 자료 및 파괴 명령 배제를 검사한다. 사용: unittest."""
         with temporary_directory() as temp:
             p=Path(temp)/'fixtures';write_files(p)
             initial=export(p);ready=export_scenario(p,['alpha-ready','beta-ready','gamma-month-end'])
-            self.assertIn('INSERT INTO payse.users (id, name, phone,',initial)
+            self.assertRegex(initial,r'INSERT INTO payse\.users\s*\(\s*id,\s*name,\s*phone,')
             self.assertNotIn('synthetic_name',initial)
             self.assertNotIn('display_name',initial)
             self.assertNotIn('INSERT INTO payse.institution_links',initial)

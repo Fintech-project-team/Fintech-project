@@ -7,7 +7,7 @@
       "phone": "01000000001",
       "codeVerifier": "DISABLED:auth-design-pending",
       "createdAt": "2026-10-19T00:00:00+09:00",
-      "initialCase": "alpha-ready"
+      "initialCase": "demo-ready"
     },
     {
       "userId": "87f7bbf9-2355-5210-9325-f25d83a8ff35",

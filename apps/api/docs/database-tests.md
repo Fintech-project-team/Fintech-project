@@ -2,6 +2,8 @@
 
 저장 계약은 [DB 사전](../../../docs/database-schema.md), 코드 규칙은 [API 필수 규칙](../src/AGENTS.md)이 기준이다. 이 문서는 테스트 대상 선택과 실행만 정의하며 제품 필드·계산 규칙을 추가하지 않는다.
 
+SQL 파일의 책임·줄바꿈·분리 기준은 [SQL 작성·구성 기준](sql-style.md)을 따른다. 인증 테스트의 파일 적재는 `psql -f`를 사용해 진입 파일 기준의 상대 포함을 유지한다. 현재 작업 디렉터리와 다른 공백 포함 경로에서도 실행하고, 하위 파일 누락·SQL 오류가 앞선 변경까지 롤백하는지 검사한다.
+
 ## 준비 자료와 대상 선택
 
 `database/test_context.py`는 검증된 `fixtures/generated`의 catalog에서 `alpha-ready`, `beta-ready`, `gamma-month-end` 사례를 읽는다. 사용자·계좌·지출·정산·배정·반복 버전·영수증은 실제 참조 관계로 찾는다. 표시명·고정 UUID·배열 첫 항목으로 대체하지 않는다. 같은 역할이 없거나 여러 개면 자료 준비 오류다. 여러 건이 필요한 카드 구매 근거는 집합 전체를 검사한다.
@@ -53,3 +55,42 @@ python -B apps/api/database/test_native_concurrency.py `
 `test_salary_receipts.sql`은 필수 payMonth·잘못된 형식·동일 회차 중복 거절과 월 경계 이동·서로 다른 회차의 같은 예정일 보존을 검사한다. 원천 보존 뒤 구간 정보 부족 판정은 Flutter 담당이다. SQL의 사용자·거래 ID는 준비 context에서 받으며 명목 회차 프로브는 독립된 테스트 전제다. 입금 거래일에서 월을 추정하는 서비스 규칙으로 사용하지 않는다.
 
 `python -B -m unittest discover -s apps/api/tests`는 기존 검사와 test_salary_receipts.py를 포함한다. 별도 급여 이행 테스트는 검토 매핑·버전 FK·이력 보존·변경 감지·롤백을 실제 폐기용 PostgreSQL에서 검사한다. 실행 인자는 `python -B apps/api/database/test_salary_evidence_migration.py --help`에서 확인한다. 일반 DB에 테스트를 실행하지 않는다.
+
+## 인증 DB 역할·요청 제한 검사
+
+[인증 DB 접근](auth-database.md)의 `003_auth_access.sql`은 별도 검사한다. 다음 실행기는 **새 작업 디렉터리에 새 PostgreSQL 클러스터**를 만들고 종료하며, 기존 서버·DB를 재사용하지 않는다. 역할은 클러스터 전체 객체이므로 일반 개발 DB에서 역할 테스트를 실행하지 않는다. 작업 디렉터리가 이미 있으면 다른 새 경로를 사용한다.
+
+```powershell
+python -B apps/api/database/test_auth_access.py `
+  --pg-bin "C:\Program Files\PostgreSQL\15\bin" `
+  --work-dir "$env:TEMP\payse-auth-check-$([guid]::NewGuid().ToString('N'))"
+```
+
+`--pg-bin`은 실제 설치한 PostgreSQL 도구 경로다. 결과와 테스트 DB는 검사 폴더에 남으며 비밀번호 파일을 공유하지 않는다. 현재 공통 API CI는 이 별도 클러스터 검사를 자동 실행하지 않으므로 실행 결과를 PR에 구분해서 기록한다.
+
+## Java 인증 DB 연결 검사
+
+`AuthRepositoryTest`는 단일 행·0~1행·정상 null·오류 결과, 파라미터 바인딩, 트랜잭션 조건과 Spring 등록을 검사한다. 실제 SQL·권한·잠금 확인은 `AuthJdbcTest`가 담당한다. 다음 실행기는 새 폐기용 PostgreSQL에 기존 001/002/003과 검사용 사용자 관계를 준비하고, 생성한 최소 권한 자격을 하위 Gradle 환경에만 전달한다. JDK 21과 기존 Gradle 도구가 필요하다.
+
+```powershell
+python -B apps/api/database/test_auth_jdbc.py `
+  --pg-bin "C:\Program Files\PostgreSQL\15\bin" `
+  --work-dir "$env:TEMP\payse-auth-jdbc-$([guid]::NewGuid().ToString('N'))"
+```
+
+기존 서버 주소·운영 DB 자격을 입력받지 않는다. 전체 Java 검사와 Java 주석 검사를 실행하며 DB 접속/관계 입력은 파일·명령 인자에 저장하지 않는다. 결과 JSON·JUnit 요약으로 실패·건너뜀을 구분하고 인증 제한 행을 제외한 공통 테이블이 그대로인지 대조한다. 종료 시 새 클러스터와 임시 접속 자격을 정리한다.
+
+실제 검증 범위는 최소 권한 함수 호출, 같은 연결의 역할/소유자 문맥 제거, 풀 크기 1의 IP 선행 커밋→후속 롤백, 실패 5회·IP 60회 경계, 동시 호출, SQL 오류를 잡은 콜백의 거짓 성공 방지다. 기본 Gradle 검사에서 전용 `PAYSE_AUTH_TEST_*` 환경이 없으면 실제 DB 검사는 SKIPPED다. 이 실행기의 실제 PostgreSQL 결과를 함께 기록해야 하며 HTTP 로그인·세션 발급·모바일 검증 완료로 보고하지 않는다.
+
+## 세션 전이·인증 서비스 검사
+
+신규 세션 함수·권한·경합은 `test_auth_sessions.py`, 서비스와 실제 JDBC 연결은 `test_session_service.py`로 검사한다. 두 실행기 모두 새 폐기용 PostgreSQL 클러스터만 사용하고 기존 서버 주소·서비스 DB 자격을 받지 않는다.
+
+```powershell
+python -B apps/api/database/test_auth_sessions.py --pg-bin "C:\Program Files\PostgreSQL\15\bin" --work-dir "$env:TEMP\payse-session-sql-$([guid]::NewGuid().ToString('N'))"
+python -B apps/api/database/test_session_service.py --pg-bin "C:\Program Files\PostgreSQL\15\bin" --work-dir "$env:TEMP\payse-session-service-$([guid]::NewGuid().ToString('N'))"
+```
+
+검증은 세션 한 개만 생성되는 동시 로그인, 기존 세션 우선, 동일 세션 재확인, 다른 사용자 자격 거절, 로그아웃·조회 경합, IP 선행 커밋·실패 누적과 전체 롤백, 권한·원천 보존을 구분한다. 테스트 준비는 새 UUID와 검증된 관계를 사용하며 제품 더미의 표시명이나 첫 행에 의존하지 않는다.
+
+일반 Gradle 검사에서 전용 DB 환경이 없으면 실제 JDBC 검사는 SKIPPED다. 네이티브 실행기의 결과를 함께 확인하며 HTTP API·모바일 통합이 통과한 것으로 기록하지 않는다. 운영 시드의 인증 코드를 자동 활성화하지 않는다.

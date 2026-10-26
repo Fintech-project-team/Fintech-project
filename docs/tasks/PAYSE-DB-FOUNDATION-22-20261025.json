@@ -1,0 +1,61 @@
+{
+  "id": "PAYSE-DB-FOUNDATION-22-20261025",
+  "role": "data",
+  "branch": "feat/api/db-foundation-22",
+  "baseCommit": "4eaf3a8485192d42a378fc91519574d1d718051e",
+  "allowedPaths": [
+    "apps/api/AGENT.md",
+    "apps/api/database/test_common_storage_migration.py",
+    "apps/api/database/test_context.py",
+    "apps/api/database/test_identity_migration.py",
+    "apps/api/database/test_native_concurrency.py",
+    "apps/api/database/test_salary_evidence_migration.py",
+    "apps/api/docs/spring-bootstrap.md",
+    "apps/api/fixtures/export_sql.py",
+    "apps/api/fixtures/generate.py",
+    "apps/api/fixtures/validate.py",
+    "apps/api/src/AGENTS.md",
+    "apps/api/src/main/java/com/payse/api/bootstrap/DatabaseConfiguration.java",
+    "apps/api/src/test/java/com/payse/api/ApiDocRulesTest.java",
+    "apps/api/src/test/java/com/payse/api/BootstrapHttpTest.java",
+    "apps/api/src/test/java/com/payse/api/DatabaseConfigurationTest.java",
+    "apps/api/src/test/java/com/payse/api/PostgreSqlDatabaseIntegrationTest.java",
+    "apps/api/src/test/java/com/payse/api/PostgresTransactionTest.java",
+    "apps/api/src/test/java/com/payse/api/auth/AuthCredentialsTest.java",
+    "apps/api/src/test/java/com/payse/api/auth/AuthCryptoConfigurationTest.java",
+    "apps/api/src/test/java/com/payse/api/auth/AuthCryptoTest.java",
+    "apps/api/testing/scenarios/export_state.py",
+    "apps/api/tests/test_common_storage.py",
+    "apps/api/tests/test_fixtures.py",
+    "apps/api/tests/test_salary_receipts.py",
+    "apps/api/tests/test_sql_context.py",
+    "apps/api/tools/VerifyApiDocs.java",
+    "docs/tasks/PAYSE-DB-FOUNDATION-22-20261025.json"
+  ],
+  "changePaths": [
+    "apps/api/AGENT.md",
+    "apps/api/src/AGENTS.md",
+    "docs/tasks/PAYSE-DB-FOUNDATION-22-20261025.json"
+  ],
+  "readBefore": [
+    "apps/api/docs/spring-bootstrap.md",
+    "apps/api/docs/v0.6/auth-design.md",
+    "apps/api/docs/v0.6/auth-verification.md",
+    "apps/api/src/AGENTS.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/ownership.md"
+  ],
+  "acceptance": [
+    "관련 이슈 #22: database 프로필의 풀 크기·연결 대기시간을 명시 설정으로 검증·주입하며 임의 운영 기본값을 추가하지 않는다.",
+    "실제 격리 PostgreSQL에서 커밋·롤백·동일 연결 재사용 시 트랜잭션 로컬 문맥 제거를 검증한다. 제품 금융 테이블·DB 역할·스키마·시드를 변경하지 않는다.",
+    "공통 v3 계약·payMonth·원본 ID/금액/날짜·모바일·계산 패키지·의존성·보안 차단 정책을 유지한다. 실제 세션/조회 API 완료로 표시하지 않는다.",
+    "기존 검사 및 적용 도구를 검증하고 현재 브랜치 적용 배치와 관련 이슈가 포함된 전체 양식 커밋 메시지를 제공한다.",
+    "관련 이슈 #22: API 내부 클래스·메서드·변수명을 역할에 맞게 정리하며 공개 API·DB·설정·CLI 계약, 조건·처리 순서·기대 결과를 유지한다.",
+    "apps/api/AGENT.md의 명명 규칙과 승인된 로직 가독성 지침 5가지를 기존 필수 규칙에서 연결한다. 인증·잠금·트랜잭션·오류 계약과 충돌하지 않게 작성하며, 지침 추가로 기존 로직을 일괄 변경하지 않는다.",
+    "원본 ID·금액·날짜·JSON/SQL 생성 결과와 모바일·계산 패키지를 보존하고 기존 DB 기반 작업의 변경 및 스테이징 상태를 보존한다.",
+    "이름 변경 참조·주석, 필수 검사, 생성물 동일성 및 현재 브랜치 적용 배치를 검증하고 관련 이슈를 포함한 전체 커밋 양식을 제공한다."
+  ],
+  "scopeNote": "B의 v3 동기화와 독립적인 서버 DB 실행 기반만 다룬다. 인증 저장·세션·조회는 후속 #22 구현이며 금융 계산은 Flutter에 유지한다. 사용자가 추가 승인한 API 내부 명명 정리를 포함하며 기존 DB 변경과 스테이징을 보존한다. 승인된 로직 가독성 지침 5가지를 문서에 추가하고 연결·작업 명세를 맞춘다. 이 추가 변경은 문서 3개에 한정하며 기존 제품 코드와 적용된 변경을 보존한다."
+}

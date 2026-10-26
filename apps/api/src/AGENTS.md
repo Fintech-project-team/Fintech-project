@@ -2,6 +2,8 @@
 
 공통 개발 원칙은 `apps/api/` 전체에 적용한다. 이 파일은 사용자가 지정한 `src/` 아래에 보관하며 루트 지침·데이터 계약과 함께 적용한다. Java 주석 의무·자동 검사는 `src/main/java`·`src/test/java`·`tools`의 직접 작성한 Java 코드에 적용한다. Flutter/Dart의 규칙은 변경하지 않는다.
 
+클래스·메서드·변수 이름과 로직 가독성은 [API 명명·로직 가독성 규칙](../AGENT.md)을 따른다.
+
 1. 계좌 합산·U·소비 집계·반복 후보 수치·미래 잔액·시뮬레이션은 Flutter에서 계산한다. 서버는 원천/설정 제공·저장 제약 검증·LLM 해석을 담당한다.
 2. 기존 데이터 모델·SQL·JSON 필드 의미를 보존한다. JSON 금액은 원화 정수, dataVersion/expectedDataVersion은 10진 정수 문자열이다. DB data_version은 bigint, sourceVersion/ruleVersion/schemaVersion은 문자열, inputRevision은 정수다. 미확인을 0으로 바꾸거나 날짜에 미확인 시각을 만들지 않는다.
 3. 이름 있는 클래스·인터페이스·annotation·enum·record, 직접 작성한 메서드·명시적 생성자 바로 위에 Javadoc으로 목적, `@created YYYY-MM-DD`, `@usedBy 주요 클래스.메서드 또는 프레임워크 진입점`을 적는다. 인자·반환·예외의 계약도 필요한 만큼 적는다.

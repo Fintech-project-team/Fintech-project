@@ -1,12 +1,18 @@
 # PAYSE v0.6 공통 응답 모델
 
-원천의 필드·타입·null·금액 단위는 [데이터 모델](data-model.md), 논리 관계·`isCurrent`도 같은 데이터 모델이 기준이며 물리 저장은 [DB 사전](database-schema.md)을 따른다. 원본 fixture의 현재 형식은 `PAYSE-DRAFT-3`다. HTTP 응답은 아래 adapter에서 권한·페이지를 적용한다.
+원천의 필드·타입·null·금액 단위는 [데이터 모델](data-model.md), 논리 관계·`isCurrent`도 같은 데이터 모델이 기준이며 물리 저장은 [DB 사전](database-schema.md)을 따른다. 원본 fixture의 현재 형식은 `PAYSE-DRAFT-3`다. 아래 adapter는 권한·페이지를 적용할 HTTP 응답 조립 계약이며, 해당 서버 조회 구현의 존재나 배포 완료를 뜻하지 않는다.
 
 ## 1. 전달 버전과 정상 응답
 
 현재 API 표현은 `schemaVersion="PAYSE-API-0.6-3"`, 원본은 `PAYSE-DRAFT-3`다. v3은 [데이터 모델의 급여 회차](data-model.md#급여-회차와-예정일)에 따라 payMonth를 필수로 제공한다. v2의 반복 계획·접근 제한 계약은 유지한다. 구 원본/응답을 날짜 기반 payMonth 보충으로 묵시 변환하지 않는다. 소비자는 지원하는 schemaVersion을 명시하고 미지원 버전은 오류로 처리한다. 새 계약 배포와 소비자 버전·필드 파싱의 배포 준비는 별도로 확인한다.
 
 같은 원천 버전의 내용을 변경하지 않는다. 원천 형식 전환은 새 sourceVersion과 현재 원천 자원의 참조를 일관되게 갱신하되, 기존 ID·금액·날짜·asOf·사용자 dataVersion·과거 승인 기록의 sourceVersion을 바꾸지 않는다. ruleVersion은 형식 전환만으로 올리지 않는다. 급여 근거가 제한되면 기존 salary.receiptEvidence 부모 키 생략·표식을 그대로 사용하고 payMonth만 우회 공개하지 않는다. 신규 accessRestrictions tuple은 추가하지 않는다.
+
+급여 원천의 유효성과 계산 가능 여부는 [급여 모델](data-model.md#급여-회차와-예정일)에 따라 구분한다. 유효한 원천의 먼 예정일·역전·동일 예정일·큰 입금만으로 조회를 실패시키거나 근거를 생략하지 않는다. 반대로 잘못된 형식·동일 회차 중복을 정상 근거로 내려보내지 않는다. 공개가 허용된 원천의 `confirmation`을 계산 상태나 사용자 확인 응답으로 덮어쓰지 않는다. 계산 정보 부족은 Flutter가 산출할 수 없는 구간에 대해 판정하며, 접근 제한 표식으로 대신 표현하지 않는다.
+
+DB의 `source_contexts.salary_evidence`는 필드 의미와 값을 유지해 `settings.salary.receiptEvidence`에 매핑한다. `unknown`·`transactionIds=[]`인 미래 예정 원천도 공개 권한이 있으면 포함한다. 해당 회차 원천이 없으면 생성하지 않는다. 반복 설정을 이용한 예상 예정일은 Flutter에서 계산하며, 원천 배열이나 서버 응답의 새 계산 필드로 추가하지 않는다. 기존 부모 키 생략·접근 제한 표식은 유지한다.
+
+다음 명목 회차와 다음 계산 경계의 구분은 [급여 데이터 모델](data-model.md#급여-회차와-예정일)을 따른다. 서버는 다음 명목 회차의 원천만 남기거나 Flutter가 고른 경계에 맞춰 원천 날짜·회차를 다시 쓰지 않는다. 같은 회차의 원천 우선, 원천이 없는 회차의 반복 예상, 이후 회차 중 먼저 도래하는 유효 예정일 선택은 Flutter 책임이며 응답 스키마·sourceVersion·receiptEvidence의 원천 값 변경을 요구하지 않는다.
 
 Snapshot 및 TransactionPage의 공통 JSON 필드 H(HTTP 헤더가 아님):
 
@@ -29,7 +35,7 @@ settings만 객체이고 나머지 금융 복수 키는 배열이다. page는 `{
 
 변환 입력은 인증된 userId, **그 사용자의** 선택된 불변 원본, 하나의 일관된 저장 상태에서 읽은 연결·계좌 선택·사용자 설정, 요청 페이지 문맥이다. 이름·화면 전역 변수로 원본을 선택하지 않는다. userId·원천 선택·종속 소유자 또는 현재 요청의 버전 문맥이 맞지 않으면 오류로 처리하며 다른 계정 원본으로 대체하지 않는다. sourceVersion·asOf는 선택한 원본 기준이고, dataVersion은 현재 저장 상태의 버전이다. 최초 상태는 원본의 초기 dataVersion으로 시작하되 설정 저장으로 증가한 현재 dataVersion이 원본 fixture의 초기 값과 같을 필요는 없다. 불변 fixture의 초기 값으로 현재 버전을 되돌리지 않는다.
 
-최초 연결 전은 현재 연결된 기관이 없는 준비 상태다. alpha-ready/beta-ready/gamma-month-end 원본 각각에서 H와 institutions를 구성하되, schemaVersion은 PAYSE-API-0.6-3로, dataVersion은 위 현재 저장 상태 값으로 설정한다. 반환 키는 H 7개+institutions+institutionLinks+coverage **10개뿐**이다. institutionLinks와 coverage는 []다. settings·accounts·cards·transactions·page·accessRestrictions 등 나머지 키를 null·[]로 채우지 않고 생략한다. 기관별 확인된 개수 메타데이터는 그 사용자 원본 값을 유지한다.
+최초 연결 전은 현재 연결된 기관이 없는 준비 상태다. 계정별 준비 원본은 `server-seeds.json`의 `initialCase`를 따른다(알파 demo-ready, 베타 beta-ready, 감마 gamma-month-end). 각 원본에서 H와 institutions를 구성하되, schemaVersion은 PAYSE-API-0.6-3로, dataVersion은 위 현재 저장 상태 값으로 설정한다. 반환 키는 H 7개+institutions+institutionLinks+coverage **10개뿐**이다. institutionLinks와 coverage는 []다. settings·accounts·cards·transactions·page·accessRestrictions 등 나머지 키를 null·[]로 채우지 않고 생략한다. 기관별 확인된 개수 메타데이터는 그 사용자 원본 값을 유지한다. initialCase는 준비 도구 전용이며 공개 응답 필드나 DB 사용자 속성이 아니다. alpha-ready는 별도 검증 사례로 보존한다.
 
 세 계정에 같은 변환 책임을 적용하며 연결 전 JSON 파일을 각 계정마다 추가하는 것은 필수가 아니다. 기존 alpha-unconnected는 예시 원본이며 beta/gamma의 대체 원본이 아니다. 원본 fixture를 수정·초기화하지 않고 새 응답 객체를 만든다. 구조 공유는 가능하지만 사용자별 가변 상태를 공유하지 않는다.
 

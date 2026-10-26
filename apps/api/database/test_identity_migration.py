@@ -93,7 +93,7 @@ class IdentityMigrationTests(unittest.TestCase):
         """Apply only the exact file chosen by the test with its original hash."""
         return migration.apply_plan(OPTIONS.psql, OPTIONS.database, self.backup, digest, OPTIONS.timeout_seconds, lock_timeout_ms or OPTIONS.lock_timeout_ms)
 
-    def test_legacy_migration_preserves_finance_sessions_verifier_and_archive(self):
+    def test_migration_preserves_account_state(self):
         self.legacy()
         before = self.state()
         digest = self.plan()
@@ -203,7 +203,7 @@ class IdentityMigrationTests(unittest.TestCase):
         with self.assertRaises(migration.MigrationError): self.plan()
         self.assertEqual(self.backup.read_text(encoding='utf-8'), 'existing')
 
-    def test_malformed_rehashed_plan_returns_value_free_rejection(self):
+    def test_invalid_plan_error_omits_values(self):
         self.plan()
         before = self.state()
         original = json.loads(self.backup.read_text(encoding='utf-8'))
