@@ -21,7 +21,7 @@ lib/data/connection/financial_api.dart          UserFinancialRepository 계약 �
 lib/data/connection/snapshot_projector.dart     원본(PAYSE-DRAFT-3) + 사용자 상태 → HTTP Snapshot(PAYSE-API-0.6-3) 순수 변환
 lib/data/connection/fake_financial_server.dart  FakeFinancialServer(앱 수명 장부) · FakeUserFinancialRepository(세션 단위)
 lib/data/connection/user_snapshot_repository.dart  Snapshot JSON → FinancialSnapshot 어댑터(첫 화면용)
-lib/app/dev/dev_user_fixtures.dart              개발 데모 계정 userId → 불변 원본(alpha-ready·beta-ready·gamma-month-end)
+lib/app/dev/dev_user_fixtures.dart              개발 데모 계정 userId → 불변 원본(알파 demo-ready·베타 beta-ready·감마 gamma-month-end, 서버 initialCase와 같음)
 ```
 
 | 수명    | 대상                                                                                                                                                                                                                                               | 처리                                                          |

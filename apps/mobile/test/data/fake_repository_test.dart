@@ -71,8 +71,10 @@ void main() {
     final source = AssetSnapshotSource(rootBundle);
 
     test('alpha-ready keeps integer amounts, as-of and versions', () async {
-      final result = await FakeFinancialSnapshotRepository(source: source)
-          .loadSnapshot();
+      final result = await FakeFinancialSnapshotRepository(
+        source: source,
+        scenario: FixtureScenario.alphaReady,
+      ).loadSnapshot();
 
       final snapshot = (result as SnapshotLoaded).snapshot;
       expect(snapshot.asOf, '2026-10-19T12:00:00+09:00');
