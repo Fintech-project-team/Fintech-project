@@ -32,12 +32,13 @@ PayseApp (lib/app) ── 생성자 주입 ──▶ FinancialSnapshotRepository
 
 ## 스냅샷 (catalog.json 사례)
 
-| 선택값            | 파일                     | 용도                                                   |
-| ----------------- | ------------------------ | ------------------------------------------------------ |
-| alphaReady (기본) | `alpha-ready.json`       | 정상: 1년 자료·선택 계좌·카드 정산·부분 정산·보호 배정 |
-| alphaShock        | `alpha-shock.json`       | 준비 사건으로 잔액 하락, 기존 보호액 유지              |
-| salaryWait        | `salary-wait.json`       | 급여일 미입금, 당일·연체 예정 지출 홈 반영 대기        |
-| alphaUnconnected  | `alpha-unconnected.json` | 초기 복원: 연결 0, 금융 자료 미노출                    |
+| 선택값           | 파일                     | 용도                                                                                                                              |
+| ---------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| demoReady (기본) | `demo-ready.json`        | #100 일상 지출 시연(2026-10-27): 9월 회차 급여 근거 confirmed, 월세 300,000·비상금 400,000(배정 없음), 선택 계좌 기준 U 1,300,000 |
+| alphaReady       | `alpha-ready.json`       | 1년 자료·선택 계좌·카드 정산·부분 정산·보호 배정 검증(직전 회차 급여 근거 없음 → 정보 부족)                                       |
+| alphaShock       | `alpha-shock.json`       | 준비 사건으로 잔액 하락, 기존 보호액 유지                                                                                         |
+| salaryWait       | `salary-wait.json`       | 급여일 미입금, 당일·연체 예정 지출 홈 반영 대기                                                                                   |
+| alphaUnconnected | `alpha-unconnected.json` | 초기 복원: 연결 0, 금융 자료 미노출                                                                                               |
 
 ## 에셋 복사본과 동기화
 

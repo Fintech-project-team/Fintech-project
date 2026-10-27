@@ -1,0 +1,43 @@
+{
+  "id": "PAYSE-MOBILE-DEMO-100-20261027",
+  "role": "integration",
+  "baseCommit": "f8121a0509b7b19d73039a47272ed395e62e9057",
+  "branch": "feat/integration/demo-ready-fixture",
+  "allowedPaths": [
+    "docs/tasks/PAYSE-MOBILE-DEMO-100-20261027.json",
+    "apps/mobile/assets/fixtures/demo-ready.json",
+    "apps/mobile/pubspec.yaml",
+    "apps/mobile/lib/data/fixture_scenario.dart",
+    "apps/mobile/lib/app/dev/dev_user_fixtures.dart",
+    "apps/mobile/test/app/payse_app_test.dart",
+    "apps/mobile/test/app/connection_entry_test.dart",
+    "apps/mobile/test/data/fake_repository_test.dart",
+    "apps/mobile/test/data/demo_ready_test.dart",
+    "apps/mobile/docs/overview.md",
+    "apps/mobile/docs/fake-repository.md",
+    "apps/mobile/docs/connection.md"
+  ],
+  "acceptance": [
+    "목적: #100 일상 지출 시연 데이터(demo-ready, #106로 develop 반영)의 앱 쪽 인계(apps/api/docs/history/2026-10-26-demo-ready-handoff.md 'B' 항목)를 반영한다. #28 4단계(01-3 첫 계산) 정상 흐름을 공통 더미로 시연·검증하기 위한 준비 작업이다",
+    "반영 범위: apps/api/fixtures/generated/snapshots/demo-ready.json을 apps/mobile/assets/fixtures/에 바이트 그대로 복사하고 pubspec.yaml 자산에 등록한다. FixtureScenario에 demoReady를 추가하고 defaultScenario를 demoReady로 바꾼다. 개발 데모 계정 알파(userId f0a4be6c-…)의 원본 매핑을 demo-ready로 바꾼다. 베타·감마 매핑과 기존 alpha-ready·파생 사례는 삭제하지 않는다. FakeFinancialServer 본문은 바꾸지 않는다",
+    "계산 기대(인계 문서): 정상 급여 근거가 있는 현재 구간(9/25 이상 10/25 미만, 기준 시각 2026-10-19 12:00 KST)에서 B=2,000,000, E=300,000(월세 10/22), R=400,000(비상금), O=0, U=1,300,000원. 카드값 110,000원(10/10 출금 완료)은 E에서 제외되고 통신비 50,000원(10/25)은 다음 기간이다. 이 값은 파서→어댑터→계산 패키지 실행 결과로 테스트한다(앱이 금액을 따로 계산하지 않음)",
+    "테스트 갱신: 원본 사본 동일성(기존 fixture_copy_test가 FixtureScenario 전체를 검사), 개발 설정 미리보기의 기본 시나리오 개수(거래 196건), demo-ready 계산 결과(B·E·R·O·U, 정보 부족 없음), 알파 계정 실제 진입 흐름 뒤 홈이 정보 부족 없이 계산되는지. 진입 흐름 테스트는 첫 은행만 연결하므로 그 계좌 잔액 1,500,000 − 400,000 − 300,000 = U 800,000을 계산 패키지 결과 그대로 확인한다. 기존 정보 부족·입금 대기 검증은 alpha-ready·salary-wait 등 기존 사례로 유지한다",
+    "범위 조정(2026-10-27 구현 중): test/data/fake_repository_test.dart의 alpha-ready 검사가 기본 시나리오에 기대어 있어 기본값 변경으로 실패한다. 이 파일을 허용 경로에 추가하고 scenario를 alphaReady로 명시만 한다(기대값 변경 없음)",
+    "범위 밖: 공통 더미·서버 계약·FakeFinancialServer·계산 패키지·어댑터 변경, #96(기존 시나리오 급여 근거 보완), 01-3 화면(#28 4단계), 실제 HTTP 조회",
+    "검증: npm run verify -- --task docs/tasks/PAYSE-MOBILE-DEMO-100-20261027.json. 에뮬레이터 확인은 사용자 확인 항목이며 하네스 통과와 구분해 보고한다"
+  ],
+  "readBefore": [
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/harness/FLUTTER_TRANSITION.md",
+    "docs/app-architecture.md",
+    "docs/data-contracts.md",
+    "docs/api-response-models.md",
+    "docs/calculation-rules.md",
+    "apps/api/docs/history/2026-10-26-demo-ready-handoff.md",
+    "apps/mobile/docs/fake-repository.md",
+    "docs/harness/AGENT_REVIEW.md"
+  ]
+}
