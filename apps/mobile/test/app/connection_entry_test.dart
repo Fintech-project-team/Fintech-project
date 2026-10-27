@@ -186,9 +186,10 @@ void main() {
       await connectAndChooseAccounts(tester);
 
       // 공통 더미 연결 검증. 정상 시나리오도 직전 회차 급여 근거가 비어 있어 0원이 아니라 정보 부족이다.
-      expect(find.text('다음 월급일까지 쓸 수 있는 돈'), findsOneWidget);
-      expect(find.text('계산할 수 없어요'), findsOneWidget);
-      expect(find.text('지난 월급 입금 정보를 확인할 수 없어 계산하지 않았어요.'), findsOneWidget);
+      expect(find.text('다음 월급일까지\n쓸 수 있는 돈'), findsOneWidget);
+      expect(find.text('아직 계산할 수 없어요'), findsOneWidget);
+      expect(find.text('9/25에 예정된 월급의 입금 여부를 확인할 정보가 없어요.'), findsOneWidget);
+      expect(find.text('월급 입금 확인 필요'), findsOneWidget);
       expect(find.text('계좌 잔액'), findsOneWidget);
     },
   );

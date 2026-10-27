@@ -45,6 +45,57 @@ class ObligationLine {
   final int? overlapKrw;
 }
 
+/// 2026-10-26: 포함 계좌 한 개의 잔액. accountLines의 합계가 B다.
+class AccountLine {
+  /// 2026-10-26: 계좌 [accountId]와 기준시각 잔액 [balanceKrw](음수 가능)로 만든다.
+  const AccountLine({required this.accountId, required this.balanceKrw});
+
+  final String accountId;
+  final int balanceKrw;
+}
+
+/// 2026-10-26: 보호액 한 건에서 현재 구간 E 의무 한 건에 배정한 미해제액(O의 근거).
+class ReserveOverlap {
+  /// 2026-10-26: 의무 [obligationId]와 미해제 배정액 [unreleasedKrw](1 이상)로 만든다.
+  const ReserveOverlap({
+    required this.obligationId,
+    required this.unreleasedKrw,
+  });
+
+  final String obligationId;
+  final int unreleasedKrw;
+}
+
+/// 2026-10-26: R에 들어간 보호액 한 건의 근거. O를 모르면 [overlaps]·[effectiveKrw]가 null이다.
+class ReserveLine {
+  /// 2026-10-26: 보호액 [reserveId]·계좌 [accountId]·설정액 [amountKrw], 현재 구간 배정 [overlaps],
+  /// 배정 합계 [usedKrw], 남겨둘 금액 [effectiveKrw](설정액−배정 합계)로 만든다. 목록은 수정 불가로 보관한다.
+  ReserveLine({
+    required this.reserveId,
+    required this.accountId,
+    required this.amountKrw,
+    required List<ReserveOverlap>? overlaps,
+    required this.usedKrw,
+    required this.effectiveKrw,
+  }) : overlaps = overlaps == null ? null : List.unmodifiable(overlaps);
+
+  final String reserveId;
+  final String accountId;
+  final int amountKrw;
+  final List<ReserveOverlap>? overlaps;
+  final int? usedKrw;
+  final int? effectiveKrw;
+}
+
+/// 2026-10-26: 의무 묶음의 건수와 금액 합계.
+class ObligationTotal {
+  /// 2026-10-26: 건수 [count]와 합계 [totalKrw]로 만든다.
+  const ObligationTotal({required this.count, required this.totalKrw});
+
+  final int count;
+  final int totalKrw;
+}
+
 /// 2026-10-23: 홈 현재 금액 입력. [salary]가 null이면 월급 설정을 받지 못한 상태다.
 class CurrentAmountInput {
   /// 2026-10-23: 장부 [ledger]와 월급 설정 [salary]로 만든다.
@@ -68,10 +119,25 @@ class CurrentAmountResult {
     required this.u,
     required List<InsufficientReason> insufficient,
     required List<ObligationLine>? obligationLines,
+    required List<AccountLine>? accountLines,
+    required List<ReserveLine>? reserveLines,
+    required this.deductionKrw,
+    required Map<ObligationPlacement, ObligationTotal>? placementTotals,
+    required this.settledTotal,
+    required this.cycleProgress,
   }) : insufficient = List.unmodifiable(insufficient),
        obligationLines = obligationLines == null
            ? null
-           : List.unmodifiable(obligationLines);
+           : List.unmodifiable(obligationLines),
+       accountLines = accountLines == null
+           ? null
+           : List.unmodifiable(accountLines),
+       reserveLines = reserveLines == null
+           ? null
+           : List.unmodifiable(reserveLines),
+       placementTotals = placementTotals == null
+           ? null
+           : Map.unmodifiable(placementTotals);
 
   final CalculationContext context;
   final SalaryCycle? salaryCycle;
@@ -83,6 +149,25 @@ class CurrentAmountResult {
   final int? u;
   final List<InsufficientReason> insufficient;
   final List<ObligationLine>? obligationLines;
+
+  /// 2026-10-26: 포함 계좌별 잔액(accountId 순). B를 계산했을 때만 있다.
+  final List<AccountLine>? accountLines;
+
+  /// 2026-10-26: R 집합 보호액별 근거(reserveId 순). R을 계산했을 때만 있다.
+  final List<ReserveLine>? reserveLines;
+
+  /// 2026-10-26: 빼야 할 돈 E+(R−O). U=B−deductionKrw이며 U를 계산했을 때만 있다.
+  final int? deductionKrw;
+
+  /// 2026-10-26: 위치가 정해진 의무의 위치별 잔여 합계·건수. 의무 근거가 있을 때만 있으며 0건 위치는 없다.
+  /// 정산 완료·취소 위치의 합계는 잔여이므로 0이다.
+  final Map<ObligationPlacement, ObligationTotal>? placementTotals;
+
+  /// 2026-10-26: 포함 계좌 의무의 유효 정산액(이미 나간 돈) 합계와 정산액이 있는 의무 건수. B에 이미 반영된 출금이다.
+  final ObligationTotal? settledTotal;
+
+  /// 2026-10-26: 정상 월급 주기의 진행률(0~1, 홈 달 표시용). 입금 대기·정보 부족이면 null이다([cycleProgress]).
+  final double? cycleProgress;
 
   /// 2026-10-23: U를 계산했으면 true. false면 insufficient에 이유가 있다.
   bool get calculated => u != null;
@@ -163,6 +248,53 @@ CurrentAmountResult calculateCurrentAmount(CurrentAmountInput input) {
   ]) {
     if (!all.contains(reason)) all.add(reason);
   }
+
+  final accountLines = b == null
+      ? null
+      : [
+          for (final a
+              in ledger.accounts.values.where((a) => a.included).toList()
+                ..sort((x, y) => x.accountId.compareTo(y.accountId)))
+            AccountLine(accountId: a.accountId, balanceKrw: a.balanceKrw!),
+        ];
+
+  Map<ObligationPlacement, ObligationTotal>? placementTotals;
+  ObligationTotal? settledTotal;
+  if (lines != null) {
+    final counts = <ObligationPlacement, int>{};
+    final sums = <ObligationPlacement, int>{};
+    var settledCount = 0;
+    var settledSum = 0;
+    // lines는 states와 같은 순서로 만든다.
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final placement = line.placement;
+      if (placement != null) {
+        counts[placement] = (counts[placement] ?? 0) + 1;
+        sums[placement] = addKrw(
+          sums[placement] ?? 0,
+          line.remainingKrw,
+          'placement[$placement]',
+        );
+      }
+      // 제외 계좌 출금은 B에 들어 있지 않아 '빠져나간 뒤의 잔액' 근거가 아니다.
+      if (line.settledKrw > 0 &&
+          ledger.isIncluded(states![i].obligation.withdrawalAccountId)) {
+        settledCount++;
+        settledSum = addKrw(settledSum, line.settledKrw, 'settled');
+      }
+    }
+    placementTotals = {
+      for (final p in counts.keys)
+        p: ObligationTotal(count: counts[p]!, totalKrw: sums[p]!),
+    };
+    settledTotal = ObligationTotal(count: settledCount, totalKrw: settledSum);
+  }
+
+  final reserveLines = r == null
+      ? null
+      : _reserveLines(ledger, lines, oValue != null);
+
   return CurrentAmountResult(
     context: context,
     salaryCycle: cycle,
@@ -174,6 +306,70 @@ CurrentAmountResult calculateCurrentAmount(CurrentAmountInput input) {
     u: u,
     insufficient: all,
     obligationLines: lines,
+    accountLines: accountLines,
+    reserveLines: reserveLines,
+    deductionKrw: u == null ? null : addKrw(e!, rEff!, 'E+(R-O)'),
+    placementTotals: placementTotals,
+    settledTotal: settledTotal,
+    cycleProgress: cycle == null ? null : cycleProgress(cycle, today),
+  );
+}
+
+/// 2026-10-26: R 집합 보호액별 근거를 반환한다. [overlapKnown]이 false(O 미정)면 배정·남겨둘 금액을 null로 둔다.
+/// 배정은 현재 구간 E 의무([lines]의 inCurrentPeriod)에 대한 미해제액만 넣으며 그 합계가 O와 같다.
+List<ReserveLine> _reserveLines(
+  Ledger ledger,
+  List<ObligationLine>? lines,
+  bool overlapKnown,
+) {
+  final inPeriod = <String>{
+    if (overlapKnown)
+      for (final line in lines!)
+        if (line.placement == ObligationPlacement.inCurrentPeriod)
+          line.obligationId,
+  };
+  final byReserve = <String, List<ReserveOverlap>>{};
+  if (overlapKnown) {
+    final sorted = [...ledger.input.allocations!]
+      ..sort((x, y) => x.allocationId.compareTo(y.allocationId));
+    for (final a in sorted) {
+      if (a.unreleasedKrw == 0 || !inPeriod.contains(a.obligationId)) continue;
+      byReserve
+          .putIfAbsent(a.reserveId, () => [])
+          .add(
+            ReserveOverlap(
+              obligationId: a.obligationId,
+              unreleasedKrw: a.unreleasedKrw,
+            ),
+          );
+    }
+  }
+  final reserves = {for (final rv in ledger.input.reserves!) rv.reserveId: rv};
+  return [
+    for (final id in ledger.reserveIdsInR!.toList()..sort())
+      _reserveLine(reserves[id]!, overlapKnown ? byReserve[id] ?? [] : null),
+  ];
+}
+
+/// 2026-10-26: 보호액 [reserve]와 현재 구간 배정 [overlaps](null이면 O 미정)로 근거 한 건을 만든다.
+ReserveLine _reserveLine(Reserve reserve, List<ReserveOverlap>? overlaps) {
+  int? used;
+  int? effective;
+  if (overlaps != null) {
+    var sum = 0;
+    for (final o in overlaps) {
+      sum = addKrw(sum, o.unreleasedKrw, 'reserves[${reserve.reserveId}]');
+    }
+    used = sum;
+    effective = subtractKrw(reserve.amountKrw, sum, 'R-O');
+  }
+  return ReserveLine(
+    reserveId: reserve.reserveId,
+    accountId: reserve.accountId,
+    amountKrw: reserve.amountKrw,
+    overlaps: overlaps,
+    usedKrw: used,
+    effectiveKrw: effective,
   );
 }
 
