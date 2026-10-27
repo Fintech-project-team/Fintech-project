@@ -32,9 +32,10 @@ class AuthCredentialsTest {
      * 이름 경계·내부 공백·비ASCII 공백·분해 한글·숫자·보조 문자를 거절한다.
      * @created 2026-10-22
      * @usedBy JUnit test
+     * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      */
     @Test
-    void rejectsInvalidNamesWithoutSilentlyRepairingThem() {
+    void rejectsInvalidNames() {
         for (String name : Arrays.asList(null, "", " ", "가", "가".repeat(21), "김 데모", "김1",
                 "\t김데모", "김데모\n", "\u00a0김데모", "김데모\u3000", "ㄱㄴ", "가", "김😀", "Ｋｉｍ")) {
             assertThrows(IllegalArgumentException.class, () -> new AuthCredentials(name, "01000000001", "000001"));
@@ -73,9 +74,10 @@ class AuthCredentialsTest {
      * 객체 표현과 형식 오류에 제출한 민감 문자열이 복제되지 않는다.
      * @created 2026-10-22
      * @usedBy JUnit test
+     * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      */
     @Test
-    void redactsCredentialsAndValidationErrors() {
+    void redactsSensitiveInput() {
         var credentials = new AuthCredentials("데모알파", "01000000001", "000001");
         assertEquals("AuthCredentials[REDACTED]", credentials.toString());
         String invalid = "private-name-must-not-be-repeated";

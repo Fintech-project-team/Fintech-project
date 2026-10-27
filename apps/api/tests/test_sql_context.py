@@ -41,7 +41,7 @@ class SqlContextTests(unittest.TestCase):
         self.assertNotEqual(actual['owner_id'], actual['other_owner_id'])
         self.assertEqual(actual['owner_name'], '데모알파')
 
-    def test_display_rename_source_rename_and_shuffle_preserve_roles(self):
+    def test_roles_ignore_labels_and_order(self):
         cases = copy.deepcopy(self.cases)
         rng = random.Random(22)
         # sourceRef remains unique; changing its formatting is safe but duplicates are not.
@@ -74,7 +74,7 @@ class SqlContextTests(unittest.TestCase):
         self.assertEqual(actual['spaced_product_name'], "changed display ' value")
         self.assertIn("changed display ' value", context.context_sql(actual))
 
-    def test_consistent_remap_all_uuids_preserves_relationships(self):
+    def test_uuid_remap_preserves_relationships(self):
         pattern = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
         mapping = {}
         def remap(value):
@@ -163,7 +163,7 @@ class SqlContextTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(ValueError):
                 self.derive(cases)
 
-    def test_context_rejects_missing_wrong_type_and_duplicate_values(self):
+    def test_context_rejects_invalid_values(self):
         changes = [lambda c: c.pop('owner_id'), lambda c: c.update(owner_id=None),
                    lambda c: c.update(owner_id='not-a-uuid'), lambda c: c.update(expected_user_count=True),
                    lambda c: c.update(card_transaction_ids=[]),
@@ -188,7 +188,7 @@ class SqlContextTests(unittest.TestCase):
         self.assertNotIn('COMMIT;', sql)
         self.assertIn("current_database() !~ '^payse_fixture_[a-z0-9_]+$'", sql)
 
-    def test_sql_payload_preserves_quotes_backslashes_and_delimiter_text(self):
+    def test_sql_payload_preserves_literal_text(self):
         value = copy.deepcopy(self.baseline)
         value['spaced_product_name'] = "quoted ' \\ slash $payse_context$ ; SELECT 'not executed'"
         sql = context.context_sql(value)

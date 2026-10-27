@@ -72,7 +72,7 @@ CREATE TABLE payse.institutions (
   kind text NOT NULL,
   name text NOT NULL,
   PRIMARY KEY (code),
-  CHECK (kind IN ('bank','card')),
+  CHECK (kind IN ('bank', 'card')),
   CHECK (code IS NULL OR length(btrim(code)) > 0),
   CHECK (kind IS NULL OR length(btrim(kind)) > 0),
   CHECK (name IS NULL OR length(btrim(name)) > 0)
@@ -96,7 +96,9 @@ CREATE TABLE payse.source_contexts (
   PRIMARY KEY (user_id),
   FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   UNIQUE (user_id, source_version),
-  CHECK (jsonb_typeof(coverage) = 'array' AND jsonb_typeof(salary_evidence) = 'array' AND jsonb_typeof(occurrence_links) = 'array'),
+  CHECK (jsonb_typeof(coverage) = 'array'
+    AND jsonb_typeof(salary_evidence) = 'array'
+    AND jsonb_typeof(occurrence_links) = 'array'),
   CHECK (as_of IS NULL OR isfinite(as_of)),
   CHECK (source_version IS NULL OR length(btrim(source_version)) > 0),
   CHECK (schema_version IS NULL OR length(btrim(schema_version)) > 0),
@@ -164,7 +166,7 @@ CREATE TABLE payse.financial_accounts (
   FOREIGN KEY (institution_code) REFERENCES payse.institutions(code) ON DELETE RESTRICT,
   FOREIGN KEY (user_id, source_version) REFERENCES payse.source_contexts(user_id, source_version) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   UNIQUE (user_id, source_ref),
-  CHECK (product_type IN ('demand','savings','time_deposit','other')),
+  CHECK (product_type IN ('demand', 'savings', 'time_deposit', 'other')),
   CHECK (as_of IS NULL OR isfinite(as_of)),
   CHECK (institution_code IS NULL OR length(btrim(institution_code)) > 0),
   CHECK (source_ref IS NULL OR length(btrim(source_ref)) > 0),
@@ -217,7 +219,7 @@ CREATE TABLE payse.financial_cards (
   FOREIGN KEY (user_id, source_version) REFERENCES payse.source_contexts(user_id, source_version) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   FOREIGN KEY (user_id, withdrawal_account_id) REFERENCES payse.financial_accounts(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   UNIQUE (user_id, source_ref),
-  CHECK (card_type IN ('credit','debit','unknown')),
+  CHECK (card_type IN ('credit', 'debit', 'unknown')),
   CHECK (jsonb_typeof(schedule_evidence) = 'array'),
   CHECK (institution_code IS NULL OR length(btrim(institution_code)) > 0),
   CHECK (source_ref IS NULL OR length(btrim(source_ref)) > 0),
@@ -254,7 +256,11 @@ CREATE TABLE payse.transaction_references (
   reason text,
   PRIMARY KEY (user_id, transaction_id),
   FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
-  CHECK ((resolution = 'resolved' AND reason IS NULL) OR (resolution = 'unavailable' AND reason IS NOT NULL AND reason IN ('outside_retention','not_provided','not_connected'))),
+  CHECK ((resolution = 'resolved'
+    AND reason IS NULL)
+    OR (resolution = 'unavailable'
+    AND reason IS NOT NULL
+    AND reason IN ('outside_retention', 'not_provided', 'not_connected'))),
   CHECK (resolution IS NULL OR length(btrim(resolution)) > 0),
   CHECK (reason IS NULL OR length(btrim(reason)) > 0)
 );
@@ -302,18 +308,28 @@ CREATE TABLE payse.financial_transactions (
   UNIQUE (user_id, source_ref),
   UNIQUE (user_id, id, card_id),
   CHECK (account_id IS NOT NULL OR card_id IS NOT NULL),
-  CHECK (record_kind IN ('account_entry','card_purchase','card_refund','card_cancellation')),
-  CHECK (direction IN ('in','out')),
-  CHECK (status IN ('approved','posted','cancelled','unknown')),
-  CHECK (reflection_reason IN ('reflected','not_reflected','not_applicable','unknown')),
-  CHECK (account_id IS NOT NULL OR reflection_reason IN ('not_applicable','unknown')),
-  CHECK ((occurred_at IS NULL AND occurred_at_basis IS NULL) OR (occurred_at IS NOT NULL AND occurred_at_basis IS NOT NULL AND occurred_at_basis IN ('purchase','booking','withdrawal','refund','cancellation'))),
+  CHECK (record_kind IN ('account_entry', 'card_purchase', 'card_refund', 'card_cancellation')),
+  CHECK (direction IN ('in', 'out')),
+  CHECK (status IN ('approved', 'posted', 'cancelled', 'unknown')),
+  CHECK (reflection_reason IN ('reflected', 'not_reflected', 'not_applicable', 'unknown')),
+  CHECK (account_id IS NOT NULL OR reflection_reason IN ('not_applicable', 'unknown')),
+  CHECK ((occurred_at IS NULL
+    AND occurred_at_basis IS NULL)
+    OR (occurred_at IS NOT NULL
+    AND occurred_at_basis IS NOT NULL
+    AND occurred_at_basis IN ('purchase', 'booking', 'withdrawal', 'refund', 'cancellation'))),
   CHECK (original_transaction_id IS NULL OR original_transaction_id <> id),
-  CHECK (payse_transaction_type IS NULL OR payse_transaction_type IN ('expense','income','internal_transfer','card_payment')),
+  CHECK (payse_transaction_type IS NULL
+    OR payse_transaction_type IN ('expense', 'income', 'internal_transfer', 'card_payment')),
   CHECK (installment_current IS NULL OR installment_current > 0),
   CHECK (installment_total IS NULL OR installment_total > 0),
-  CHECK (installment_current IS NULL OR installment_total IS NULL OR installment_current <= installment_total),
-  CHECK ((record_kind = 'account_entry' AND account_id IS NOT NULL) OR (record_kind <> 'account_entry' AND card_id IS NOT NULL)),
+  CHECK (installment_current IS NULL
+    OR installment_total IS NULL
+    OR installment_current <= installment_total),
+  CHECK ((record_kind = 'account_entry'
+    AND account_id IS NOT NULL)
+    OR (record_kind <> 'account_entry'
+    AND card_id IS NOT NULL)),
   CHECK (purchase_date IS NULL OR isfinite(purchase_date)),
   CHECK (withdrawal_date IS NULL OR isfinite(withdrawal_date)),
   CHECK (refund_date IS NULL OR isfinite(refund_date)),
@@ -395,8 +411,12 @@ CREATE TABLE payse.card_statements (
   FOREIGN KEY (user_id, card_id) REFERENCES payse.financial_cards(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   UNIQUE (user_id, source_ref),
   UNIQUE (user_id, id, card_id),
-  CHECK (detail_completeness IN ('complete','partial','unavailable')),
-  CHECK ((period_start IS NULL AND period_end IS NULL) OR (period_start IS NOT NULL AND period_end IS NOT NULL AND period_start <= period_end)),
+  CHECK (detail_completeness IN ('complete', 'partial', 'unavailable')),
+  CHECK ((period_start IS NULL
+    AND period_end IS NULL)
+    OR (period_start IS NOT NULL
+    AND period_end IS NOT NULL
+    AND period_start <= period_end)),
   CHECK (due_date IS NULL OR isfinite(due_date)),
   CHECK (period_start IS NULL OR isfinite(period_start)),
   CHECK (period_end IS NULL OR isfinite(period_end)),
@@ -453,7 +473,7 @@ CREATE TABLE payse.transaction_relations (
   FOREIGN KEY (user_id, from_id) REFERENCES payse.financial_transactions(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   FOREIGN KEY (user_id, to_id) REFERENCES payse.financial_transactions(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   CHECK (from_id <> to_id),
-  CHECK (kind IN ('card_account_pair','internal_transfer')),
+  CHECK (kind IN ('card_account_pair', 'internal_transfer')),
   CHECK (kind IS NULL OR length(btrim(kind)) > 0),
   CHECK (evidence_ref IS NULL OR length(btrim(evidence_ref)) > 0)
 );
@@ -532,8 +552,13 @@ CREATE TABLE payse.recurring_plan_revisions (
   UNIQUE (user_id, id, plan_id),
   CHECK (EXTRACT(DAY FROM effective_from_month) = 1),
   CHECK (monthly_day BETWEEN 1 AND 31),
-  CHECK (status IN ('active','cancelled')),
-  CHECK ((payment_timing = 'immediate' AND schedule_basis = 'withdrawal' AND card_id IS NULL) OR (payment_timing = 'card_bill' AND schedule_basis IN ('purchase','withdrawal') AND card_id IS NOT NULL)),
+  CHECK (status IN ('active', 'cancelled')),
+  CHECK ((payment_timing = 'immediate'
+    AND schedule_basis = 'withdrawal'
+    AND card_id IS NULL)
+    OR (payment_timing = 'card_bill'
+    AND schedule_basis IN ('purchase', 'withdrawal')
+    AND card_id IS NOT NULL)),
   CHECK (jsonb_typeof(schedule_overrides) = 'array'),
   CHECK (effective_from_month IS NULL OR isfinite(effective_from_month)),
   CHECK (label IS NULL OR length(btrim(label)) > 0),
@@ -588,8 +613,14 @@ CREATE TABLE payse.obligations (
   FOREIGN KEY (user_id, withdrawal_account_id) REFERENCES payse.financial_accounts(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   FOREIGN KEY (user_id, statement_id) REFERENCES payse.card_statements(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   FOREIGN KEY (user_id, plan_revision_id, plan_id) REFERENCES payse.recurring_plan_revisions(user_id, id, plan_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
-  CHECK (status IN ('active','cancelled')),
-  CHECK ((plan_id IS NULL AND plan_revision_id IS NULL AND occurrence_month IS NULL) OR (plan_id IS NOT NULL AND plan_revision_id IS NOT NULL AND occurrence_month IS NOT NULL AND EXTRACT(DAY FROM occurrence_month) = 1)),
+  CHECK (status IN ('active', 'cancelled')),
+  CHECK ((plan_id IS NULL
+    AND plan_revision_id IS NULL
+    AND occurrence_month IS NULL)
+    OR (plan_id IS NOT NULL
+    AND plan_revision_id IS NOT NULL
+    AND occurrence_month IS NOT NULL
+    AND EXTRACT(DAY FROM occurrence_month) = 1)),
   CHECK (statement_id IS NULL OR plan_id IS NULL),
   UNIQUE (user_id, plan_id, occurrence_month),
   CHECK (due_date IS NULL OR isfinite(due_date)),
@@ -633,7 +664,7 @@ CREATE TABLE payse.occurrence_overrides (
   FOREIGN KEY (user_id, plan_revision_id, plan_id) REFERENCES payse.recurring_plan_revisions(user_id, id, plan_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   FOREIGN KEY (user_id, withdrawal_account_id) REFERENCES payse.financial_accounts(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   CHECK (EXTRACT(DAY FROM occurrence_month) = 1),
-  CHECK (status IN ('active','cancelled')),
+  CHECK (status IN ('active', 'cancelled')),
   CHECK (occurrence_month IS NULL OR isfinite(occurrence_month)),
   CHECK (due_date IS NULL OR isfinite(due_date)),
   CHECK (status IS NULL OR length(btrim(status)) > 0)
@@ -711,7 +742,7 @@ CREATE TABLE payse.settlement_links (
   FOREIGN KEY (user_id) REFERENCES payse.users(id) ON DELETE RESTRICT,
   FOREIGN KEY (user_id, obligation_id) REFERENCES payse.obligations(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   FOREIGN KEY (user_id, transaction_id) REFERENCES payse.financial_transactions(user_id, id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
-  CHECK (method IN ('automatic','manual')),
+  CHECK (method IN ('automatic', 'manual')),
   CHECK (jsonb_typeof(evidence) = 'array' AND jsonb_array_length(evidence) > 0),
   CHECK (invalidated_at IS NULL OR isfinite(invalidated_at)),
   CHECK (method IS NULL OR length(btrim(method)) > 0)
@@ -831,15 +862,20 @@ COMMENT ON COLUMN payse.write_receipts.result_version IS '커밋 결과 dataVers
 
 COMMENT ON COLUMN payse.write_receipts.created_at IS '커밋 기록 시각';
 
-CREATE UNIQUE INDEX current_plan_revision_per_month ON payse.recurring_plan_revisions(user_id, plan_id, effective_from_month) WHERE is_current;
+CREATE UNIQUE INDEX current_plan_revision_per_month ON payse.recurring_plan_revisions(user_id, plan_id, effective_from_month)
+WHERE is_current;
 
-CREATE UNIQUE INDEX active_session_per_user ON payse.demo_sessions(user_id) WHERE ended_at IS NULL;
+CREATE UNIQUE INDEX active_session_per_user ON payse.demo_sessions(user_id)
+WHERE ended_at IS NULL;
 
-CREATE UNIQUE INDEX active_institution_per_user ON payse.institution_links(user_id, institution_code) WHERE disconnected_at IS NULL;
+CREATE UNIQUE INDEX active_institution_per_user ON payse.institution_links(user_id, institution_code)
+WHERE disconnected_at IS NULL;
 
-CREATE UNIQUE INDEX active_statement_obligation ON payse.obligations(user_id, statement_id) WHERE statement_id IS NOT NULL AND status = 'active';
+CREATE UNIQUE INDEX active_statement_obligation ON payse.obligations(user_id, statement_id)
+WHERE statement_id IS NOT NULL AND status = 'active';
 
-CREATE UNIQUE INDEX active_settlement_pair ON payse.settlement_links(user_id, obligation_id, transaction_id) WHERE invalidated_at IS NULL;
+CREATE UNIQUE INDEX active_settlement_pair ON payse.settlement_links(user_id, obligation_id, transaction_id)
+WHERE invalidated_at IS NULL;
 
 CREATE INDEX transactions_by_account_date ON payse.financial_transactions(user_id, account_id, booking_date, id);
 
@@ -847,137 +883,202 @@ CREATE INDEX transactions_by_card_date ON payse.financial_transactions(user_id, 
 
 CREATE INDEX obligations_by_due ON payse.obligations(user_id, due_date, id);
 
-CREATE INDEX settlements_by_transaction ON payse.settlement_links(user_id, transaction_id) WHERE invalidated_at IS NULL;
+CREATE INDEX settlements_by_transaction ON payse.settlement_links(user_id, transaction_id)
+WHERE invalidated_at IS NULL;
 
 CREATE INDEX allocations_by_obligation ON payse.reserve_allocations(user_id, obligation_id);
 
-CREATE INDEX reserves_by_account ON payse.reserves(user_id, account_id) WHERE cancelled_at IS NULL;
+CREATE INDEX reserves_by_account ON payse.reserves(user_id, account_id)
+WHERE cancelled_at IS NULL;
 
 ALTER TABLE payse.users ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.users FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.users USING (id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.users
+  USING (id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.demo_sessions ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.demo_sessions FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.demo_sessions USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.demo_sessions
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.source_contexts ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.source_contexts FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.source_contexts USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.source_contexts
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.institution_links ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.institution_links FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.institution_links USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.institution_links
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.financial_accounts ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.financial_accounts FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.financial_accounts USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.financial_accounts
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.financial_cards ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.financial_cards FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.financial_cards USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.financial_cards
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.transaction_references ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.transaction_references FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.transaction_references USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.transaction_references
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.financial_transactions ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.financial_transactions FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.financial_transactions USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.financial_transactions
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.card_statements ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.card_statements FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.card_statements USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.card_statements
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.statement_items ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.statement_items FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.statement_items USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.statement_items
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.transaction_relations ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.transaction_relations FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.transaction_relations USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.transaction_relations
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.user_attributes ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.user_attributes FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.user_attributes USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.user_attributes
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.recurring_plans ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.recurring_plans FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.recurring_plans USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.recurring_plans
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.recurring_plan_revisions ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.recurring_plan_revisions FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.recurring_plan_revisions USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.recurring_plan_revisions
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.obligations ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.obligations FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.obligations USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.obligations
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.occurrence_overrides ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.occurrence_overrides FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.occurrence_overrides USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.occurrence_overrides
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.recurring_decisions ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.recurring_decisions FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.recurring_decisions USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.recurring_decisions
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.settlement_links ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.settlement_links FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.settlement_links USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.settlement_links
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.reserves ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.reserves FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.reserves USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.reserves
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.reserve_allocations ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.reserve_allocations FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.reserve_allocations USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.reserve_allocations
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 ALTER TABLE payse.write_receipts ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE payse.write_receipts FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_rows ON payse.write_receipts USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid) WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
+CREATE POLICY own_rows
+  ON payse.write_receipts
+  USING (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('payse.user_id', true), '')::uuid);
 
 
 

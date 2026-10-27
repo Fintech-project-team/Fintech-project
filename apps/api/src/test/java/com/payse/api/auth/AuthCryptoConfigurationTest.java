@@ -26,9 +26,10 @@ class AuthCryptoConfigurationTest {
      * 비활성 인증 기능에는 비밀 설정과 빈 생성이 필요하지 않다.
      * @created 2026-10-22
      * @usedBy JUnit test
+     * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      */
     @Test
-    void inactiveProfileDoesNotRequireKeys() {
+    void skipsInactiveProfile() {
         try (var context = new AnnotationConfigApplicationContext()) {
             context.setEnvironment(new MockEnvironment());
             context.register(AuthCryptoConfiguration.class);
@@ -42,9 +43,10 @@ class AuthCryptoConfigurationTest {
      * auth가 활성화된 경우 누락 키를 임의 값으로 대체하지 않고 시작에 실패한다.
      * @created 2026-10-22
      * @usedBy JUnit test
+     * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      */
     @Test
-    void activeProfileFailsClosedWithoutKeys() {
+    void requiresActiveProfileKeys() {
         try (var context = new AnnotationConfigApplicationContext()) {
             var environment = new MockEnvironment();
             environment.setActiveProfiles("auth");
@@ -63,9 +65,10 @@ class AuthCryptoConfigurationTest {
      * 유효한 명시 설정에서만 두 빈이 구성되며 활성화 자체가 HTTP 인증을 구현하지 않는다.
      * @created 2026-10-22
      * @usedBy JUnit test
+     * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      */
     @Test
-    void activeProfileInjectsValidatedKeys() {
+    void loadsValidKeys() {
         try (var context = new AnnotationConfigApplicationContext()) {
             var environment = validEnvironment();
             environment.setActiveProfiles("auth");
@@ -83,10 +86,11 @@ class AuthCryptoConfigurationTest {
      * 실제 auth 프로필 서버에서도 암호 빈 생성만으로 업무 HTTP가 열리지 않는지 확인한다.
      * @created 2026-10-22
      * @usedBy JUnit test
+     * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      * @throws Exception 로컬 테스트 서버 요청 실패
      */
     @Test
-    void activeProfileStillDeniesBusinessHttpRoutes() throws Exception {
+    void blocksBusinessRoutes() throws Exception {
         var environment = validEnvironment();
         var application = new SpringApplication(PayseApiApplication.class);
         application.setDefaultProperties(Map.of(
@@ -119,9 +123,10 @@ class AuthCryptoConfigurationTest {
      * 비정규 Base64·잘못된 길이·동일 키·식별자 오류를 일반 오류로 거절한다.
      * @created 2026-10-22
      * @usedBy JUnit test
+     * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      */
     @Test
-    void invalidConfigurationNeverEchoesSecretInput() {
+    void redactsInvalidSecrets() {
         var configuration = new AuthCryptoConfiguration();
         for (String invalid : new String[]{"private-secret!", "", " ", "A".repeat(44),
                 Base64.getEncoder().encodeToString(new byte[31]), Base64.getEncoder().encodeToString(new byte[33]),
