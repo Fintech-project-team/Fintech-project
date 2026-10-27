@@ -9,18 +9,21 @@ class AmountHero extends StatelessWidget {
   /// 2026-10-20: 라벨·금액·기준 시각·안내 문장으로 위젯을 만든다.
   /// [amountKrw]가 null이면 정보 부족으로 보고 0원 대신 '계산할 수 없어요'를 보인다.
   /// [message]는 호출자가 만든 부족·정보 부족 안내 문장이며 없으면 생략한다.
+  /// 2026-10-26: [unavailableLabel]은 정보 부족 금액 자리 문구다. 없으면 [unavailableText]를 쓴다.
   const AmountHero({
     super.key,
     required this.label,
     required this.amountKrw,
     this.asOfLabel,
     this.message,
+    this.unavailableLabel,
   });
 
   final String label;
   final int? amountKrw;
   final String? asOfLabel;
   final String? message;
+  final String? unavailableLabel;
 
   static const String unavailableText = '계산할 수 없어요';
 
@@ -34,7 +37,7 @@ class AmountHero extends StatelessWidget {
     final Widget amountLine;
     if (amount == null) {
       amountLine = Text(
-        unavailableText,
+        unavailableLabel ?? unavailableText,
         style: PayseTypography.amountLabel.copyWith(
           fontSize: 20,
           fontWeight: FontWeight.w700,
