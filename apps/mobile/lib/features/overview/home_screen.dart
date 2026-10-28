@@ -10,6 +10,7 @@ import 'calculation_detail_screen.dart';
 import 'composition_bar.dart';
 import 'cycle_moon.dart';
 import 'home_calculation.dart';
+import 'home_skeleton.dart';
 
 /// 2026-10-23: 02-1 홈. 공유 계산 결과 [calculation]만 표시하며 금액을 직접 계산하지 않는다.
 /// 데이터 오류·예상하지 못한 오류에서는 이전 금액을 보이지 않고 [onReload]로 다시 불러온다.
@@ -18,6 +19,7 @@ class HomeScreen extends StatelessWidget {
   /// 2026-10-26: [record]는 4단계 기기 기록에서 판단할 보조 상태이며 3단계에서는 기본값(기록 없음)이다.
   /// [refresh]는 새로고침 진행 상태로, 홈 상태(음수·입금 대기·정보 부족)와 따로 관리한다.
   /// 2026-10-27: [onShowFirstCalc]는 '처음 계산 과정을 단계별로 보기'를 눌렀을 때 01-3을 다시 보인다.
+  /// 2026-10-28: [coachTargets]가 있으면 02-1a 코치마크가 강조할 금액 영역·'계산 내역 보기'에 위치 키를 붙인다.
   const HomeScreen({
     super.key,
     required this.calculation,
@@ -25,6 +27,7 @@ class HomeScreen extends StatelessWidget {
     this.record = HomeSalaryRecord.none,
     this.refresh = HomeRefresh.idle,
     this.onShowFirstCalc,
+    this.coachTargets,
   });
 
   final HomeCalculation calculation;
@@ -32,6 +35,7 @@ class HomeScreen extends StatelessWidget {
   final HomeSalaryRecord record;
   final HomeRefresh refresh;
   final VoidCallback? onShowFirstCalc;
+  final HomeCoachTargets? coachTargets;
 
   static const String amountLabel = '다음 월급일까지\n쓸 수 있는 돈';
 
@@ -48,6 +52,7 @@ class HomeScreen extends StatelessWidget {
         onReload: onReload,
         refreshFailed: failed,
         onShowFirstCalc: onShowFirstCalc,
+        coachTargets: coachTargets,
       ),
       HomeCalculationDataError() || HomeCalculationUnexpectedError()
           when failed =>
@@ -67,6 +72,20 @@ class HomeScreen extends StatelessWidget {
       ),
     };
   }
+}
+
+/// 2026-10-28: 02-1a 코치마크가 강조할 홈 위젯의 위치 키. 앱 셸이 만들고 홈이 붙인다.
+class HomeCoachTargets {
+  /// 2026-10-28: 금액 영역 시작(라벨) [amountTop], 끝(구성 바 또는 '월급 입금 확인하기') [amountBottom],
+  /// '계산 내역 보기' [detail] 키를 새로 만든다.
+  HomeCoachTargets()
+    : amountTop = GlobalKey(debugLabel: 'coach-amount-top'),
+      amountBottom = GlobalKey(debugLabel: 'coach-amount-bottom'),
+      detail = GlobalKey(debugLabel: 'coach-detail');
+
+  final GlobalKey amountTop;
+  final GlobalKey amountBottom;
+  final GlobalKey detail;
 }
 
 /// 2026-10-26: 홈 새로고침 진행 상태. 앱 진입 화면이 소유하고 홈은 표시만 한다.
@@ -104,6 +123,7 @@ class _HomeReady extends StatelessWidget {
     required this.onReload,
     required this.refreshFailed,
     this.onShowFirstCalc,
+    this.coachTargets,
   });
 
   final HomeCalculationReady calculation;
@@ -111,6 +131,7 @@ class _HomeReady extends StatelessWidget {
   final VoidCallback onReload;
   final bool refreshFailed;
   final VoidCallback? onShowFirstCalc;
+  final HomeCoachTargets? coachTargets;
 
   /// 2026-10-26: 머리·주기 줄·금액·상태 안내·장부를 스크롤 영역에 두고 '계산 내역 보기' 띠 버튼을 화면 아래에 고정한다.
   @override
@@ -187,7 +208,8 @@ class _HomeReady extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: PayseSpace.section),
-                  _padded(
+                  _target(
+                    coachTargets?.amountTop,
                     AmountHero(
                       label: HomeScreen.amountLabel,
                       amountKrw: u,
@@ -227,7 +249,8 @@ class _HomeReady extends StatelessWidget {
                   ],
                   if (absent) ...[
                     const SizedBox(height: PayseSpace.x5),
-                    _padded(
+                    _target(
+                      coachTargets?.amountBottom,
                       const _WideOutlinedButton(
                         key: ValueKey('home-salary-check-button'),
                         label: '월급 입금 확인하기',
@@ -236,7 +259,10 @@ class _HomeReady extends StatelessWidget {
                     ),
                   ],
                   if (showBar)
-                    _padded(CompositionBar(result: result, showLegend: false)),
+                    _target(
+                      absent ? null : coachTargets?.amountBottom,
+                      CompositionBar(result: result, showLegend: false),
+                    ),
                   if (notice.isNotEmpty) ...[
                     const SizedBox(height: PayseSpace.x5),
                     ...notice,
@@ -271,15 +297,22 @@ class _HomeReady extends StatelessWidget {
               ),
             ),
           ),
-          PrimaryButton(
-            key: const ValueKey('home-detail-button'),
-            label: '계산 내역 보기',
-            onPressed: () => _openDetail(context),
+          KeyedSubtree(
+            key: coachTargets?.detail,
+            child: PrimaryButton(
+              key: const ValueKey('home-detail-button'),
+              label: '계산 내역 보기',
+              onPressed: () => _openDetail(context),
+            ),
           ),
         ],
       ),
     );
   }
+
+  /// 2026-10-28: 화면 좌우 여백을 적용하고 코치마크 위치 키 [key]가 있으면 붙인다.
+  static Widget _target(GlobalKey? key, Widget child) =>
+      KeyedSubtree(key: key, child: _padded(child));
 
   /// 2026-10-26: 같은 계산 결과로 02-2 계산 내역을 연다.
   void _openDetail(BuildContext context) {
@@ -483,10 +516,17 @@ class _HomeLedgerRow extends StatelessWidget {
   final VoidCallback? onTap;
 
   /// 2026-10-26: true면 금액 자리에 회색 로딩 틀을 둔다(새로고침 중).
+  /// 2026-10-28: 보조 줄 [subtitle]도 그 문구 크기의 로딩 틀로 둔다.
   final bool skeleton;
 
   /// 2026-10-26: 금액을 모를 때의 문구(기본 '계산 불가').
   final String missingText;
+
+  static const TextStyle _subtitleStyle = TextStyle(
+    fontSize: 12,
+    height: 18 / 12,
+    color: PayseColors.textSecondary,
+  );
 
   /// 2026-10-26: 행을 반환한다.
   @override
@@ -532,14 +572,12 @@ class _HomeLedgerRow extends StatelessWidget {
                   ),
                 ),
                 if (subtitle != null)
-                  Text(
-                    subtitle!,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      height: 18 / 12,
-                      color: PayseColors.textSecondary,
-                    ),
-                  ),
+                  skeleton
+                      ? SkeletonBone.text(
+                          TextSpan(text: subtitle),
+                          style: _subtitleStyle,
+                        )
+                      : Text(subtitle!, style: _subtitleStyle),
               ],
             ),
           ),
@@ -552,10 +590,9 @@ class _HomeLedgerRow extends StatelessWidget {
                   0.6,
             ),
             child: skeleton
-                ? const SizedBox(
-                    width: 88,
-                    height: 22,
-                    child: Center(child: _Bar(width: 88, height: 14)),
+                ? const SkeletonBone.text(
+                    TextSpan(text: '0,000,000원'),
+                    style: PayseTypography.ledgerAmount,
                   )
                 : FittedBox(
                     fit: BoxFit.scaleDown,
@@ -818,31 +855,6 @@ class _HomeError extends StatelessWidget {
   }
 }
 
-/// 2026-10-26: 회색 로딩 틀 막대.
-class _Bar extends StatelessWidget {
-  /// 2026-10-26: 폭 [width](null이면 가능한 만큼)과 높이 [height]로 만든다.
-  const _Bar({this.width, required this.height, this.radius = 4});
-
-  final double? width;
-  final double height;
-  final double radius;
-
-  /// 2026-10-26: 막대를 반환한다.
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      height: height,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: PayseColors.surfaceMuted,
-          borderRadius: BorderRadius.circular(radius),
-        ),
-      ),
-    );
-  }
-}
-
 /// 2026-10-26: 새로고침 실패 안내 띠(design.md §6). 옅은 중립 바탕, 빨간 안내 아이콘, 오른쪽 '다시 시도' 글자 버튼.
 /// 좁은 화면·큰 글자에서는 버튼이 설명 바로 아래로 붙는다. 원인을 모를 수 있어 인터넷 문제로 단정하지 않는다.
 /// 2026-10-27: 01-2도 같은 띠를 쓰도록 공개하고 설명·글자 버튼을 선택으로 바꿨다(같은 원인 문장을 반복하지 않음).
@@ -956,6 +968,7 @@ class NoticeBand extends StatelessWidget {
 }
 
 /// 2026-10-26: 새로고침 중 홈(최초 로딩과 같은 화면). 이전 숫자를 보이지 않고 같은 크기의 로딩 틀만 둔다.
+/// 2026-10-28: 틀은 정상 홈과 같은 간격·글자 모양의 견본으로 크기를 정해 로딩 전후 자리가 같고, 옅은 빛이 지나간다.
 class _HomeLoading extends StatelessWidget {
   /// 2026-10-26: 인자 없이 만든다.
   const _HomeLoading();
@@ -976,90 +989,122 @@ class _HomeLoading extends StatelessWidget {
         children: [
           Expanded(
             child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const _HomeHeader(onReload: null),
-                  padded(
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: PayseColors.dividerSection),
+              child: SkeletonShimmer(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const _HomeHeader(onReload: null),
+                    padded(
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: PayseColors.dividerSection,
+                            ),
+                          ),
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 14),
+                          child: Row(
+                            children: [
+                              MoonSkeleton(),
+                              SizedBox(width: PayseSpace.x3),
+                              Expanded(
+                                child: Wrap(
+                                  alignment: WrapAlignment.spaceBetween,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: PayseSpace.x2,
+                                  children: [
+                                    SkeletonBone.text(
+                                      TextSpan(text: '월급까지 00일'),
+                                      style: PayseTypography.meta,
+                                    ),
+                                    SkeletonBone.text(
+                                      TextSpan(text: '00/00 – 00/00'),
+                                      style: PayseTypography.caption,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 14),
-                        child: Row(
-                          children: [
-                            MoonSkeleton(),
-                            SizedBox(width: PayseSpace.x3),
-                            _Bar(width: 96, height: 14),
-                            Spacer(),
-                            _Bar(width: 72, height: 12),
-                          ],
+                    ),
+                    const SizedBox(height: PayseSpace.section),
+                    padded(
+                      const Text(
+                        HomeScreen.amountLabel,
+                        style: PayseTypography.amountLabel,
+                      ),
+                    ),
+                    const SizedBox(height: PayseSpace.x2),
+                    padded(
+                      const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: SkeletonBone.text(
+                          TextSpan(
+                            children: [
+                              TextSpan(text: '0,000,000'),
+                              TextSpan(
+                                text: '원',
+                                style: PayseTypography.amountUnit,
+                              ),
+                            ],
+                          ),
+                          style: PayseTypography.amountDisplay,
+                          radius: 8,
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: PayseSpace.section),
-                  padded(
-                    const Text(
-                      HomeScreen.amountLabel,
-                      style: PayseTypography.amountLabel,
+                    const SizedBox(height: 10),
+                    padded(
+                      const Text(
+                        '금융 정보를 불러오고 있어요',
+                        style: PayseTypography.caption,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: PayseSpace.x2),
-                  padded(
-                    const FractionallySizedBox(
-                      alignment: Alignment.centerLeft,
-                      widthFactor: 0.62,
-                      child: _Bar(height: 48, radius: 8),
+                    padded(
+                      const Padding(
+                        padding: EdgeInsets.only(top: PayseSpace.x6),
+                        child: SkeletonBone.box(height: 6, radius: 3),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  padded(
-                    const Text(
-                      '금융 정보를 불러오고 있어요',
-                      style: PayseTypography.caption,
+                    const SizedBox(height: PayseSpace.section),
+                    padded(
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: PayseColors.dividerSection,
+                          ),
+                          _HomeLedgerRow(
+                            name: '계좌 잔액',
+                            strong: true,
+                            amount: null,
+                            skeleton: true,
+                          ),
+                          _HomeLedgerRow(
+                            name: '모아둘 돈',
+                            subtitle: '0건',
+                            amount: null,
+                            skeleton: true,
+                          ),
+                          _HomeLedgerRow(
+                            name: '예정 지출',
+                            subtitle: '월급일 전 0건',
+                            amount: null,
+                            skeleton: true,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  padded(
-                    const Padding(
-                      padding: EdgeInsets.only(top: PayseSpace.x6),
-                      child: _Bar(height: 6, radius: 3),
-                    ),
-                  ),
-                  const SizedBox(height: PayseSpace.section),
-                  padded(
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Divider(
-                          height: 1,
-                          thickness: 1,
-                          color: PayseColors.dividerSection,
-                        ),
-                        _HomeLedgerRow(
-                          name: '계좌 잔액',
-                          strong: true,
-                          amount: null,
-                          skeleton: true,
-                        ),
-                        _HomeLedgerRow(
-                          name: '모아둘 돈',
-                          amount: null,
-                          skeleton: true,
-                        ),
-                        _HomeLedgerRow(
-                          name: '예정 지출',
-                          amount: null,
-                          skeleton: true,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                ],
+                    const SizedBox(height: 22),
+                  ],
+                ),
               ),
             ),
           ),

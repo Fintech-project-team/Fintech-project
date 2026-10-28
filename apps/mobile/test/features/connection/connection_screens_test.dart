@@ -454,7 +454,19 @@ void main() {
           find.byKey(const ValueKey('clear-reserve-dialog')),
           findsOneWidget,
         );
-        expect(find.text('모아둘 돈이 있는 계좌 1개를\n해제할까요?'), findsOneWidget);
+        expect(
+          find.text('입출금 계좌 ${demand.length}개를 모두 선택 해제할까요?'),
+          findsOneWidget,
+          reason: '실제로 해제되는 계좌 수',
+        );
+        expect(
+          find.text(
+            '이 중 1개 계좌에는 모아둘 돈이 있어요.\n선택을 해제한 계좌의 잔액과 연결된 모아둘 돈은 계산에서 제외돼요.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('취소'), findsOneWidget);
+        expect(find.text('모두 선택 해제'), findsOneWidget);
         await tester.tap(find.byKey(const ValueKey('clear-reserve-cancel')));
         await tester.pumpAndSettle();
         expect(demand.every(c.isAccountSelected), isTrue, reason: '취소하면 선택 유지');
@@ -565,7 +577,7 @@ void main() {
         isTrue,
         reason: '예정 지출은 날짜순',
       );
-      expect(find.text('확인·수정'), findsNothing, reason: '월급 수정은 4b');
+      expect(find.text('확인·수정'), findsNothing, reason: '수정 진입을 넘기지 않으면 없음');
       expect(find.textContaining('계획'), findsNothing, reason: '계획 탭 안내는 #29');
       expect(find.byKey(const ValueKey('review-scope-note')), findsNothing);
       expect(find.byKey(const ValueKey('review-load-band')), findsNothing);

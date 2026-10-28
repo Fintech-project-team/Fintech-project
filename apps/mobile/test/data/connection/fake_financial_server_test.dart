@@ -592,6 +592,263 @@ void main() {
       );
     });
   });
+
+  group('PATCH /settings salary', () {
+    const kbDemand = '6069b37a-abf5-56fc-8bf0-153f5301fd1c';
+    const hanaDemand = '48feba1a-c98e-5d0e-91e1-23d8e1ef00fc';
+    const kbDeposit = '2c56e23d-2e82-59ed-8fce-21459e226167';
+
+    /// 2026-10-28: 알파 전체 연결 뒤 국민·하나 입출금을 고른 토큰을 반환한다(자료 버전 3).
+    Future<String> connected(_World world) async {
+      final token = await world.login(0);
+      ok(
+        await world.server.postInstitutionLinks(token, _allAlpha, w('1', 'l')),
+      );
+      ok(
+        await world.server.patchAccountSelection(token, [
+          kbDemand,
+          hanaDemand,
+        ], w('2', 's')),
+      );
+      return token;
+    }
+
+    /// 2026-10-28: Snapshot의 settings.salary를 반환한다.
+    Map<String, Object?> salaryOf(Map<String, Object?> snapshot) =>
+        ((snapshot['settings']! as Map)['salary']! as Map)
+            .cast<String, Object?>();
+
+    test(
+      'saves only the sent fields, bumps the version and reports settings',
+      () async {
+        final world = _World();
+        final token = await connected(world);
+        final before = ok(await world.server.getSnapshot(token));
+
+        final saved = ok(
+          await world.server.patchSettings(
+            token,
+            const SalaryPatch(
+              salaryDay: (value: 10),
+              salaryAccountId: (value: hanaDemand),
+            ),
+            w('3', 'p'),
+          ),
+        );
+        expect(saved.replayed, isFalse);
+        expect(saved.receipt.resultVersion, '4');
+        expect(saved.snapshot['dataVersion'], '4');
+        expect(saved.receipt.changedRefs.map((r) => (r.resource, r.id)), [
+          ('settings', 'f0a4be6c-01d7-53eb-ab2c-74675b22fd8c'),
+        ]);
+        final salary = salaryOf(saved.snapshot);
+        expect(salary['salaryDay'], 10);
+        expect(salary['salaryAccountId'], hanaDemand);
+        expect(salary['salaryAmountKRW'], 3000000, reason: '보내지 않은 필드는 그대로');
+        expect(salary['receiptEvidence'], salaryOf(before)['receiptEvidence']);
+        expect(saved.snapshot['sourceVersion'], before['sourceVersion']);
+        expect(saved.snapshot['asOf'], before['asOf']);
+        expect(
+          saved.snapshot['accounts'],
+          before['accounts'],
+          reason: '잔액·원천 불변',
+        );
+      },
+    );
+
+    test('null clears a field while omission keeps it', () async {
+      final world = _World();
+      final token = await connected(world);
+      final saved = ok(
+        await world.server.patchSettings(
+          token,
+          const SalaryPatch(salaryAmountKrw: (value: null)),
+          w('3', 'p'),
+        ),
+      );
+      final salary = salaryOf(saved.snapshot);
+      expect(salary.containsKey('salaryAmountKRW'), isTrue);
+      expect(salary['salaryAmountKRW'], isNull);
+      expect(salary['salaryDay'], 25);
+    });
+
+    test(
+      'same key and body replays; same key with another body is 409',
+      () async {
+        final world = _World();
+        final token = await connected(world);
+        const patch = SalaryPatch(salaryAmountKrw: (value: 3100000));
+        final first = ok(
+          await world.server.patchSettings(token, patch, w('3', 'p')),
+        );
+        final again = ok(
+          await world.server.patchSettings(token, patch, w('3', 'p')),
+        );
+        expect(again.replayed, isTrue);
+        expect(again.receipt.receiptId, first.receipt.receiptId);
+        expect(again.snapshot['dataVersion'], '4', reason: '다시 저장하지 않음');
+        expect(
+          await world.server.patchSettings(
+            token,
+            const SalaryPatch(salaryAmountKrw: (value: 3200000)),
+            w('3', 'p'),
+          ),
+          isA<FinancialIdempotencyConflict<WriteSuccess>>(),
+        );
+        expect(
+          await world.server.patchSettings(
+            token,
+            const SalaryPatch(salaryAmountKrw: (value: null)),
+            w('3', 'p'),
+          ),
+          isA<FinancialIdempotencyConflict<WriteSuccess>>(),
+          reason: 'null과 다른 값은 다른 요청',
+        );
+      },
+    );
+
+    test(
+      'stale data and rule versions are 409 kinds and change nothing',
+      () async {
+        final world = _World();
+        final token = await connected(world);
+        const patch = SalaryPatch(salaryDay: (value: 1));
+        expect(
+          await world.server.patchSettings(token, patch, w('2', 'a')),
+          isA<FinancialStaleData<WriteSuccess>>(),
+        );
+        expect(
+          await world.server.patchSettings(
+            token,
+            patch,
+            w('3', 'b', rule: 'X'),
+          ),
+          isA<FinancialRuleVersionMismatch<WriteSuccess>>(),
+        );
+        final now = ok(await world.server.getSnapshot(token));
+        expect(now['dataVersion'], '3');
+        expect(salaryOf(now)['salaryDay'], 25);
+      },
+    );
+
+    test('422 for empty or out of range values and unselected accounts; 403 for unreachable', () async {
+      final world = _World();
+      final token = await connected(world);
+      final cases = <(SalaryPatch, Type)>[
+        (const SalaryPatch(), FinancialInvalid<WriteSuccess>),
+        (
+          const SalaryPatch(salaryDay: (value: 0)),
+          FinancialInvalid<WriteSuccess>,
+        ),
+        (
+          const SalaryPatch(salaryDay: (value: 32)),
+          FinancialInvalid<WriteSuccess>,
+        ),
+        (
+          const SalaryPatch(salaryAmountKrw: (value: -1)),
+          FinancialInvalid<WriteSuccess>,
+        ),
+        (
+          const SalaryPatch(salaryAmountKrw: (value: 9000000000001)),
+          FinancialInvalid<WriteSuccess>,
+        ),
+        (
+          const SalaryPatch(salaryAccountId: (value: kbDeposit)),
+          FinancialInvalid<WriteSuccess>,
+        ),
+        (
+          const SalaryPatch(salaryAccountId: (value: 'no-such-account')),
+          FinancialForbidden<WriteSuccess>,
+        ),
+      ];
+      var i = 0;
+      for (final (patch, type) in cases) {
+        final result = await world.server.patchSettings(
+          token,
+          patch,
+          w('3', 'k${i++}'),
+        );
+        expect(result.runtimeType, type, reason: patch.toJson().toString());
+      }
+      final now = ok(await world.server.getSnapshot(token));
+      expect(now['dataVersion'], '3', reason: '실패는 아무것도 바꾸지 않음');
+    });
+
+    test('an account of an unlinked institution is 403', () async {
+      final world = _World();
+      final token = await world.login(0);
+      ok(await world.server.postInstitutionLinks(token, [_kb], w('1', 'l')));
+      ok(
+        await world.server.patchAccountSelection(token, [
+          kbDemand,
+        ], w('2', 's')),
+      );
+      expect(
+        await world.server.patchSettings(
+          token,
+          const SalaryPatch(salaryAccountId: (value: hanaDemand)),
+          w('3', 'p'),
+        ),
+        isA<FinancialForbidden<WriteSuccess>>(),
+      );
+    });
+
+    test('saved settings survive re-login and later writes; other users are untouched', () async {
+      final world = _World();
+      final token = await connected(world);
+      ok(
+        await world.server.patchSettings(
+          token,
+          const SalaryPatch(salaryDay: (value: 5)),
+          w('3', 'p'),
+        ),
+      );
+      ok(
+        await world.server.patchAccountSelection(token, [
+          kbDemand,
+        ], w('4', 's2')),
+      );
+      await world.auth.endSession(token);
+      final second = await world.login(0);
+      final again = ok(await world.server.getSnapshot(second));
+      expect(salaryOf(again)['salaryDay'], 5);
+      expect(again['dataVersion'], '5');
+
+      final beta = await world.login(1);
+      final betaToken = beta;
+      ok(
+        await world.server.postInstitutionLinks(betaToken, const [
+          'bank.kb',
+        ], w('1', 'bl')),
+      );
+      final betaSnap = ok(await world.server.getSnapshot(betaToken));
+      expect(salaryOf(betaSnap)['salaryDay'], isNot(5));
+    });
+
+    test('the session repository sends the patch and drops late responses after close', () async {
+      final world = _World();
+      final token = await connected(world);
+      final repo = FakeUserFinancialRepository(
+        server: world.server,
+        accessToken: token,
+      );
+      final saved = ok(
+        await repo.updateSalarySettings(
+          const SalaryPatch(salaryDay: (value: 7)),
+          w('3', 'p'),
+        ),
+      );
+      expect(salaryOf(saved.snapshot)['salaryDay'], 7);
+      repo.close();
+      expect(
+        await repo.updateSalarySettings(
+          const SalaryPatch(salaryDay: (value: 8)),
+          w('4', 'q'),
+        ),
+        isA<FinancialSessionInvalid<WriteSuccess>>(),
+      );
+    });
+  });
 }
 
 /// 2026-10-22: 조회에서 버전 1의 옛 스냅샷을 돌려주는 서버(늦게 도착한 응답 흉내).

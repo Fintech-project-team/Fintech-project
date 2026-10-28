@@ -11,6 +11,7 @@ import '../data/auth/session_cleanup.dart';
 import '../data/connection/fake_financial_server.dart';
 import '../data/connection/financial_api.dart';
 import '../data/financial_snapshot_repository.dart';
+import '../data/coachmark_record_store.dart';
 import '../data/first_calc_record_store.dart';
 import '../data/fixture_scenario.dart';
 import '../data/snapshot_source.dart';
@@ -39,6 +40,7 @@ class PayseApp extends StatefulWidget {
   /// 2026-10-23: [presentationPolicy]는 실패 연출 사용 여부(개발 설정 토글의 현재 값)를 받아 연결 표시 정책을
   /// 만든다. 생략하면 실제 난수·시간을 쓴다(테스트에서 바꿔 끼움).
   /// 2026-10-27: [firstCalcRecords]는 01-3 첫 계산 기록 저장소다(기본은 앱 실행 동안 유지되는 메모리 구현).
+  /// 2026-10-28: [coachmarkRecords]는 02-1a 코치마크 기록 저장소다. 기본은 없음이며 코치마크를 띄우지 않는다.
   const PayseApp({
     super.key,
     this.snapshotSource,
@@ -52,6 +54,7 @@ class PayseApp extends StatefulWidget {
     this.userFixtures,
     this.presentationPolicy,
     this.firstCalcRecords,
+    this.coachmarkRecords,
   });
 
   final SnapshotSource? snapshotSource;
@@ -70,6 +73,7 @@ class PayseApp extends StatefulWidget {
   presentationPolicy;
 
   final FirstCalcRecordStore? firstCalcRecords;
+  final CoachmarkRecordStore? coachmarkRecords;
 
   /// 2026-10-20: 앱 루트 상태 객체를 반환한다. 인자 없음.
   @override
@@ -324,6 +328,7 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
         reloadKey: _financialSession,
         userName: _userName,
         firstCalcRecords: _firstCalcRecords,
+        coachmarkRecords: widget.coachmarkRecords,
         devEntryBuilder: _devEntryOrNull,
         onSessionInvalid: _onFinancialSessionInvalid,
       ),

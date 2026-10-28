@@ -497,6 +497,17 @@ class ConnectionFlowController extends ChangeNotifier {
     _reserveNoticeAccount = null;
   }
 
+  /// 2026-10-28: 흐름 밖 쓰기(01-2 월급 설정 저장·최신 정보 불러오기)로 받은 [snapshot]을 현재 Snapshot으로 삼는다.
+  /// 01-1로 돌아가 다시 저장해도 옛 자료 버전으로 보내지 않게 한다. 진행 중 선택은 응답에 있는 계좌만 남긴다.
+  void adoptSnapshot(FinancialSnapshot snapshot) {
+    if (_disposed) return;
+    _snapshot = snapshot;
+    _selectedAccounts.removeWhere(
+      (id) => !accounts.any((a) => a.accountId == id),
+    );
+    _changed();
+  }
+
   /// 2026-10-22: [codes]에 은행 기관이 있으면 true를 반환한다.
   bool _hasBank(Set<String> codes) =>
       institutions.any((i) => i.kind == 'bank' && codes.contains(i.code));

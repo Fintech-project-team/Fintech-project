@@ -3,6 +3,7 @@ import 'dart:math';
 
 import '../auth/auth_repository.dart';
 import '../auth/random_id.dart';
+import '../financial_snapshot.dart' show maxAbsKrw;
 import 'financial_api.dart';
 import 'snapshot_projector.dart';
 
@@ -10,7 +11,7 @@ import 'snapshot_projector.dart';
 typedef UserSourceLoader = Future<Map<String, Object?>> Function(String userId);
 
 /// 2026-10-22: 금융 조회·연결 쓰기를 흉내 내는 앱 수명 가짜 서버(서버 장부 역할). 사용자별 불변 원본과 가변 상태
-/// (연결 기록·계좌 선택·자료 버전·작업 영수증)를 분리해 재로그인까지 상태를 유지한다. 메모리 구현이며 실제 서버 영속화가 아니다.
+/// (연결 기록·계좌 선택·월급 설정·자료 버전·작업 영수증)를 분리해 재로그인까지 상태를 유지한다. 메모리 구현이며 실제 서버 영속화가 아니다.
 class FakeFinancialServer {
   /// 2026-10-22: 토큰→사용자 [sessions], 원본 [loadSource], 시각 [now], 난수 [random]으로 만든다.
   FakeFinancialServer({
@@ -110,6 +111,7 @@ class FakeFinancialServer {
       return FinancialOk((
         institutionLinks: links,
         selectedAccountIds: keptSelection,
+        salarySettings: state.salarySettings,
         changed: [
           for (final l in links)
             ChangedRef(resource: 'institutionLink', id: l['linkId'] as String),
@@ -148,6 +150,7 @@ class FakeFinancialServer {
       return FinancialOk((
         institutionLinks: state.institutionLinks,
         selectedAccountIds: next,
+        salarySettings: state.salarySettings,
         changed: [
           for (final id in {...next, ...before})
             if (next.contains(id) != before.contains(id))
@@ -157,13 +160,61 @@ class FakeFinancialServer {
     },
   );
 
+  /// 2026-10-28: PATCH /settings의 월급 설정([salary]만, 카드 계획은 보내지 않음). 빈 patch·범위 밖 값은 422,
+  /// 연결 밖·없는 계좌는 403, 연결됐지만 계산에 고르지 않은 계좌는 422다. 바꾼 필드만 덮고 입금 근거는 그대로 둔다.
+  Future<FinancialOutcome<WriteSuccess>> patchSettings(
+    String accessToken,
+    SalaryPatch salary,
+    WriteContext write,
+  ) {
+    final fields = salary.toJson();
+    return _write(
+      accessToken: accessToken,
+      method: 'PATCH',
+      path: '/settings',
+      body: {'salary': fields},
+      write: write,
+      apply: (source, state) {
+        if (fields.isEmpty) return const FinancialInvalid();
+        final day = salary.salaryDay?.value;
+        if (day != null && (day < 1 || day > 31)) {
+          return const FinancialInvalid();
+        }
+        final amount = salary.salaryAmountKrw?.value;
+        if (amount != null && (amount < 0 || amount > maxAbsKrw)) {
+          return const FinancialInvalid();
+        }
+        final accountId = salary.salaryAccountId?.value;
+        if (accountId != null) {
+          final reachable = {
+            for (final a in (source['accounts'] as List?) ?? const [])
+              if (state.connectedCodes.contains((a as Map)['institutionCode']))
+                a['accountId'] as String,
+          };
+          if (!reachable.contains(accountId)) return const FinancialForbidden();
+          if (!(state.selectedAccountIds ?? const {}).contains(accountId)) {
+            return const FinancialInvalid();
+          }
+        }
+        return FinancialOk((
+          institutionLinks: state.institutionLinks,
+          selectedAccountIds: state.selectedAccountIds,
+          salarySettings: {...state.salarySettings, ...fields},
+          changed: [
+            ChangedRef(resource: 'settings', id: source['userId'] as String),
+          ],
+        ));
+      },
+    );
+  }
+
   /// 2026-10-22: 금융 쓰기 공통 절차(§5). 형식 → 같은 키 replay/충돌 → 규칙·자료 버전 → 소유권·제약 → 상태·영수증·버전을
   /// 한 번에 확정한다. 중간 실패는 아무것도 바꾸지 않는다.
   Future<FinancialOutcome<WriteSuccess>> _write({
     required String accessToken,
     required String method,
     required String path,
-    required List<String> body,
+    required Object? body,
     required WriteContext write,
     required FinancialOutcome<_Change> Function(
       Map<String, Object?> source,
@@ -193,7 +244,7 @@ class FakeFinancialServer {
     _UserLedger ledger,
     String method,
     String path,
-    List<String> body,
+    Object? body,
     WriteContext write,
     FinancialOutcome<_Change> Function(
       Map<String, Object?> source,
@@ -235,6 +286,7 @@ class FakeFinancialServer {
       institutionLinks: change.value.institutionLinks,
       selectedAccountIds: change.value.selectedAccountIds,
       dataVersion: nextVersion,
+      salarySettings: change.value.salarySettings,
     );
     final projected = _project(source, nextState);
     if (projected is! FinancialOk<Map<String, Object?>>) {
@@ -283,7 +335,8 @@ class FakeFinancialServer {
       changedRefs: [
         for (final ref in receipt.changedRefs)
           if ((ref.resource == 'institutionLink' && links.contains(ref.id)) ||
-              (ref.resource == 'account' && accounts.contains(ref.id)))
+              (ref.resource == 'account' && accounts.contains(ref.id)) ||
+              (ref.resource == 'settings' && ref.id == snapshot['userId']))
             ref,
       ],
     );
@@ -359,6 +412,7 @@ class FakeFinancialServer {
 typedef _Change = ({
   List<Map<String, Object?>> institutionLinks,
   Set<String>? selectedAccountIds,
+  Map<String, Object?> salarySettings,
   List<ChangedRef> changed,
 });
 
@@ -443,6 +497,15 @@ class FakeUserFinancialRepository implements UserFinancialRepository {
       : _accepted(
           await server.patchAccountSelection(accessToken, accountIds, write),
         );
+
+  /// 2026-10-28: 월급 설정을 저장한다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> updateSalarySettings(
+    SalaryPatch salary,
+    WriteContext write,
+  ) async => _closed
+      ? const FinancialSessionInvalid()
+      : _accepted(await server.patchSettings(accessToken, salary, write));
 
   /// 2026-10-22: 쓰기 성공의 Snapshot 버전을 기록한다. 닫힌 세션의 늦은 응답은 세션 무효, 낮은 버전 응답은 서비스 불가로 바꿔 반영하지 않게 한다.
   FinancialOutcome<WriteSuccess> _accepted(
