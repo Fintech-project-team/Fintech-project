@@ -322,7 +322,7 @@ void main() {
   });
 
   group('choosing accounts', () {
-    test('demand accounts start selected, deposits and savings do not', () {
+    test('first entry starts with nothing selected; saved choices return', () {
       final c = _controller(
         ScriptedRepository(),
         snapshot: betaSnapshot({...betaBanks}),
@@ -330,10 +330,42 @@ void main() {
       for (final a in c.accounts) {
         expect(
           c.isAccountSelected(a.accountId),
-          a.productType == 'demand',
+          isFalse,
           reason: a.productName,
         );
       }
+      expect(c.canSaveSelection, isFalse);
+      final kb = c.accounts.first.accountId;
+      final saved = _controller(
+        ScriptedRepository(),
+        snapshot: betaSnapshot({...betaBanks}, selected: {kb}),
+      );
+      expect(
+        [
+          for (final a in saved.accounts)
+            if (saved.isAccountSelected(a.accountId)) a.accountId,
+        ],
+        [kb],
+        reason: '기존 설정을 고칠 때는 저장된 선택 복원',
+      );
+    });
+
+    test('group select and clear touch only that group without warnings', () {
+      final c = _controller(
+        ScriptedRepository(),
+        snapshot: betaSnapshot({...betaBanks}),
+      );
+      final demand = [
+        for (final a in c.accounts)
+          if (a.productType == 'demand') a.accountId,
+      ];
+      c.setAccounts(demand, selected: true);
+      for (final a in c.accounts) {
+        expect(c.isAccountSelected(a.accountId), a.productType == 'demand');
+      }
+      c.setAccounts(demand, selected: false);
+      expect(c.canSaveSelection, isFalse, reason: '0개 상태는 허용');
+      expect(c.reserveNoticeAccount, isNull, reason: '묶음 해제는 화면이 한 번 확인한다');
     });
 
     test('unchecking an account with a reserve warns every time', () {
@@ -344,12 +376,15 @@ void main() {
       final kb = c.accounts.first.accountId;
       expect(c.reservesOf(kb).single.label, '현재 비상금');
       c.toggleAccount(kb);
+      expect(c.reserveNoticeAccount, isNull, reason: '처음 미선택 계좌를 고를 때는 안내 없음');
+      c.toggleAccount(kb);
       expect(c.reserveNoticeAccount, kb);
       c.toggleAccount(kb);
       expect(c.reserveNoticeAccount, isNull);
       c.toggleAccount(kb);
       expect(c.reserveNoticeAccount, kb, reason: '해제할 때마다 안내');
       final plain = c.accounts[2].accountId;
+      c.toggleAccount(plain);
       c.toggleAccount(plain);
       expect(c.reserveNoticeAccount, isNull, reason: '모아둘 돈이 없는 계좌는 안내 없음');
     });
@@ -408,6 +443,11 @@ void main() {
       isTrue,
       reason: '연결만으로 계좌 선택을 확정하지 않음',
     );
+    expect(await c.saveSelection(), isFalse, reason: '처음에는 미선택이라 저장 불가');
+    c.setAccounts([
+      for (final a in c.accounts)
+        if (a.productType == 'demand') a.accountId,
+    ], selected: true);
     expect(await c.saveSelection(), isTrue);
     expect(
       c.snapshot.accounts!.where((a) => a.included).map((a) => a.productType),

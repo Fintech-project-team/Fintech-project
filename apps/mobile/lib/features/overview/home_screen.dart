@@ -17,18 +17,21 @@ class HomeScreen extends StatelessWidget {
   /// 2026-10-23: 계산 결과 [calculation]과 다시 불러오기 [onReload]로 만든다.
   /// 2026-10-26: [record]는 4단계 기기 기록에서 판단할 보조 상태이며 3단계에서는 기본값(기록 없음)이다.
   /// [refresh]는 새로고침 진행 상태로, 홈 상태(음수·입금 대기·정보 부족)와 따로 관리한다.
+  /// 2026-10-27: [onShowFirstCalc]는 '처음 계산 과정을 단계별로 보기'를 눌렀을 때 01-3을 다시 보인다.
   const HomeScreen({
     super.key,
     required this.calculation,
     required this.onReload,
     this.record = HomeSalaryRecord.none,
     this.refresh = HomeRefresh.idle,
+    this.onShowFirstCalc,
   });
 
   final HomeCalculation calculation;
   final VoidCallback onReload;
   final HomeSalaryRecord record;
   final HomeRefresh refresh;
+  final VoidCallback? onShowFirstCalc;
 
   static const String amountLabel = '다음 월급일까지\n쓸 수 있는 돈';
 
@@ -44,6 +47,7 @@ class HomeScreen extends StatelessWidget {
         record: record,
         onReload: onReload,
         refreshFailed: failed,
+        onShowFirstCalc: onShowFirstCalc,
       ),
       HomeCalculationDataError() || HomeCalculationUnexpectedError()
           when failed =>
@@ -99,12 +103,14 @@ class _HomeReady extends StatelessWidget {
     required this.record,
     required this.onReload,
     required this.refreshFailed,
+    this.onShowFirstCalc,
   });
 
   final HomeCalculationReady calculation;
   final HomeSalaryRecord record;
   final VoidCallback onReload;
   final bool refreshFailed;
+  final VoidCallback? onShowFirstCalc;
 
   /// 2026-10-26: 머리·주기 줄·금액·상태 안내·장부를 스크롤 영역에 두고 '계산 내역 보기' 띠 버튼을 화면 아래에 고정한다.
   @override
@@ -164,10 +170,13 @@ class _HomeReady extends StatelessWidget {
                 children: [
                   _HomeHeader(onReload: onReload),
                   if (refreshFailed)
-                    _RefreshFailedNotice(
+                    NoticeBand(
+                      key: const ValueKey('home-refresh-failed'),
                       title: '새 정보를 불러오지 못했어요',
                       body: '이전에 불러온 정보를 보여드려요',
-                      onRetry: onReload,
+                      actionLabel: '다시 시도',
+                      actionKey: const ValueKey('home-refresh-retry'),
+                      onAction: onReload,
                     ),
                   _padded(
                     _CycleLine(
@@ -250,10 +259,10 @@ class _HomeReady extends StatelessWidget {
                   if (resolved) ...[
                     const SizedBox(height: PayseSpace.x6),
                     _padded(
-                      const _WideOutlinedButton(
-                        key: ValueKey('home-first-calc-button'),
+                      _WideOutlinedButton(
+                        key: const ValueKey('home-first-calc-button'),
                         label: '처음 계산 과정을 단계별로 보기',
-                        onPressed: null,
+                        onPressed: onShowFirstCalc,
                       ),
                     ),
                   ],
@@ -836,23 +845,31 @@ class _Bar extends StatelessWidget {
 
 /// 2026-10-26: 새로고침 실패 안내 띠(design.md §6). 옅은 중립 바탕, 빨간 안내 아이콘, 오른쪽 '다시 시도' 글자 버튼.
 /// 좁은 화면·큰 글자에서는 버튼이 설명 바로 아래로 붙는다. 원인을 모를 수 있어 인터넷 문제로 단정하지 않는다.
-class _RefreshFailedNotice extends StatelessWidget {
-  /// 2026-10-26: 제목 [title], 설명 [body], 다시 시도 [onRetry]로 만든다.
-  const _RefreshFailedNotice({
+/// 2026-10-27: 01-2도 같은 띠를 쓰도록 공개하고 설명·글자 버튼을 선택으로 바꿨다(같은 원인 문장을 반복하지 않음).
+class NoticeBand extends StatelessWidget {
+  /// 2026-10-26: 제목 [title], 설명 [body], 글자 버튼 [actionLabel]·[onAction]으로 만든다.
+  /// 2026-10-27: [body]·버튼은 생략할 수 있고 버튼 키는 [actionKey]다.
+  const NoticeBand({
+    super.key,
     required this.title,
-    required this.body,
-    required this.onRetry,
+    this.body,
+    this.actionLabel,
+    this.actionKey,
+    this.onAction,
   });
 
   final String title;
-  final String body;
-  final VoidCallback onRetry;
+  final String? body;
+  final String? actionLabel;
+  final Key? actionKey;
+  final VoidCallback? onAction;
 
   /// 2026-10-26: 안내 띠를 반환한다.
   @override
   Widget build(BuildContext context) {
+    final body = this.body;
+    final action = actionLabel;
     return Padding(
-      key: const ValueKey('home-refresh-failed'),
       padding: const EdgeInsets.only(top: 6),
       child: Semantics(
         liveRegion: true,
@@ -899,31 +916,33 @@ class _RefreshFailedNotice extends StatelessWidget {
                               color: PayseColors.textPrimary,
                             ),
                           ),
-                          Text(
-                            body,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              height: 19 / 13,
-                              color: PayseColors.textSecondary,
+                          if (body != null)
+                            Text(
+                              body,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                height: 19 / 13,
+                                color: PayseColors.textSecondary,
+                              ),
                             ),
-                          ),
                         ],
                       ),
-                      TextButton(
-                        key: const ValueKey('home-refresh-retry'),
-                        onPressed: onRetry,
-                        style: TextButton.styleFrom(
-                          minimumSize: const Size(44, PayseSize.touchMin),
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          foregroundColor: PayseColors.textPrimary,
-                          textStyle: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            decoration: TextDecoration.underline,
+                      if (action != null)
+                        TextButton(
+                          key: actionKey,
+                          onPressed: onAction,
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(44, PayseSize.touchMin),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            foregroundColor: PayseColors.textPrimary,
+                            textStyle: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              decoration: TextDecoration.underline,
+                            ),
                           ),
+                          child: Text(action),
                         ),
-                        child: const Text('다시 시도'),
-                      ),
                     ],
                   ),
                 ),
@@ -1083,10 +1102,13 @@ class _HomeLoadFailed extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _HomeHeader(onReload: onReload),
-                  _RefreshFailedNotice(
+                  NoticeBand(
+                    key: const ValueKey('home-refresh-failed'),
                     title: '금융 정보를 불러오지 못했어요',
                     body: '정보를 불러온 뒤 쓸 수 있는 돈을 계산할 수 있어요',
-                    onRetry: onReload,
+                    actionLabel: '다시 시도',
+                    actionKey: const ValueKey('home-refresh-retry'),
+                    onAction: onReload,
                   ),
                   padded(
                     const DecoratedBox(

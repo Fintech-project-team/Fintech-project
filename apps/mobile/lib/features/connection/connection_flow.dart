@@ -3,7 +3,10 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../../data/connection/financial_api.dart';
+import '../../data/connection/user_snapshot_repository.dart';
 import '../../data/financial_snapshot.dart';
+import '../../data/financial_snapshot_repository.dart';
+import '../overview/home_calculation.dart';
 import 'connection_flow_controller.dart';
 import 'connection_presentation_policy.dart';
 import 'connection_screens.dart';
@@ -16,6 +19,7 @@ class ConnectionFlow extends StatefulWidget {
   /// 01-2 확인 뒤 [onFinished], 세션 무효 [onSessionInvalid], 작업 키 난수 [random]으로 만든다.
   /// 2026-10-23: [devEntry]는 12-1·01-1 목록 끝에 붙는 개발 설정 진입이며 릴리스에서는 null이다.
   /// [userName]은 진입 로딩 제목에 쓰는 사용자 이름(없으면 이름 없이)이다.
+  /// 2026-10-27: [onFinished]는 01-2가 보여 준 스냅샷과 '나중에 확인하고 홈으로'를 골랐는지(deferred)를 받는다.
   const ConnectionFlow({
     super.key,
     required this.repository,
@@ -31,7 +35,8 @@ class ConnectionFlow extends StatefulWidget {
   final UserFinancialRepository repository;
   final FinancialSnapshot snapshot;
   final ConnectionPresentationPolicy policy;
-  final VoidCallback onFinished;
+  final void Function(FinancialSnapshot snapshot, {required bool deferred})
+  onFinished;
   final VoidCallback onSessionInvalid;
   final Random? random;
   final Widget? devEntry;
@@ -141,10 +146,13 @@ class _ConnectionFlowState extends State<ConnectionFlow> {
   );
 
   /// 2026-10-22: 01-2 화면을 반환한다. 계좌 선택 저장 응답의 최신 Snapshot을 보인다.
-  Widget _review() => ConnectionReviewScreen(
+  /// 2026-10-27: 다시 불러오기와 같은 스냅샷 계산을 맡는 [_ReviewHost]로 감싼다.
+  Widget _review() => _ReviewHost(
+    repository: widget.repository,
     snapshot: _controller.snapshot,
     onBack: () => _navigator.pop(),
-    onConfirmed: widget.onFinished,
+    onFinished: widget.onFinished,
+    onSessionInvalid: widget.onSessionInvalid,
   );
 
   /// 2026-10-22: 시스템 뒤로 가기를 흐름 Navigator로 넘기는 흐름 화면을 반환한다.
@@ -160,6 +168,88 @@ class _ConnectionFlowState extends State<ConnectionFlow> {
             _route(resume ? _accounts(canGoBack: false) : _entryLoading()),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 2026-10-27: 01-2 상태 소유자. 보이는 스냅샷과 그 홈 계산 결과, 다시 불러오기 진행 상태를 보관한다.
+/// 2026-10-28: 계산 자체가 오류(데이터 오류·예상하지 못한 오류)인 채 홈으로 가면 보완 미룸을 기록하지 않는다.
+class _ReviewHost extends StatefulWidget {
+  /// 2026-10-27: 세션 저장소 [repository], 처음 보일 [snapshot], 뒤로 [onBack], 끝 [onFinished],
+  /// 세션 무효 [onSessionInvalid]로 만든다.
+  const _ReviewHost({
+    required this.repository,
+    required this.snapshot,
+    required this.onBack,
+    required this.onFinished,
+    required this.onSessionInvalid,
+  });
+
+  final UserFinancialRepository repository;
+  final FinancialSnapshot snapshot;
+  final VoidCallback onBack;
+  final void Function(FinancialSnapshot snapshot, {required bool deferred})
+  onFinished;
+  final VoidCallback onSessionInvalid;
+
+  /// 2026-10-27: 01-2 상태 객체를 반환한다.
+  @override
+  State<_ReviewHost> createState() => _ReviewHostState();
+}
+
+/// 2026-10-27: 다시 불러오기에 성공하면 새 스냅샷으로 다시 계산하고, 실패하면 이전 화면을 유지하고 알린다.
+class _ReviewHostState extends State<_ReviewHost> {
+  late FinancialSnapshot _snapshot = widget.snapshot;
+  late HomeCalculation _calculation = computeHomeCalculation(_snapshot);
+  ReviewReload _reload = ReviewReload.idle;
+
+  /// 2026-10-27: 스냅샷을 다시 조회한다. 진행 중이면 다시 요청하지 않는다. 계좌 묶음이 없거나 형식이 맞지 않는
+  /// 응답은 실패로 보고 이전 스냅샷을 유지한다. 세션 무효면 신규 로그인으로 넘긴다.
+  Future<void> _reloadSnapshot() async {
+    if (_reload == ReviewReload.loading) return;
+    setState(() => _reload = ReviewReload.loading);
+    SnapshotLoadResult result;
+    try {
+      result = await UserSnapshotRepository(widget.repository).loadSnapshot();
+    } catch (error, stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(exception: error, stack: stack, library: 'payse'),
+      );
+      result = SnapshotLoadFailed(error);
+    }
+    if (!mounted) return;
+    switch (result) {
+      case SnapshotLoaded(:final snapshot) when snapshot.accounts != null:
+        setState(() {
+          _snapshot = snapshot;
+          _calculation = computeHomeCalculation(snapshot);
+          _reload = ReviewReload.idle;
+        });
+      case SnapshotLoadFailed(:final error)
+          when error is FinancialLoadError && error.sessionInvalid:
+        widget.onSessionInvalid();
+      case _:
+        setState(() => _reload = ReviewReload.failed);
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(content: Text('정보를 다시 불러오지 못했어요. 이전에 불러온 정보를 보여드려요.')),
+        );
+    }
+  }
+
+  /// 2026-10-27: 01-2 화면을 반환한다.
+  @override
+  Widget build(BuildContext context) {
+    return ConnectionReviewScreen(
+      snapshot: _snapshot,
+      calculation: _calculation,
+      reload: _reload,
+      onBack: widget.onBack,
+      onReload: _reloadSnapshot,
+      onCalculate: () => widget.onFinished(_snapshot, deferred: false),
+      onDefer: () => widget.onFinished(
+        _snapshot,
+        deferred: _calculation is HomeCalculationReady,
       ),
     );
   }

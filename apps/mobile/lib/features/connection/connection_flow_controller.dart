@@ -118,6 +118,12 @@ class ConnectionFlowController extends ChangeNotifier {
   }
 
   /// 2026-10-22: 은행을 1곳 이상 골랐으면 true를 반환한다(12-1 다음 활성 조건).
+  /// 2026-10-27: 12-1 묶음 [codes]를 모두 고르거나([selected]) 모두 푼다.
+  void setChosen(Iterable<String> codes, {required bool selected}) {
+    selected ? _chosen.addAll(codes) : _chosen.removeAll(codes);
+    _changed();
+  }
+
   bool get hasChosenBank => _hasBank(_chosen);
 
   /// 2026-10-22: 카드사만 골랐으면 true를 반환한다. 처음(아무것도 안 고름)에는 false다.
@@ -298,6 +304,7 @@ class ConnectionFlowController extends ChangeNotifier {
 
   final Set<String> _selectedAccounts = {};
   String? _reserveNoticeAccount;
+  bool _accountSelectionStarted = false;
 
   /// 2026-10-22: 연결된 계좌를 응답 순서대로 반환한다.
   List<Account> get accounts => _snapshot.accounts ?? const [];
@@ -326,6 +333,16 @@ class ConnectionFlowController extends ChangeNotifier {
       _selectedAccounts.add(accountId);
       if (_reserveNoticeAccount == accountId) _reserveNoticeAccount = null;
     }
+    _changed();
+  }
+
+  /// 2026-10-27: 01-1 묶음 [accountIds]를 모두 고르거나([selected]) 모두 푼다. 묶음 해제는 화면이 한 번 확인한 뒤
+  /// 부르므로 계좌별 09-10 안내를 띄우지 않는다.
+  void setAccounts(Iterable<String> accountIds, {required bool selected}) {
+    selected
+        ? _selectedAccounts.addAll(accountIds)
+        : _selectedAccounts.removeAll(accountIds);
+    _reserveNoticeAccount = null;
     _changed();
   }
 
@@ -461,12 +478,21 @@ class ConnectionFlowController extends ChangeNotifier {
   }
 
   /// 2026-10-22: 계좌 선택 기본값을 맞춘다. 입출금은 선택, 예금·적금·기타는 해제(D9).
+  /// 2026-10-27: 처음 들어올 때만 맞추며 기본은 모두 미선택이다(저장된 포함 계좌가 있으면 복원). 같은 흐름에서
+  /// 12-3으로 돌아갔다 다시 와도 진행 중 선택을 유지하고 응답에 없는 계좌만 뺀다.
   void _resetAccountSelection() {
+    if (_accountSelectionStarted) {
+      _selectedAccounts.removeWhere(
+        (id) => !accounts.any((a) => a.accountId == id),
+      );
+      return;
+    }
+    _accountSelectionStarted = true;
     _selectedAccounts
       ..clear()
       ..addAll([
         for (final a in accounts)
-          if (a.productType == 'demand') a.accountId,
+          if (a.included) a.accountId,
       ]);
     _reserveNoticeAccount = null;
   }
