@@ -10,6 +10,7 @@ import 'calculation_detail_screen.dart';
 import 'composition_bar.dart';
 import 'cycle_moon.dart';
 import 'home_calculation.dart';
+import 'home_skeleton.dart';
 
 /// 2026-10-23: 02-1 홈. 공유 계산 결과 [calculation]만 표시하며 금액을 직접 계산하지 않는다.
 /// 데이터 오류·예상하지 못한 오류에서는 이전 금액을 보이지 않고 [onReload]로 다시 불러온다.
@@ -515,10 +516,17 @@ class _HomeLedgerRow extends StatelessWidget {
   final VoidCallback? onTap;
 
   /// 2026-10-26: true면 금액 자리에 회색 로딩 틀을 둔다(새로고침 중).
+  /// 2026-10-28: 보조 줄 [subtitle]도 그 문구 크기의 로딩 틀로 둔다.
   final bool skeleton;
 
   /// 2026-10-26: 금액을 모를 때의 문구(기본 '계산 불가').
   final String missingText;
+
+  static const TextStyle _subtitleStyle = TextStyle(
+    fontSize: 12,
+    height: 18 / 12,
+    color: PayseColors.textSecondary,
+  );
 
   /// 2026-10-26: 행을 반환한다.
   @override
@@ -564,14 +572,12 @@ class _HomeLedgerRow extends StatelessWidget {
                   ),
                 ),
                 if (subtitle != null)
-                  Text(
-                    subtitle!,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      height: 18 / 12,
-                      color: PayseColors.textSecondary,
-                    ),
-                  ),
+                  skeleton
+                      ? SkeletonBone.text(
+                          TextSpan(text: subtitle),
+                          style: _subtitleStyle,
+                        )
+                      : Text(subtitle!, style: _subtitleStyle),
               ],
             ),
           ),
@@ -584,10 +590,9 @@ class _HomeLedgerRow extends StatelessWidget {
                   0.6,
             ),
             child: skeleton
-                ? const SizedBox(
-                    width: 88,
-                    height: 22,
-                    child: Center(child: _Bar(width: 88, height: 14)),
+                ? const SkeletonBone.text(
+                    TextSpan(text: '0,000,000원'),
+                    style: PayseTypography.ledgerAmount,
                   )
                 : FittedBox(
                     fit: BoxFit.scaleDown,
@@ -850,31 +855,6 @@ class _HomeError extends StatelessWidget {
   }
 }
 
-/// 2026-10-26: 회색 로딩 틀 막대.
-class _Bar extends StatelessWidget {
-  /// 2026-10-26: 폭 [width](null이면 가능한 만큼)과 높이 [height]로 만든다.
-  const _Bar({this.width, required this.height, this.radius = 4});
-
-  final double? width;
-  final double height;
-  final double radius;
-
-  /// 2026-10-26: 막대를 반환한다.
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      height: height,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: PayseColors.surfaceMuted,
-          borderRadius: BorderRadius.circular(radius),
-        ),
-      ),
-    );
-  }
-}
-
 /// 2026-10-26: 새로고침 실패 안내 띠(design.md §6). 옅은 중립 바탕, 빨간 안내 아이콘, 오른쪽 '다시 시도' 글자 버튼.
 /// 좁은 화면·큰 글자에서는 버튼이 설명 바로 아래로 붙는다. 원인을 모를 수 있어 인터넷 문제로 단정하지 않는다.
 /// 2026-10-27: 01-2도 같은 띠를 쓰도록 공개하고 설명·글자 버튼을 선택으로 바꿨다(같은 원인 문장을 반복하지 않음).
@@ -988,6 +968,7 @@ class NoticeBand extends StatelessWidget {
 }
 
 /// 2026-10-26: 새로고침 중 홈(최초 로딩과 같은 화면). 이전 숫자를 보이지 않고 같은 크기의 로딩 틀만 둔다.
+/// 2026-10-28: 틀은 정상 홈과 같은 간격·글자 모양의 견본으로 크기를 정해 로딩 전후 자리가 같고, 옅은 빛이 지나간다.
 class _HomeLoading extends StatelessWidget {
   /// 2026-10-26: 인자 없이 만든다.
   const _HomeLoading();
@@ -1008,90 +989,122 @@ class _HomeLoading extends StatelessWidget {
         children: [
           Expanded(
             child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const _HomeHeader(onReload: null),
-                  padded(
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: PayseColors.dividerSection),
+              child: SkeletonShimmer(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const _HomeHeader(onReload: null),
+                    padded(
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: PayseColors.dividerSection,
+                            ),
+                          ),
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 14),
+                          child: Row(
+                            children: [
+                              MoonSkeleton(),
+                              SizedBox(width: PayseSpace.x3),
+                              Expanded(
+                                child: Wrap(
+                                  alignment: WrapAlignment.spaceBetween,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: PayseSpace.x2,
+                                  children: [
+                                    SkeletonBone.text(
+                                      TextSpan(text: '월급까지 00일'),
+                                      style: PayseTypography.meta,
+                                    ),
+                                    SkeletonBone.text(
+                                      TextSpan(text: '00/00 – 00/00'),
+                                      style: PayseTypography.caption,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 14),
-                        child: Row(
-                          children: [
-                            MoonSkeleton(),
-                            SizedBox(width: PayseSpace.x3),
-                            _Bar(width: 96, height: 14),
-                            Spacer(),
-                            _Bar(width: 72, height: 12),
-                          ],
+                    ),
+                    const SizedBox(height: PayseSpace.section),
+                    padded(
+                      const Text(
+                        HomeScreen.amountLabel,
+                        style: PayseTypography.amountLabel,
+                      ),
+                    ),
+                    const SizedBox(height: PayseSpace.x2),
+                    padded(
+                      const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: SkeletonBone.text(
+                          TextSpan(
+                            children: [
+                              TextSpan(text: '0,000,000'),
+                              TextSpan(
+                                text: '원',
+                                style: PayseTypography.amountUnit,
+                              ),
+                            ],
+                          ),
+                          style: PayseTypography.amountDisplay,
+                          radius: 8,
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: PayseSpace.section),
-                  padded(
-                    const Text(
-                      HomeScreen.amountLabel,
-                      style: PayseTypography.amountLabel,
+                    const SizedBox(height: 10),
+                    padded(
+                      const Text(
+                        '금융 정보를 불러오고 있어요',
+                        style: PayseTypography.caption,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: PayseSpace.x2),
-                  padded(
-                    const FractionallySizedBox(
-                      alignment: Alignment.centerLeft,
-                      widthFactor: 0.62,
-                      child: _Bar(height: 48, radius: 8),
+                    padded(
+                      const Padding(
+                        padding: EdgeInsets.only(top: PayseSpace.x6),
+                        child: SkeletonBone.box(height: 6, radius: 3),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  padded(
-                    const Text(
-                      '금융 정보를 불러오고 있어요',
-                      style: PayseTypography.caption,
+                    const SizedBox(height: PayseSpace.section),
+                    padded(
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: PayseColors.dividerSection,
+                          ),
+                          _HomeLedgerRow(
+                            name: '계좌 잔액',
+                            strong: true,
+                            amount: null,
+                            skeleton: true,
+                          ),
+                          _HomeLedgerRow(
+                            name: '모아둘 돈',
+                            subtitle: '0건',
+                            amount: null,
+                            skeleton: true,
+                          ),
+                          _HomeLedgerRow(
+                            name: '예정 지출',
+                            subtitle: '월급일 전 0건',
+                            amount: null,
+                            skeleton: true,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  padded(
-                    const Padding(
-                      padding: EdgeInsets.only(top: PayseSpace.x6),
-                      child: _Bar(height: 6, radius: 3),
-                    ),
-                  ),
-                  const SizedBox(height: PayseSpace.section),
-                  padded(
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Divider(
-                          height: 1,
-                          thickness: 1,
-                          color: PayseColors.dividerSection,
-                        ),
-                        _HomeLedgerRow(
-                          name: '계좌 잔액',
-                          strong: true,
-                          amount: null,
-                          skeleton: true,
-                        ),
-                        _HomeLedgerRow(
-                          name: '모아둘 돈',
-                          amount: null,
-                          skeleton: true,
-                        ),
-                        _HomeLedgerRow(
-                          name: '예정 지출',
-                          amount: null,
-                          skeleton: true,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                ],
+                    const SizedBox(height: 22),
+                  ],
+                ),
               ),
             ),
           ),

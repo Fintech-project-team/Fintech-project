@@ -13,6 +13,8 @@
     "apps/mobile/test/features/overview/",
     "apps/mobile/lib/data/coachmark_record_store.dart",
     "apps/mobile/test/data/coachmark_record_store_test.dart",
+    "apps/mobile/lib/features/connection/connection_presentation_policy.dart",
+    "apps/mobile/lib/shared/design/payse_tokens.dart",
     "apps/mobile/lib/app/main_entry.dart",
     "apps/mobile/lib/app/app_shell.dart",
     "apps/mobile/lib/app/payse_app.dart",
@@ -28,6 +30,8 @@
     "동작: 코치마크가 떠 있는 동안 아래 홈은 누를 수 없고(덮개가 터치를 막음) 화면 읽기 프로그램에도 안내 면만 대화 상자('사용법 n / 3')로 읽힌다. 단계가 바뀔 때 강조·안내 면은 짧게 전환하며, 움직임 줄이기 설정이면 즉시 바꾼다. 금액·계산은 바꾸지 않는다",
     "검증: 위젯 테스트로 세 단계 문구·버튼(③ 건너뛰기 없음·시작하기), 강조 영역이 실제 대상(금액 영역·계산 내역 보기·계획 탭)을 감싸는지, 안내 면 아래 끝이 계산 내역 보기 위 8dp인지, ① 연결선, 정보 부족판 문구와 강조 범위, 덮개가 홈 터치를 막는지, 건너뛰기·시작하기·뒤로 가기 기록, 320dp·글자 1.3배 넘침 없음과 안내 면 확장. 앱 진입 테스트로 01-3을 마친 뒤·건너뛴 뒤·01-2 나중에 확인 뒤 홈에서 코치마크가 한 번 보이고, 기록이 있으면 다시 보이지 않으며, 같은 실행 안 재로그인 유지·다른 사용자 분리, 데이터 오류 홈에서는 보이지 않음, 저장소가 없으면(앱 기본값) 보이지 않음. 기록 저장소 단위 테스트. 에뮬레이터·실기기 확인은 사용자 확인 항목이다",
     "4b-2 결정 기록(2026-10-28 혜연·성현 결정): 입금 내역에서 월급 거래 고르기(SalaryPick*)·입금 확인(SalaryConfirm*)·입금 확인 저장을 적용하지 않는다. 앱은 서버 스냅샷의 입금 근거만 쓰고 홈 '월급 입금 확인하기'는 비활성을 유지한다(2026-10-28 혜연 결정: 나중에 입금 내역에서 고르는 별도 화면에 연결하며, 지금 시안 SalaryPick*·SalaryConfirm*와 다른 화면이다). apps/mobile/docs/overview.md·connection.md·screen-rules-update.md에 기록하며 코드는 바꾸지 않는다",
+    "추가 범위(2026-10-28 혜연 요청, 에뮬레이터에서 새로고침 로딩이 보이지 않음): 홈 새로고침은 응답이 빨라도 로딩 화면을 최소 3초 보인 뒤 결과(성공·실패·세션 무효)를 반영한다. 3초는 연결 표시 정책(connection_presentation_policy.dart)의 대기로 두어 테스트에서 바꿔 끼운다. 응답이 3초보다 늦으면 응답이 올 때까지 로딩을 유지한다. 앱 진입 테스트로 2.9초에는 로딩, 3초 뒤 성공 금액·실패 안내가 보이는지 확인한다",
+    "추가 범위(2026-10-28 혜연 요청): 홈 새로고침 로딩 틀을 정상 홈과 같은 크기로 맞춘다. 글자 자리 틀은 원본 글자 모양에 견본 문구를 넣어 크기를 정하고(달 39·주기 문구·기간·금액·기준 시각 자리·구성 바·장부 금액·보조 줄), 로딩 전후 금액 라벨·장부 행·달·'계산 내역 보기' 위치가 같아야 한다. 틀 위로 옅은 빛(새 토큰 skeletonHighlight #FAFAFB, payse_tokens.dart·design.md)이 1.5초마다 왼쪽→오른쪽으로 지나가고 동작 줄이기 설정이면 멈춘다. 위젯 테스트로 위치 일치와 빛 지나감·멈춤을 확인한다",
     "문서: apps/mobile/docs/overview.md(5단계 상태·코치마크 규칙·기록), docs/design.md(§6에 02-1a 코치마크 규격). 범위 밖: 내 정보 '사용법' 다시 보기, 앱 재실행 뒤 기록 복원, 4b-2, #29 계획 화면, 계산 패키지·공통 더미·서버 계약·어댑터 변경"
   ],
   "readBefore": [

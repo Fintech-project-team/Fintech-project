@@ -167,12 +167,14 @@ class _MainEntryState extends State<MainEntry> {
   }
 
   /// 2026-10-26: 홈 새로고침. 진행 중이면 중복 요청하지 않는다. 늦게 온 이전 응답은 버린다.
+  /// 2026-10-28: 응답이 빨라도 로딩을 최소 3초 보인 뒤 결과(성공·실패)를 반영한다.
   void _refreshHome() {
     if (_refresh == HomeRefresh.loading) return;
     final id = ++_refreshes;
     setState(() => _refresh = HomeRefresh.loading);
-    _load().then(
-      (result) {
+    (_load(), widget.policy.refreshMinimum()).wait.then(
+      (done) {
+        final (result, _) = done;
         if (!mounted || id != _refreshes) return;
         setState(() => _applyRefresh(result));
       },

@@ -7,6 +7,7 @@ import 'package:payse/features/overview/calculation_detail_screen.dart';
 import 'package:payse/features/overview/composition_bar.dart';
 import 'package:payse/features/overview/cycle_moon.dart';
 import 'package:payse/features/overview/home_screen.dart';
+import 'package:payse/features/overview/home_skeleton.dart';
 import 'package:payse/shared/design/amount_hero.dart';
 import 'package:payse/shared/design/payse_theme.dart';
 import 'package:payse/shared/design/primary_button.dart';
@@ -575,6 +576,104 @@ void main() {
       );
       expect(moon.lit, 0.5);
       expect(find.text('불러오는 중'), findsOneWidget);
+    });
+
+    testWidgets('로딩 틀은 정상 홈과 같은 자리에 놓인다', (tester) async {
+      Future<Map<String, Rect>> layout(HomeRefresh refresh) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: buildPayseTheme(),
+            home: Scaffold(
+              body: HomeScreen(
+                calculation: calculate(alphaWithReceipt()),
+                onReload: () {},
+                refresh: refresh,
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        return {
+          for (final name in [
+            HomeScreen.amountLabel,
+            '계좌 잔액',
+            '모아둘 돈',
+            '예정 지출',
+          ])
+            name: tester.getRect(
+              find.textContaining(name, findRichText: true).first,
+            ),
+          'moon': tester.getRect(
+            refresh == HomeRefresh.loading
+                ? find.byType(MoonSkeleton)
+                : find.byKey(const ValueKey('home-cycle-moon')),
+          ),
+          'detail': tester.getRect(
+            find.byKey(const ValueKey('home-detail-button')),
+          ),
+        };
+      }
+
+      final ready = await layout(HomeRefresh.idle);
+      final loading = await layout(HomeRefresh.loading);
+      final bones = tester.widgetList<SkeletonBone>(find.byType(SkeletonBone));
+      for (final element in find.byType(SkeletonBone).evaluate()) {
+        final fill = find.descendant(
+          of: find.byWidget(element.widget),
+          matching: find.byType(DecoratedBox),
+        );
+        expect(tester.getSize(fill.last).width, greaterThan(0));
+      }
+      expect(
+        bones.length,
+        greaterThanOrEqualTo(7),
+        reason: '달·문구 2·금액·바·장부 금액 3',
+      );
+      for (final key in ready.keys) {
+        expect(loading[key]!.top, ready[key]!.top, reason: key);
+        expect(loading[key]!.bottom, ready[key]!.bottom, reason: key);
+      }
+    });
+
+    testWidgets('로딩 틀에 옅은 빛이 지나가고, 동작 줄이기면 멈춘다', (tester) async {
+      Future<void> show({required bool reduced}) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: buildPayseTheme(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(disableAnimations: reduced),
+              child: child!,
+            ),
+            home: Scaffold(
+              body: HomeScreen(
+                calculation: calculate(alphaWithReceipt()),
+                onReload: () {},
+                refresh: HomeRefresh.loading,
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+      }
+
+      await show(reduced: false);
+      expect(find.byType(SkeletonShimmer), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(SkeletonShimmer),
+          matching: find.byType(ShaderMask),
+        ),
+        findsWidgets,
+      );
+      await show(reduced: true);
+      expect(
+        find.descendant(
+          of: find.byType(SkeletonShimmer),
+          matching: find.byType(ShaderMask),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets('이전 결과가 있는 실패: 금액·장부·기준 시각을 유지하고 안내와 다시 시도', (tester) async {

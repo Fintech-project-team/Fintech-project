@@ -11,6 +11,9 @@ abstract final class PayseColors {
   static const Color background = Color(0xFFFFFFFF);
   static const Color surfaceMuted = Color(0xFFF1F2F4);
 
+  /// 2026-10-28: 로딩 틀(surfaceMuted) 위를 지나가는 옅은 빛.
+  static const Color skeletonHighlight = Color(0xFFFAFAFB);
+
   static const Color textPrimary = Color(0xFF242629);
   static const Color textSecondary = Color(0xFF62676F);
   static const Color onCharcoal = Color(0xFFFFFFFF);
