@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:payse/app/main_entry.dart';
 import 'package:payse/data/connection/financial_api.dart';
+import 'package:payse/data/financial_snapshot.dart';
 import 'package:payse/data/first_calc_record_store.dart';
+import 'package:payse/features/overview/home_calculation.dart';
+import 'package:payse/shared/design/amount_format.dart';
 import 'package:payse/shared/design/payse_theme.dart';
 import 'package:payse/shared/design/primary_button.dart';
 
@@ -203,6 +206,82 @@ void main() {
       isNull,
       reason: '진입만으로는 기록하지 않음',
     );
+  });
+
+  testWidgets('a salary saved on 01-2 drives 01-3 and home', (tester) async {
+    final records = MemoryFirstCalcRecordStore();
+    final unchosen = _unchosen(_computable());
+    final saved = _computable();
+    salaryOf(saved)['salaryDay'] = 20;
+    saved['dataVersion'] = '2';
+    final before = computeHomeCalculation(
+      FinancialSnapshot.fromJson(_computable()),
+    );
+    final after = computeHomeCalculation(FinancialSnapshot.fromJson(saved));
+    final u = (after as HomeCalculationReady).result.u!;
+    expect(u, isNot((before as HomeCalculationReady).result.u));
+    final repo = ScriptedRepository()
+      ..loadResults.add(FinancialOk(unchosen))
+      ..selectResults.add(written(_computable()))
+      ..salaryResults.add(written(saved));
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPayseTheme(),
+        home: MainEntry(
+          financial: repo,
+          policy: instantPolicy(),
+          reloadKey: 0,
+          devEntryBuilder: (_) => null,
+          onSessionInvalid: () {},
+          firstCalcRecords: records,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('group-demand')),
+        matching: find.text('모두 선택'),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('이 계좌로 계산하기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('review-salary-edit')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('salary-day')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('salary-day-20')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('salary-save')));
+    await tester.pumpAndSettle();
+    expect(repo.salaryCalls.single.$1.toJson(), {'salaryDay': 20});
+    await tester.tap(find.byKey(const ValueKey('salary-done')));
+    await tester.pumpAndSettle();
+    expect(find.text('매월 20일'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('review-calculate')));
+    await tester.pumpAndSettle();
+    for (var i = 0; i < 3; i++) {
+      await tester.tap(find.byKey(const ValueKey('first-calc-next')));
+      await tester.pumpAndSettle();
+    }
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('first-calc-result'))).data,
+      formatKrw(u),
+      reason: '01-3도 저장한 월급일로 계산',
+    );
+    await tester.tap(find.byKey(const ValueKey('first-calc-next')));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 4));
+    await tester.tap(find.text('홈으로 가기'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 4));
+    expect(find.byKey(_home), findsOneWidget);
+    expect(find.textContaining(formatKrw(u)), findsWidgets, reason: '홈도 같은 계산');
   });
 
   testWidgets('a computed first entry explains 1/4 to 4/4 and records it', (

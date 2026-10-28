@@ -77,6 +77,8 @@ class ScriptedRepository implements UserFinancialRepository {
   final Queue<FinancialOutcome<WriteSuccess>> linkResults = Queue();
   final Queue<FinancialOutcome<WriteSuccess>> selectResults = Queue();
   final Queue<FinancialOutcome<Map<String, Object?>>> loadResults = Queue();
+  final Queue<FinancialOutcome<WriteSuccess>> salaryResults = Queue();
+  final List<(SalaryPatch, WriteContext)> salaryCalls = [];
   final List<(List<String>, WriteContext)> linkCalls = [];
   final List<(List<String>, WriteContext)> selectCalls = [];
 
@@ -103,6 +105,16 @@ class ScriptedRepository implements UserFinancialRepository {
   ) async {
     selectCalls.add((accountIds, write));
     return selectResults.removeFirst();
+  }
+
+  /// 2026-10-28: 요청을 기록하고 다음 월급 설정 저장 결과를 반환한다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> updateSalarySettings(
+    SalaryPatch salary,
+    WriteContext write,
+  ) async {
+    salaryCalls.add((salary, write));
+    return salaryResults.removeFirst();
   }
 
   /// 2026-10-22: 상태가 없으므로 할 일이 없다.
