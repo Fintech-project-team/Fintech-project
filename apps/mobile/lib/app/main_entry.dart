@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/connection/financial_api.dart';
 import '../data/connection/user_snapshot_repository.dart';
+import '../data/first_calc_record_store.dart';
 import '../data/financial_snapshot.dart';
 import '../data/financial_snapshot_repository.dart';
 import '../features/connection/connection_flow.dart';
@@ -9,6 +10,7 @@ import '../features/connection/connection_illustration.dart';
 import '../features/connection/connection_page.dart';
 import '../features/connection/connection_presentation_policy.dart';
 import '../features/overview/home_screen.dart' show HomeRefresh;
+import '../features/overview/slide_switch.dart';
 import '../shared/design/payse_tokens.dart';
 import '../shared/design/primary_button.dart';
 import 'app_shell.dart';
@@ -22,6 +24,7 @@ class MainEntry extends StatefulWidget {
   /// 2026-10-21: 개발 진입 위젯 생성 [devEntryBuilder](릴리스에서는 null 반환)로 만든다.
   /// 2026-10-22: 바뀌면 다시 조회할 [reloadKey], 세션 무효 콜백 [onSessionInvalid]를 받는다.
   /// 2026-10-23: 세션 금융 저장소 [financial]과 연결 표시 정책 [policy], 진입 로딩 제목의 사용자 이름 [userName]을 받는다.
+  /// 2026-10-27: [firstCalcRecords]는 01-3 첫 계산 기록 저장소다. 앱이 넘기며, 없으면 이 화면 동안만 쓰는 메모리 저장소다.
   const MainEntry({
     super.key,
     required this.financial,
@@ -30,6 +33,7 @@ class MainEntry extends StatefulWidget {
     required this.devEntryBuilder,
     required this.onSessionInvalid,
     this.userName,
+    this.firstCalcRecords,
   });
 
   final UserFinancialRepository financial;
@@ -38,6 +42,7 @@ class MainEntry extends StatefulWidget {
   final Widget? Function(BuildContext) devEntryBuilder;
   final VoidCallback onSessionInvalid;
   final String? userName;
+  final FirstCalcRecordStore? firstCalcRecords;
 
   /// 2026-10-21: 조회 상태 객체를 반환한다.
   @override
@@ -62,7 +67,11 @@ EntryDestination entryDestination(FinancialSnapshot snapshot) {
 /// 2026-10-23: 조회할 때마다 연결 흐름을 새로 만들어 이전 흐름의 상태·늦은 응답을 버린다.
 /// 2026-10-26: 홈 새로고침은 진입 조회와 따로 관리한다. 새로고침 중에도 홈(탭)을 유지하고, 성공하면 새 스냅샷,
 /// 실패하면 이전 스냅샷을 그대로 둔다. 세션 무효·다른 진입 화면이면 그 결과를 따른다.
+/// 2026-10-27: 조회한 사용자의 01-3 기록을 함께 읽어 홈 셸에 넘긴다.
 class _MainEntryState extends State<MainEntry> {
+  late final FirstCalcRecordStore _records =
+      widget.firstCalcRecords ?? MemoryFirstCalcRecordStore();
+  FirstCalcRecord? _record;
   late Future<SnapshotLoadResult> _result = _load();
   int _loads = 0;
   FinancialSnapshot? _refreshed;
@@ -73,10 +82,16 @@ class _MainEntryState extends State<MainEntry> {
   /// 2026-10-21: 현재 스냅샷을 조회한다.
   /// 2026-10-22: 예상하지 못한 예외는 Flutter 오류로 보고한 뒤 다시 던져 다시 시도 화면을 보인다.
   /// 2026-10-23: 세션 저장소에서 읽는다. 개발용 미리보기 스냅샷은 쓰지 않는다.
+  /// 2026-10-27: 성공하면 그 사용자의 01-3 기록도 읽는다.
   Future<SnapshotLoadResult> _load() async {
     _loads++;
     try {
-      return await UserSnapshotRepository(widget.financial).loadSnapshot();
+      final result = await UserSnapshotRepository(widget.financial)
+          .loadSnapshot();
+      if (result is SnapshotLoaded) {
+        _record = await _records.read(result.snapshot.userId);
+      }
+      return result;
     } catch (error, stack) {
       FlutterError.reportError(
         FlutterErrorDetails(exception: error, stack: stack, library: 'payse'),
@@ -101,6 +116,30 @@ class _MainEntryState extends State<MainEntry> {
       _resetRefresh();
       _result = _load();
     });
+  }
+
+  /// 2026-10-27: 01-2가 끝났다. 01-2가 보여 준 스냅샷 [snapshot]을 다시 조회하지 않고 그대로 써서 01-2 → 01-3 → 홈이
+  /// 같은 스냅샷 계산을 쓰게 한다. '나중에 확인하고 홈으로'([deferred])면 보완 미룸을 기록한다.
+  Future<void> _finishReview(
+    FinancialSnapshot snapshot, {
+    required bool deferred,
+  }) async {
+    if (deferred) {
+      await _records.save(snapshot.userId, FirstCalcRecord.deferred);
+    }
+    final record = await _records.read(snapshot.userId);
+    if (!mounted) return;
+    setState(() {
+      _resetRefresh();
+      _record = record;
+      _override = SnapshotLoaded(snapshot);
+    });
+  }
+
+  /// 2026-10-27: 01-3 기록 [record]를 사용자 [userId]로 남긴다.
+  Future<void> _saveRecord(String userId, FirstCalcRecord record) async {
+    await _records.save(userId, record);
+    if (mounted) setState(() => _record = record);
   }
 
   /// 2026-10-26: 홈 새로고침 상태를 비우고 진행 중인 새로고침 응답을 버린다.
@@ -158,11 +197,28 @@ class _MainEntryState extends State<MainEntry> {
   /// 다시 조회해 판단하며, 재조회가 실패하면 홈 대신 다시 시도 화면을 보인다. 다시 조회하는 동안에는 이전 결과
   /// (이전 세션 Snapshot 포함)로 화면을 만들지 않고 로딩을 보인다.
   /// 2026-10-26: 홈에 들어온 뒤의 새로고침 결과([_override])가 있으면 그것을 먼저 보인다.
+  /// 2026-10-27: 01-2 확인 뒤에는 다시 조회하지 않고 01-2가 보여 준 스냅샷으로 홈 셸을 만든다(01-2에서 이미 다시
+  /// 불러오기를 제공한다).
+  /// 2026-10-28: 01-2가 끝나면 그 스냅샷 결과를 바로 쓰고(로딩 화면 없이), 연결 흐름에서 01-3·홈으로 바뀔 때
+  /// 새 화면이 오른쪽에서 들어온다([slideSwitch]).
   @override
   Widget build(BuildContext context) {
     final override = _override;
-    if (override != null) return _fromResult(context, override);
+    return slideSwitch(
+      context,
+      override != null
+          ? KeyedSubtree(
+              key: const ValueKey('entry-override'),
+              child: _fromResult(context, override),
+            )
+          : _loaded(context),
+    );
+  }
+
+  /// 2026-10-28: 진입 조회 결과 화면. 조회 중이면 로딩, 실패하면 다시 시도다.
+  Widget _loaded(BuildContext context) {
     return FutureBuilder<SnapshotLoadResult>(
+      key: const ValueKey('entry-load'),
       future: _result,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
@@ -182,10 +238,13 @@ class _MainEntryState extends State<MainEntry> {
       SnapshotLoaded(:final snapshot) => switch (entryDestination(snapshot)) {
         EntryDestination.home => Builder(
           builder: (context) => AppShell(
+            key: ValueKey(('app-shell', snapshot.userId)),
             snapshot: _refreshed ?? snapshot,
             onReload: _refreshHome,
             refresh: _refresh,
             devEntry: widget.devEntryBuilder(context),
+            firstCalcRecord: _record,
+            onFirstCalcRecord: (record) => _saveRecord(snapshot.userId, record),
           ),
         ),
         EntryDestination.connect || EntryDestination.chooseAccounts => Builder(
@@ -194,7 +253,7 @@ class _MainEntryState extends State<MainEntry> {
             repository: widget.financial,
             snapshot: snapshot,
             policy: widget.policy,
-            onFinished: _reload,
+            onFinished: _finishReview,
             onSessionInvalid: widget.onSessionInvalid,
             devEntry: widget.devEntryBuilder(context),
             userName: widget.userName,

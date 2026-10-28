@@ -227,38 +227,24 @@ void main() {
   });
 
   testWidgets(
-    'after 01-2 the entry reloads; a failed reload shows retry, not home',
+    'after 01-2 the entry keeps the reviewed snapshot without reloading',
     (tester) async {
       final kb = betaSnapshot({...betaBanks}).accounts!.first.accountId;
-      final repo =
-          _loads([
-              FinancialOk(betaJson({...betaBanks})),
-              const FinancialNetworkFailure('offline'),
-              FinancialOk(
-                betaJson({...betaBanks}, selected: {kb}, version: '2'),
-              ),
-            ])
-            ..selectResults.add(
-              written(betaJson({...betaBanks}, selected: {kb}, version: '2')),
-            );
+      final repo = _CountingRepository()
+        ..loadResults.add(FinancialOk(betaJson({...betaBanks})))
+        ..selectResults.add(
+          written(betaJson({...betaBanks}, selected: {kb}, version: '2')),
+        );
       await pumpEntry(tester, repo);
-      for (final a in betaSnapshot({...betaBanks}).accounts!) {
-        if (a.accountId != kb && a.productType == 'demand') {
-          await tester.tap(find.byKey(ValueKey('account-${a.accountId}')));
-        }
-      }
+      await tester.tap(find.byKey(ValueKey('account-$kb')));
+      await tester.pump();
       await tester.tap(find.text('이 계좌로 계산하기'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('확인했어요'));
+      await tester.tap(find.byKey(const ValueKey('review-defer')));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(_offline), findsOneWidget, reason: '네트워크 실패');
-      expect(find.text('금융사 목록을\n불러오지 못했어요'), findsOneWidget);
-      expect(find.text('인터넷 연결을 확인한 뒤 다시 시도해주세요.'), findsOneWidget);
-      expect(find.byType(NavigationBar), findsNothing);
-      await tester.tap(find.text('다시 시도'));
-      await tester.pumpAndSettle();
       expect(find.byType(NavigationBar), findsOneWidget);
+      expect(repo.loads, 1, reason: '01-2가 보여 준 스냅샷을 그대로 쓴다');
       expect(repo.selectCalls.single.$1, [kb]);
     },
   );
