@@ -162,18 +162,22 @@ class FixtureTests(unittest.TestCase):
         """2026-10-23: Check tracked JSON semantic values after formatting and manifest validation.
 
         2026-10-26: Include the independent eighteenth demo case; used by unittest.
+        2026-10-28: Include three separate installment/edge cases, preserving the prior eighteen.
         """
-        self.assertEqual(validate_directory(FIXTURES/'generated'),18)
+        self.assertEqual(validate_directory(FIXTURES/'generated'),21)
         for name,snapshot in self.cases.items():
             stored=json.loads((FIXTURES/'generated'/'snapshots'/f'{name}.json').read_text(encoding='utf-8'))
             self.assertEqual(stored,snapshot)
         self.assertEqual(load_bank_directory(FIXTURES/'generated'/'bank-directory.json'),load_bank_directory())
 
     def test_deterministic_bytes_and_manifest(self):
-        """2026-10-26: Verify the expanded bundle remains deterministic; used by unittest."""
+        """2026-10-26: Verify the expanded bundle remains deterministic; used by unittest.
+
+        2026-10-28: Check the twenty-one-case bundle including the new independent scenarios.
+        """
         with temporary_directory() as temp:
             a,b=Path(temp)/'a',Path(temp)/'b';write_files(a);write_files(b)
-            self.assertEqual(validate_directory(a),18)
+            self.assertEqual(validate_directory(a),21)
             for p in a.rglob('*.json'):
                 self.assertEqual(p.read_bytes(),(b/p.relative_to(a)).read_bytes())
 
