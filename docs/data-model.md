@@ -188,7 +188,7 @@ Snapshot은 `recurringPlanRevisions: RecurringPlanRevision[]`, `occurrenceOverri
 
 ## 6. 사용자·인증·변경 기록
 
-승인 전 `RecurringCandidate`는 로컬 메모리 객체다. `candidateKey`, `ruleVersion`, `sourceVersion`(문자열), `evidenceTransactionIds`(거래 ID 배열), `normalizedName`(문자열), `suggestedAmountKRW`(마지막 확인 금액), `suggestedDay`(1~31 또는 null)를 가진다. 이름·근거와 수치는 로컬 규칙으로 재검증하고 승인할 때만 §5의 확정 금액·첫 회차·출금 계좌를 저장한다. 서버 LLM 요청은 필요한 이름·근거로 제한하고 응답은 후보 식별·이름·허용된 거래 분류·설명·근거 참조만 허용한다. 이 로컬 객체가 별도 영구 후보 테이블을 요구하지 않는다. 서버가 받은 LLM 해석 결과의 암호화 보관·복구는 [실행 공통 계약](payse-execution-contract.md)의 Q1을 따른다. 분석 결과의 일반 보관·중요보존 예외·참조 자격은 Q1·D1~D4가 단일 기준이다. 분석 저장이나 장기 보존은 RecurringCandidate 수치·가상 미래 투영 저장, RecurringDecision 승인 또는 미래 거래 전체 규칙 학습과 다르다. 논리 저장 책임은 [API 상세](../apps/api/docs/llm-execution.md)에 있으며 실제 DB 필드·마이그레이션은 아직 없다.
+승인 전 `RecurringCandidate`는 로컬 메모리 객체다. `candidateKey`, `ruleVersion`, `sourceVersion`(문자열), `evidenceTransactionIds`(거래 ID 배열), `normalizedName`(문자열), `suggestedAmountKRW`(마지막 확인 금액), `suggestedDay`(1~31 또는 null)를 가진다. 이름·근거와 수치는 로컬 규칙으로 재검증하고 승인할 때만 §5의 확정 금액·첫 회차·출금 계좌를 저장한다. 서버 LLM 요청은 필요한 이름·근거로 제한하고 후보 의미 응답은 후보 식별·이름·허용된 거래 분류·설명·근거 참조만 허용한다. AI 참고자료의 보존·참조 지정은 실행 공통 계약의 별도 분석 메타데이터이며 이 후보의 수치·승인·금융 원천을 변경하는 권한이 아니다. 이 로컬 객체가 별도 영구 후보 테이블을 요구하지 않는다. 서버가 받은 LLM 해석 결과의 암호화 보관·복구는 [실행 공통 계약](payse-execution-contract.md)의 Q1을 따른다. 분석 결과의 일반 보관·중요보존 예외·참조 자격은 Q1·D1~D4가 단일 기준이다. 분석 저장이나 장기 보존은 RecurringCandidate 수치·가상 미래 투영 저장, RecurringDecision 승인 또는 미래 거래 전체 규칙 학습과 다르다. 논리 저장 책임은 [API 상세](../apps/api/docs/llm-execution.md)에 있으며 실제 DB 필드·마이그레이션은 아직 없다.
 
 아래 민감 필드는 일반 Snapshot·금융 더미 공개 JSON·LLM 입력에 포함하지 않는다. 합성 계정 시드와 금융 자료는 별개다.
 
