@@ -180,17 +180,23 @@ void main() {
   });
 
   testWidgets(
-    'home after connecting shows the common dummy result: insufficient until #96 adds salary evidence',
+    'home after connecting shows the demo-ready result for the connected bank',
     (tester) async {
       await _openAlpha(tester);
       await connectAndChooseAccounts(tester);
 
-      // 공통 더미 연결 검증. 정상 시나리오도 직전 회차 급여 근거가 비어 있어 0원이 아니라 정보 부족이다.
+      // 공통 더미 연결 검증. 알파는 #100 demo-ready(9월 회차 급여 근거 confirmed)라 정보 부족 없이 계산된다.
+      // 첫 은행만 연결하므로 계좌 잔액은 그 계좌 1,500,000원이고 U = 1,500,000 − 400,000 − 300,000.
       expect(find.text('다음 월급일까지\n쓸 수 있는 돈'), findsOneWidget);
-      expect(find.text('아직 계산할 수 없어요'), findsOneWidget);
-      expect(find.text('9/25에 예정된 월급의 입금 여부를 확인할 정보가 없어요.'), findsOneWidget);
-      expect(find.text('월급 입금 확인 필요'), findsOneWidget);
-      expect(find.text('계좌 잔액'), findsOneWidget);
+      expect(
+        find.textContaining('800,000', findRichText: true),
+        findsOneWidget,
+      );
+      expect(find.text('1,500,000원'), findsOneWidget);
+      expect(find.text('−400,000원'), findsOneWidget);
+      expect(find.text('−300,000원'), findsOneWidget);
+      expect(find.text('아직 계산할 수 없어요'), findsNothing);
+      expect(find.text('월급 입금 확인 필요'), findsNothing);
     },
   );
 
@@ -205,6 +211,13 @@ void main() {
 
       final alpha = devDemoAccounts.first;
       auth.terminateSessionOf(alpha.userId);
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const ValueKey('group-demand')),
+          matching: find.text('모두 선택'),
+        ),
+      );
+      await tester.pump();
       await tester.tap(find.text('이 계좌로 계산하기'));
       await tester.pumpAndSettle();
       expect(

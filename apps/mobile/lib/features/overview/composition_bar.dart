@@ -45,14 +45,17 @@ bool showsCompositionBar(CompositionBarState state) => switch (state) {
 /// 구간 길이는 계산 결과의 R−O·E·U를 그대로 비율로 쓰며 0원 구간과 그 범례는 생략한다.
 class CompositionBar extends StatelessWidget {
   /// 2026-10-26: U가 있고 B>0인 계산 결과 [result]로 만든다. 홈은 [showLegend]를 false로 넘겨 바만 보인다.
+  /// 2026-10-28: [reveal](0→1)을 주면 구간을 왼쪽부터 차례로 늘리고 범례를 차례로 나타낸다(01-3 4/4).
   const CompositionBar({
     super.key,
     required this.result,
     this.showLegend = true,
+    this.reveal,
   });
 
   final calc.CurrentAmountResult result;
   final bool showLegend;
+  final Animation<double>? reveal;
 
   /// 2026-10-26: 상태에 맞는 바·범례를 반환한다. 바를 그리지 않는 상태면 빈 상자다.
   @override
@@ -67,7 +70,7 @@ class CompositionBar extends StatelessWidget {
     if (!showsCompositionBar(state) || segments.isEmpty) {
       return const SizedBox.shrink();
     }
-    final bar = _SegmentRow(segments: segments);
+    final bar = _SegmentRow(segments: segments, reveal: reveal);
     return Column(
       key: const ValueKey('composition-bar'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -92,12 +95,16 @@ class CompositionBar extends StatelessWidget {
             spacing: PayseSpace.x4,
             runSpacing: PayseSpace.x1,
             children: [
-              for (final s in segments)
+              for (var i = 0; i < segments.length; i++)
                 ExcludeSemantics(
-                  child: ColorChipLabel(
-                    label: s.$1,
-                    color: s.$2,
-                    style: DetailTypography.secondary,
+                  child: _Staged(
+                    reveal: reveal,
+                    interval: _labelInterval(i, segments.length),
+                    child: ColorChipLabel(
+                      label: segments[i].$1,
+                      color: segments[i].$2,
+                      style: DetailTypography.secondary,
+                    ),
                   ),
                 ),
             ],
@@ -111,9 +118,11 @@ class CompositionBar extends StatelessWidget {
 /// 2026-10-26: 6dp 구간 막대. 구간 사이 3dp, 양 끝만 3dp 둥글게.
 class _SegmentRow extends StatelessWidget {
   /// 2026-10-26: (이름, 색, 비율로 쓸 금액) 목록 [segments]로 만든다. 금액은 모두 1원 이상이다.
-  const _SegmentRow({required this.segments});
+  /// 2026-10-28: [reveal]이 있으면 각 구간이 제 자리 안에서 왼쪽부터 늘어난다.
+  const _SegmentRow({required this.segments, this.reveal});
 
   final List<(String, Color, int)> segments;
+  final Animation<double>? reveal;
 
   /// 2026-10-26: 구간 막대를 반환한다.
   @override
@@ -128,12 +137,16 @@ class _SegmentRow extends StatelessWidget {
             if (i > 0) const SizedBox(width: 3),
             Expanded(
               flex: segments[i].$3,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: segments[i].$2,
-                  borderRadius: BorderRadius.horizontal(
-                    left: i == 0 ? radius : Radius.zero,
-                    right: i == segments.length - 1 ? radius : Radius.zero,
+              child: _Grow(
+                reveal: reveal,
+                interval: _segmentInterval(i, segments.length),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: segments[i].$2,
+                    borderRadius: BorderRadius.horizontal(
+                      left: i == 0 ? radius : Radius.zero,
+                      right: i == segments.length - 1 ? radius : Radius.zero,
+                    ),
                   ),
                 ),
               ),
@@ -141,6 +154,77 @@ class _SegmentRow extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// 2026-10-28: [count]개 중 [index]번째 구간이 늘어나는 구간(전체 0~1 중). 구간은 차례로 이어진다.
+Interval _segmentInterval(int index, int count) {
+  final span = 0.8 / count;
+  return Interval(index * span, (index + 1) * span, curve: Curves.easeOutCubic);
+}
+
+/// 2026-10-28: [index]번째 범례가 나타나는 구간. 해당 구간이 반쯤 늘어난 뒤 시작한다.
+Interval _labelInterval(int index, int count) {
+  final span = 0.8 / count;
+  final start = index * span + span / 2;
+  return Interval(start, (start + 0.2).clamp(0, 1), curve: Curves.easeOut);
+}
+
+/// 2026-10-28: [reveal]의 [interval] 동안 [child]를 제 자리 안에서 왼쪽부터 늘린다. [reveal]이 없으면 그대로 둔다.
+class _Grow extends StatelessWidget {
+  /// 2026-10-28: 진행 [reveal], 구간 [interval], 내용 [child]로 만든다.
+  const _Grow({
+    required this.reveal,
+    required this.interval,
+    required this.child,
+  });
+
+  final Animation<double>? reveal;
+  final Interval interval;
+  final Widget child;
+
+  /// 2026-10-28: 늘어나는 내용을 반환한다.
+  @override
+  Widget build(BuildContext context) {
+    final r = reveal;
+    if (r == null) return child;
+    return AnimatedBuilder(
+      animation: r,
+      builder: (context, child) => Align(
+        alignment: Alignment.centerLeft,
+        child: FractionallySizedBox(
+          widthFactor: interval.transform(r.value),
+          heightFactor: 1,
+          child: child,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// 2026-10-28: [reveal]의 [interval] 동안 [child]를 서서히 나타낸다. [reveal]이 없으면 그대로 둔다.
+class _Staged extends StatelessWidget {
+  /// 2026-10-28: 진행 [reveal], 구간 [interval], 내용 [child]로 만든다.
+  const _Staged({
+    required this.reveal,
+    required this.interval,
+    required this.child,
+  });
+
+  final Animation<double>? reveal;
+  final Interval interval;
+  final Widget child;
+
+  /// 2026-10-28: 나타나는 내용을 반환한다.
+  @override
+  Widget build(BuildContext context) {
+    final r = reveal;
+    if (r == null) return child;
+    return FadeTransition(
+      opacity: CurvedAnimation(parent: r, curve: interval),
+      child: child,
     );
   }
 }

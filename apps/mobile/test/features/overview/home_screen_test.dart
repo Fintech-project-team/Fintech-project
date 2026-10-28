@@ -307,7 +307,9 @@ void main() {
     );
   });
 
-  testWidgets('나중에 해결한 뒤(입력 예시): 정상 홈 장부 아래 비활성 첫 계산 과정 버튼', (tester) async {
+  testWidgets('나중에 해결한 뒤(입력 예시): 다시 보기 콜백이 없으면 첫 계산 과정 버튼이 비활성', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       home(
         calculate(alphaWithReceipt()),
@@ -326,6 +328,31 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('home-first-calc-button')));
     await tester.pumpAndSettle();
     expect(find.byType(CalculationDetailScreen), findsNothing);
+  });
+
+  testWidgets('나중에 해결한 뒤: 다시 보기 콜백이 있으면 첫 계산 과정 버튼이 눌린다', (tester) async {
+    var shown = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPayseTheme(),
+        home: Scaffold(
+          body: HomeScreen(
+            calculation: calculate(alphaWithReceipt()),
+            onReload: () {},
+            record: HomeSalaryRecord.resolvedAfterFirstCalc,
+            onShowFirstCalc: () => shown++,
+          ),
+        ),
+      ),
+    );
+    final button = find.byKey(const ValueKey('home-first-calc-button'));
+    await tester.scrollUntilVisible(
+      button,
+      80,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(button);
+    expect(shown, 1);
   });
 
   testWidgets('해결 뒤 기록이어도 아직 정보 부족이면 첫 계산 과정 버튼이 없다', (tester) async {
