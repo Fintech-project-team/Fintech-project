@@ -938,7 +938,7 @@ class AccountSelectScreen extends StatelessWidget {
     required int total,
     required int withReserve,
   }) async {
-    const effect = '선택을 해제한 계좌의 잔액과 연결된 모아둘 돈은 계산에서 제외돼요. 모아둘 돈 설정은 삭제되지 않아요.';
+    const effect = '선택을 해제한 계좌의 잔액과 연결된 모아둘 돈은 계산에서 제외돼요.';
     final single = total == 1;
     final result = await showConnectionConfirm(
       context,
