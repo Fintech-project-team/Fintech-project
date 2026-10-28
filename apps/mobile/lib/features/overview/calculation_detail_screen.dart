@@ -24,7 +24,7 @@ class CalculationDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final result = calculation.result;
-    final names = _SnapshotNames(calculation.snapshot);
+    final names = SnapshotNames(calculation.snapshot);
     final state = compositionBarStateOf(result);
     final chips = showsCompositionBar(state);
     final awaiting =
@@ -384,7 +384,7 @@ class _Receipt extends StatelessWidget {
   });
 
   final calc.CurrentAmountResult result;
-  final _SnapshotNames names;
+  final SnapshotNames names;
   final bool chips;
   final bool awaiting;
 
@@ -573,7 +573,7 @@ class _ReserveDetail extends StatelessWidget {
   const _ReserveDetail({required this.line, required this.names});
 
   final calc.ReserveLine line;
-  final _SnapshotNames names;
+  final SnapshotNames names;
 
   /// 2026-10-26: 보호액 내역을 반환한다.
   @override
@@ -641,7 +641,7 @@ class _ScheduledItem extends StatefulWidget {
 
   final calc.ObligationLine line;
   final calc.BusinessDate today;
-  final _SnapshotNames names;
+  final SnapshotNames names;
   final List<calc.ReserveLine>? reserveLines;
 
   /// 2026-10-26: 펼침 상태 객체를 반환한다.
@@ -731,7 +731,7 @@ class _Groups extends StatelessWidget {
   const _Groups({required this.result, required this.names});
 
   final calc.CurrentAmountResult result;
-  final _SnapshotNames names;
+  final SnapshotNames names;
 
   /// 2026-10-26: 묶음 목록을 반환한다.
   @override
@@ -1178,9 +1178,9 @@ class StatusLabel extends StatelessWidget {
 }
 
 /// 2026-10-26: 스냅샷의 이름·계좌·날짜 원천 값 조회. 금액을 계산하지 않는다.
-class _SnapshotNames {
+class SnapshotNames {
   /// 2026-10-26: 계산에 쓴 스냅샷 [snapshot]으로 만든다.
-  _SnapshotNames(this.snapshot)
+  SnapshotNames(this.snapshot)
     : _accounts = {
         for (final a in snapshot.accounts ?? <Account>[]) a.accountId: a,
       },

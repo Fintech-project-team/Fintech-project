@@ -425,6 +425,8 @@ void main() {
       await enterPin(tester, testPin);
       await passEntryLoading(tester);
       await tester.scrollUntilVisible(find.text('개발 설정'), 200);
+      await tester.ensureVisible(find.text('개발 설정'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('개발 설정'));
       await tester.pumpAndSettle();
       expect(find.byType(FixtureDebugScreen), findsOneWidget);

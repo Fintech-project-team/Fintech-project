@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:payse/shared/design/primary_button.dart';
 import 'package:payse/app/dev/dev_demo_accounts.dart';
 import 'package:payse/data/auth/auth_repository.dart';
 import 'package:payse/data/auth/credential_stores.dart';
@@ -86,6 +87,7 @@ Future<void> passEntryLoading(WidgetTester tester) async {
 }
 
 /// 2026-10-23: 12-1 목록 맨 위로 돌아가 첫 은행 하나를 골라 동의·불러오기·기본 계좌 선택·01-2 확인까지 마치고 홈으로 간다.
+/// 2026-10-27: 01-3이 뜨면 건너뛴다. 01-1은 처음에 미선택이라 입출금 '모두 선택'으로 고른다.
 /// 연결 흐름 자체의 검사는 연결 테스트에 두며, 여기서는 홈이 필요한 테스트의 준비만 한다.
 Future<void> connectAndChooseAccounts(WidgetTester tester) async {
   await passEntryLoading(tester);
@@ -101,9 +103,37 @@ Future<void> connectAndChooseAccounts(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(find.text('계속하기'));
   await tester.pumpAndSettle();
+  await tester.tap(
+    find.descendant(
+      of: find.byKey(const ValueKey('group-demand')),
+      matching: find.text('모두 선택'),
+    ),
+  );
+  await tester.pump();
   await tester.tap(find.text('이 계좌로 계산하기'));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('확인했어요'));
+  await finishReview(tester);
+}
+
+/// 2026-10-27: 01-2를 마친다. 계산되면 '쓸 수 있는 돈 계산하기'로 01-3에 들어가 건너뛰고, 아니면 나중에 확인한다.
+Future<void> finishReview(WidgetTester tester) async {
+  final calculate = tester.widget<PrimaryButton>(
+    find.byKey(const ValueKey('review-calculate')),
+  );
+  if (calculate.onPressed != null) {
+    await tester.tap(find.byKey(const ValueKey('review-calculate')));
+  } else {
+    await tester.tap(find.byKey(const ValueKey('review-defer')));
+  }
+  await tester.pumpAndSettle();
+  await skipFirstCalc(tester);
+}
+
+/// 2026-10-27: 01-3이 떠 있으면 '홈으로 가기'로 건너뛴다(설명 건너뜀 기록).
+Future<void> skipFirstCalc(WidgetTester tester) async {
+  final skip = find.byKey(const ValueKey('first-calc-skip'));
+  if (skip.evaluate().isEmpty) return;
+  await tester.tap(skip);
   await tester.pumpAndSettle();
 }
 
