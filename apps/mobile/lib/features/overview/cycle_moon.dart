@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../shared/design/payse_tokens.dart';
+import 'home_skeleton.dart';
 
 /// 2026-10-26: 홈 달의 밝은 면 비율(design.md §6 '홈 달'). 정상 주기 10% + 82% × 진행률, 입금 대기 100%.
 /// 진행률은 계산 패키지 값을 그대로 받으며 이 함수는 표시 비율만 정한다. 주기를 모르면 null이다.
@@ -33,6 +34,7 @@ class CycleMoon extends StatelessWidget {
 }
 
 /// 2026-10-26: 로딩 중 큰 달 자리의 회색 원형 로딩 틀.
+/// 2026-10-28: [SkeletonShimmer] 안이면 빛이 지나간다.
 class MoonSkeleton extends StatelessWidget {
   /// 2026-10-26: 지름 [size]로 만든다.
   const MoonSkeleton({super.key, this.size = 39});
@@ -41,17 +43,7 @@ class MoonSkeleton extends StatelessWidget {
 
   /// 2026-10-26: 회색 원을 반환한다.
   @override
-  Widget build(BuildContext context) {
-    return SizedBox.square(
-      dimension: size,
-      child: const DecoratedBox(
-        decoration: BoxDecoration(
-          color: PayseColors.surfaceMuted,
-          shape: BoxShape.circle,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => SkeletonBone.circle(size: size);
 }
 
 /// 2026-10-26: 새로고침 로딩 표시의 28px 달. 1.6초마다 초승달에서 보름까지 차오른 뒤 옅어지며 다시 시작한다.

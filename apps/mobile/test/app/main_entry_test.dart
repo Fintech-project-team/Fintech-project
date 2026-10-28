@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:payse/app/main_entry.dart';
 import 'package:payse/data/connection/financial_api.dart';
+import 'package:payse/features/connection/connection_presentation_policy.dart';
 import 'package:payse/shared/design/payse_theme.dart';
 
 import '../data/calculation_input_adapter_test.dart' show salaryOf;
@@ -21,11 +22,13 @@ Finder _loadFailed() =>
 /// 2026-10-22: [repository]로 MainEntry를 띄운다. 세션 무효 콜백 호출 수를 [onSessionInvalid]로 센다.
 /// 2026-10-23: 세션 금융 저장소와 기다리지 않는 표시 정책으로 띄운다.
 /// 2026-10-27: 조회를 보류한 채 띄울 때는 [settle]을 false로 둔다(진입 로딩 표시가 계속 움직인다).
+/// 2026-10-28: 표시 정책을 바꿀 때는 [policy]를 넘긴다.
 Future<void> pumpEntry(
   WidgetTester tester,
   UserFinancialRepository repository, {
   VoidCallback? onSessionInvalid,
   bool settle = true,
+  ConnectionPresentationPolicy? policy,
 }) async {
   tester.view.physicalSize = const Size(1170, 2532);
   tester.view.devicePixelRatio = 3;
@@ -35,7 +38,7 @@ Future<void> pumpEntry(
       theme: buildPayseTheme(),
       home: MainEntry(
         financial: repository,
-        policy: instantPolicy(),
+        policy: policy ?? instantPolicy(),
         reloadKey: 0,
         devEntryBuilder: (_) => null,
         onSessionInvalid: onSessionInvalid ?? () {},
@@ -309,6 +312,38 @@ void main() {
         expect(repo.loads, 3);
       },
     );
+
+    testWidgets('a fast refresh still shows loading for 3 seconds', (
+      tester,
+    ) async {
+      final repo = _CountingRepository()
+        ..loadResults.addAll([
+          FinancialOk(_homeJson(balance: 777000)),
+          FinancialOk(_homeJson(balance: 888000, version: '2')),
+          const FinancialUnavailable(),
+        ]);
+      await pumpEntry(
+        tester,
+        repo,
+        policy: ConnectionPresentationPolicy(failuresEnabled: () => false),
+      );
+      await _tapRefresh(tester);
+      await tester.pump(const Duration(milliseconds: 2900));
+      expect(find.byKey(const ValueKey('home-loading')), findsOneWidget);
+      expect(repo.loads, 2, reason: '조회는 바로 끝남');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('home-loading')), findsNothing);
+      expect(find.text('888,000원'), findsOneWidget);
+
+      await _tapRefresh(tester);
+      await tester.pump(const Duration(milliseconds: 2900));
+      expect(find.byKey(const ValueKey('home-loading')), findsOneWidget);
+      expect(find.text('새 정보를 불러오지 못했어요'), findsNothing);
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump();
+      expect(find.text('새 정보를 불러오지 못했어요'), findsOneWidget, reason: '실패도 3초 뒤');
+    });
 
     testWidgets('a refresh in progress ignores repeated requests', (
       tester,
