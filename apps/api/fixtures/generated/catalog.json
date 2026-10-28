@@ -684,6 +684,158 @@
           "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
         }
       ]
+    },
+    {
+      "id": "demo-installments",
+      "file": "snapshots/demo-installments.json",
+      "goal": "정상 시연과 할부 원문 2건",
+      "expected": {
+        "preparationTransactionIds": {
+          "appliance": "c7c42119-28e9-5feb-ad4b-2028cd0aae97",
+          "computer": "71fe9d95-8e2b-53f0-8ab7-9d7a9da12faa"
+        },
+        "installmentCount": 2,
+        "installmentEvidence": "회차는 합성 원천 명시값; 날짜/총액에서 추정하지 않음",
+        "newStatementCount": 0,
+        "sourceSalaryEvidenceUnchanged": true,
+        "selectedBalanceKRW": 2000000,
+        "scope": "시나리오 검증 메타데이터이며 공개 Snapshot·LLM 입력에 포함하지 않음"
+      },
+      "ledgerOpeningBalances": [
+        {
+          "accountId": "6069b37a-abf5-56fc-8bf0-153f5301fd1c",
+          "balanceKRW": 3850000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "67521b1b-de86-54cf-98ba-91bb04d0a256",
+          "balanceKRW": 438000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "48feba1a-c98e-5d0e-91e1-23d8e1ef00fc",
+          "balanceKRW": 1140000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "4021635f-1b2c-534d-b5b6-9680b3c8d5f2",
+          "balanceKRW": 440000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "1ce9128d-d667-5bfc-bed0-949a571c78f5",
+          "balanceKRW": 0,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "2c56e23d-2e82-59ed-8fce-21459e226167",
+          "balanceKRW": 988000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        }
+      ]
+    },
+    {
+      "id": "beta-cashflow-edge",
+      "file": "snapshots/beta-cashflow-edge.json",
+      "goal": "부수입·일회성 큰 지출·동일 표시의 별도 구매",
+      "expected": {
+        "preparationTransactionIds": {
+          "appliance": "c4a386e2-491a-5d77-a9cb-52f686296dea",
+          "computer": "cf1e1ba2-4942-52a4-95da-c2ef579eb0cf",
+          "side-income": "db90c4a7-790b-5b98-87cf-5d5449ce607c",
+          "medical": "024fbcf7-3d88-522a-819e-39faa54b1873",
+          "purchase-a": "f0465e7e-7673-5e61-ad02-cc7a4ea771a9",
+          "purchase-b": "32396718-01e7-54a6-aad7-f81fba44f810"
+        },
+        "installmentCount": 2,
+        "installmentEvidence": "회차는 합성 원천 명시값; 날짜/총액에서 추정하지 않음",
+        "newStatementCount": 0,
+        "sourceSalaryEvidenceUnchanged": true,
+        "selectedBalanceKRW": 2079800,
+        "scope": "시나리오 검증 메타데이터이며 공개 Snapshot·LLM 입력에 포함하지 않음"
+      },
+      "ledgerOpeningBalances": [
+        {
+          "accountId": "1d383795-5b7c-56f9-9535-ff418040183d",
+          "balanceKRW": 2950000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "193eba4d-a29e-5a1a-9087-08b3f2aa353b",
+          "balanceKRW": 438000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "89abcc26-5a13-5031-944d-f6fa79fad474",
+          "balanceKRW": 1140000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "43022b12-90c0-551a-8e22-37f5df9c1df0",
+          "balanceKRW": 440000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "bbe92aed-d8a4-5f81-b3b1-8451f7163f9f",
+          "balanceKRW": 0,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "1bc0e831-1341-5e99-8030-92b8653a0aba",
+          "balanceKRW": 988000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        }
+      ]
+    },
+    {
+      "id": "gamma-ai-misread",
+      "file": "snapshots/gamma-ai-misread.json",
+      "goal": "AI 오판 평가용 정상 금융 원천; 오판 결과는 별도 도구",
+      "expected": {
+        "preparationTransactionIds": {
+          "appliance": "73107670-65d4-519a-b5bc-3fccbf31a382",
+          "computer": "40532095-2b79-523c-b9a2-0ec00c003179",
+          "ambiguous-income": "f3215a37-d94c-5465-9de7-99582a8be627"
+        },
+        "installmentCount": 2,
+        "installmentEvidence": "회차는 합성 원천 명시값; 날짜/총액에서 추정하지 않음",
+        "newStatementCount": 0,
+        "sourceSalaryEvidenceUnchanged": true,
+        "selectedBalanceKRW": 5000000,
+        "scope": "시나리오 검증 메타데이터이며 공개 Snapshot·LLM 입력에 포함하지 않음"
+      },
+      "ledgerOpeningBalances": [
+        {
+          "accountId": "d308d10f-bb67-570f-bc55-9b15a6541546",
+          "balanceKRW": 2950000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "94f8e790-5d6f-5528-bbc5-289445ff7508",
+          "balanceKRW": 438000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "2cc2e8e2-af87-5332-b5e1-e8e67445231f",
+          "balanceKRW": 1140000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "ed52eb04-574a-51b5-8b10-1fe369b275c1",
+          "balanceKRW": 440000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "a6a4d595-126b-58fe-bb46-916145492bf9",
+          "balanceKRW": 0,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "5161b562-3253-5f5f-a631-d819451c3304",
+          "balanceKRW": 988000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        }
+      ]
     }
   ],
   "events": [
