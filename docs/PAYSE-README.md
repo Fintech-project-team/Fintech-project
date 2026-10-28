@@ -24,6 +24,8 @@
 | 구현 대기·미승인 범위 변경      | [남은 작업](open-decisions.md)                                                                                  |
 | 과거 기준과 정리 근거           | [검토 이력](reconciliation-report.md)                                                                           |
 
+AI·Flutter·API 실행 경계를 구현·변경·검증할 때는 [실행 공통 계약](payse-execution-contract.md)의 관련 절을 필수로 읽는다. 서버 LLM·결과 저장/복구와 Flutter 분석 요청/조회/재시도 연동 작업은 [API 실행 상세](../apps/api/docs/llm-execution.md)도 필수다. 과거 결정·검사 조사에만 [실행 검토 이력](../apps/api/docs/history/2026-10-27-execution-review.md)을 확인한다. 조건별 연결은 [필수 참조 기준](harness/GATE_MATRIX.md#실행-계약의-조건부-필수-참조)을 따른다.
+
 `apps/api/docs/`는 내부 인증 설계·실행 안내·검증 사례를 유지한다. 기존 데이터 모델·DB·HTTP·응답 문서 경로는 위 기준으로 안내하며 독립 규칙을 병행하지 않는다. 실제 DTO·SQL·Flutter 구현과 검사는 해당 코드/상세 문서의 상태로 확인한다.
 
 ## 적용 우선순위
