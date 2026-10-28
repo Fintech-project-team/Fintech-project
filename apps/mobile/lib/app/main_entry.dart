@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/connection/financial_api.dart';
 import '../data/connection/user_snapshot_repository.dart';
 import '../data/first_calc_record_store.dart';
+import '../data/coachmark_record_store.dart';
 import '../data/financial_snapshot.dart';
 import '../data/financial_snapshot_repository.dart';
 import '../features/connection/connection_flow.dart';
@@ -25,6 +26,7 @@ class MainEntry extends StatefulWidget {
   /// 2026-10-22: 바뀌면 다시 조회할 [reloadKey], 세션 무효 콜백 [onSessionInvalid]를 받는다.
   /// 2026-10-23: 세션 금융 저장소 [financial]과 연결 표시 정책 [policy], 진입 로딩 제목의 사용자 이름 [userName]을 받는다.
   /// 2026-10-27: [firstCalcRecords]는 01-3 첫 계산 기록 저장소다. 앱이 넘기며, 없으면 이 화면 동안만 쓰는 메모리 저장소다.
+  /// 2026-10-28: [coachmarkRecords]는 02-1a 코치마크 기록 저장소다. 없으면 코치마크를 띄우지 않는다.
   const MainEntry({
     super.key,
     required this.financial,
@@ -34,6 +36,7 @@ class MainEntry extends StatefulWidget {
     required this.onSessionInvalid,
     this.userName,
     this.firstCalcRecords,
+    this.coachmarkRecords,
   });
 
   final UserFinancialRepository financial;
@@ -43,6 +46,7 @@ class MainEntry extends StatefulWidget {
   final VoidCallback onSessionInvalid;
   final String? userName;
   final FirstCalcRecordStore? firstCalcRecords;
+  final CoachmarkRecordStore? coachmarkRecords;
 
   /// 2026-10-21: 조회 상태 객체를 반환한다.
   @override
@@ -68,10 +72,13 @@ EntryDestination entryDestination(FinancialSnapshot snapshot) {
 /// 2026-10-26: 홈 새로고침은 진입 조회와 따로 관리한다. 새로고침 중에도 홈(탭)을 유지하고, 성공하면 새 스냅샷,
 /// 실패하면 이전 스냅샷을 그대로 둔다. 세션 무효·다른 진입 화면이면 그 결과를 따른다.
 /// 2026-10-27: 조회한 사용자의 01-3 기록을 함께 읽어 홈 셸에 넘긴다.
+/// 2026-10-28: 02-1a 코치마크 기록도 같은 때 읽는다.
 class _MainEntryState extends State<MainEntry> {
   late final FirstCalcRecordStore _records =
       widget.firstCalcRecords ?? MemoryFirstCalcRecordStore();
   FirstCalcRecord? _record;
+  late final CoachmarkRecordStore? _coachmarks = widget.coachmarkRecords;
+  CoachmarkRecord? _coachmark;
   late Future<SnapshotLoadResult> _result = _load();
   int _loads = 0;
   FinancialSnapshot? _refreshed;
@@ -90,6 +97,7 @@ class _MainEntryState extends State<MainEntry> {
           .loadSnapshot();
       if (result is SnapshotLoaded) {
         _record = await _records.read(result.snapshot.userId);
+        _coachmark = await _coachmarks?.read(result.snapshot.userId);
       }
       return result;
     } catch (error, stack) {
@@ -128,10 +136,12 @@ class _MainEntryState extends State<MainEntry> {
       await _records.save(snapshot.userId, FirstCalcRecord.deferred);
     }
     final record = await _records.read(snapshot.userId);
+    final coachmark = await _coachmarks?.read(snapshot.userId);
     if (!mounted) return;
     setState(() {
       _resetRefresh();
       _record = record;
+      _coachmark = coachmark;
       _override = SnapshotLoaded(snapshot);
     });
   }
@@ -140,6 +150,12 @@ class _MainEntryState extends State<MainEntry> {
   Future<void> _saveRecord(String userId, FirstCalcRecord record) async {
     await _records.save(userId, record);
     if (mounted) setState(() => _record = record);
+  }
+
+  /// 2026-10-28: 코치마크 기록 [record]를 사용자 [userId]로 남긴다.
+  Future<void> _saveCoachmark(String userId, CoachmarkRecord record) async {
+    await _coachmarks?.save(userId, record);
+    if (mounted) setState(() => _coachmark = record);
   }
 
   /// 2026-10-26: 홈 새로고침 상태를 비우고 진행 중인 새로고침 응답을 버린다.
@@ -245,6 +261,10 @@ class _MainEntryState extends State<MainEntry> {
             devEntry: widget.devEntryBuilder(context),
             firstCalcRecord: _record,
             onFirstCalcRecord: (record) => _saveRecord(snapshot.userId, record),
+            coachmarkRecord: _coachmark,
+            onCoachmarkRecord: _coachmarks == null
+                ? null
+                : (record) => _saveCoachmark(snapshot.userId, record),
           ),
         ),
         EntryDestination.connect || EntryDestination.chooseAccounts => Builder(

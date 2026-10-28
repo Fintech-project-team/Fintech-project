@@ -1,0 +1,19 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:payse/data/coachmark_record_store.dart';
+
+void main() {
+  test('기록이 없으면 null, 저장한 사용자만 값을 돌려준다', () async {
+    final store = MemoryCoachmarkRecordStore();
+    expect(await store.read('a'), isNull);
+    await store.save('a', CoachmarkRecord.skipped);
+    expect(await store.read('a'), CoachmarkRecord.skipped);
+    expect(await store.read('b'), isNull);
+  });
+
+  test('같은 사용자는 마지막 기록 하나만 남는다', () async {
+    final store = MemoryCoachmarkRecordStore();
+    await store.save('a', CoachmarkRecord.skipped);
+    await store.save('a', CoachmarkRecord.completed);
+    expect(await store.read('a'), CoachmarkRecord.completed);
+  });
+}

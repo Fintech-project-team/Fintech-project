@@ -18,6 +18,7 @@ class HomeScreen extends StatelessWidget {
   /// 2026-10-26: [record]는 4단계 기기 기록에서 판단할 보조 상태이며 3단계에서는 기본값(기록 없음)이다.
   /// [refresh]는 새로고침 진행 상태로, 홈 상태(음수·입금 대기·정보 부족)와 따로 관리한다.
   /// 2026-10-27: [onShowFirstCalc]는 '처음 계산 과정을 단계별로 보기'를 눌렀을 때 01-3을 다시 보인다.
+  /// 2026-10-28: [coachTargets]가 있으면 02-1a 코치마크가 강조할 금액 영역·'계산 내역 보기'에 위치 키를 붙인다.
   const HomeScreen({
     super.key,
     required this.calculation,
@@ -25,6 +26,7 @@ class HomeScreen extends StatelessWidget {
     this.record = HomeSalaryRecord.none,
     this.refresh = HomeRefresh.idle,
     this.onShowFirstCalc,
+    this.coachTargets,
   });
 
   final HomeCalculation calculation;
@@ -32,6 +34,7 @@ class HomeScreen extends StatelessWidget {
   final HomeSalaryRecord record;
   final HomeRefresh refresh;
   final VoidCallback? onShowFirstCalc;
+  final HomeCoachTargets? coachTargets;
 
   static const String amountLabel = '다음 월급일까지\n쓸 수 있는 돈';
 
@@ -48,6 +51,7 @@ class HomeScreen extends StatelessWidget {
         onReload: onReload,
         refreshFailed: failed,
         onShowFirstCalc: onShowFirstCalc,
+        coachTargets: coachTargets,
       ),
       HomeCalculationDataError() || HomeCalculationUnexpectedError()
           when failed =>
@@ -67,6 +71,20 @@ class HomeScreen extends StatelessWidget {
       ),
     };
   }
+}
+
+/// 2026-10-28: 02-1a 코치마크가 강조할 홈 위젯의 위치 키. 앱 셸이 만들고 홈이 붙인다.
+class HomeCoachTargets {
+  /// 2026-10-28: 금액 영역 시작(라벨) [amountTop], 끝(구성 바 또는 '월급 입금 확인하기') [amountBottom],
+  /// '계산 내역 보기' [detail] 키를 새로 만든다.
+  HomeCoachTargets()
+    : amountTop = GlobalKey(debugLabel: 'coach-amount-top'),
+      amountBottom = GlobalKey(debugLabel: 'coach-amount-bottom'),
+      detail = GlobalKey(debugLabel: 'coach-detail');
+
+  final GlobalKey amountTop;
+  final GlobalKey amountBottom;
+  final GlobalKey detail;
 }
 
 /// 2026-10-26: 홈 새로고침 진행 상태. 앱 진입 화면이 소유하고 홈은 표시만 한다.
@@ -104,6 +122,7 @@ class _HomeReady extends StatelessWidget {
     required this.onReload,
     required this.refreshFailed,
     this.onShowFirstCalc,
+    this.coachTargets,
   });
 
   final HomeCalculationReady calculation;
@@ -111,6 +130,7 @@ class _HomeReady extends StatelessWidget {
   final VoidCallback onReload;
   final bool refreshFailed;
   final VoidCallback? onShowFirstCalc;
+  final HomeCoachTargets? coachTargets;
 
   /// 2026-10-26: 머리·주기 줄·금액·상태 안내·장부를 스크롤 영역에 두고 '계산 내역 보기' 띠 버튼을 화면 아래에 고정한다.
   @override
@@ -187,7 +207,8 @@ class _HomeReady extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: PayseSpace.section),
-                  _padded(
+                  _target(
+                    coachTargets?.amountTop,
                     AmountHero(
                       label: HomeScreen.amountLabel,
                       amountKrw: u,
@@ -227,7 +248,8 @@ class _HomeReady extends StatelessWidget {
                   ],
                   if (absent) ...[
                     const SizedBox(height: PayseSpace.x5),
-                    _padded(
+                    _target(
+                      coachTargets?.amountBottom,
                       const _WideOutlinedButton(
                         key: ValueKey('home-salary-check-button'),
                         label: '월급 입금 확인하기',
@@ -236,7 +258,10 @@ class _HomeReady extends StatelessWidget {
                     ),
                   ],
                   if (showBar)
-                    _padded(CompositionBar(result: result, showLegend: false)),
+                    _target(
+                      absent ? null : coachTargets?.amountBottom,
+                      CompositionBar(result: result, showLegend: false),
+                    ),
                   if (notice.isNotEmpty) ...[
                     const SizedBox(height: PayseSpace.x5),
                     ...notice,
@@ -271,15 +296,22 @@ class _HomeReady extends StatelessWidget {
               ),
             ),
           ),
-          PrimaryButton(
-            key: const ValueKey('home-detail-button'),
-            label: '계산 내역 보기',
-            onPressed: () => _openDetail(context),
+          KeyedSubtree(
+            key: coachTargets?.detail,
+            child: PrimaryButton(
+              key: const ValueKey('home-detail-button'),
+              label: '계산 내역 보기',
+              onPressed: () => _openDetail(context),
+            ),
           ),
         ],
       ),
     );
   }
+
+  /// 2026-10-28: 화면 좌우 여백을 적용하고 코치마크 위치 키 [key]가 있으면 붙인다.
+  static Widget _target(GlobalKey? key, Widget child) =>
+      KeyedSubtree(key: key, child: _padded(child));
 
   /// 2026-10-26: 같은 계산 결과로 02-2 계산 내역을 연다.
   void _openDetail(BuildContext context) {
