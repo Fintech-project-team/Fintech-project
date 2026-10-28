@@ -19,15 +19,19 @@ class SnapshotContractException implements Exception {
 class ProjectionState {
   /// 2026-10-22: 연결 기록 [institutionLinks](연결 순서 유지), 계좌 선택 [selectedAccountIds](아직 저장 전이면 null),
   /// 현재 자료 버전 [dataVersion]으로 만든다.
+  /// 2026-10-28: [salarySettings]는 사용자가 저장한 월급 설정 필드(salaryDay·salaryAmountKRW·salaryAccountId)이며
+  /// 원본 settings.salary의 같은 키를 덮는다. 입금 근거(receiptEvidence)는 담지 않는다.
   const ProjectionState({
     required this.institutionLinks,
     required this.selectedAccountIds,
     required this.dataVersion,
+    this.salarySettings = const {},
   });
 
   final List<Map<String, Object?>> institutionLinks;
   final Set<String>? selectedAccountIds;
   final String dataVersion;
+  final Map<String, Object?> salarySettings;
 
   /// 2026-10-22: 연결된 기관 코드 집합을 반환한다.
   Set<String> get connectedCodes => {
@@ -63,6 +67,9 @@ abstract final class SnapshotProjector {
         '지원하지 않는 원본 형식',
       );
     }
+    final settings = src['settings'];
+    final salary = settings is Map ? settings['salary'] : null;
+    if (salary is Map) salary.addAll(state.salarySettings);
     final header = <String, Object?>{
       for (final key in _headerKeys) key: src[key],
       'schemaVersion': apiSchema,

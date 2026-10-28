@@ -135,4 +135,25 @@ void main() {
     final label = tester.getRect(find.text('계산 내역 보기'));
     expect(label.left - band.left, 18);
   });
+
+  testWidgets('a back button mirrors the band: arrow left, label right', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      themed(
+        PrimaryButton(label: '확인 화면으로 돌아가기', onPressed: () {}, back: true),
+      ),
+    );
+    final arrow = tester.getRect(find.byIcon(Icons.chevron_left));
+    final label = tester.getRect(find.text('확인 화면으로 돌아가기'));
+    final band = tester.getRect(find.byType(PrimaryButton));
+    expect(arrow.left - band.left, 24, reason: '‹는 왼쪽 끝');
+    expect(band.right - label.right, 24, reason: '글자는 오른쪽 끝');
+    expect(
+      tester.widget<Text>(find.text('확인 화면으로 돌아가기')).textAlign,
+      TextAlign.right,
+    );
+    expect(label.left - arrow.right, greaterThanOrEqualTo(16));
+    expect(find.byIcon(Icons.chevron_right), findsNothing);
+  });
 }
