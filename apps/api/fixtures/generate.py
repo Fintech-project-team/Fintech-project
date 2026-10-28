@@ -251,6 +251,7 @@ def build() -> tuple[dict, dict, dict]:
     2026-10-23: Resolve templates by owned IDs/relations, preserving scenario facts.
     2026-10-26: Add a manually supplied future schedule and an otherwise equal absent-source case.
     2026-10-26: Add an independent everyday-spending demo without changing existing cases.
+    2026-10-28: Add separate installment/edge scenarios without changing prior fixtures.
     """
     cases={};catalog={'fixtureVersion':FIXTURE_VERSION,'schemaVersion':SCHEMA,'ruleVersion':RULE,'cases':[],'events':[],'localVectors':[]}
     def add_case(name,snapshot,goal,expected):
@@ -363,6 +364,12 @@ def build() -> tuple[dict, dict, dict]:
          'flutterExpected': {'b': 2000000, 'e': 300000, 'r': 400000, 'o': 0, 'u': 1300000},
          'expectationScope': '독립 Flutter 검사 기대값; 서버 응답·서버 계산 결과가 아님'},
     )
+    # 2026-10-28: Existing snapshots stay unchanged; explicit demo profiles use ordinary tables.
+    from demo_cases import make_cases
+    for name, snapshot, goal, expected in make_cases(
+            make_demo_snapshot(base), beta, make_snapshot('gamma'), uid):
+        update_versions(snapshot, snapshot['sourceVersion'] + ':' + name, '1')
+        add_case(name, snapshot, goal, expected)
     for entry in catalog['cases']:
         snapshot=cases[entry['id']]
         if 'accounts' in snapshot and all(coverage_row['status']=='complete' for coverage_row in snapshot['coverage']):

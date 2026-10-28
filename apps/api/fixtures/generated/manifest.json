@@ -20,8 +20,11 @@
     "snapshots/salary-schedule-provided.json": "0341ce4142ef424d9bbacea8e75345fe0b524bfb82d6abb8a8d2e42e1cbf6cae",
     "snapshots/salary-schedule-absent.json": "1c276ee6779d839abd547780dcf8f0d96ace8b3493d23a2d255a63c23666b008",
     "snapshots/demo-ready.json": "f2ab4cb7c0a4841a78b07b22f1485ed98a691688e24168832dbb26c23e71df83",
+    "snapshots/demo-installments.json": "9f775ffc9d3c1d70225d61da81b78e83f8c8e80c70a1be9e9c5761fcb67989ec",
+    "snapshots/beta-cashflow-edge.json": "3d93815d1b621548e32c1b82b7db2ead53ceeb46b2fdf4730957516864addffa",
+    "snapshots/gamma-ai-misread.json": "4c2936a33c67a67a017e4d8c7844d50a52113eef2aa98d397c9fad3630505969",
     "server-seeds.json": "5b0b3401930cbe794606df5bcf42693bc6556aa861d0daa2ed6d37924172e617",
-    "catalog.json": "e5997c3eb244015096d1a52007384eb8dfcc52d6ba7769c4ce2c3bc1e6d7d439",
+    "catalog.json": "58f5212d65afedc485a8e409f0b51ca96dfd5ec65fa87c5fbe0a2e24e52d1823",
     "bank-directory.json": "097a9a5100f4d6a19c37b60f49ba5f6fc8075bb3fc00456433000294b7513640"
   }
 }
