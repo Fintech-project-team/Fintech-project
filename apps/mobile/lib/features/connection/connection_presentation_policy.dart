@@ -42,6 +42,9 @@ class ConnectionPresentationPolicy {
   /// 2026-10-22: 실패 행 다시 시도 뒤 표시상 완료까지(2~3초)를 기다린다.
   Future<void> retryDelay() => _wait(_between(2000, 3000));
 
+  /// 2026-10-28: 홈 새로고침 로딩을 보이는 최소 시간(3초)을 기다린다.
+  Future<void> refreshMinimum() => _wait(const Duration(seconds: 3));
+
   /// 2026-10-22: [minMs] 이상 [maxMs] 이하의 지연을 반환한다.
   Duration _between(int minMs, int maxMs) =>
       Duration(milliseconds: minMs + _random.nextInt(maxMs - minMs + 1));

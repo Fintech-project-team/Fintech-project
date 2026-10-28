@@ -901,110 +901,58 @@ class AccountSelectScreen extends StatelessWidget {
       onPressed: !enabled
           ? null
           : all
-          ? () => _clearGroup(context, ids)
+          ? () => _clearGroup(context, title, ids)
           : () => controller.setAccounts(ids, selected: true),
     );
   }
 
   /// 2026-10-27: 묶음 [ids]를 모두 해제한다. 모아둘 돈이 있는 계좌가 있으면 확인 창을 한 번 띄우고, 취소하면 그대로 둔다.
-  Future<void> _clearGroup(BuildContext context, List<String> ids) async {
+  /// 2026-10-28: 확인 창이 묶음 이름 [group]과 해제할 계좌 수를 말하도록 넘긴다.
+  Future<void> _clearGroup(
+    BuildContext context,
+    String group,
+    List<String> ids,
+  ) async {
     final withReserve = [
       for (final id in ids)
         if (controller.reservesOf(id).isNotEmpty) id,
     ];
     if (withReserve.isNotEmpty &&
-        !await _confirmClear(context, withReserve.length)) {
+        !await _confirmClear(
+          context,
+          group: group,
+          total: ids.length,
+          withReserve: withReserve.length,
+        )) {
       return;
     }
     controller.setAccounts(ids, selected: false);
   }
 
-  /// 2026-10-27: 모아둘 돈이 있는 계좌 [count]개를 해제할지 묻는다. '선택 해제'면 true다.
-  static Future<bool> _confirmClear(BuildContext context, int count) async {
-    final result = await showDialog<bool>(
-      context: context,
-      barrierColor: const Color(0x80242629),
-      builder: (context) => Dialog(
-        key: const ValueKey('clear-reserve-dialog'),
-        backgroundColor: PayseColors.background,
-        insetPadding: const EdgeInsets.symmetric(
-          horizontal: PayseSpace.screenHorizontal,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(PayseRadius.sm),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                '모아둘 돈이 있는 계좌 $count개를\n해제할까요?',
-                style: const TextStyle(
-                  fontSize: 17,
-                  height: 1.45,
-                  fontWeight: FontWeight.w700,
-                  color: PayseColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                '이 계좌의 잔액과 연결된 모아둘 돈은 이번 계산에서 제외돼요. 모아둘 돈 설정은 삭제되지 않아요.',
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.5,
-                  color: PayseColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: PayseSpace.x5),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      key: const ValueKey('clear-reserve-cancel'),
-                      onPressed: () => Navigator.of(context).pop(false),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
-                        foregroundColor: PayseColors.textPrimary,
-                        side: const BorderSide(color: PayseColors.borderStrong),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(PayseRadius.sm),
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      child: const Text('취소'),
-                    ),
-                  ),
-                  const SizedBox(width: PayseSpace.x2),
-                  Expanded(
-                    child: FilledButton(
-                      key: const ValueKey('clear-reserve-confirm'),
-                      onPressed: () => Navigator.of(context).pop(true),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
-                        backgroundColor: PayseColors.charcoal,
-                        foregroundColor: PayseColors.onCharcoal,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(PayseRadius.sm),
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      child: const Text('선택 해제'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+  /// 2026-10-27: 모아둘 돈이 있는 계좌를 해제할지 묻는다. 해제하기로 하면 true다.
+  /// 2026-10-28: 확인 창 모양은 [showConnectionConfirm]을 쓴다. 제목은 실제로 해제되는 [group] 묶음 계좌 수 [total]을,
+  /// 설명은 그중 모아둘 돈이 있는 계좌 수 [withReserve]를 말한다(혜연 검토: 한 계좌만 해제된다고 오해하지 않게).
+  static Future<bool> _confirmClear(
+    BuildContext context, {
+    required String group,
+    required int total,
+    required int withReserve,
+  }) async {
+    const effect = '선택을 해제한 계좌의 잔액과 연결된 모아둘 돈은 계산에서 제외돼요.';
+    final single = total == 1;
+    final result = await showConnectionConfirm(
+      context,
+      key: const ValueKey('clear-reserve-dialog'),
+      title: single
+          ? '$group 계좌 1개를 선택 해제할까요?'
+          : '$group 계좌 $total개를 모두 선택 해제할까요?',
+      body: single
+          ? '이 계좌에는 모아둘 돈이 있어요.\n$effect'
+          : '이 중 $withReserve개 계좌에는 모아둘 돈이 있어요.\n$effect',
+      secondaryLabel: '취소',
+      secondaryKey: const ValueKey('clear-reserve-cancel'),
+      primaryLabel: single ? '선택 해제' : '모두 선택 해제',
+      primaryKey: const ValueKey('clear-reserve-confirm'),
     );
     return result ?? false;
   }
@@ -1225,6 +1173,7 @@ class ConnectionReviewScreen extends StatelessWidget {
   /// 2026-10-27: 같은 스냅샷의 계산 결과 [calculation], 계산하기 [onCalculate], 나중에 확인 [onDefer],
   /// 다시 불러오기 [onReload]와 진행 상태 [reload]를 받는다. [analysisReceived]는 거래 분석 결과(LLM)를
   /// 받았는지이며, 수신 여부를 판단할 근거가 정해지기 전까지 false다.
+  /// 2026-10-28: [onEditSalary]가 있고 설정이 있으면 월급 묶음 머리에 '확인·수정 ›'을 둔다(#28 4b-1).
   const ConnectionReviewScreen({
     super.key,
     required this.snapshot,
@@ -1235,6 +1184,7 @@ class ConnectionReviewScreen extends StatelessWidget {
     required this.onReload,
     this.reload = ReviewReload.idle,
     this.analysisReceived = false,
+    this.onEditSalary,
   });
 
   final FinancialSnapshot snapshot;
@@ -1245,6 +1195,7 @@ class ConnectionReviewScreen extends StatelessWidget {
   final VoidCallback onReload;
   final ReviewReload reload;
   final bool analysisReceived;
+  final VoidCallback? onEditSalary;
 
   /// 2026-10-22: 계좌 [accountId]의 이름을 반환한다. 응답에 없으면 "계좌 정보 없음"이다.
   String _account(String accountId) {
@@ -1309,7 +1260,11 @@ class ConnectionReviewScreen extends StatelessWidget {
                 onAction: reload == ReviewReload.loading ? null : onReload,
               ),
             ),
-          const _ReviewSection('월급', FinanceIconKind.salary),
+          _ReviewSection(
+            '월급',
+            FinanceIconKind.salary,
+            onEdit: salary == null ? null : onEditSalary,
+          ),
           if (salary == null)
             const _ReviewRow(name: '월급 정보 없음', muted: true)
           else ...[
@@ -1601,10 +1556,12 @@ class _ReviewValue {
 class _ReviewSection extends StatelessWidget {
   /// 2026-10-22: 묶음 이름 [title]로 만든다.
   /// 2026-10-27: 아이콘 [icon]을 받는다.
-  const _ReviewSection(this.title, this.icon);
+  /// 2026-10-28: [onEdit]이 있으면 오른쪽에 '확인·수정 ›'(14/600, 터치 44)을 둔다.
+  const _ReviewSection(this.title, this.icon, {this.onEdit});
 
   final String title;
   final FinanceIconKind icon;
+  final VoidCallback? onEdit;
 
   /// 2026-10-22: 이름과 아래 선을 반환한다.
   @override
@@ -1638,6 +1595,38 @@ class _ReviewSection extends StatelessWidget {
               ),
             ),
           ),
+          if (onEdit != null)
+            Semantics(
+              button: true,
+              label: '$title 확인·수정',
+              excludeSemantics: true,
+              child: InkWell(
+                key: const ValueKey('review-salary-edit'),
+                onTap: onEdit,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 44),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '확인·수정',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: PayseColors.textPrimary,
+                        ),
+                      ),
+                      SizedBox(width: 2),
+                      Icon(
+                        Icons.chevron_right,
+                        size: 18,
+                        color: PayseColors.borderStrong,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

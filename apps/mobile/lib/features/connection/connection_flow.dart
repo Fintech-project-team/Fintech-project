@@ -10,6 +10,8 @@ import '../overview/home_calculation.dart';
 import 'connection_flow_controller.dart';
 import 'connection_presentation_policy.dart';
 import 'connection_screens.dart';
+import 'salary_settings_controller.dart';
+import 'salary_settings_screen.dart';
 
 /// 2026-10-22: 금융사 연결 흐름(12-1 → 12-2 → 12-3 → 01-1 → 01-2). 자체 Navigator로 단계를 쌓는다.
 /// 시작 Snapshot이 연결 전이면 12-1, 연결은 저장됐지만 고른 계좌가 없으면 01-1에서 시작한다.
@@ -147,12 +149,15 @@ class _ConnectionFlowState extends State<ConnectionFlow> {
 
   /// 2026-10-22: 01-2 화면을 반환한다. 계좌 선택 저장 응답의 최신 Snapshot을 보인다.
   /// 2026-10-27: 다시 불러오기와 같은 스냅샷 계산을 맡는 [_ReviewHost]로 감싼다.
+  /// 2026-10-28: 월급 설정을 저장하면 흐름 상태도 새 Snapshot으로 바꾼다.
   Widget _review() => _ReviewHost(
     repository: widget.repository,
     snapshot: _controller.snapshot,
+    random: widget.random,
     onBack: () => _navigator.pop(),
     onFinished: widget.onFinished,
     onSessionInvalid: widget.onSessionInvalid,
+    onSnapshot: _controller.adoptSnapshot,
   );
 
   /// 2026-10-22: 시스템 뒤로 가기를 흐름 Navigator로 넘기는 흐름 화면을 반환한다.
@@ -178,12 +183,15 @@ class _ConnectionFlowState extends State<ConnectionFlow> {
 class _ReviewHost extends StatefulWidget {
   /// 2026-10-27: 세션 저장소 [repository], 처음 보일 [snapshot], 뒤로 [onBack], 끝 [onFinished],
   /// 세션 무효 [onSessionInvalid]로 만든다.
+  /// 2026-10-28: 월급 설정에서 새 Snapshot을 받으면 [onSnapshot]으로 알린다. [random]은 작업 키 난수다.
   const _ReviewHost({
     required this.repository,
     required this.snapshot,
     required this.onBack,
     required this.onFinished,
     required this.onSessionInvalid,
+    required this.onSnapshot,
+    this.random,
   });
 
   final UserFinancialRepository repository;
@@ -192,6 +200,8 @@ class _ReviewHost extends StatefulWidget {
   final void Function(FinancialSnapshot snapshot, {required bool deferred})
   onFinished;
   final VoidCallback onSessionInvalid;
+  final ValueChanged<FinancialSnapshot> onSnapshot;
+  final Random? random;
 
   /// 2026-10-27: 01-2 상태 객체를 반환한다.
   @override
@@ -237,6 +247,37 @@ class _ReviewHostState extends State<_ReviewHost> {
     }
   }
 
+  /// 2026-10-28: 새 [snapshot]으로 01-2를 다시 계산해 보이고 흐름 상태에도 알린다.
+  void _adopt(FinancialSnapshot snapshot) {
+    setState(() {
+      _snapshot = snapshot;
+      _calculation = computeHomeCalculation(snapshot);
+      _reload = ReviewReload.idle;
+    });
+    widget.onSnapshot(snapshot);
+  }
+
+  /// 2026-10-28: 월급 설정 화면을 연다. 화면을 떠나면 그 입력 상태를 버린다.
+  void _editSalary() {
+    final controller = SalarySettingsController(
+      repository: widget.repository,
+      snapshot: _snapshot,
+      onSessionInvalid: widget.onSessionInvalid,
+      random: widget.random,
+    );
+    Navigator.of(context)
+        .push<void>(
+          MaterialPageRoute(
+            builder: (route) => SalarySettingsScreen(
+              controller: controller,
+              onSnapshot: _adopt,
+              onBack: () => Navigator.of(route).pop(),
+            ),
+          ),
+        )
+        .whenComplete(controller.dispose);
+  }
+
   /// 2026-10-27: 01-2 화면을 반환한다.
   @override
   Widget build(BuildContext context) {
@@ -246,6 +287,7 @@ class _ReviewHostState extends State<_ReviewHost> {
       reload: _reload,
       onBack: widget.onBack,
       onReload: _reloadSnapshot,
+      onEditSalary: _editSalary,
       onCalculate: () => widget.onFinished(_snapshot, deferred: false),
       onDefer: () => widget.onFinished(
         _snapshot,

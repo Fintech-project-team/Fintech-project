@@ -16,6 +16,32 @@ class WriteContext {
   final String idempotencyKey;
 }
 
+/// 2026-10-28: PATCH /settings의 월급 설정 변경(SalaryPatch). 바꾼 필드만 담으며 생략과 null(해제)을 구분한다.
+/// 각 필드는 보낼 때만 `(value: 값)`이고, 보내지 않으면 null이다. 입금 근거를 바꾸는 값이 아니다.
+class SalaryPatch {
+  /// 2026-10-28: 월급일 [salaryDay](1~31|null), 예상 금액 [salaryAmountKrw](원|null), 월급 계좌 [salaryAccountId]로 만든다.
+  const SalaryPatch({
+    this.salaryDay,
+    this.salaryAmountKrw,
+    this.salaryAccountId,
+  });
+
+  final ({int? value})? salaryDay;
+  final ({int? value})? salaryAmountKrw;
+  final ({String? value})? salaryAccountId;
+
+  /// 2026-10-28: 보낼 필드가 하나도 없으면 true를 반환한다(빈 patch는 보내지 않는다).
+  bool get isEmpty =>
+      salaryDay == null && salaryAmountKrw == null && salaryAccountId == null;
+
+  /// 2026-10-28: 요청 본문의 salary 객체를 키 이름 순서로 반환한다. 보내지 않는 필드는 키가 없다.
+  Map<String, Object?> toJson() => {
+    if (salaryAccountId != null) 'salaryAccountId': salaryAccountId!.value,
+    if (salaryAmountKrw != null) 'salaryAmountKRW': salaryAmountKrw!.value,
+    if (salaryDay != null) 'salaryDay': salaryDay!.value,
+  };
+}
+
 /// 2026-10-22: 쓰기로 바뀐 자원 하나(ChangedRef).
 class ChangedRef {
   /// 2026-10-22: 자원 종류 [resource]와 ID [id]로 만든다.
@@ -141,6 +167,12 @@ abstract interface class UserFinancialRepository {
     WriteContext write,
   );
 
+  /// 2026-10-28: PATCH /settings. 월급 설정 변경 [salary]를 [write]로 저장한다. 카드 계획은 보내지 않는다.
+  Future<FinancialOutcome<WriteSuccess>> updateSalarySettings(
+    SalaryPatch salary,
+    WriteContext write,
+  );
+
   /// 2026-10-22: 세션이 끝났음을 알린다. 이후 요청과 진행 중 요청의 늦은 응답을 반영하지 않는다.
   void close();
 }
@@ -166,6 +198,13 @@ class UnavailableUserFinancialRepository implements UserFinancialRepository {
   @override
   Future<FinancialOutcome<WriteSuccess>> selectAccounts(
     List<String> accountIds,
+    WriteContext write,
+  ) async => const FinancialUnavailable();
+
+  /// 2026-10-28: 저장하지 않고 서비스 불가를 반환한다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> updateSalarySettings(
+    SalaryPatch salary,
     WriteContext write,
   ) async => const FinancialUnavailable();
 
