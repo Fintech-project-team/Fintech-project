@@ -211,6 +211,13 @@ void main() {
 
       final alpha = devDemoAccounts.first;
       auth.terminateSessionOf(alpha.userId);
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const ValueKey('group-demand')),
+          matching: find.text('모두 선택'),
+        ),
+      );
+      await tester.pump();
       await tester.tap(find.text('이 계좌로 계산하기'));
       await tester.pumpAndSettle();
       expect(

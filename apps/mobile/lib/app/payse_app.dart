@@ -11,6 +11,7 @@ import '../data/auth/session_cleanup.dart';
 import '../data/connection/fake_financial_server.dart';
 import '../data/connection/financial_api.dart';
 import '../data/financial_snapshot_repository.dart';
+import '../data/first_calc_record_store.dart';
 import '../data/fixture_scenario.dart';
 import '../data/snapshot_source.dart';
 import '../features/auth/auth_flows.dart';
@@ -37,6 +38,7 @@ class PayseApp extends StatefulWidget {
   /// 2026-10-22: [userFixtures]는 사용자별 금융 원본 대응이다.
   /// 2026-10-23: [presentationPolicy]는 실패 연출 사용 여부(개발 설정 토글의 현재 값)를 받아 연결 표시 정책을
   /// 만든다. 생략하면 실제 난수·시간을 쓴다(테스트에서 바꿔 끼움).
+  /// 2026-10-27: [firstCalcRecords]는 01-3 첫 계산 기록 저장소다(기본은 앱 실행 동안 유지되는 메모리 구현).
   const PayseApp({
     super.key,
     this.snapshotSource,
@@ -49,6 +51,7 @@ class PayseApp extends StatefulWidget {
     this.lockTimeout = const Duration(minutes: 10),
     this.userFixtures,
     this.presentationPolicy,
+    this.firstCalcRecords,
   });
 
   final SnapshotSource? snapshotSource;
@@ -65,6 +68,8 @@ class PayseApp extends StatefulWidget {
 
   final ConnectionPresentationPolicy Function(bool Function() failuresEnabled)?
   presentationPolicy;
+
+  final FirstCalcRecordStore? firstCalcRecords;
 
   /// 2026-10-20: 앱 루트 상태 객체를 반환한다. 인자 없음.
   @override
@@ -89,6 +94,8 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
     now: _now,
   );
   late final FakeFinancialServer? _financialServer = _defaultFinancialServer();
+  late final FirstCalcRecordStore _firstCalcRecords =
+      widget.firstCalcRecords ?? MemoryFirstCalcRecordStore();
   UserFinancialRepository _financial =
       const UnavailableUserFinancialRepository();
   int _financialSession = 0;
@@ -316,6 +323,7 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
         policy: _presentation,
         reloadKey: _financialSession,
         userName: _userName,
+        firstCalcRecords: _firstCalcRecords,
         devEntryBuilder: _devEntryOrNull,
         onSessionInvalid: _onFinancialSessionInvalid,
       ),
