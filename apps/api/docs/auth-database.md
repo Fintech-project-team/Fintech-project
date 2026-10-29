@@ -86,3 +86,9 @@ Spring의 `database` 프로필에서만 Repository·Transactions 두 bean을 등
 `AuthResult`는 HTTP DTO가 아닌 내부 결과다. Login에는 최초 성공에 필요한 토큰만, Verified에는 기존 userId/sessionId만, Failure에는 오류 종류와 제한 시각만 둔다. 토큰·코드·이름 원문을 예외나 자동 문자열 표현에 포함하지 않는다. 인증 함수에 금융 dataVersion 변경이나 급여 계산을 추가하지 않는다.
 
 검사는 [DB 테스트](database-tests.md)의 실제 PostgreSQL 실행기를 사용한다. SQL 전이·서비스 통과와 실제 HTTP 로그인·Flutter 통합·배포 완료는 별도다.
+
+## 로컬 합성 자격 준비
+
+[별도 개발 서버 도구](local-server-guide.md#별도-개발-dbapi-제어)는 새 소유 클러스터의 초기 적재에서만 `PrepareDemo.java`를 통해 기존 `AuthCrypto.codeVerifier`를 호출한다. 시드의 사용자 ID·이름·전화번호·기존 DISABLED 값을 대조하고 각 한 행만 활성화한다. 세 계정의 승인된 개발 코드와 모바일 입력 규칙은 유지하며 모바일 파일을 수정하지 않는다.
+
+자격 갱신은 세 행 전체가 하나의 트랜잭션이며 단일 매핑이 아니면 롤백한다. API 시작·재시작은 이 준비를 다시 실행하지 않는다. 개발 DB의 코드 키·제한 키·cursor 키는 서로 다른 무작위 값이고 현재 Windows 사용자 보호 저장소에서 재사용한다. 이 도구는 실제 SMS 인증·운영 계정 발급·키 회전·다른 PC 복구 도구가 아니다.

@@ -1,6 +1,6 @@
 # Windows PC에서 PAYSE 서버 준비하기
 
-처음에는 본인·팀원만 접속하고, 이후 외부 시연 접속을 추가할 수 있는 구조로 준비한다. **이 문서는 설치 가이드이며 설치·외부 공개를 실행한 결과가 아니다.** 소스는 생존 확인, `database,auth` 프로필의 로그인·재확인·로그아웃, `finance` 프로필을 함께 켠 v3 금융 조회·연결·설정 저장 HTTP를 제공한다. 직접 접속 모드·DB·암호 설정은 [인증 DB·HTTP](auth-database.md), 금융 검증 범위는 [금융 인계](history/2026-10-29-financial-api-handoff.md)를 따른다. 분석 HTTP·프록시·외부 접속 구성은 별도다.
+처음에는 본인·팀원만 접속하고, 이후 외부 시연 접속을 추가할 수 있는 구조로 준비한다. **아래 개발 도구는 이 PC의 별도 loopback DB·API를 준비한다. 외부 공개·실제 기기 연결은 별도다.** 소스는 생존 확인, `database,auth` 프로필의 로그인·재확인·로그아웃, `finance` 프로필을 함께 켠 v3 금융 조회·연결·설정 저장 HTTP를 제공한다. 직접 접속 모드·DB·암호 설정은 [인증 DB·HTTP](auth-database.md), 금융 검증 범위는 [금융 인계](history/2026-10-29-financial-api-handoff.md)를 따른다. 분석 HTTP·프록시·외부 접속 구성은 별도다.
 
 ## 1. 권장 구조
 
@@ -90,3 +90,64 @@ PostgreSQL 공식 정책은 major별 최신 minor 사용을 권고한다. major 
 백업은 사용자·금융·분석 결과와 키의 복구 경로를 함께 다룬다. 일반 분석 3개월, 중요보존 예외, 사용자 삭제, 탈퇴 후 1년 규칙은 복원 뒤에도 유지해야 한다. KMS 키 회전만으로 과거 백업의 완전 폐기를 완료했다고 보고하지 않는다.
 
 로컬 생존 확인과 격리 DB의 인증·금융 HTTP 검증은 서버 구현 범위다. DB 운용 버전·네트워크 제품·HTTPS/신뢰 프록시·비밀 주입·백업/KMS 및 Flutter 실제 서버 연결까지 확인해야 팀원/외부 시연 서버 준비 완료로 판단한다.
+
+## 다른 PC·운영체제에 서버 설치
+
+API 실행은 Windows 개발 DB 관리 도구에 의존하지 않는다. [서버 배포·이동 안내](../deploy/README.md)에 따라 실행 JAR·외부 설정 예시만 묶고, 대상 DB 주소·포트·사용자·키를 별도로 제공한다. 다른 환경에서 Java 21로 같은 JAR를 실행하며 소스의 PC 경로를 수정하지 않는다. 제품 설정 로더를 추가하지 않고 Spring의 외부 설정을 사용한다. 설치/재시작은 DB 초기화·키 재생성·자료 이동을 수행하지 않는다.
+
+아래 도구는 **Windows에서 소유한 개발 DB를 관리할 때만** 사용한다. 이 도구의 DPAPI·경로 제한을 일반 배포나 다른 PC의 복구 수단으로 사용하지 않는다.
+
+## 별도 개발 DB·API 제어
+
+저장소 루트에서 JDK 21·Python 3.10+·PowerShell 7·PostgreSQL 도구를 사용한다. 기존 Windows PostgreSQL 서비스는 시작·정지하지 않는다. 개발 도구는 `%LOCALAPPDATA%/PAYSE/development/api-v3/` 아래 **별도 클러스터**만 관리한다. 소유 경로·클러스터 시스템 ID를 대조하며 기존 경로의 재초기화는 거절한다.
+
+- DB: `payse_dev`, `127.0.0.1:15432`. API: `http://127.0.0.1:18080`.
+- 기본 포트가 사용 중이면 중단한다. 최초 준비의 `--pg-port`·`--api-port`로 다른 미사용 포트를 명시할 수 있다.
+- PostgreSQL 실행 파일 경로는 `init --pg-bin`에서 지정하며 기존 설치를 자동 변경하지 않는다. 현재 확인 환경은 15.13이며 운영 버전 확정이 아니다.
+- API는 `database,auth,finance`·직접 접속 모드와 비관리자 계정을 사용한다. 초기화 관리자 비밀번호를 API에 전달하지 않는다.
+- 개발 연결 풀은 최대 8개, 연결 대기 5초, 검증 대기 1초다. 이 PC의 검증 설정이며 운영 부하 기준으로 확정한 값이 아니다.
+- 공개 응답은 v3다. v4 자료·Flutter·계산 패키지는 변경하지 않는다.
+
+최초 준비는 신규 환경에서 **한 번만** 실행한다. 이미 준비된 환경에서는 다음 초기화 명령을 반복하지 않는다.
+
+```powershell
+python -B apps/api/tools/dev_server.py init --pg-bin 'C:\Program Files\PostgreSQL\15\bin'
+```
+
+초기화는 001→002→003→004→007, 은행 기준정보, 일반 사용자·금융 원천을 적재하고 기존 합성 코드의 verifier만 새 DB에서 활성화한다. 005/006 이행이나 테스트의 TRUNCATE를 사용하지 않는다. 사용자 설정은 기본 적재 규칙대로 빈 상태이며, B의 새로운 생활 흐름 사례로 자동 전환하지 않는다.
+
+시작 전에 현재 소스의 실행 JAR를 빌드한다. `start`는 해당 JAR를 개발 폴더로 복사하며, 이미 실행 중인 서버를 조용히 교체하지 않는다.
+
+```powershell
+node scripts/harness/run-api.mjs check
+python -B apps/api/tools/dev_server.py start
+python -B apps/api/tools/dev_server.py status
+```
+
+```powershell
+# API만 재시작한다. DB·키·활성 세션·저장값은 유지한다.
+python -B apps/api/tools/dev_server.py restart
+
+# 이 도구가 시작한 API와 전용 DB만 중지한다. 데이터 파일은 유지한다.
+python -B apps/api/tools/dev_server.py stop
+
+# 중지 후 같은 DB·키로 다시 시작한다.
+python -B apps/api/tools/dev_server.py start
+```
+
+현재 Windows 사용자 전용 ACL과 DPAPI로 `secrets.dpapi`를 보호한다. DB 비밀번호·코드/제한/cursor 키는 저장소·명령 인자·평문 설정 파일에 넣지 않는다. 초기 initdb 비밀번호 파일은 준비 직후 삭제한다. API에는 필요한 자식 환경값만 전달한다. 이 보호 파일은 다른 PC/Windows 계정의 복구 수단이 아니므로 임의 복사·키 재생성을 복구 절차로 사용하지 않는다.
+
+HTTP 예시는 **PC 내부 loopback 개발 확인 전용**이다. 모바일·팀원 기기는 이 주소로 접속할 수 없다. 원격 접속을 위해 bind 주소나 방화벽을 임의로 넓히지 않고 앞 절의 사설 접속·HTTPS를 별도로 준비한다. Windows 서비스·자동 시작은 등록하지 않는다.
+
+### 실제 개발 서버 검증
+
+```powershell
+python -B -m unittest discover -s apps/api/tests -p test_dev_server.py
+python -B apps/api/tools/dev_server.py verify
+```
+
+`verify`는 소유 표식과 DB 정체성을 확인한 뒤 실제 HTTP에서 세 계정 로그인·중복 로그인 거절·재확인·연결·100건 페이지·설정 저장·403/409·멱등·API 재시작·재로그인 보존과 DB를 함께 중지·재시작한 뒤의 원천·설정·세션·영수증 보존을 검사한다. 토큰은 메모리에만 두고 마지막에 로그아웃한다. 실행 중 해당 합성 계정을 앱에서 동시에 사용하지 않는다. 기존 활성 세션이 있으면 강제 종료하지 않고 검증을 중단한다.
+
+검증용 지출·모아둘 돈은 API로 논리 취소하고 변경 가능한 설정을 원복한다. 최초 미연결·빈 계좌 선택은 검증 뒤 연결된 상태와 검증 계좌 선택으로 남을 수 있으며 결과에 표시한다. 영수증·버전·취소 이력은 지우지 않는다. 금융 원천 지문은 전후 같아야 한다. 테스트 계정의 검증 상태 변경을 금융 원천 변경으로 처리하지 않는다.
+
+비민감 결과는 개발 폴더의 `verification.json`, 실행 로그는 `api.log`·`postgres.log`에 둔다. 검사 실패는 성공으로 바꾸지 않으며 기존 DB 초기화로 해결하지 않는다. 소유 경로를 확인할 수 없거나 초기 준비가 중단됐으면 도구는 재시작을 거절한다. 경로·로그를 확인한 뒤 중단된 새 환경을 보존하고 새 경로에 준비한다.
