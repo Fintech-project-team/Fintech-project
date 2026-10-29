@@ -1,0 +1,27 @@
+{
+  "id": "PAYSE-DEMO-DATA-AGREEMENT-20261029",
+  "role": "allocation",
+  "baseCommit": "8f5c325705fccb9186e73e069c3c123f3282611b",
+  "branch": "docs/allocation/demo-data-agreement",
+  "allowedPaths": [
+    "docs/demo/realism/README.md",
+    "docs/tasks/PAYSE-DEMO-DATA-AGREEMENT-20261029.json"
+  ],
+  "changePaths": [
+    "docs/demo/realism/README.md",
+    "docs/tasks/PAYSE-DEMO-DATA-AGREEMENT-20261029.json"
+  ],
+  "acceptance": [
+    "목적: 2026-10-29 혜연(B)·성현(A) 구두 합의를 문서에 남긴다(혜연 요청, A 동의). 기존 공통 더미는 유지하고 B의 생활 흐름 데이터를 별도 사례로 추가하며 기본 데모 데이터로 쓴다. 작업자 B, 범위는 더미 생성 스크립트와 결과 JSON뿐, 현재 데모알파·추후 베타·감마",
+    "범위 밖: 실제 사례 추가·생성기·결과 JSON·앱 코드·에셋 변경(별도 작업 명세로 진행), 그 밖의 API 코드·계약·DB·테스트",
+    "검증: 필수 검사(npm run verify) 통과"
+  ],
+  "readBefore": [
+    "docs/mvp-scope.md",
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/harness/COMMIT_PR_POLICY.md"
+  ]
+}

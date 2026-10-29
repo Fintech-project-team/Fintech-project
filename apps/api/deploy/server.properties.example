@@ -1,0 +1,28 @@
+# Copy to server.properties outside the source checkout; change installation values here.
+# Relative paths are resolved from the directory where java is started.
+spring.profiles.active=database,auth,finance
+# Required secret directory; missing directory or keys must fail startup.
+spring.config.import=configtree:./secrets/
+
+# Keep loopback until a separate network/TLS setup is reviewed.
+PAYSE_BIND_ADDRESS=127.0.0.1
+PAYSE_PORT=8080
+
+# Use an existing prepared database and a non-administrator runtime login.
+PAYSE_JDBC_URL=jdbc:postgresql://CHANGE_DB_HOST:5432/CHANGE_DB_NAME
+PAYSE_DB_USER=CHANGE_RUNTIME_USER
+# Pool values are development examples; set them for the target database budget.
+PAYSE_DB_MAX_POOL_SIZE=8
+PAYSE_DB_CONNECTION_TIMEOUT_MS=5000
+PAYSE_DB_VALIDATION_TIMEOUT_MS=1000
+
+# Must match the verifier key ID already prepared in the selected database.
+PAYSE_AUTH_CODE_KEY_ID=CHANGE_EXISTING_KEY_ID
+# Current API supports direct peer mode only; do not invent a proxy mode.
+PAYSE_AUTH_PEER_MODE=direct
+
+# No passwords or keys here. Required files in secrets/:
+# PAYSE_DB_PASSWORD
+# PAYSE_AUTH_CODE_KEY_BASE64
+# PAYSE_AUTH_LIMIT_KEY_BASE64
+# PAYSE_FINANCE_CURSOR_KEY_BASE64
