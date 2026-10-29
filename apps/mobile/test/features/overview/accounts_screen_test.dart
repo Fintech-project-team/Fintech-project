@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:payse/app/dev/dev_demo_accounts.dart';
 import 'package:payse/data/auth/auth_repository.dart';
@@ -129,6 +130,50 @@ Finder _inRow(String id, String text) => find.descendant(
   matching: find.text(text),
 );
 
+/// 2026-10-29: 화면에 그려진 계좌 줄 ID를 위에서부터 반환한다.
+List<String> _rowOrder(WidgetTester tester) {
+  final keys = [
+    for (final e
+        in find
+            .byWidgetPredicate(
+              (w) =>
+                  w.key is ValueKey<String> &&
+                  (w.key! as ValueKey<String>).value.startsWith('account-row-'),
+            )
+            .evaluate())
+      e.widget.key! as ValueKey<String>,
+  ];
+  keys.sort(
+    (a, b) => tester
+        .getRect(find.byKey(a))
+        .top
+        .compareTo(tester.getRect(find.byKey(b)).top),
+  );
+  return [for (final k in keys) k.value.substring('account-row-'.length)];
+}
+
+/// 2026-10-29: 금융사 머리 [names]를 위에서부터 정렬해 반환한다.
+List<String> _bankOrder(WidgetTester tester, List<String> names) =>
+    [...names]..sort(
+      (a, b) => tester
+          .getRect(find.text(a))
+          .top
+          .compareTo(tester.getRect(find.text(b)).top),
+    );
+
+const _banks = ['국민은행', '신한은행', '하나은행', '기업은행', '카카오뱅크'];
+
+/// 2026-10-29: 계좌 [id] 보조 줄 조각을 이어 붙인 글자를 반환한다.
+String _detail(WidgetTester tester, String id) => tester
+    .widgetList<Text>(
+      find.descendant(
+        of: find.byKey(ValueKey('account-detail-$id')),
+        matching: find.byType(Text),
+      ),
+    )
+    .map((t) => t.data)
+    .join();
+
 /// 2026-10-29: 계좌 [id]의 이름 바꾸기 시트를 연다.
 Future<void> _openRename(WidgetTester tester, String id) async {
   await tester.scrollUntilVisible(
@@ -167,10 +212,24 @@ void main() {
         reason: '계산에 포함할 계좌 바꾸기는 잔액 요약 바로 아래, 목록 위',
       );
       expect(
-        _inRow(_kbDemand, '····0001 · 월급 계좌 · 모아둘 돈 400,000원 · 카드 3장 결제'),
-        findsOneWidget,
+        _detail(tester, _kbDemand),
+        '····0001 · 모아둘 돈 400,000원 · 카드 3장 결제',
       );
-      expect(_inRow(_hanaDemand, '····0003 · 카드 1장 결제'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('account-salary-$_kbDemand')),
+        findsOneWidget,
+        reason: '월급 계좌는 이름 옆 라벨',
+      );
+      expect(
+        find.byKey(const ValueKey('account-salary-$_hanaDemand')),
+        findsNothing,
+      );
+      expect(_detail(tester, _hanaDemand), '····0003 · 카드 1장 결제');
+      expect(
+        tester.getSize(find.byKey(ValueKey('account-salary-$_kbDemand'))).width,
+        lessThan(100),
+        reason: '라벨은 글자 폭만큼만 차지',
+      );
       await tester.scrollUntilVisible(
         find.byKey(const ValueKey('account-excluded-$_kbDeposit')),
         120,
@@ -179,6 +238,13 @@ void main() {
       expect(
         find.byKey(const ValueKey('account-excluded-$_kbDeposit')),
         findsOneWidget,
+      );
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey('account-excluded-$_kbDeposit')))
+            .width,
+        lessThan(120),
+        reason: '계산에서 제외 라벨은 글자 폭만큼만 차지',
       );
       expect(
         find.byKey(const ValueKey('account-excluded-$_shinhanSavings')),
@@ -192,6 +258,53 @@ void main() {
         tester.getSize(find.byKey(const ValueKey('account-rename-$_kbDemand'))),
         const Size(48, 48),
       );
+    });
+
+    testWidgets('banks with an included account come first; '
+        'included accounts lead inside a bank', (tester) async {
+      final (repo, snapshot) = await _connected();
+      await _pump(tester, repo, snapshot);
+      expect(_bankOrder(tester, _banks), [
+        '국민은행',
+        '하나은행',
+        '기업은행',
+        '카카오뱅크',
+        '신한은행',
+      ], reason: '모두 제외한 신한은행은 뒤로, 나머지는 데이터 순서');
+      expect(_rowOrder(tester), [
+        _kbDemand,
+        _kbDeposit,
+        _hanaDemand,
+        _ibkDemand,
+        _kakaoDemand,
+        _shinhanSavings,
+      ]);
+    });
+
+    testWidgets('inside a mixed bank the included account moves up', (
+      tester,
+    ) async {
+      final (repo, snapshot) = await _connected();
+      final saved = await repo.selectAccounts(
+        [_kbDeposit, _hanaDemand, _ibkDemand, _kakaoDemand],
+        WriteContext(
+          expectedDataVersion: snapshot.dataVersion,
+          ruleVersion: snapshot.ruleVersion,
+          idempotencyKey: 'swap',
+        ),
+      );
+      await _pump(
+        tester,
+        repo,
+        FinancialSnapshot.fromJson(
+          (saved as FinancialOk<WriteSuccess>).value.snapshot,
+        ),
+      );
+      expect(_rowOrder(tester).take(2), [
+        _kbDeposit,
+        _kbDemand,
+      ], reason: '데이터 순서는 입출금→정기예금이지만 포함한 정기예금이 먼저');
+      expect(_bankOrder(tester, _banks).first, '국민은행');
     });
 
     testWidgets('a row itself opens nothing in 29-1', (tester) async {
@@ -237,12 +350,14 @@ void main() {
       expect(find.text('3/12'), findsOneWidget);
       expect(_saveEnabled(tester), isTrue);
 
+      final before = _rowOrder(tester);
       await tester.tap(find.byKey(const ValueKey('rename-save')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('rename-field')), findsNothing);
       expect(find.text('계좌 이름을 바꿨어요.'), findsOneWidget);
+      expect(_rowOrder(tester), before, reason: '이름만 바꾸면 순서 그대로');
       expect(_inRow(_hanaDemand, '생활비'), findsOneWidget);
-      expect(_inRow(_hanaDemand, '생활비 통장 ····0003 · 카드 1장 결제'), findsOneWidget);
+      expect(_detail(tester, _hanaDemand), '생활비 통장 ····0003 · 카드 1장 결제');
     });
 
     testWidgets('clearing a saved name reverts to the original', (
@@ -268,7 +383,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('원래 이름으로 되돌렸어요.'), findsOneWidget);
       expect(_inRow(_hanaDemand, '생활비 통장'), findsOneWidget);
-      expect(_inRow(_hanaDemand, '····0003 · 카드 1장 결제'), findsOneWidget);
+      expect(_detail(tester, _hanaDemand), '····0003 · 카드 1장 결제');
     });
 
     testWidgets('input rules: specials only, blocked letters, 12 graphemes', (
@@ -400,6 +515,9 @@ void main() {
     testWidgets('leaving after a change asks; saving updates the tab', (
       tester,
     ) async {
+      await (FontLoader('Pretendard')
+            ..addFont(rootBundle.load('assets/fonts/Pretendard-SemiBold.otf')))
+          .load();
       final (repo, snapshot) = await _connected();
       await _pump(tester, repo, snapshot);
       await tester.tap(find.byKey(const ValueKey('accounts-change-selection')));
@@ -418,6 +536,12 @@ void main() {
         find.byKey(const ValueKey('selection-leave-dialog')),
         findsOneWidget,
       );
+      final leave = tester.getRect(
+        find.byKey(const ValueKey('selection-leave')),
+      );
+      final keep = tester.getRect(find.byKey(const ValueKey('selection-keep')));
+      expect(leave.top, keep.top, reason: '두 버튼은 한 줄에 나란히');
+      expect(leave.right, lessThan(keep.left), reason: '왼쪽 나가기, 오른쪽 계속 고르기');
       await tester.tap(find.byKey(const ValueKey('selection-keep')));
       await tester.pumpAndSettle();
       expect(find.byType(AccountSelectScreen), findsOneWidget);
@@ -430,6 +554,76 @@ void main() {
         find.byKey(const ValueKey('account-excluded-$_kbDeposit')),
         findsNothing,
       );
+    });
+
+    testWidgets('the selection screen shows the saved account name', (
+      tester,
+    ) async {
+      final (repo, snapshot) = await _connected();
+      final renamed = await repo.updateAccountNickname(
+        _hanaDemand,
+        '생활비',
+        WriteContext(
+          expectedDataVersion: snapshot.dataVersion,
+          ruleVersion: snapshot.ruleVersion,
+          idempotencyKey: 'rename',
+        ),
+      );
+      await _pump(
+        tester,
+        repo,
+        FinancialSnapshot.fromJson(
+          (renamed as FinancialOk<WriteSuccess>).value.snapshot,
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('accounts-change-selection')));
+      await tester.pumpAndSettle();
+      final row = find.byKey(const ValueKey('account-$_hanaDemand'));
+      expect(
+        find.descendant(of: row, matching: find.text('생활비')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: row, matching: find.text('하나은행 생활비 통장 ····0003')),
+        findsOneWidget,
+        reason: '바꾼 이름 아래에 원래 상품명',
+      );
+    });
+
+    testWidgets('rows stay put while choosing; the tab reorders after saving', (
+      tester,
+    ) async {
+      final (repo, snapshot) = await _connected();
+      await _pump(tester, repo, snapshot);
+      expect(_bankOrder(tester, _banks).last, '신한은행');
+      await tester.tap(find.byKey(const ValueKey('accounts-change-selection')));
+      await tester.pumpAndSettle();
+      final row = find.byKey(const ValueKey('account-$_shinhanSavings'));
+      await tester.scrollUntilVisible(
+        row,
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      final top = tester.getRect(row).top;
+      await tester.tap(row);
+      await tester.pump();
+      expect(tester.getRect(row).top, top, reason: '고르는 동안 행이 움직이지 않음');
+
+      await tester.tap(find.text('이 계좌로 계산하기'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AccountSelectScreen), findsNothing);
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('accounts-meta')),
+        -120,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(_bankOrder(tester, _banks), [
+        '국민은행',
+        '신한은행',
+        '하나은행',
+        '기업은행',
+        '카카오뱅크',
+      ], reason: '저장 뒤 신한은행에 포함 계좌가 생겨 데이터 순서 자리로');
     });
 
     testWidgets('leaving after a change can discard it', (tester) async {

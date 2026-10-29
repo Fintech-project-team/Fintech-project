@@ -98,7 +98,10 @@ void main() {
       await tester.scrollUntilVisible(
         find.byKey(const ValueKey('account-rename-$_hanaDemand')),
         120,
-        scrollable: find.byType(Scrollable).last,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('accounts-list')),
+          matching: find.byType(Scrollable),
+        ),
       );
       await tester.tap(
         find.byKey(const ValueKey('account-rename-$_hanaDemand')),
@@ -117,9 +120,12 @@ void main() {
       );
 
       await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('accounts-change-selection')),
+        find.byKey(const ValueKey('accounts-meta')),
         -120,
-        scrollable: find.byType(Scrollable).last,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('accounts-list')),
+          matching: find.byType(Scrollable),
+        ),
       );
       await tester.tap(find.byKey(const ValueKey('accounts-change-selection')));
       await tester.pumpAndSettle();
@@ -135,7 +141,10 @@ void main() {
       await tester.scrollUntilVisible(
         find.byKey(const ValueKey('accounts-meta')),
         -120,
-        scrollable: find.byType(Scrollable).last,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('accounts-list')),
+          matching: find.byType(Scrollable),
+        ),
       );
       expect(find.text('계산에 포함한 계좌 5개 · 10월 19일 12:00 기준'), findsOneWidget);
 

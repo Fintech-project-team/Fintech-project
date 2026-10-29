@@ -996,9 +996,10 @@ class AccountSelectScreen extends StatelessWidget {
           final balance = a.balanceKrw;
           return SelectionListRow(
             key: ValueKey('account-${a.accountId}'),
-            title: a.productName,
+            title: a.nickname ?? a.productName,
             subtitle: [
               '${institutionName(snapshot, a.institutionCode)} '
+                  '${a.nickname != null ? '${a.productName} ' : ''}'
                   '····${a.maskedNumber.substring(a.maskedNumber.length - 4)}',
               if (controller.reservesOf(a.accountId).isNotEmpty) '모아둘 돈 있음',
             ].join(' · '),
@@ -1780,14 +1781,16 @@ class _StatusLabel extends StatelessWidget {
       key: const ValueKey('status-label'),
       constraints: const BoxConstraints(minHeight: 22),
       padding: const EdgeInsets.symmetric(horizontal: PayseSpace.x2),
-      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: PayseColors.surfaceMuted,
         borderRadius: BorderRadius.circular(PayseRadius.sm),
       ),
-      child: Text(
-        text,
-        style: PayseTypography.caption.copyWith(fontWeight: FontWeight.w500),
+      child: Align(
+        widthFactor: 1,
+        child: Text(
+          text,
+          style: PayseTypography.caption.copyWith(fontWeight: FontWeight.w500),
+        ),
       ),
     );
   }

@@ -85,7 +85,8 @@ class AccountsScreen extends StatelessWidget {
     if (next != null) w.onSnapshot(next);
   }
 
-  /// 2026-10-29: 잔액 요약·버튼·금융사별 계좌 목록을 반환한다.
+  /// 2026-10-29: 잔액 요약·버튼·금융사별 계좌 목록을 반환한다. 계산 포함 계좌가 있는 금융사를 먼저, 묶음 안에서는
+  /// 포함 계좌를 먼저 두고 나머지는 데이터 순서를 따른다.
   @override
   Widget build(BuildContext context) {
     final accounts = snapshot.accounts ?? const <Account>[];
@@ -97,11 +98,16 @@ class AccountsScreen extends StatelessWidget {
         (
           name: i.name,
           accounts: [
-            for (final a in accounts)
-              if (a.institutionCode == i.code) a,
+            for (final included in [true, false])
+              for (final a in accounts)
+                if (a.institutionCode == i.code && a.included == included) a,
           ],
         ),
     ].where((g) => g.accounts.isNotEmpty);
+    final ordered = [
+      ...groups.where((g) => g.accounts.first.included),
+      ...groups.where((g) => !g.accounts.first.included),
+    ];
     return SafeArea(
       bottom: false,
       child: ListView(
@@ -202,7 +208,7 @@ class AccountsScreen extends StatelessWidget {
           ),
           const SizedBox(height: PayseSpace.x6),
           const Divider(height: 1, color: PayseColors.dividerSection),
-          for (final g in groups) ...[
+          for (final g in ordered) ...[
             const SizedBox(height: PayseSpace.x3),
             Container(
               constraints: const BoxConstraints(minHeight: 44),
@@ -223,8 +229,8 @@ class AccountsScreen extends StatelessWidget {
   }
 }
 
-/// 2026-10-29: 계좌 한 줄. 이름(별명이 있으면 별명) → 보조 줄(별명이면 원래 이름, 끝 4자리, 월급 계좌, 모아둘 돈,
-/// 결제 카드, 계산에서 제외) … 잔액 · 연필(48×48). 행 자체는 누를 수 없다.
+/// 2026-10-29: 계좌 한 줄. 이름(별명이 있으면 별명)·월급 계좌 라벨 → 보조 줄(별명이면 원래 이름, 끝 4자리, 모아둘 돈,
+/// 결제 카드. 조각 중간에서 줄을 바꾸지 않음)·계산에서 제외 라벨 … 잔액 · 연필(48×48). 행 자체는 누를 수 없다.
 class _AccountRow extends StatelessWidget {
   /// 2026-10-29: Snapshot [snapshot]의 계좌 [account], 이름 바꾸기 [onRename]으로 만든다.
   const _AccountRow({
@@ -251,7 +257,6 @@ class _AccountRow extends StatelessWidget {
     ];
     return [
       '${a.nickname != null ? '${a.productName} ' : ''}····${lastFour(a.maskedNumber)}',
-      if (snapshot.settings?.salary.salaryAccountId == a.accountId) '월급 계좌',
       if (reserves.length == 1) '모아둘 돈 ${formatKrw(reserves.single.amountKrw)}',
       if (reserves.length > 1) '모아둘 돈 ${reserves.length}건',
       if (cards.isNotEmpty) '카드 ${cards.length}장 결제',
@@ -268,6 +273,8 @@ class _AccountRow extends StatelessWidget {
         : PayseColors.textPrimary;
     final name = a.nickname ?? a.productName;
     final balance = a.balanceKrw;
+    final salary = snapshot.settings?.salary.salaryAccountId == a.accountId;
+    final details = _details();
     return Container(
       constraints: const BoxConstraints(minHeight: 64),
       padding: const EdgeInsets.symmetric(vertical: PayseSpace.x3),
@@ -280,47 +287,50 @@ class _AccountRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  name,
-                  style: TextStyle(
-                    fontSize: 15,
-                    height: 1.47,
-                    fontWeight: FontWeight.w600,
-                    color: color,
-                  ),
-                ),
                 Wrap(
                   spacing: PayseSpace.x2,
                   runSpacing: PayseSpace.x1,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
-                      _details().join(' · '),
-                      style: PayseTypography.caption,
+                      name,
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 1.47,
+                        fontWeight: FontWeight.w600,
+                        color: color,
+                      ),
                     ),
-                    if (excluded)
-                      Container(
-                        key: ValueKey('account-excluded-${a.accountId}'),
-                        constraints: const BoxConstraints(minHeight: 22),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: PayseSpace.x2,
-                        ),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: PayseColors.surfaceMuted,
-                          borderRadius: BorderRadius.circular(PayseRadius.sm),
-                        ),
-                        child: const Text(
-                          '계산에서 제외',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: PayseColors.textSecondary,
-                          ),
-                        ),
+                    if (salary)
+                      _Tag(
+                        '월급 계좌',
+                        key: ValueKey('account-salary-${a.accountId}'),
+                        background: PayseColors.moonYellowSoft,
+                        color: PayseColors.textPrimary,
                       ),
                   ],
                 ),
+                Wrap(
+                  key: ValueKey('account-detail-${a.accountId}'),
+                  runSpacing: PayseSpace.x1,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    for (final (i, part) in details.indexed)
+                      Text(
+                        i == 0 ? part : ' · $part',
+                        style: PayseTypography.caption,
+                      ),
+                  ],
+                ),
+                if (excluded) ...[
+                  const SizedBox(height: PayseSpace.x1),
+                  _Tag(
+                    '계산에서 제외',
+                    key: ValueKey('account-excluded-${a.accountId}'),
+                    background: PayseColors.surfaceMuted,
+                    color: PayseColors.textSecondary,
+                  ),
+                ],
               ],
             ),
           ),
@@ -348,6 +358,45 @@ class _AccountRow extends StatelessWidget {
             icon: const Icon(Icons.edit_outlined, size: 20),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 2026-10-29: 계좌 줄에 붙는 상태 라벨(높이 22·좌우 8·반경 8, 13/500). 글자 폭만큼만 차지한다.
+class _Tag extends StatelessWidget {
+  /// 2026-10-29: 글자 [text], 바탕 [background], 글자색 [color]로 만든다.
+  const _Tag(
+    this.text, {
+    super.key,
+    required this.background,
+    required this.color,
+  });
+
+  final String text;
+  final Color background;
+  final Color color;
+
+  /// 2026-10-29: 라벨을 반환한다.
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 22),
+      padding: const EdgeInsets.symmetric(horizontal: PayseSpace.x2),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(PayseRadius.sm),
+      ),
+      child: Align(
+        widthFactor: 1,
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: color,
+          ),
+        ),
       ),
     );
   }
