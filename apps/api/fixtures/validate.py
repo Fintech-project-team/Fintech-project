@@ -15,6 +15,7 @@ from pathlib import Path
 from uuid import UUID
 
 from identity_contract import validate_server_seeds
+from statement_items import validate_statement_items
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from reference_data.banks import load_bank_directory, check_fixture_banks
@@ -68,7 +69,7 @@ def validate_snapshot(snapshot: dict) -> None:
     require(ROOT_KEYS<=snapshot.keys(),'missing snapshot keys')
     require(not(set(snapshot)-ROOT_KEYS-FINANCIAL_KEYS),'unknown snapshot keys')
     uuid(snapshot['userId']);owner=snapshot['userId']
-    require(snapshot['schemaVersion']=='PAYSE-DRAFT-3' and snapshot['ruleVersion']=='PAYSE-CALC-1' and snapshot['currency']=='KRW','unsupported contract')
+    require(snapshot['schemaVersion'] in ('PAYSE-DRAFT-3', 'PAYSE-DRAFT-4') and snapshot['ruleVersion']=='PAYSE-CALC-1' and snapshot['currency']=='KRW','unsupported contract')
     require(isinstance(snapshot['dataVersion'],str) and re.fullmatch('[1-9][0-9]*',snapshot['dataVersion']) and int(snapshot['dataVersion'])<=9223372036854775807,'bad dataVersion')
     as_of=instant(snapshot['asOf']);today=as_of.astimezone(SEOUL).date()
     institutions={i['code']:i for i in snapshot['institutions']}
@@ -142,6 +143,10 @@ def validate_snapshot(snapshot: dict) -> None:
         for field in ('purchaseDate','withdrawalDate','refundDate','bookingDate'):
             if transaction[field] is not None:
                 require(day(transaction[field])<=today,'future actual transaction')
+        cancellation_date = transaction.get('cancellationDate')
+        if cancellation_date is not None:
+            require(transaction['recordKind'] == 'card_cancellation', 'cancellation date kind')
+            require(day(cancellation_date) <= today, 'future cancellation date')
         if transaction['occurredAt'] is None:
             require(transaction['occurredAtBasis'] is None,'invented time basis')
         else:
@@ -149,6 +154,8 @@ def validate_snapshot(snapshot: dict) -> None:
             basis=transaction['occurredAtBasis'];require(basis in ('purchase','booking','withdrawal','refund','cancellation'),'time basis')
             if basis!='cancellation':
                 require(transaction[basis+'Date'] is not None and moment.astimezone(SEOUL).date()==day(transaction[basis+'Date']),'timestamp/date mismatch')
+            if cancellation_date is not None:
+                require(basis == 'cancellation' and moment.astimezone(SEOUL).date() == day(cancellation_date), 'cancellation timestamp/date mismatch')
         original_id=transaction['originalTransactionId']
         if original_id:
             require(original_id!=transaction['transactionId'] and (original_id in transactions or original_id in resolved),'dangling original')
@@ -169,6 +176,13 @@ def validate_snapshot(snapshot: dict) -> None:
             require(day(statement['periodStart'])<=day(statement['periodEnd']),'statement range')
         if statement['dueDate']:
             day(statement['dueDate'])
+    if snapshot['schemaVersion'] == 'PAYSE-DRAFT-4':
+        validate_statement_items(snapshot['statements'], transactions, owner, snapshot['sourceVersion'])
+        for statement in snapshot['statements']:
+            for item in statement['items']:
+                require(item['purchaseDate'] is None or day(item['purchaseDate']) <= today, 'future statement item purchase')
+    else:
+        require(all('items' not in statement for statement in snapshot['statements']), 'v4 items in v3 source')
     relation_keys=set()
     for relation in snapshot['transactionRelations']:
         from_id,to_id=relation['fromId'],relation['toId'];require(from_id in transactions and to_id in transactions and from_id!=to_id and relation['evidenceRef'],'invalid relation')
@@ -305,7 +319,7 @@ def validate_snapshot(snapshot: dict) -> None:
         for transaction in snapshot['transactions']:
             if transaction['accountId' if kind=='account' else 'cardId']!=target:
                 continue
-            stamp=transaction['bookingDate'] if kind=='account' else transaction['purchaseDate'] or transaction['refundDate'] or (instant(transaction['occurredAt']).astimezone(SEOUL).date().isoformat() if transaction['occurredAt'] else None)
+            stamp=transaction['bookingDate'] if kind=='account' else transaction.get('cancellationDate') or transaction['purchaseDate'] or transaction['refundDate'] or (instant(transaction['occurredAt']).astimezone(SEOUL).date().isoformat() if transaction['occurredAt'] else None)
             if stamp:
                 require(day(stamp) in covered,'transaction outside covered range')
     require(len(target_keys)==len(accounts)+len(cards),'missing target coverage')
@@ -325,13 +339,16 @@ def validate_directory(path: Path) -> int:
         canonical=json.dumps(obj,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode('utf-8')
         require(hashlib.sha256(canonical).hexdigest()==digest,'fixture manifest mismatch: '+name)
     catalog=json.loads((path/'catalog.json').read_text(encoding='utf-8'))
-    require(manifest['fixtureVersion']==catalog['fixtureVersion']=='PAYSE-FIXTURE-3','unsupported fixture release')
+    releases = {'PAYSE-FIXTURE-3': 'PAYSE-DRAFT-3', 'PAYSE-FIXTURE-4': 'PAYSE-DRAFT-4'}
+    require(manifest['fixtureVersion'] == catalog['fixtureVersion'] and catalog['fixtureVersion'] in releases, 'unsupported fixture release')
+    require(catalog['schemaVersion'] == releases[catalog['fixtureVersion']], 'fixture release/schema mismatch')
     directory=load_bank_directory(path/'bank-directory.json')
     snapshots = {}
     for entry in catalog['cases']:
         require(entry['file'] in manifest['sha256'], 'catalog case missing from manifest')
         require(entry['id'] not in snapshots, 'duplicate catalog case ID')
         snapshot = json.loads((path/entry['file']).read_text(encoding='utf-8'))
+        require(snapshot['schemaVersion'] == catalog['schemaVersion'], 'mixed fixture release')
         validate_snapshot(snapshot)
         check_fixture_banks(snapshot,directory)
         snapshots[entry['id']] = snapshot

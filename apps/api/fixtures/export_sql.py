@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from validate import require, validate_directory
+from statement_items import legacy_items
 from reference_data.institutions import institution_rows
 
 def literal(value) -> str:
@@ -59,11 +60,19 @@ def financial_rows(snapshot, seed, connected=False):
             add_row('transaction_references',{'user_id':owner,'transaction_id':ref['transactionId'],'resolution':ref['status'],'reason':ref['reason']})
     transaction_fields={'id':'transactionId','source_ref':'sourceRef','source_version':'sourceVersion','account_id':'accountId','card_id':'cardId','record_kind':'recordKind','amount_krw':'amountKRW','direction':'direction','status':'status','merchant_name':'merchantName','description':'description','purchase_date':'purchaseDate','withdrawal_date':'withdrawalDate','refund_date':'refundDate','booking_date':'bookingDate','occurred_at':'occurredAt','occurred_at_basis':'occurredAtBasis','reflection_reason':'reflectionReason','original_transaction_id':'originalTransactionId','payse_transaction_type':'payseTransactionType','installment_current':'installmentCurrent','installment_total':'installmentTotal'}
     for transaction in transactions:
-        add_row('financial_transactions',{'user_id':owner,**{column:transaction[field] for column,field in transaction_fields.items()}})
+        add_row('financial_transactions',{'user_id':owner,**{column:transaction[field] for column,field in transaction_fields.items()},'cancellation_date':transaction.get('cancellationDate')})
     for statement in snapshot['statements']:
         add_row('card_statements',{'id':statement['statementId'],'user_id':owner,'source_ref':statement['sourceRef'],'source_version':statement['sourceVersion'],'card_id':statement['cardId'],'amount_krw':statement['amountKRW'],'due_date':statement['dueDate'],'period_start':statement['periodStart'],'period_end':statement['periodEnd'],'detail_completeness':statement['detailCompleteness']})
-        for transaction_id in statement['includedTransactionRefs']:
-            add_row('statement_items',{'user_id':owner,'statement_id':statement['statementId'],'card_id':statement['cardId'],'transaction_id':transaction_id})
+        # v3는 명시적인 저장 어댑터로 식별만 전환한다. 미상 청구 금액은 계산하지 않는다.
+        items = statement['items'] if snapshot['schemaVersion'] == 'PAYSE-DRAFT-4' else legacy_items(statement)
+        item_fields = {'id': 'itemId', 'source_ref': 'sourceRef', 'source_version': 'sourceVersion',
+            'transaction_id': 'transactionId', 'label': 'label', 'merchant_name': 'merchantName',
+            'purchase_date': 'purchaseDate', 'original_used_amount_krw': 'originalUsedAmountKRW',
+            'billed_principal_krw': 'billedPrincipalKRW', 'fee_or_adjustment_amount_krw': 'feeOrAdjustmentAmountKRW',
+            'billed_amount_krw': 'billedAmountKRW', 'installment_months': 'installmentMonths', 'installment_round': 'installmentRound'}
+        for item in items:
+            add_row('statement_items', {'user_id': owner, 'statement_id': statement['statementId'],
+                'card_id': statement['cardId'], **{column: item[field] for column, field in item_fields.items()}})
     for relation in snapshot['transactionRelations']:
         add_row('transaction_relations',{'user_id':owner,'kind':relation['kind'],'from_id':relation['fromId'],'to_id':relation['toId'],'evidence_ref':relation['evidenceRef']})
     add_row('user_attributes',{'user_id':owner,'salary_day':None,'salary_amount_krw':None,'salary_account_id':None,'card_plan_overrides':[]})

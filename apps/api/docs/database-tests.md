@@ -94,3 +94,19 @@ python -B apps/api/database/test_session_service.py --pg-bin "C:\Program Files\P
 검증은 세션 한 개만 생성되는 동시 로그인, 기존 세션 우선, 동일 세션 재확인, 다른 사용자 자격 거절, 로그아웃·조회 경합, IP 선행 커밋·실패 누적과 전체 롤백, 권한·원천 보존을 구분한다. 테스트 준비는 새 UUID와 검증된 관계를 사용하며 제품 더미의 표시명이나 첫 행에 의존하지 않는다.
 
 일반 Gradle 검사에서 전용 DB 환경이 없으면 실제 JDBC 검사는 SKIPPED다. 네이티브 실행기의 결과를 함께 확인하며 HTTP API·모바일 통합이 통과한 것으로 기록하지 않는다. 운영 시드의 인증 코드를 자동 활성화하지 않는다.
+
+## 취소 날짜와 원거래 JOIN
+
+`python -B apps/api/database/test_cancellation_date.py --pg-bin <PostgreSQL bin> --work-dir <새 폴더>`는 새 소유 클러스터에서 신규 001·기존 DB용 005의 동일 제약, 기존 행 보존, 재실행 거절, 중간 실패 롤백을 검사한다. 실제 DB 주소를 받지 않는다. 과거 구조/급여 이행 검사는 frozen 001_common_storage.v2.sql 및 테스트 전용 legacy_seed.py의 175컬럼 입력을 사용한다. legacy_seed는 운영 적재 경로가 아니다.
+
+기존 test_session_service.py는 원거래 LEFT JOIN JDBC 검사도 함께 실행한다. prepare_links.py는 동적 UUID·소유자·카드 관계를 확인해 새 테스트 자료만 준비한다. 원거래 없음/미확보/기관 제한·타 사용자·트랜잭션 문맥을 구분하며 금융 원천의 사용자별 불변도 확인한다. 이 내부 조회 검사를 금융 조회 HTTP 구현 완료로 기록하지 않는다.
+
+## 청구 항목 저장과 기존 연결 이행
+
+`python -B apps/api/database/test_statement_storage.py --pg-bin <PostgreSQL bin> --work-dir <새 폴더>`는 소유한 새 임시 클러스터에서 신규 001·기존 공통 DB용 006을 검사한다. 기존 서비스 DB에 접속하지 않는다. 검사 범위는 signed 조정/청구액·nullable 거래, 기존 비음수 금액 규칙, 소유자/카드/원천 버전 FK·RLS, 동일 구매의 여러 항목, 구 행·관계 보존, 재실행 거절, 실패 시 전체 롤백이다.
+
+신규 001에는 취소 날짜와 청구 항목 구조가 함께 포함된다. 기존 DB의 명시적 전환 순서는 공통 구조/급여 회차 이행 → 005 취소 날짜 → 006 청구 항목이다. 새 001에 005/006을 다시 실행하지 않는다. 006은 사용자·거래·청구 관계만 새 항목 ID로 옮기고 새 금액/표시/회차는 null로 유지한다. 원천 버전과 schemaVersion을 자동 변경하지 않는다. 실제 서비스 DB 이행은 별도 작업이다.
+
+`export_sql.py`는 v3 참조를 동일한 식별 매핑으로 명시 변환하거나 v4 항목을 그대로 저장한다. 과거 175컬럼 회귀에 쓰는 `legacy_seed.py`는 v3 자료만 허용하고 당시 네 청구 연결 컬럼을 투영한다. 신규 구조의 필드를 과거 이행 입력에 섞지 않는다.
+
+원천 검증·생성 재현·공개 제한/다음 페이지/구버전 반례는 `python -B -m unittest discover -s apps/api/tests`에 포함된다. 이는 Flutter 실행이나 금융 조회 HTTP 제공 완료를 뜻하지 않는다. 실제 v4 공동 전환은 [인계 기록](history/2026-10-29-statement-items-handoff.md)을 따른다.

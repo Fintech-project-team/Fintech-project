@@ -18,6 +18,11 @@
         "allocationUnreleasedKRW": 60000,
         "emptyAccountId": "1ce9128d-d667-5bfc-bed0-949a571c78f5"
       },
+      "preparedReversalIds": [
+        "2b03e5fd-9d96-540a-be2f-f07426f76113",
+        "a818ca93-3a95-5b82-83f6-cb266c29a02f",
+        "acb2a8fe-b9b5-51c5-9389-17f795c8b8c9"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "6069b37a-abf5-56fc-8bf0-153f5301fd1c",
@@ -58,6 +63,11 @@
       "expected": {
         "mustNotShareIdsWith": "alpha-ready"
       },
+      "preparedReversalIds": [
+        "0ef082e7-8517-555c-ad0a-01553553e3fc",
+        "18f76751-d838-5119-9cf6-e98c0cc4e8b0",
+        "a431fa21-2ceb-527b-8fdb-971f1c629c51"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "1d383795-5b7c-56f9-9535-ff418040183d",
@@ -99,7 +109,8 @@
         "financialKeysAbsent": true,
         "coverage": [],
         "homeCalculated": false
-      }
+      },
+      "preparedReversalIds": []
     },
     {
       "id": "salary-wait",
@@ -109,6 +120,11 @@
         "confirmation": "unknown",
         "pendingObligationsRetained": true
       },
+      "preparedReversalIds": [
+        "2b03e5fd-9d96-540a-be2f-f07426f76113",
+        "a818ca93-3a95-5b82-83f6-cb266c29a02f",
+        "acb2a8fe-b9b5-51c5-9389-17f795c8b8c9"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "6069b37a-abf5-56fc-8bf0-153f5301fd1c",
@@ -151,6 +167,11 @@
         "balanceIncrementKRW": 1000000,
         "compareTo": "salary-wait"
       },
+      "preparedReversalIds": [
+        "2b03e5fd-9d96-540a-be2f-f07426f76113",
+        "a818ca93-3a95-5b82-83f6-cb266c29a02f",
+        "acb2a8fe-b9b5-51c5-9389-17f795c8b8c9"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "6069b37a-abf5-56fc-8bf0-153f5301fd1c",
@@ -193,6 +214,11 @@
         "balanceIncrementKRW": 2000000,
         "compareTo": "salary-partial"
       },
+      "preparedReversalIds": [
+        "2b03e5fd-9d96-540a-be2f-f07426f76113",
+        "a818ca93-3a95-5b82-83f6-cb266c29a02f",
+        "acb2a8fe-b9b5-51c5-9389-17f795c8b8c9"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "6069b37a-abf5-56fc-8bf0-153f5301fd1c",
@@ -236,6 +262,11 @@
         "reserveAmountKRW": 400000,
         "sourceEventOnceOnly": true
       },
+      "preparedReversalIds": [
+        "2b03e5fd-9d96-540a-be2f-f07426f76113",
+        "a818ca93-3a95-5b82-83f6-cb266c29a02f",
+        "acb2a8fe-b9b5-51c5-9389-17f795c8b8c9"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "6069b37a-abf5-56fc-8bf0-153f5301fd1c",
@@ -278,6 +309,11 @@
         "refundConsumptionKRW": -80000,
         "refundDate": "2026-10-05"
       },
+      "preparedReversalIds": [
+        "2b03e5fd-9d96-540a-be2f-f07426f76113",
+        "a818ca93-3a95-5b82-83f6-cb266c29a02f",
+        "acb2a8fe-b9b5-51c5-9389-17f795c8b8c9"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "6069b37a-abf5-56fc-8bf0-153f5301fd1c",
@@ -319,6 +355,11 @@
         "originalReferenceRetained": true,
         "interpretationComplete": false
       },
+      "preparedReversalIds": [
+        "2b03e5fd-9d96-540a-be2f-f07426f76113",
+        "a818ca93-3a95-5b82-83f6-cb266c29a02f",
+        "acb2a8fe-b9b5-51c5-9389-17f795c8b8c9"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "6069b37a-abf5-56fc-8bf0-153f5301fd1c",
@@ -360,7 +401,12 @@
         "targetId": "4021635f-1b2c-534d-b5b6-9680b3c8d5f2",
         "missingMonth": "2026-08",
         "annualComplete": false
-      }
+      },
+      "preparedReversalIds": [
+        "2b03e5fd-9d96-540a-be2f-f07426f76113",
+        "a818ca93-3a95-5b82-83f6-cb266c29a02f",
+        "acb2a8fe-b9b5-51c5-9389-17f795c8b8c9"
+      ]
     },
     {
       "id": "failed-card-history",
@@ -369,7 +415,11 @@
       "expected": {
         "failedTargetId": "fd516d5c-e977-564a-a0fe-1f8611b20cb0",
         "annualComplete": false
-      }
+      },
+      "preparedReversalIds": [
+        "a818ca93-3a95-5b82-83f6-cb266c29a02f",
+        "acb2a8fe-b9b5-51c5-9389-17f795c8b8c9"
+      ]
     },
     {
       "id": "unknown-card-schedule",
@@ -379,6 +429,11 @@
         "cardId": "0613de09-9a0b-5fa0-8502-a20b4bdd6a9a",
         "futureCardSimulationAllowed": false
       },
+      "preparedReversalIds": [
+        "2b03e5fd-9d96-540a-be2f-f07426f76113",
+        "a818ca93-3a95-5b82-83f6-cb266c29a02f",
+        "acb2a8fe-b9b5-51c5-9389-17f795c8b8c9"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "6069b37a-abf5-56fc-8bf0-153f5301fd1c",
@@ -423,6 +478,11 @@
         "reserveAmountKRW": 440000,
         "allocationUnreleasedKRW": 100000
       },
+      "preparedReversalIds": [
+        "2b03e5fd-9d96-540a-be2f-f07426f76113",
+        "a818ca93-3a95-5b82-83f6-cb266c29a02f",
+        "acb2a8fe-b9b5-51c5-9389-17f795c8b8c9"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "6069b37a-abf5-56fc-8bf0-153f5301fd1c",
@@ -464,6 +524,11 @@
         "originalTransactionId": "8058aeaa-2c70-5453-b6e9-8207e0e80204",
         "extraNetConsumptionKRW": 0
       },
+      "preparedReversalIds": [
+        "2b03e5fd-9d96-540a-be2f-f07426f76113",
+        "a818ca93-3a95-5b82-83f6-cb266c29a02f",
+        "acb2a8fe-b9b5-51c5-9389-17f795c8b8c9"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "6069b37a-abf5-56fc-8bf0-153f5301fd1c",
@@ -508,6 +573,11 @@
         "futureRevisionAmountKRW": 110000,
         "aprilIndividualAmountKRW": 120000
       },
+      "preparedReversalIds": [
+        "3caaedcb-8926-520c-adc1-fc1b373b629c",
+        "472048e7-742d-58e0-b44c-3df85d92a607",
+        "e14a5b98-f4d5-5cd2-807a-5e507408be4e"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "d308d10f-bb67-570f-bc55-9b15a6541546",
@@ -552,6 +622,11 @@
         "confirmation": "unknown",
         "transactionIds": []
       },
+      "preparedReversalIds": [
+        "2b03e5fd-9d96-540a-be2f-f07426f76113",
+        "a818ca93-3a95-5b82-83f6-cb266c29a02f",
+        "acb2a8fe-b9b5-51c5-9389-17f795c8b8c9"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "6069b37a-abf5-56fc-8bf0-153f5301fd1c",
@@ -593,6 +668,11 @@
         "compareTo": "salary-schedule-provided",
         "receiptEvidence": []
       },
+      "preparedReversalIds": [
+        "2b03e5fd-9d96-540a-be2f-f07426f76113",
+        "a818ca93-3a95-5b82-83f6-cb266c29a02f",
+        "acb2a8fe-b9b5-51c5-9389-17f795c8b8c9"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "6069b37a-abf5-56fc-8bf0-153f5301fd1c",
@@ -652,6 +732,11 @@
         },
         "expectationScope": "독립 Flutter 검사 기대값; 서버 응답·서버 계산 결과가 아님"
       },
+      "preparedReversalIds": [
+        "2b03e5fd-9d96-540a-be2f-f07426f76113",
+        "a818ca93-3a95-5b82-83f6-cb266c29a02f",
+        "acb2a8fe-b9b5-51c5-9389-17f795c8b8c9"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "6069b37a-abf5-56fc-8bf0-153f5301fd1c",
@@ -701,6 +786,11 @@
         "selectedBalanceKRW": 2000000,
         "scope": "시나리오 검증 메타데이터이며 공개 Snapshot·LLM 입력에 포함하지 않음"
       },
+      "preparedReversalIds": [
+        "2b03e5fd-9d96-540a-be2f-f07426f76113",
+        "a818ca93-3a95-5b82-83f6-cb266c29a02f",
+        "acb2a8fe-b9b5-51c5-9389-17f795c8b8c9"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "6069b37a-abf5-56fc-8bf0-153f5301fd1c",
@@ -754,6 +844,11 @@
         "selectedBalanceKRW": 2079800,
         "scope": "시나리오 검증 메타데이터이며 공개 Snapshot·LLM 입력에 포함하지 않음"
       },
+      "preparedReversalIds": [
+        "0ef082e7-8517-555c-ad0a-01553553e3fc",
+        "18f76751-d838-5119-9cf6-e98c0cc4e8b0",
+        "a431fa21-2ceb-527b-8fdb-971f1c629c51"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "1d383795-5b7c-56f9-9535-ff418040183d",
@@ -804,6 +899,11 @@
         "selectedBalanceKRW": 5000000,
         "scope": "시나리오 검증 메타데이터이며 공개 Snapshot·LLM 입력에 포함하지 않음"
       },
+      "preparedReversalIds": [
+        "3caaedcb-8926-520c-adc1-fc1b373b629c",
+        "472048e7-742d-58e0-b44c-3df85d92a607",
+        "e14a5b98-f4d5-5cd2-807a-5e507408be4e"
+      ],
       "ledgerOpeningBalances": [
         {
           "accountId": "d308d10f-bb67-570f-bc55-9b15a6541546",
@@ -844,8 +944,8 @@
       "userId": "f0a4be6c-01d7-53eb-ab2c-74675b22fd8c",
       "beforeCase": "alpha-ready",
       "afterCase": "alpha-shock",
-      "sourceVersionBefore": "fixture-3:alpha:2026-10-19:base",
-      "sourceVersionAfter": "fixture-3:alpha:2026-10-19:base:shock"
+      "sourceVersionBefore": "fixture-3:alpha:2026-10-19:base:reversals-1:labels-1",
+      "sourceVersionAfter": "fixture-3:alpha:2026-10-19:base:shock:reversals-1:labels-1"
     }
   ],
   "localVectors": [

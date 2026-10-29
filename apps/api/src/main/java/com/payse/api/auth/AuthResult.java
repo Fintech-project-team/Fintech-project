@@ -42,8 +42,9 @@ public sealed interface AuthResult {
      * 기존 인증 오류 의미만 표현한다. 비활성·기존 세션·자격 불일치는 구분하지 않는다.
      * @created 2026-10-26
      * @usedBy AuthResult.Failure, AuthService
+     * @modified 2026-10-28 - JSON 구문·본문 상한 오류를 자격 실패와 구분
      */
-    enum Reason { INVALID_INPUT, AUTH_REJECTED, SESSION_INVALID, RATE_LIMITED }
+    enum Reason { INVALID_INPUT, INVALID_JSON, REQUEST_TOO_LARGE, AUTH_REJECTED, SESSION_INVALID, RATE_LIMITED }
 
     /**
      * 실패 제한 기록까지 커밋된 업무 결과다. 저장 장애는 AuthStoreException으로 구분한다.

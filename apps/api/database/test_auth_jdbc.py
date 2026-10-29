@@ -15,6 +15,7 @@ import uuid
 import xml.etree.ElementTree as ET
 
 from auth_test_support import Cluster, PROCESS_FLAGS, quote
+from prepare_links import prepare_links
 
 
 DIRECTORY = Path(__file__).resolve().parent
@@ -54,6 +55,7 @@ def prepare_database(cluster):
     """2026-10-25: 격리 DB에 기존 스키마·두 사용자 관계·최소 권한 접속 역할을 준비한다.
 
     사용: main; 생성한 자격은 반환 환경에만 담고 디스크/출력에 기록하지 않는다.
+    수정 2026-10-29: 원거래 JOIN을 위한 연결·거래 관계 준비를 추가한다.
     """
     # 새 클러스터 안에만 테스트 DB를 만들고 현재 001/002를 적용한다.
     cluster.sql("CREATE DATABASE " + DATABASE + ";")
@@ -91,6 +93,7 @@ def prepare_database(cluster):
         """
         if cluster.sql(statement, DATABASE) != ["t"]:
             raise AssertionError("Generated JDBC fixture relationship was not unique and complete")
+        user.update(prepare_links(cluster, DATABASE, user))
     # 검토한 인증 SQL을 그대로 적용한 뒤 runtime 역할로 전환 가능한 테스트 로그인만 추가한다.
     cluster.load(DIRECTORY / "003_auth_access.sql", DATABASE)
     login = "payse_jdbc_" + uuid.uuid4().hex

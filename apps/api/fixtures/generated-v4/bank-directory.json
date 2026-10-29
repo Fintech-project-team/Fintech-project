@@ -1,0 +1,153 @@
+{
+  "directoryVersion": "PAYSE-KR-BANKS-20261023",
+  "countryCode": "KR",
+  "verifiedOn": "2026-10-23",
+  "scope": "domestic_commercial_regional_internet_special",
+  "sources": {
+    "bok": "https://www.bok.or.kr/portal/main/contents.do?menuNo=200580",
+    "fsc_internet": "https://www.fsc.go.kr/po010101/81348",
+    "citi_name": "https://www.citibank.co.kr/"
+  },
+  "banks": [
+    {
+      "code": "bank.woori",
+      "kind": "bank",
+      "name": "우리은행",
+      "category": "commercial",
+      "sourceRefs": ["bok"]
+    },
+    {
+      "code": "bank.sc",
+      "kind": "bank",
+      "name": "한국스탠다드차타드은행",
+      "category": "commercial",
+      "sourceRefs": ["bok"]
+    },
+    {
+      "code": "bank.kb",
+      "kind": "bank",
+      "name": "국민은행",
+      "category": "commercial",
+      "sourceRefs": ["bok"]
+    },
+    {
+      "code": "bank.citi",
+      "kind": "bank",
+      "name": "한국씨티은행",
+      "category": "commercial",
+      "sourceRefs": ["bok", "citi_name"]
+    },
+    {
+      "code": "bank.shinhan",
+      "kind": "bank",
+      "name": "신한은행",
+      "category": "commercial",
+      "sourceRefs": ["bok"]
+    },
+    {
+      "code": "bank.hana",
+      "kind": "bank",
+      "name": "하나은행",
+      "category": "commercial",
+      "sourceRefs": ["bok"]
+    },
+    {
+      "code": "bank.im",
+      "kind": "bank",
+      "name": "iM뱅크",
+      "category": "commercial",
+      "sourceRefs": ["bok"]
+    },
+    {
+      "code": "bank.kbank",
+      "kind": "bank",
+      "name": "케이뱅크",
+      "category": "internet",
+      "sourceRefs": ["bok", "fsc_internet"]
+    },
+    {
+      "code": "bank.kakao",
+      "kind": "bank",
+      "name": "카카오뱅크",
+      "category": "internet",
+      "sourceRefs": ["bok", "fsc_internet"]
+    },
+    {
+      "code": "bank.toss",
+      "kind": "bank",
+      "name": "토스뱅크",
+      "category": "internet",
+      "sourceRefs": ["bok", "fsc_internet"]
+    },
+    {
+      "code": "bank.gyeongnam",
+      "kind": "bank",
+      "name": "경남은행",
+      "category": "regional",
+      "sourceRefs": ["bok"]
+    },
+    {
+      "code": "bank.gwangju",
+      "kind": "bank",
+      "name": "광주은행",
+      "category": "regional",
+      "sourceRefs": ["bok"]
+    },
+    {
+      "code": "bank.busan",
+      "kind": "bank",
+      "name": "부산은행",
+      "category": "regional",
+      "sourceRefs": ["bok"]
+    },
+    {
+      "code": "bank.jeonbuk",
+      "kind": "bank",
+      "name": "전북은행",
+      "category": "regional",
+      "sourceRefs": ["bok"]
+    },
+    {
+      "code": "bank.jeju",
+      "kind": "bank",
+      "name": "제주은행",
+      "category": "regional",
+      "sourceRefs": ["bok"]
+    },
+    {
+      "code": "bank.ibk",
+      "kind": "bank",
+      "name": "기업은행",
+      "category": "special",
+      "sourceRefs": ["bok"]
+    },
+    {
+      "code": "bank.nh",
+      "kind": "bank",
+      "name": "농협은행",
+      "category": "special",
+      "sourceRefs": ["bok"]
+    },
+    {
+      "code": "bank.suhyup",
+      "kind": "bank",
+      "name": "수협은행",
+      "category": "special",
+      "sourceRefs": ["bok"]
+    },
+    {
+      "code": "bank.kdb",
+      "kind": "bank",
+      "name": "한국산업은행",
+      "category": "special",
+      "sourceRefs": ["bok"]
+    },
+    {
+      "code": "bank.exim",
+      "kind": "bank",
+      "name": "한국수출입은행",
+      "category": "special",
+      "sourceRefs": ["bok"]
+    }
+  ]
+}

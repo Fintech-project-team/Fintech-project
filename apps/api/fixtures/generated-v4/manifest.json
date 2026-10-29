@@ -1,0 +1,33 @@
+{
+  "fixtureVersion": "PAYSE-FIXTURE-4",
+  "hashMode": "canonical-json-utf8",
+  "sha256": {
+    "snapshots/alpha-ready.json": "314bbab03eb9ae93e38ce4af4a8eaf89d5ef9fda13793cd3e0fa28a138aff292",
+    "snapshots/beta-ready.json": "1f6834defad74e034827e898cc6b4968dc3607065d64f5d650db23968e425447",
+    "snapshots/alpha-unconnected.json": "ddcaafbf5b591d686ea34ea47284fbb3c6574b2e9840964c5492073e7139d164",
+    "snapshots/salary-wait.json": "fba9b0857b57a98fb7871db9bbc224007d13eacf32ccfab450d9be4aff2ecbb3",
+    "snapshots/salary-partial.json": "fdd3576a5a8253f294bbc6625e52196198a45417794a5066fb72bff9c00db848",
+    "snapshots/salary-confirmed.json": "5bf2d48c03600075844bac2c107ea9239f70f6aaa5a6a860ff4b8f012b42a551",
+    "snapshots/alpha-shock.json": "1ae452fc5e8a06fce86dcf5e1dc3adf997382382da890d3c448e4a05b3142bb0",
+    "snapshots/refund-outside-window.json": "abd1937464fd09fd8c105b80e9bdb7be38f92a3c54d3c0a36b24e6e9551b34d6",
+    "snapshots/refund-unavailable-original.json": "854bb2248ff9ee2d905bd0a23961712b3ff3fe643aa47ac5901711c038aa844e",
+    "snapshots/partial-history.json": "35957e589967879a1a5aed85dcc6f576d244965856820c4865a72c9cee7ccb22",
+    "snapshots/failed-card-history.json": "863ed18b1a0f976c0a0a87efed9eb96548c2f26bcc55c84ebc752c44c3a3fe62",
+    "snapshots/unknown-card-schedule.json": "1cb0e39e1bc91e7f1d8f3e98f584f22ae80f52d2abd6c3104df226ae2e1ca1b1",
+    "snapshots/settlement-corrected.json": "c21e3f4a434d5b9481d74cc9c50b7546d64f8ec7b0dcaf1a58a006187b75c086",
+    "snapshots/cancelled-approval.json": "03d426759904fb1ba8801e1a16823549f095ccdd8e7cc0b29d0503ebcd0bc922",
+    "snapshots/gamma-month-end.json": "dc16e8f7d600e569531b6841609e2502b963c113bc35b911309dc514c7ef8881",
+    "snapshots/salary-schedule-provided.json": "4d6b40fa2c50f84ea444a27dfbcb59e49c32b4a2446b90abffa2552305294aaa",
+    "snapshots/salary-schedule-absent.json": "605c85380dfadf1170e3442c216a2726d535e443168e5fbb5cd45f461047b95b",
+    "snapshots/demo-ready.json": "3907776cdc86fa6d29519d673636903864023a43830c96bf3d0a9558a1d1c2b0",
+    "snapshots/demo-installments.json": "e6e01d88498946da0b55db2565416b7431c11dd3df9238a0f3e9c26966407e0d",
+    "snapshots/beta-cashflow-edge.json": "2bbbcf5a93be5f4d22053506737a714c1facbedb78cbaecf44558337bec0b695",
+    "snapshots/gamma-ai-misread.json": "872c926e2913e41b87f0e24b8e7bbe8a76e9e9b63e02074c8c87e0149c27fe91",
+    "snapshots/alpha-billing-items.json": "c3f4f425a8adfa22c8ca8545a8b3b8c3418feb3b3cd0e9e4a56e19ae6267d482",
+    "snapshots/beta-billing-items.json": "87a9b82339b81b48b5af34e70813a2a9fdf5ebc7a47dc709f7036fc73a606941",
+    "snapshots/gamma-billing-items.json": "441c46efe374c1567abff7572675a600acb32238d30fef223fe17274eb1679e2",
+    "server-seeds.json": "5b0b3401930cbe794606df5bcf42693bc6556aa861d0daa2ed6d37924172e617",
+    "catalog.json": "aea22035539983681e0466b667cd19c1efc5a7934faa47446d4aa4b0c5a2f1bc",
+    "bank-directory.json": "097a9a5100f4d6a19c37b60f49ba5f6fc8075bb3fc00456433000294b7513640"
+  }
+}
