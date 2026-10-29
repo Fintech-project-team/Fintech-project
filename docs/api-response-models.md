@@ -2,6 +2,8 @@
 
 원천의 필드·타입·null·금액 단위는 [데이터 모델](data-model.md), 논리 관계·`isCurrent`도 같은 데이터 모델이 기준이며 물리 저장은 [DB 사전](database-schema.md)을 따른다. 기존 원본은 `PAYSE-DRAFT-3`, 공동 적용 준비용 청구 항목 원본은 `PAYSE-DRAFT-4`다. 아래 adapter는 권한·페이지를 적용할 HTTP 응답 조립 계약이며, 해당 서버 조회 구현의 존재나 배포 완료를 뜻하지 않는다.
 
+Java 금융 HTTP는 명시적인 `database,auth,finance` 프로필에서 DB의 v3 원천을 `PAYSE-API-0.6-3`으로 제공한다. v4 저장 자료·준비 도구는 보존하되 v4 원천을 v3로 재표기하지 않는다. 지원하지 않는 원천 형식은 503이며 v4 공개는 Flutter와 공동 검증 후 전환한다. 구현·검증 범위는 [금융 API 인계](../apps/api/docs/history/2026-10-29-financial-api-handoff.md)를 따른다.
+
 ## 승인 취소일과 원거래 조회
 
 Transaction의 `cancellationDate?: Date|null`는 v3의 선택 필드다. 기존 자료의 키 생략을 null로 읽으며 새 제공자는 확인된 날짜 또는 null을 전달한다. 원천 값 검증은 [거래 모델](data-model.md)을 따른다. API-0.6-3/DRAFT-3와 필수 키는 유지하고 변경한 준비 자료의 sourceVersion은 갱신한다. 구 소비자가 새 키를 무시할 수 있다는 사실은 취소일 화면 지원 완료를 뜻하지 않는다.

@@ -6,6 +6,16 @@ SQL 파일의 책임·줄바꿈·분리 기준은 [SQL 작성·구성 기준](sq
 
 ## 준비 자료와 대상 선택
 
+### 실제 금융 HTTP·설정 저장 검사
+
+`test_financial_service.py`는 새 폐기용 PostgreSQL에 001~004와 007을 적용하고, 명시된 시나리오를 일반 사용자·금융 테이블에 적재한다. 기존 DB 주소를 입력받지 않는다. Java는 실제 HTTP로 조회·저장·취소·재로그인·권한·멱등·동시성·롤백을 검증하고, 기존 인증 검사 DB와 금융 원천의 전후 동일성도 확인한다.
+
+```powershell
+python -B apps/api/database/test_financial_service.py --pg-bin 'C:\Program Files\PostgreSQL\15\bin' --work-dir '<존재하지 않는 새 검사 폴더>'
+```
+
+JDK 21과 테스트용 Python을 먼저 준비한다. 결과는 새 검사 폴더의 `result.json`·`java-tests.log`, 합성 공개 응답은 `public-responses/`다. 임시 자격은 하위 프로세스 환경으로만 전달한다. 이 검사는 기존 DB 마이그레이션이나 외부 HTTPS 배포를 실행하지 않는다. 실제 API 활성화에는 [서버 가이드](local-server-guide.md)의 `finance` 프로필·별도 cursor 키가 필요하다.
+
 `database/test_context.py`는 검증된 `fixtures/generated`의 catalog에서 `alpha-ready`, `beta-ready`, `gamma-month-end` 사례를 읽는다. 사용자·계좌·지출·정산·배정·반복 버전·영수증은 실제 참조 관계로 찾는다. 표시명·고정 UUID·배열 첫 항목으로 대체하지 않는다. 같은 역할이 없거나 여러 개면 자료 준비 오류다. 여러 건이 필요한 카드 구매 근거는 집합 전체를 검사한다.
 
 `test_context.sql`의 임시 함수는 같은 연결에서 DB의 ID·소유자·관계·자료 버전과 검사에 필요한 사전 상태를 다시 대조한다. 준비 오류는 기대 SQLSTATE를 포착하는 본 검사 밖에서 발생해야 한다. 행이 없는 UPDATE가 성공했다는 이유로 제약 검사를 통과시키지 않는다. 생성한 context를 DB·파일에 영구 저장하거나 서비스의 공통 모델로 사용하지 않는다.
@@ -84,7 +94,7 @@ python -B apps/api/database/test_auth_jdbc.py `
 
 ## 세션 전이·인증 서비스 검사
 
-신규 세션 함수·권한·경합은 `test_auth_sessions.py`, 서비스와 실제 JDBC 연결은 `test_session_service.py`로 검사한다. 두 실행기 모두 새 폐기용 PostgreSQL 클러스터만 사용하고 기존 서버 주소·서비스 DB 자격을 받지 않는다.
+신규 세션 함수·권한·경합은 `test_auth_sessions.py`, 서비스의 JPA 트랜잭션·실제 PostgreSQL 연결은 `test_session_service.py`로 검사한다. 두 실행기 모두 새 폐기용 PostgreSQL 클러스터만 사용하고 기존 서버 주소·서비스 DB 자격을 받지 않는다. 관리자 관측·자료 준비용 JdbcTemplate은 제품 저장 계층과 구분하여 유지한다.
 
 ```powershell
 python -B apps/api/database/test_auth_sessions.py --pg-bin "C:\Program Files\PostgreSQL\15\bin" --work-dir "$env:TEMP\payse-session-sql-$([guid]::NewGuid().ToString('N'))"
@@ -93,13 +103,13 @@ python -B apps/api/database/test_session_service.py --pg-bin "C:\Program Files\P
 
 검증은 세션 한 개만 생성되는 동시 로그인, 기존 세션 우선, 동일 세션 재확인, 다른 사용자 자격 거절, 로그아웃·조회 경합, IP 선행 커밋·실패 누적과 전체 롤백, 권한·원천 보존을 구분한다. 테스트 준비는 새 UUID와 검증된 관계를 사용하며 제품 더미의 표시명이나 첫 행에 의존하지 않는다.
 
-일반 Gradle 검사에서 전용 DB 환경이 없으면 실제 JDBC 검사는 SKIPPED다. 네이티브 실행기의 결과를 함께 확인하며 HTTP API·모바일 통합이 통과한 것으로 기록하지 않는다. 운영 시드의 인증 코드를 자동 활성화하지 않는다.
+일반 Gradle 검사에서 전용 DB 환경이 없으면 실제 PostgreSQL 검사는 SKIPPED다. 전용 실행기의 결과를 함께 확인하며 이 서비스 검사만으로 HTTP API·모바일 통합이 통과한 것으로 기록하지 않는다. `AuthJdbcTest`·`SessionJdbcTest`는 기존 클래스명을 유지하지만 제품 호출은 JPA 트랜잭션을 사용한다. 운영 시드의 인증 코드를 자동 활성화하지 않는다.
 
 ## 취소 날짜와 원거래 JOIN
 
 `python -B apps/api/database/test_cancellation_date.py --pg-bin <PostgreSQL bin> --work-dir <새 폴더>`는 새 소유 클러스터에서 신규 001·기존 DB용 005의 동일 제약, 기존 행 보존, 재실행 거절, 중간 실패 롤백을 검사한다. 실제 DB 주소를 받지 않는다. 과거 구조/급여 이행 검사는 frozen 001_common_storage.v2.sql 및 테스트 전용 legacy_seed.py의 175컬럼 입력을 사용한다. legacy_seed는 운영 적재 경로가 아니다.
 
-기존 test_session_service.py는 원거래 LEFT JOIN JDBC 검사도 함께 실행한다. prepare_links.py는 동적 UUID·소유자·카드 관계를 확인해 새 테스트 자료만 준비한다. 원거래 없음/미확보/기관 제한·타 사용자·트랜잭션 문맥을 구분하며 금융 원천의 사용자별 불변도 확인한다. 이 내부 조회 검사를 금융 조회 HTTP 구현 완료로 기록하지 않는다.
+기존 test_session_service.py는 원거래 LEFT JOIN의 JPA native SQL 검사도 함께 실행한다. prepare_links.py는 동적 UUID·소유자·카드 관계를 확인해 새 테스트 자료만 준비한다. 원거래 없음/미확보/기관 제한·타 사용자·트랜잭션 문맥을 구분하며 금융 원천의 사용자별 불변도 확인한다. 이 내부 조회 검사를 금융 조회 HTTP 구현 완료로 기록하지 않는다.
 
 ## 청구 항목 저장과 기존 연결 이행
 
