@@ -1,0 +1,29 @@
+{
+  "warning": "합성 개발 시드 전용. 금융 응답에 포함 금지. 실제 인증 구현 아님.",
+  "users": [
+    {
+      "userId": "f0a4be6c-01d7-53eb-ab2c-74675b22fd8c",
+      "name": "데모알파",
+      "phone": "01000000001",
+      "codeVerifier": "DISABLED:auth-design-pending",
+      "createdAt": "2026-10-19T00:00:00+09:00",
+      "initialCase": "demo-ready"
+    },
+    {
+      "userId": "87f7bbf9-2355-5210-9325-f25d83a8ff35",
+      "name": "데모베타",
+      "phone": "01000000002",
+      "codeVerifier": "DISABLED:auth-design-pending",
+      "createdAt": "2026-10-19T00:00:00+09:00",
+      "initialCase": "beta-ready"
+    },
+    {
+      "userId": "d04073fd-f7ab-518d-8938-f2920d593db2",
+      "name": "데모감마",
+      "phone": "01000000003",
+      "codeVerifier": "DISABLED:auth-design-pending",
+      "createdAt": "2026-10-19T00:00:00+09:00",
+      "initialCase": "gamma-month-end"
+    }
+  ]
+}

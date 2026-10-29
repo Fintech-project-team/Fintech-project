@@ -17,6 +17,7 @@ sys.path.insert(0,str(FIXTURES.parent))
 import generate
 from generate import build, uid, write_files, owned_row
 from validate import validate_snapshot, validate_directory
+from transaction_labels import display
 from export_sql import literal, export
 from testing.scenarios.export_state import export as export_scenario
 from reference_data.export_sql import export as export_reference
@@ -47,6 +48,140 @@ class FixtureTests(unittest.TestCase):
         """2026-10-19: Build immutable reference fixtures once for independent copies in tests."""
         cls.cases,cls.seeds,cls.catalog=build()
 
+    def test_distinct_counterparties_and_methods(self):
+        """2026-10-28: 계좌 1년 내역에 종류명만 반복하거나 적요를 복사하지 않는다. 사용: unittest."""
+        rows = [r for r in self.cases['demo-ready']['transactions'] if r['recordKind'] == 'account_entry']
+        self.assertEqual(len(rows), 147)
+        self.assertGreaterEqual(len({r['merchantName'] for r in rows}), 30)
+        for snapshot in self.cases.values():
+            for collection in ('transactions', 'relatedTransactions'):
+                for row in snapshot.get(collection, []):
+                    self.assertNotEqual(row['merchantName'], row['description'])
+                    self.assertNotIn(row['merchantName'], {'동네마트', '생활비', '월세', '예금이자', '본인 계좌 이체'})
+
+    def test_paired_events_keep_counterparty(self):
+        """2026-10-28: 카드/통장 한 사건과 원구매/환불·취소의 상대방을 유지한다. 사용: unittest."""
+        for snapshot in self.cases.values():
+            rows = {r['transactionId']: r for key in ('transactions', 'relatedTransactions')
+                    for r in snapshot.get(key, [])}
+            for relation in snapshot.get('transactionRelations', []):
+                if relation['kind'] == 'card_account_pair':
+                    self.assertEqual(rows[relation['fromId']]['merchantName'], rows[relation['toId']]['merchantName'])
+            for row in rows.values():
+                original = rows.get(row.get('originalTransactionId'))
+                if original:
+                    self.assertEqual(row['merchantName'], original['merchantName'])
+                    if row['recordKind'] in ('card_refund', 'card_cancellation'):
+                        self.assertNotEqual(row['description'], original['description'])
+
+    def test_plan_labels_and_approval_versions_stay_separate(self):
+        """2026-10-28: 원천 개정이 사용자 계획명이나 과거 승인 버전을 덮지 않는다. 사용: unittest."""
+        for snapshot in self.cases.values():
+            for revision in snapshot.get('recurringPlanRevisions', []):
+                self.assertIn(revision['label'], {'휴대폰 요금', '월세'})
+            for decision in snapshot.get('recurringDecisions', []):
+                self.assertFalse(decision['sourceVersion'].endswith(':labels-1'))
+            if 'transactions' in snapshot:
+                self.assertTrue(snapshot['sourceVersion'].endswith(':labels-1'))
+
+    def test_unknown_source_requires_authoring(self):
+        """2026-10-28: 미정 사건을 임의의 일반 거래명으로 숨기지 않는다. 사용: unittest."""
+        with self.assertRaises(ValueError):
+            display('unreviewed-event', 'alpha')
+
+    def test_rebuild_is_deterministic(self):
+        """2026-10-28: 실행 시각·랜덤값에 의해 이름·원천 버전이 바뀌지 않는다. 사용: unittest."""
+        cases, _, catalog = build()
+        self.assertEqual(self.cases, cases)
+        self.assertEqual(self.catalog, catalog)
+
+    def test_event_versions_match_referenced_cases(self):
+        """2026-10-28: 현재 사례 전이 버전이 표시 개정 이전을 가리키지 않게 한다. 사용: unittest."""
+        for event in self.catalog['events']:
+            self.assertEqual(event['sourceVersionBefore'], self.cases[event['beforeCase']]['sourceVersion'])
+            self.assertEqual(event['sourceVersionAfter'], self.cases[event['afterCase']]['sourceVersion'])
+
+    def test_cancellation_date_only_and_legacy(self):
+        """2026-10-29: 날짜만 있는 취소와 새 필드가 없는 v3 원천을 보존한다. 사용: unittest."""
+        snapshot = self.case()
+        row = next(t for t in snapshot['transactions'] if t['recordKind'] == 'card_cancellation')
+        row.update(occurredAt=None, occurredAtBasis=None)
+        validate_snapshot(snapshot)
+        self.assertEqual(row['cancellationDate'], '2026-10-13')
+        del row['cancellationDate']
+        validate_snapshot(snapshot)
+        self.assertNotIn('cancellationDate', row)
+
+    def test_cancellation_date_rejects_conflicting_facts(self):
+        """2026-10-29: 종류·날짜·시각·조회 범위 모순을 거절한다. 사용: unittest."""
+        for change in (
+            {'cancellationDate': '2026-10-14'},
+            {'cancellationDate': '2026-10-32'},
+            {'cancellationDate': '2026-10-20'},
+            {'cancellationDate': '2025-10-01', 'occurredAt': None, 'occurredAtBasis': None},
+            {'occurredAtBasis': 'purchase', 'purchaseDate': '2026-10-13'},
+            {'recordKind': 'card_refund'},
+        ):
+            with self.subTest(change=change):
+                snapshot = self.case()
+                row = next(t for t in snapshot['transactions'] if t['recordKind'] == 'card_cancellation')
+                row.update(change)
+                with self.assertRaises(ValueError):
+                    validate_snapshot(snapshot)
+
+    def test_three_regular_card_returns(self):
+        """2026-10-29: 기본 세 사용자에 소수의 취소/환불과 소유 원결제를 확인한다. 사용: unittest."""
+        for name in ('alpha-ready', 'demo-ready', 'beta-ready', 'gamma-month-end',
+                     'demo-installments', 'beta-cashflow-edge', 'gamma-ai-misread'):
+            snapshot = self.cases[name]
+            case, = [entry for entry in self.catalog['cases'] if entry['id'] == name]
+            rows = {row['transactionId']: row for row in snapshot['transactions']}
+            returns = [rows[identity] for identity in case['preparedReversalIds']]
+            self.assertEqual(len(returns), 3)
+            self.assertEqual(sum(row['recordKind'] == 'card_cancellation' for row in returns), 1)
+            self.assertEqual(sum(row['recordKind'] == 'card_refund' for row in returns), 2)
+            self.assertEqual(sorted(row['amountKRW'] for row in returns), [12000, 18000, 30000])
+            self.assertLess(len(returns) / sum(row['recordKind'] == 'card_purchase' for row in rows.values()), 0.1)
+            for row in returns:
+                original = rows[row['originalTransactionId']]
+                self.assertEqual((row['userId'], row['cardId']), (original['userId'], original['cardId']))
+                self.assertEqual(original['recordKind'], 'card_purchase')
+                self.assertEqual(row['direction'], 'in')
+                self.assertIsNone(row['accountId'])
+                self.assertIsNone(row['balanceReflected'])
+                self.assertEqual(row['reflectionReason'], 'not_applicable')
+                self.assertLessEqual(row['amountKRW'], original['amountKRW'])
+                self.assertEqual(row['merchantName'], original['merchantName'])
+                if row['recordKind'] == 'card_cancellation':
+                    self.assertEqual(original['status'], 'cancelled')
+                    self.assertEqual(row['amountKRW'], original['amountKRW'])
+                else:
+                    self.assertEqual(original['status'], 'posted')
+            full, = [row for row in returns if row['amountKRW'] == 18000]
+            partial, = [row for row in returns if row['amountKRW'] == 12000]
+            self.assertEqual(rows[full['originalTransactionId']]['amountKRW'], 18000)
+            self.assertEqual(rows[partial['originalTransactionId']]['amountKRW'], 40000)
+
+    def test_cancellation_uses_its_confirmed_time(self):
+        """2026-10-29: 취소일을 구매일·환불일로 위장하지 않는다. 사용: unittest."""
+        snapshot = self.cases['demo-ready']
+        row, = [row for row in snapshot['transactions'] if row['recordKind'] == 'card_cancellation']
+        original, = [item for item in snapshot['transactions'] if item['transactionId'] == row['originalTransactionId']]
+        self.assertEqual(original['purchaseDate'], '2026-10-12')
+        self.assertEqual(row['occurredAt'], '2026-10-13T10:30:00+09:00')
+        self.assertEqual(row['occurredAtBasis'], 'cancellation')
+        for field in ('purchaseDate', 'refundDate', 'bookingDate', 'withdrawalDate'):
+            self.assertIsNone(row[field])
+
+    def test_original_reference_is_not_always_available(self):
+        """2026-10-29: 원천 미상 원거래 ID·시각을 허용하는 기존 계약을 유지한다. 사용: unittest."""
+        snapshot = self.case('demo-ready')
+        row, = [row for row in snapshot['transactions'] if row['recordKind'] == 'card_cancellation']
+        row['originalTransactionId'] = None
+        row['occurredAt'] = None
+        row['occurredAtBasis'] = None
+        validate_snapshot(snapshot)
+
     def case(self,name='alpha-ready'):
         """2026-10-19: Return a deep fixture copy so failure mutations cannot affect other checks."""
         return copy.deepcopy(self.cases[name])
@@ -73,7 +208,7 @@ class FixtureTests(unittest.TestCase):
 
     def test_transaction_selection_ignores_labels(self):
         """2026-10-23: Equal labels must retain salary, recurring evidence, refund and cancellation identities."""
-        with patch.dict(generate.TRANSACTION_NAMES,{key:'같은 거래명' for key in generate.TRANSACTION_NAMES}):
+        with patch('transaction_labels.display', return_value=('같은 거래명', '같은 적요')):
             cases,_,catalog=build()
         self.assertEqual(catalog,self.catalog)
         for name, snapshot in cases.items():
@@ -162,18 +297,22 @@ class FixtureTests(unittest.TestCase):
         """2026-10-23: Check tracked JSON semantic values after formatting and manifest validation.
 
         2026-10-26: Include the independent eighteenth demo case; used by unittest.
+        2026-10-28: Include three separate installment/edge cases, preserving the prior eighteen.
         """
-        self.assertEqual(validate_directory(FIXTURES/'generated'),18)
+        self.assertEqual(validate_directory(FIXTURES/'generated'),21)
         for name,snapshot in self.cases.items():
             stored=json.loads((FIXTURES/'generated'/'snapshots'/f'{name}.json').read_text(encoding='utf-8'))
             self.assertEqual(stored,snapshot)
         self.assertEqual(load_bank_directory(FIXTURES/'generated'/'bank-directory.json'),load_bank_directory())
 
     def test_deterministic_bytes_and_manifest(self):
-        """2026-10-26: Verify the expanded bundle remains deterministic; used by unittest."""
+        """2026-10-26: Verify the expanded bundle remains deterministic; used by unittest.
+
+        2026-10-28: Check the twenty-one-case bundle including the new independent scenarios.
+        """
         with temporary_directory() as temp:
             a,b=Path(temp)/'a',Path(temp)/'b';write_files(a);write_files(b)
-            self.assertEqual(validate_directory(a),18)
+            self.assertEqual(validate_directory(a),21)
             for p in a.rglob('*.json'):
                 self.assertEqual(p.read_bytes(),(b/p.relative_to(a)).read_bytes())
 
@@ -313,9 +452,13 @@ class FixtureTests(unittest.TestCase):
         self.assertEqual(self.case('unknown-card-schedule')['cards'][1]['scheduleEvidence'],[])
 
     def test_date_only_and_confirmed_time(self):
-        self.assertTrue(all(t['occurredAt'] is None for t in self.case()['transactions']))
-        self.rejects(lambda s:s['transactions'][0].update(occurredAt='2026-10-19T00:00:00'))
-        self.rejects(lambda s:s['transactions'][0].update(occurredAt='2026-10-19T00:00:00+09:00',occurredAtBasis='booking'))
+        """2026-10-29: 명시한 취소 시각만 허용하고 다른 원천의 미상 시각을 채우지 않는다. 사용: unittest."""
+        timed = [row for row in self.case()['transactions'] if row['occurredAt'] is not None]
+        self.assertEqual(len(timed), 1)
+        self.assertEqual((timed[0]['recordKind'], timed[0]['occurredAtBasis']), ('card_cancellation', 'cancellation'))
+        identity = uid('alpha/transaction/repair-partial')
+        self.rejects(lambda s:owned_row(s, 'transactions', 'transactionId', identity).update(occurredAt='2026-10-19T00:00:00'))
+        self.rejects(lambda s:owned_row(s, 'transactions', 'transactionId', identity).update(occurredAt='2026-10-19T00:00:00+09:00',occurredAtBasis='booking'))
 
     def test_card_purchase_statement_withdrawal_evidence(self):
         s=self.case();st=s['statements'][0];tx={t['transactionId']:t for t in s['transactions']}

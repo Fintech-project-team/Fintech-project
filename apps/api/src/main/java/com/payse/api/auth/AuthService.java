@@ -6,14 +6,16 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 /**
  * 인증 요청의 제한·코드 대조·세션 전이를 순서대로 커밋한다. 요청 상태를 필드에 보관하지 않는다.
- * HTTP 파싱·프록시 신뢰·응답 작성은 미연결이며 금융 원천과 로컬 PIN을 변경하지 않는다.
+ * HTTP 입력은 IP 기록 커밋 이후 지연 해석하며 금융 원천과 로컬 PIN을 변경하지 않는다.
  * @created 2026-10-26
- * @usedBy AuthServiceTest, SessionJdbcTest, 미연결: 예정 인증 Controller
+ * @usedBy AuthController, AuthServiceTest, SessionJdbcTest
+ * @modified 2026-10-28 - HTTP 입력 지연 해석·재확인 토큰 우선 처리 연결
  */
 @Service
 @Profile("database & auth")
@@ -36,29 +38,71 @@ public final class AuthService {
     /**
      * IP 기록을 먼저 커밋하고 검증된 조합으로 세션을 생성한다. 원문은 이 요청에서만 사용한다.
      * @created 2026-10-26
-     * @usedBy AuthServiceTest, SessionJdbcTest, 미연결: 예정 POST /demo-sessions
+     * @usedBy AuthServiceTest, SessionJdbcTest
+     * @modified 2026-10-28 - 공통 지연 입력 경로에 위임
      * @param peer 서버 연결 또는 신뢰 프록시 어댑터가 확인한 IP; 임의 헤더/DNS 입력 아님
      * @return 커밋된 최초 로그인 또는 원문 없는 실패 결과
      */
     public AuthResult login(InetAddress peer, String name, String phone, String code) {
-        return attempt(peer, name, phone, code, this::signIn);
+        return login(peer, () -> new AuthInput(name, phone, code));
+    }
+
+    /**
+     * IP 기록을 커밋한 뒤 요청을 읽는다. 파싱 실패도 정확히 한 번 집계한다.
+     * @created 2026-10-28
+     * @usedBy AuthController.login, AuthService.login
+     */
+    public AuthResult login(InetAddress peer, Supplier<AuthInput> input) {
+        AuthRepository.IpLimit ip = recordIp(peer);
+        return read(ip, input, this::signIn);
     }
 
     /**
      * 같은 세션의 소유자 자격만 재확인한다. 새 세션·토큰 발급이나 실패 시 기존 세션 종료는 없다.
      * @created 2026-10-26
-     * @usedBy SessionJdbcTest, 미연결: 예정 POST /demo-sessions/current/reverify
+     * @usedBy SessionJdbcTest
+     * @modified 2026-10-28 - 지연 입력·토큰 우선 처리 경로에 위임
      * @param token 현재 클라이언트 토큰 원문; 로그/DB에 저장하지 않음
      * @return 동일 세션 재확인 또는 기존 오류 의미의 실패
      */
     public AuthResult reverify(InetAddress peer, String token, String name, String phone, String code) {
-        return attempt(peer, name, phone, code, credentials -> confirm(token, credentials));
+        return reverify(peer, () -> token, () -> new AuthInput(name, phone, code));
+    }
+
+    /**
+     * IP 커밋 후 토큰부터 확인한다. 최종 자격 대조 트랜잭션에서도 세션을 다시 검증한다.
+     * 사전 사용자 잠금은 별도 트랜잭션에서 끝내 조합→사용자 잠금 순서를 뒤집지 않는다.
+     * @created 2026-10-28
+     * @usedBy AuthController.reverify, AuthService.reverify
+     */
+    public AuthResult reverify(InetAddress peer, Supplier<String> tokenInput, Supplier<AuthInput> input) {
+        AuthRepository.IpLimit ip = recordIp(peer);
+        String token = tokenInput.get();
+        boolean active = transactions.run(() -> repository.authorize(digest(token)).isPresent());
+        if (!active) return ip.allowed() ? failure(AuthResult.Reason.SESSION_INVALID) : limited(ip.retryAt());
+        return read(ip, input, credentials -> confirm(token, credentials));
+    }
+
+    /**
+     * 제한 기록 이후 파싱하며 파서 오류 원문은 외부로 전파하지 않는다.
+     * @created 2026-10-28
+     * @usedBy AuthService.login, reverify
+     */
+    private AuthResult read(AuthRepository.IpLimit ip, Supplier<AuthInput> source,
+            Function<AuthCredentials, AuthResult> action) {
+        AuthInput input;
+        try {
+            input = source.get();
+        } catch (AuthInputException invalid) {
+            return ip.allowed() ? failure(invalid.reason()) : limited(ip.retryAt());
+        }
+        return attempt(ip, input.name(), input.phone(), input.code(), action);
     }
 
     /**
      * 현재 토큰의 세션만 종료한다. 이미 무효인 토큰을 종료 성공으로 표시하지 않는다.
      * @created 2026-10-26
-     * @usedBy SessionJdbcTest, 미연결: 예정 DELETE /demo-sessions/current
+     * @usedBy AuthController.logout, SessionJdbcTest
      * @return 종료 커밋 결과 또는 SESSION_INVALID
      */
     public AuthResult logout(String token) {
@@ -81,11 +125,11 @@ public final class AuthService {
      * 선행 IP 커밋 뒤 입력을 검사하고 조합 잠금부터 시작하는 별도 트랜잭션을 실행한다.
      * @created 2026-10-26
      * @usedBy AuthService.login, reverify
+     * @modified 2026-10-28 - 이미 커밋한 IP 결과를 받아 중복 집계를 방지
      * @return 제한 기록과 업무 처리가 커밋된 결과; DB 장애는 성공으로 바꾸지 않음
      */
-    private AuthResult attempt(InetAddress peer, String name, String phone, String code,
+    private AuthResult attempt(AuthRepository.IpLimit ip, String name, String phone, String code,
             Function<AuthCredentials, AuthResult> action) {
-        AuthRepository.IpLimit ip = recordIp(peer);
         String normalizedName;
         String normalizedPhone;
         try {

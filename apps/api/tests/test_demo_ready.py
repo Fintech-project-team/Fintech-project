@@ -7,7 +7,7 @@ from pathlib import Path
 API = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(API / 'fixtures'))
 sys.path.insert(0, str(API))
-from generate import build, make_demo_snapshot, make_snapshot, owned_row, uid
+from generate import build, make_demo_snapshot, make_snapshot, owned_row, uid, update_versions
 from validate import validate_snapshot
 from export_sql import financial_rows, load_sources
 from testing.scenarios.export_state import state_rows
@@ -27,7 +27,9 @@ class DemoReadyTests(unittest.TestCase):
         before = copy.deepcopy(base)
         demo = make_demo_snapshot(base)
         self.assertEqual(base, before)
-        self.assertEqual(base, self.cases['alpha-ready'])
+        published = copy.deepcopy(self.cases['alpha-ready'])
+        update_versions(published, base['sourceVersion'], base['dataVersion'])
+        self.assertEqual(base, published)
         self.assertNotEqual(demo['sourceVersion'], base['sourceVersion'])
         for collection, key in [('accounts', 'accountId'), ('cards', 'cardId'),
                                 ('transactions', 'transactionId'), ('statements', 'statementId')]:
@@ -48,7 +50,8 @@ class DemoReadyTests(unittest.TestCase):
         self.assertEqual(len(decisions), 1)
         decision = decisions[0]
         self.assertEqual(decision['decision'], 'approved')
-        self.assertEqual(decision['sourceVersion'], demo['sourceVersion'])
+        # 표시 개정은 원천 버전만 바꾸며 승인 당시 근거 버전은 보존한다.
+        self.assertEqual(decision['sourceVersion'] + ':reversals-1:labels-1', demo['sourceVersion'])
         self.assertEqual(plan['firstOccurrenceMonth'], '2026-10')
         self.assertEqual(revision['effectiveFromMonth'], '2026-10')
         self.assertEqual((revision['amountKRW'], revision['monthlyDay']), (300000, 22))

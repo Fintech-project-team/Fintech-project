@@ -30,6 +30,68 @@ class AuthServiceTest {
     private AuthCredentials credentials;
 
     /**
+     * 파싱 콜백에 진입하기 전에 IP 저장이 끝나고 JSON 실패를 다시 세지 않는다.
+     * @created 2026-10-28
+     * @usedBy JUnit test
+     */
+    @Test
+    void recordsIpBeforeParsing() {
+        AuthResult.Failure result = assertInstanceOf(AuthResult.Failure.class, service.login(peer, () -> {
+            verify(repository).recordIp(anyString());
+            verify(transactions).run(any());
+            throw new AuthInputException(AuthResult.Reason.INVALID_JSON);
+        }));
+        assertEquals(AuthResult.Reason.INVALID_JSON, result.reason());
+        verify(repository).recordIp(anyString());
+        verify(repository, never()).lockCode(any(), any());
+    }
+
+    /**
+     * 무효 세션이면 입력 콜백을 호출하지 않으며 IP 초과는 기존 429를 유지한다.
+     * @created 2026-10-28
+     * @usedBy JUnit test
+     */
+    @Test
+    void rejectsTokenBeforeReadingBody() {
+        Supplier<AuthInput> unread = () -> { throw new AssertionError("Body must not be read"); };
+        assertEquals(AuthResult.Reason.SESSION_INVALID, assertInstanceOf(AuthResult.Failure.class,
+            service.reverify(peer, () -> "invalid", unread)).reason());
+        Instant retryAt = Instant.now().plusSeconds(60);
+        when(repository.recordIp(anyString())).thenReturn(new AuthRepository.IpLimit(false, retryAt));
+        assertEquals(AuthResult.Reason.RATE_LIMITED, assertInstanceOf(AuthResult.Failure.class,
+            service.reverify(peer, () -> "invalid", unread)).reason());
+        verify(repository, times(2)).recordIp(anyString());
+    }
+
+    /**
+     * Retry-After를 초 경계에서 올림하고 만료 직후에도 음수를 반환하지 않는다.
+     * @created 2026-10-28
+     * @usedBy JUnit test
+     */
+    @Test
+    void roundsRetrySeconds() {
+        Instant now = Instant.parse("2026-10-28T00:00:00Z");
+        var result = new AuthResult.Failure(AuthResult.Reason.RATE_LIMITED, now.plusSeconds(1).plusNanos(1));
+        assertEquals("2", AuthHttpResponse.reply(result, now).getHeaders().getFirst("Retry-After"));
+        assertEquals("1", AuthHttpResponse.reply(result, now.plusSeconds(5)).getHeaders().getFirst("Retry-After"));
+    }
+
+    /**
+     * 직접 접속 모드 누락·프록시 자동 신뢰는 인증 시작 시 실패한다.
+     * @created 2026-10-28
+     * @usedBy JUnit test
+     */
+    @Test
+    void requiresExplicitPeerMode() {
+        var environment = new org.springframework.mock.env.MockEnvironment();
+        assertThrows(IllegalStateException.class, () -> new AuthHttpInput(environment));
+        environment.withProperty("PAYSE_AUTH_PEER_MODE", "direct").withProperty("server.forward-headers-strategy", "native");
+        assertThrows(IllegalStateException.class, () -> new AuthHttpInput(environment));
+        environment.withProperty("server.forward-headers-strategy", "none");
+        assertDoesNotThrow(() -> new AuthHttpInput(environment));
+    }
+
+    /**
      * 호출별 사용자와 암호 키를 새로 만들며 저장 전이만 대역으로 분리한다.
      * @created 2026-10-26
      * @usedBy JUnit BeforeEach

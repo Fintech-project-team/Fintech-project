@@ -250,7 +250,7 @@ BEGIN
       AND t.account_id = pg_temp.ctx_uuid('owner_account_id')
         AND t.record_kind = 'account_entry'
         AND t.direction = 'out'
-      AND (SELECT array_agg(si.transaction_id ORDER BY si.transaction_id)
+      AND (SELECT array_agg(DISTINCT si.transaction_id ORDER BY si.transaction_id) FILTER (WHERE si.transaction_id IS NOT NULL)
         FROM payse.statement_items si
         WHERE si.user_id = owner AND si.statement_id = st.id)
         IS NOT DISTINCT FROM (SELECT array_agg(x ORDER BY x)

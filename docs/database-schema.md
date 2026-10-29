@@ -12,7 +12,7 @@
 
 ## 저장 단위와 물리 배치
 
-현재 초기 SQL은 **22개 테이블·175개 컬럼**이다. users는 단일 name을 저장한다. 이 정의가 이미 존재하는 DB에 자동 적용되는 것은 아니다. 이 숫자를 서비스의 이론적 최솟값으로 확정하지 않는다. 아래는 관계를 분리한 추가 저장 단위의 이유이며 전체 22개 테이블은 컬럼 사전에 정의한다.
+현재 초기 SQL은 **22개 테이블·188개 컬럼**이다. users는 단일 name을 저장한다. 이 정의가 이미 존재하는 DB에 자동 적용되는 것은 아니다. 이 숫자를 서비스의 이론적 최솟값으로 확정하지 않는다. 아래는 관계를 분리한 추가 저장 단위의 이유이며 전체 22개 테이블은 컬럼 사전에 정의한다.
 
 | 저장 단위                | 필요한 이유                                                       |
 | ------------------------ | ----------------------------------------------------------------- |
@@ -47,7 +47,7 @@ erDiagram
   transaction_references ||--o| financial_transactions : availability
   financial_cards ||--o{ card_statements : bills
   card_statements ||--o{ statement_items : includes
-  financial_transactions ||--o{ statement_items : details
+  financial_transactions |o--o{ statement_items : details
   financial_transactions ||--o{ transaction_relations : evidence_pair
   users ||--|| user_attributes : config
   recurring_plans ||--|{ recurring_plan_revisions : versions
@@ -145,7 +145,7 @@ ID/소유키는 기존 명세의 UUID다. `payse.money`는 음수 허용, `nonne
 | kind | text | 예   | bank/card 구분                         |
 | name | text | 예   | 표시명                                 |
 
-기존 PK(code)·kind CHECK·이름의 공백-only 금지 제약을 재사용한다. 은행 수 확대 때문에 테이블·컬럼·인덱스를 추가하지 않는다. 확인일·분류·공식 근거는 버전 관리되는 기준 JSON에 보존하며 별도 런타임 조회 기능이 없는 메타데이터를 중복 저장하지 않는다. 초기 DDL의 **22개 테이블·175개 컬럼**은 유지된다.
+기존 PK(code)·kind CHECK·이름의 공백-only 금지 제약을 재사용한다. 은행 수 확대 때문에 테이블·컬럼·인덱스를 추가하지 않는다. 확인일·분류·공식 근거는 버전 관리되는 기준 JSON에 보존하며 별도 런타임 조회 기능이 없는 메타데이터를 중복 저장하지 않는다. 초기 DDL의 **22개 테이블·188개 컬럼**은 유지된다.
 
 ### source_contexts
 
@@ -242,6 +242,7 @@ ID/소유키는 기존 명세의 UUID다. `payse.money`는 음수 허용, `nonne
 | purchase_date           | date                    | 아니오 | 확인된 이용일                                                           |
 | withdrawal_date         | date                    | 아니오 | 확인된 계좌 출금일; 입금일 전용 금지                                    |
 | refund_date             | date                    | 아니오 | 확인된 환불 반영일                                                      |
+| cancellation_date       | date                    | 아니오 | 확인된 승인 취소일. 종류·유한 날짜·동시 제공 시각 일치 CHECK            |
 | booking_date            | date                    | 아니오 | 입금도 포함한 계좌 기장일                                               |
 | occurred_at             | timestamptz             | 아니오 | 확인된 실제 시각만; 날짜만 있으면 null                                  |
 | occurred_at_basis       | text                    | 아니오 | 어느 사실의 시각인지; 시각 없으면 null                                  |
@@ -270,14 +271,22 @@ ID/소유키는 기존 명세의 UUID다. `payse.money`는 음수 허용, `nonne
 
 ### statement_items
 
-청구에 포함된 거래의 동일 카드·사용자 관계.
+청구 항목을 단일 기준으로 저장한다. 기존 거래 연결 4컬럼을 보존하고 12컬럼을 추가한다. 같은 구매의 여러 청구/항목을 허용한다.
 
-| 컬럼           | 타입 | 필수 | 설정 근거                                        |
-| -------------- | ---- | ---- | ------------------------------------------------ |
-| user_id        | uuid | 예   | 인증 세션에서 정한 소유자; 다른 사용자 참조 차단 |
-| statement_id   | uuid | 예   | 청구 참조                                        |
-| card_id        | uuid | 예   | 교차 카드 참조를 복합 FK로 차단                  |
-| transaction_id | uuid | 예   | 확보된 포함 구매/환불 참조                       |
+| 컬럼                                             | 타입                   | 필수   | 이유                                                      |
+| ------------------------------------------------ | ---------------------- | ------ | --------------------------------------------------------- |
+| id                                               | uuid                   | 예     | 항목별 안정 ID·PK. 거래 연결 없는 항목도 식별             |
+| user_id                                          | uuid                   | 예     | 소유 사용자·RLS                                           |
+| statement_id / card_id                           | uuid 각각              | 예     | 같은 사용자·청구·카드의 복합 FK 유지                      |
+| transaction_id                                   | uuid                   | 아니오 | 같은 사용자·카드의 실제 거래 FK. 연회비 등은 null         |
+| source_ref / source_version                      | text 각각              | 예     | 원천 항목 식별·현재 원천 버전. 사용자별 source_ref UNIQUE |
+| label / merchant_name                            | text 각각              | 아니오 | 청구 원천 표시. 원거래 없어도 보존                        |
+| purchase_date                                    | date                   | 아니오 | 확인된 유한 이용일                                        |
+| original_used_amount_krw / billed_principal_krw  | nonnegative_money 각각 | 아니오 | 원이용 금액·해당 청구 원금, 기존 비음수 범위 유지         |
+| fee_or_adjustment_amount_krw / billed_amount_krw | money 각각             | 아니오 | 항목 조정액·청구액만 ±9조 범위 허용                       |
+| installment_months / installment_round           | integer 각각           | 아니오 | 양수 회차, 둘 다 있을 때 round≤months                     |
+
+PK(id), UNIQUE(user_id,id), UNIQUE(user_id,source_ref)와 기존 사용자/청구/카드/거래 복합 FK, source_contexts(user_id,source_version) FK를 적용한다. transaction_id에 UNIQUE를 걸지 않는다. 청구별 목록(user_id,statement_id,id)과 거래→청구 역조회(user_id,transaction_id,statement_id; non-null) 인덱스를 둔다. 원천 금액의 등식·합계를 강제하지 않고 null/불일치를 보존한다. includedTransactionRefs는 이 행들의 공개 가능한 non-null 거래 ID를 중복 제거해 응답에서 조립한다.
 
 ### transaction_relations
 
@@ -454,7 +463,7 @@ ID/소유키는 기존 명세의 UUID다. `payse.money`는 음수 허용, `nonne
 - 계획의 최소 버전 시작 월은 first_occurrence_month와 같아야 한다. occurrence_overrides와 반복 obligations의 회차월은 계획 첫 월과 참조 버전의 effective_from_month 이상이어야 한다. 기존에 고정된 이전 버전을 새 버전으로 자동 치환하지 않는다.
 - source_contexts.salary_evidence는 과거 원천 근거다. 현재 salary_account_id 설정 변경을 막지 않으며 동일 사용자·posted 계좌 입금·잔액 반영 여부를 검증한다.
 - reserve_allocations.amount_krw는 해제 누계를 포함한 현재 유효 배정 총액이다. 최초 배정액·이전 수정값은 write_receipts의 변경 근거와 구분한다.
-- 175개는 단일 name을 반영한 초기 DDL의 실제 컬럼 수다. 후속 인증 설계의 미구현 컬럼은 이 수에 포함하지 않는다.
+- 188개는 단일 name·cancellation_date·청구 항목 12개 추가 컬럼을 반영한 초기 DDL의 실제 컬럼 수다. 후속 인증 설계의 미구현 컬럼은 이 수에 포함하지 않는다.
 
 ## 원천·설정·공개 응답의 저장 경계
 
@@ -485,3 +494,17 @@ ID/소유키는 기존 명세의 UUID다. `payse.money`는 음수 허용, `nonne
 `source_contexts.salary_evidence`의 요소는 [급여 모델](data-model.md#급여-회차와-예정일)을 따른다. 새 테이블·컬럼은 추가하지 않는다. 저장 검증은 해당 user_id의 JSON 배열에서 필수 필드·연월/날짜·입금 근거·payMonth 유일성을 검사한다. 다른 payMonth의 동일 expectedPayDate는 허용한다. 사용자 현재 급여 설정으로 원천을 덮어쓰지 않는다.
 
 기존 v2 자료에는 새 검증 함수만 먼저 설치하지 않는다. 공통 사용자 구조 이름 전환과 급여 v3 전환은 [이행 절차](../apps/api/docs/common-storage.md)에서 분리한다. 검토된 명시 회차 매핑 없이 기존 입금월을 payMonth로 채우지 않는다. sourceVersion 전환은 현재 원천과 네 금융 테이블의 FK를 같은 트랜잭션에서 맞추며, recurring_decisions의 승인 당시 source_version은 보존한다.
+
+## 승인 취소일의 저장과 기존 DB 전환
+
+새 001은 nullable cancellation_date를 포함한다. 원천이 없으면 null이며 시각·구매일·환불일로 역산해 저장하지 않는다. non-null은 card_cancellation에만 허용하고, 유한 날짜이며 occurred_at이 있으면 basis=cancellation 및 Asia/Seoul 날짜 일치를 CHECK한다. 조회 기준시각·coverage 범위는 fixture/입력 검증 책임이며 이 행 CHECK가 대신 검증하지 않는다.
+
+기존 공통 스키마에는 `apps/api/database/005_cancellation_date.sql`을 검토 후 1회 적용한다. 컬럼·제약·주석은 한 트랜잭션이며 기존 행은 null을 유지한다. 신규 001 적용 DB 또는 005 재실행은 중복 컬럼으로 실패하고 부분 변경을 남기지 않는다. 초기화 시 자동 실행하지 않는다. 과거 공통 구조/급여 이행 도구는 frozen `migrations/001_common_storage.v2.sql`의 175개 컬럼을 기준으로 검증하고 005를 별도 단계로 취급한다.
+
+기존 original_transaction_id → transaction_references의 관계를 재사용한다. 직접 financial_transactions FK로 바꿔 미확보 참조를 거절하지 않는다. 원거래 조회는 user_id·id의 기존 UNIQUE 인덱스를 사용하는 LEFT JOIN으로 수행하고 날짜 필드 추가만을 위해 새 테이블·중복 ID·인덱스를 만들지 않는다.
+
+## 기존 청구 연결의 v4 저장 전환
+
+신규 001에는 청구 항목 구조가 포함된다. 기존 공통 DB는 005 이후 006_statement_items.sql을 검토해 1회 실행한다. 새 테이블은 만들지 않고 statement_items를 확장한다. 기존 PK의 사용자·청구·거래 UUID로 결정적 item ID를 만들고 기존 관계/건수를 보존한다. 이 식별 변환의 MD5는 인증·개인정보 보호 수단이 아니다. 공개 source_ref에는 새 항목 ID만 넣어 숨겨진 거래 ID가 직접 노출되지 않게 한다.
+
+새 금액·표시·회차는 null로 유지하고 source_version은 부모 청구의 원천 버전을 사용한다. 006은 컬럼·식별 전환·PK/FK·인덱스를 한 트랜잭션으로 적용하며 오류 시 전부 롤백한다. 기존 RLS·사용자/ID 불변 검사를 끄지 않는다. 기존 source_contexts의 v3 표기를 DB 구조 전환만으로 v4로 바꾸지 않는다. 실제 v4 원천 적재·응답 공동 전환은 별도다. 기존 DB나 앱 기동에 자동 적용하지 않는다. 과거 v2→v3 이행의 frozen175컬럼 기준은 유지한다.

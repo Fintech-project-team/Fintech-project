@@ -1,10 +1,28 @@
 # PAYSE v0.6 공통 응답 모델
 
-원천의 필드·타입·null·금액 단위는 [데이터 모델](data-model.md), 논리 관계·`isCurrent`도 같은 데이터 모델이 기준이며 물리 저장은 [DB 사전](database-schema.md)을 따른다. 원본 fixture의 현재 형식은 `PAYSE-DRAFT-3`다. 아래 adapter는 권한·페이지를 적용할 HTTP 응답 조립 계약이며, 해당 서버 조회 구현의 존재나 배포 완료를 뜻하지 않는다.
+원천의 필드·타입·null·금액 단위는 [데이터 모델](data-model.md), 논리 관계·`isCurrent`도 같은 데이터 모델이 기준이며 물리 저장은 [DB 사전](database-schema.md)을 따른다. 기존 원본은 `PAYSE-DRAFT-3`, 공동 적용 준비용 청구 항목 원본은 `PAYSE-DRAFT-4`다. 아래 adapter는 권한·페이지를 적용할 HTTP 응답 조립 계약이며, 해당 서버 조회 구현의 존재나 배포 완료를 뜻하지 않는다.
+
+## 승인 취소일과 원거래 조회
+
+Transaction의 `cancellationDate?: Date|null`는 v3의 선택 필드다. 기존 자료의 키 생략을 null로 읽으며 새 제공자는 확인된 날짜 또는 null을 전달한다. 원천 값 검증은 [거래 모델](data-model.md)을 따른다. API-0.6-3/DRAFT-3와 필수 키는 유지하고 변경한 준비 자료의 sourceVersion은 갱신한다. 구 소비자가 새 키를 무시할 수 있다는 사실은 취소일 화면 지원 완료를 뜻하지 않는다.
+
+DB 매핑은 financial_transactions.cancellation_date → cancellationDate다. 원결제 조회는 original_transaction_id와 같은 user_id를 조건으로 LEFT JOIN하여 원거래 미확보 때문에 취소 기록 자체가 사라지지 않게 한다. 조인된 행은 내부 조회 결과이며 신규 공개 originalTransaction 객체나 경로를 추가하지 않는다. 응답 조립에서는 기존 transactions/relatedTransactions/referenceResolutions와 아래 원천별 접근 규칙을 그대로 적용한다. 미확보 원참조의 기관 권한을 검증하지 못하면 기존 503 계약을 유지한다. 내부 LEFT JOIN 성공을 공개 응답 권한 검증 완료로 보지 않는다.
+
+## v4 공동 전환과 청구 항목 공개
+
+v4는 Statement.items와 `statementItem` 접근 제한을 함께 도입한다. API·Fake 서버·Flutter의 버전 허용 목록뿐 아니라 필수 필드·타입·소유권/카드 관계·응답 형식·제한 표식 검사를 함께 갱신한 뒤 적용한다. v3를 v4라고 재표기하거나 알 수 없는 items를 구 파서에 그대로 통과시키지 않는다. v3 지원은 기존 경로로 유지하고, v4 전용 검증기는 v3 입력을 거절한다. 기존 거래의 선택 cancellationDate 규칙은 두 버전 모두 유지한다.
+
+공개된 청구의 items만 노출한다. 청구 카드가 미연결이면 청구 전체를 생략하고 기존 response/statements/card 표식을 사용한다. 공개된 항목의 거래가 미연결이면 transactionId 키만 생략하고 `{ownerType:"statementItem",ownerId:공개 itemId,field:"transactionId",targetKind:"transaction",reason:"not_connected"}`로 표시한다. 실제 연결 없음은 transactionId=null이며 제한을 만들지 않는다. sourceRef 등에 숨겨진 거래 ID가 포함돼 있으면 기존 규칙대로 오류 처리하고 문자열 치환으로 숨기지 않는다.
+
+항목의 label·merchantName·날짜·금액은 공개 권한이 확인된 청구 원천 값만 유지한다. 미연결 원거래의 값을 조회하여 채우지 않는다. 다른 사용자 항목/거래는 거절하며 not_connected로 설명하지 않는다. 공개 가능한 item.transactionId만 중복 제거해 includedTransactionRefs를 파생한다. 거래를 생략했다면 기존 statement/includedTransactionRefs 표식도 유지한다.
+
+조회 페이지에 거래가 없다는 이유로 연결 없음이나 접근 제한으로 처리하지 않는다. 서버가 확인한 동일 사용자·카드의 원천 관계 및 기관 권한을 기준으로 공개하고, 권한 있는 다음 페이지 참조는 ID를 유지한다. 다음 페이지 거래를 relatedTransactions에 복제하거나 unavailable로 꾸미지 않는다. 원천 관계의 권한을 확인할 수 없으면 503 계약을 유지한다.
+
+`statementItem`의 ownerId는 공개 Statement.items 안의 itemId로 확인한다. v4의 신규 등록 조합은 `statementItem / itemId / transactionId / transaction`이며 v3 등록표에 소급해서 넣지 않는다. 아래 기존 표의 statement/includedTransactionRefs 조합은 유지한다. 전체 응답 조립은 items 검증과 기존 페이지/접근 규칙을 함께 적용해야 한다. 오프라인 `billing_projection.py`는 이 청구 조각의 계약 검증용 참조 구현이며 금융 HTTP 서비스 또는 전체 Snapshot 변환기가 아니다.
 
 ## 1. 전달 버전과 정상 응답
 
-현재 API 표현은 `schemaVersion="PAYSE-API-0.6-3"`, 원본은 `PAYSE-DRAFT-3`다. v3은 [데이터 모델의 급여 회차](data-model.md#급여-회차와-예정일)에 따라 payMonth를 필수로 제공한다. v2의 반복 계획·접근 제한 계약은 유지한다. 구 원본/응답을 날짜 기반 payMonth 보충으로 묵시 변환하지 않는다. 소비자는 지원하는 schemaVersion을 명시하고 미지원 버전은 오류로 처리한다. 새 계약 배포와 소비자 버전·필드 파싱의 배포 준비는 별도로 확인한다.
+기존 API 계약은 `PAYSE-API-0.6-3`/`PAYSE-DRAFT-3`, 새 공동 적용 계약은 `PAYSE-API-0.6-4`/`PAYSE-DRAFT-4`다. 아직 v4의 모바일 통합·금융 HTTP 배포를 완료한 상태가 아니다. v3은 [데이터 모델의 급여 회차](data-model.md#급여-회차와-예정일)에 따라 payMonth를 필수로 제공한다. v2의 반복 계획·접근 제한 계약은 유지한다. 구 원본/응답을 날짜 기반 payMonth 보충으로 묵시 변환하지 않는다. 소비자는 지원하는 schemaVersion을 명시하고 미지원 버전은 오류로 처리한다. 새 계약 배포와 소비자 버전·필드 파싱의 배포 준비는 별도로 확인한다.
 
 같은 원천 버전의 내용을 변경하지 않는다. 원천 형식 전환은 새 sourceVersion과 현재 원천 자원의 참조를 일관되게 갱신하되, 기존 ID·금액·날짜·asOf·사용자 dataVersion·과거 승인 기록의 sourceVersion을 바꾸지 않는다. ruleVersion은 형식 전환만으로 올리지 않는다. 급여 근거가 제한되면 기존 salary.receiptEvidence 부모 키 생략·표식을 그대로 사용하고 payMonth만 우회 공개하지 않는다. 신규 accessRestrictions tuple은 추가하지 않는다.
 

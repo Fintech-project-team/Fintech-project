@@ -3,9 +3,12 @@ package com.payse.api.auth;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
+import com.payse.api.finance.TransactionRepository;
+import com.payse.api.finance.TransactionRepository.OriginalState;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -37,14 +40,16 @@ class AuthJdbcTest {
     private JdbcTemplate jdbc;
     private AuthRepository repository;
     private AuthTransactions transactions;
+    private TransactionRepository links;
 
     /**
      * 준비 도구가 제공한 관계 입력을 보관하며 표시명이나 첫 행으로 대상을 찾지 않는다.
      * @created 2026-10-25
      * @usedBy AuthJdbcTest.loadFixture, 인증 조회·소유권 검사
+     * @modified 2026-10-29 - 검증된 원거래 관계 입력 연결
      */
     private record Fixture(UUID userId, UUID sessionId, UUID accountId, String name,
-            String phone, String tokenDigest, String verifier) {
+            String phone, String tokenDigest, String verifier, LinkInputs links) {
         /**
          * 테스트 실패 출력에서도 토큰·verifier·합성 자격 원문을 숨긴다.
          * @created 2026-10-25
@@ -95,24 +100,27 @@ class AuthJdbcTest {
      * @usedBy AuthJdbcTest.readEnvironment
      * @param index 준비 입력의 0 또는 1 슬롯이며 DB 행 순서가 아님
      * @return UUID로 연결된 사용자·세션·계좌 입력
+     * @modified 2026-10-29 - 원거래 준비 ID를 입력으로 전달
      */
     private static Fixture loadFixture(int index) {
         return new Fixture(UUID.fromString(required("USER_" + index)),
             UUID.fromString(required("SESSION_" + index)), UUID.fromString(required("ACCOUNT_" + index)),
             required("NAME_" + index), required("PHONE_" + index),
-            required("TOKEN_" + index), required("VERIFIER_" + index));
+            required("TOKEN_" + index), required("VERIFIER_" + index), loadLinks(index));
     }
 
     /**
      * 같은 물리 연결 재사용과 중첩 연결 대기 방지를 검증할 크기 1 풀을 연다.
      * @created 2026-10-25
      * @usedBy JUnit BeforeEach
+     * @modified 2026-10-29 - 인증과 같은 JDBC의 원거래 저장소 추가
      */
     @BeforeEach
     void openPool() {
         pool = newPool(1);
         jdbc = new JdbcTemplate(pool);
         repository = new AuthRepository(jdbc);
+        links = new TransactionRepository(jdbc);
         transactions = new AuthTransactions(jdbc, new JdbcTransactionManager(pool));
         assertEquals(login, jdbc.queryForObject("SELECT session_user", String.class));
         // 테스트 로그인 자체의 관리자·RLS 우회 권한이 없는지 실제 서버에서 확인한다.
@@ -396,5 +404,142 @@ class AuthJdbcTest {
             for (var future : executor.invokeAll(requests)) if (future.get(15, TimeUnit.SECONDS)) allowed++;
             assertEquals(60, allowed);
         }
+    }
+
+    /**
+     * 준비 단계에서 소유권·관계를 확인한 거래 식별자를 보관한다.
+     * @created 2026-10-29
+     * @usedBy AuthJdbcTest.loadLinks, 원거래 JOIN 검사
+     */
+    private record LinkInputs(UUID cardId, UUID purchaseId, UUID cancellationId,
+            UUID unavailableId, UUID missingId, UUID unreferencedId, UUID hiddenPurchaseId) {
+        /**
+         * 테스트 실패 메시지에 금융 식별자를 남기지 않는다.
+         * @created 2026-10-29
+         * @usedBy JUnit 객체 표현
+         * @return 원문 없는 고정 설명
+         */
+        @Override public String toString() { return "LinkInputs[REDACTED]"; }
+    }
+
+    /**
+     * 준비된 원결제·취소와 미확보 참조를 명시적인 환경 키로 읽는다.
+     * @created 2026-10-29
+     * @usedBy AuthJdbcTest.loadFixture
+     * @param index 준비 입력 슬롯; DB 행 순서가 아님
+     * @return 검증된 관계 ID 입력
+     */
+    private static LinkInputs loadLinks(int index) {
+        return new LinkInputs(UUID.fromString(required("CARD_" + index)),
+            UUID.fromString(required("PURCHASE_" + index)),
+            UUID.fromString(required("CANCELLATION_" + index)),
+            UUID.fromString(required("UNAVAILABLE_" + index)),
+            UUID.fromString(required("MISSING_" + index)),
+            UUID.fromString(required("UNREFERENCED_" + index)),
+            UUID.fromString(required("HIDDEN_PURCHASE_" + index)));
+    }
+
+    /**
+     * 날짜만 있는 취소도 인증과 같은 연결에서 원결제 날짜·금액·버전에 연결한다.
+     * @created 2026-10-29
+     * @usedBy JUnit test
+     */
+    @Test
+    void joinsOriginalPurchase() {
+        for (Fixture fixture : fixtures) transactions.run(() -> {
+            assertTrue(repository.authorize(fixture.tokenDigest()).isPresent());
+            int backend = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
+            var result = links.findLink(fixture.links().cancellationId()).orElseThrow();
+            assertEquals(fixture.links().cancellationId(), result.id());
+            assertEquals(LocalDate.of(2026, 10, 13), result.cancellationDate());
+            assertEquals(fixture.links().purchaseId(), result.originalTransactionId());
+            assertEquals(OriginalState.AVAILABLE, result.originalState());
+            assertEquals(fixture.links().purchaseId(), result.original().id());
+            assertEquals(fixture.links().cardId(), result.original().cardId());
+            assertEquals("card_purchase", result.original().recordKind());
+            assertEquals(LocalDate.of(2026, 10, 12), result.original().purchaseDate());
+            assertEquals(30000L, result.original().amountKRW());
+            assertEquals("jdbc-source", result.original().sourceVersion());
+            assertEquals("TransactionLink[REDACTED]", result.toString());
+            assertEquals("Original[REDACTED]", result.original().toString());
+            assertEquals(backend, jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
+            return null;
+        });
+    }
+
+    /**
+     * 원거래 행 미확보와 참조 미상을 구분하고 두 경우 모두 현재 취소행을 보존한다.
+     * @created 2026-10-29
+     * @usedBy JUnit test
+     */
+    @Test
+    void preservesMissingOriginals() {
+        for (Fixture fixture : fixtures) transactions.run(() -> {
+            assertTrue(repository.authorize(fixture.tokenDigest()).isPresent());
+            var unavailable = links.findLink(fixture.links().unavailableId()).orElseThrow();
+            assertEquals(fixture.links().unavailableId(), unavailable.id());
+            assertEquals(LocalDate.of(2026, 10, 14), unavailable.cancellationDate());
+            assertEquals(fixture.links().missingId(), unavailable.originalTransactionId());
+            assertEquals(OriginalState.UNAVAILABLE, unavailable.originalState());
+            assertNull(unavailable.original());
+            var absent = links.findLink(fixture.links().unreferencedId()).orElseThrow();
+            assertEquals(fixture.links().unreferencedId(), absent.id());
+            assertEquals(LocalDate.of(2026, 10, 15), absent.cancellationDate());
+            assertEquals(OriginalState.ABSENT, absent.originalState());
+            assertNull(absent.originalTransactionId());
+            assertNull(absent.original());
+            var purchase = links.findLink(fixture.links().purchaseId()).orElseThrow();
+            assertNull(purchase.cancellationDate());
+            assertEquals(OriginalState.ABSENT, purchase.originalState());
+            return null;
+        });
+    }
+
+    /**
+     * 다른 사용자와 미연결 카드의 거래는 UUID를 알고 있어도 반환하지 않는다.
+     * @created 2026-10-29
+     * @usedBy JUnit test
+     */
+    @Test
+    void enforcesSourceAccess() {
+        for (int index = 0; index < fixtures.size(); index++) {
+            Fixture fixture = fixtures.get(index);
+            Fixture other = fixtures.get(1 - index);
+            transactions.run(() -> {
+                assertTrue(repository.authorize(fixture.tokenDigest()).isPresent());
+                assertTrue(links.findLink(other.links().cancellationId()).isEmpty());
+                assertTrue(links.findLink(other.links().purchaseId()).isEmpty());
+                assertTrue(links.findLink(fixture.links().hiddenPurchaseId()).isEmpty());
+                assertTrue(links.findLink(UUID.randomUUID()).isEmpty());
+                return null;
+            });
+        }
+    }
+
+    /**
+     * 인증 문맥 없이 자동 커밋하거나 별도 연결로 조회하는 경로를 거절한다.
+     * @created 2026-10-29
+     * @usedBy JUnit test
+     */
+    @Test
+    void requiresAuthenticatedTransaction() {
+        Fixture fixture = fixtures.get(0);
+        assertThrows(IllegalStateException.class, () -> links.findLink(fixture.links().cancellationId()));
+        assertThrows(IllegalStateException.class,
+            () -> transactions.run(() -> links.findLink(fixture.links().cancellationId())));
+        try (HikariDataSource separatePool = newPool(1)) {
+            var separate = new TransactionRepository(new JdbcTemplate(separatePool));
+            assertThrows(IllegalStateException.class, () -> transactions.run(() -> {
+                assertTrue(repository.authorize(fixture.tokenDigest()).isPresent());
+                return separate.findLink(fixture.links().cancellationId());
+            }));
+        }
+        transactions.run(() -> {
+            assertTrue(repository.authorize(fixture.tokenDigest()).isPresent());
+            assertTrue(links.findLink(fixture.links().cancellationId()).isPresent());
+            return null;
+        });
+        assertThrows(IllegalStateException.class,
+            () -> transactions.run(() -> links.findLink(fixture.links().cancellationId())));
     }
 }

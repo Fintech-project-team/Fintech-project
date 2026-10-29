@@ -1,5 +1,7 @@
 """2026-10-26: 새 PostgreSQL에서 세션 서비스와 기존 JDBC 회귀 검사를 실행한다.
 
+2026-10-28: 실제 인증 HTTP 검사를 같은 최소 권한 DB 환경에서 함께 검증한다.
+
 기존 서버 주소를 받지 않는다. 임시 준비 관리자와 최소 권한 앱 자격은 하위
 검사 프로세스 환경으로만 전달하고 결과 파일에 남기지 않는다.
 """
@@ -85,7 +87,8 @@ def fingerprint(cluster):
 def main():
     """2026-10-26: 새 클러스터에서 전체 Java 검사와 두 DB 보존 여부를 확인한다.
 
-    사용: 파일 직접 실행. 실제 HTTP·운영 DB 검증으로 보고하지 않는다.
+    2026-10-28: AuthHttpTest 실행·건너뜀을 확인한다.
+    사용: 파일 직접 실행. 운영 DB·HTTPS 외부 배포 검증으로 보고하지 않는다.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pg-bin", required=True, type=Path)
@@ -107,18 +110,20 @@ def main():
         suites = java_results()
         if not any(suite["name"].endswith(".SessionJdbcTest") for suite in suites):
             raise RuntimeError("SessionJdbcTest did not produce a JUnit result")
+        if not any(suite["name"].endswith(".AuthHttpTest") for suite in suites):
+            raise RuntimeError("AuthHttpTest did not produce a JUnit result")
         preserved = before_jdbc == jdbc_fingerprint(cluster) and before_finance == fingerprint(cluster)
         passed = completed.returncode == 0 and preserved and all(int(suite[key]) == 0
             for suite in suites for key in ("failures", "errors", "skipped"))
         cluster.report.update({"passed": passed, "javaExitCode": completed.returncode,
             "javaSuites": suites, "baselineRowsUnchanged": preserved,
-            "preservedFinancialTables": len(before_finance), "httpAuthenticationVerified": False,
+            "preservedFinancialTables": len(before_finance), "httpAuthenticationVerified": passed,
             "runtimeCredentialsPersisted": False})
         if not preserved:
             raise AssertionError("Session service checks changed baseline financial rows")
         if not passed:
             return 1
-        print("PASS: session service, existing JDBC checks and financial rows preserved")
+        print("PASS: authentication HTTP, session service, JDBC checks and financial rows preserved")
     return 0
 
 

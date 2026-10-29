@@ -1,0 +1,60 @@
+{
+  "id": "PAYSE-ANALYSIS-32-20261028",
+  "role": "integration",
+  "baseCommit": "d3b3981fcb387ea68d7241c899d7a1789f258087",
+  "branch": "docs/api/analysis-service-contracts",
+  "allowedPaths": [
+    "docs/payse-execution-contract.md",
+    "apps/api/docs/llm-execution.md",
+    "apps/api/docs/auth-foundation.md",
+    "apps/api/docs/spring-bootstrap.md",
+    "apps/api/docs/analysis-api.md",
+    "apps/api/docs/analysis-storage.md",
+    "apps/api/docs/service-boundaries.md",
+    "apps/api/docs/local-server-guide.md",
+    "apps/api/docs/history/README.md",
+    "apps/api/docs/history/2026-10-28-analysis-foundation.md",
+    "docs/tasks/PAYSE-ANALYSIS-32-20261028.json",
+    "docs/data-model.md"
+  ],
+  "changePaths": [
+    "docs/payse-execution-contract.md",
+    "apps/api/docs/llm-execution.md",
+    "apps/api/docs/auth-foundation.md",
+    "apps/api/docs/spring-bootstrap.md",
+    "apps/api/docs/analysis-api.md",
+    "apps/api/docs/analysis-storage.md",
+    "apps/api/docs/service-boundaries.md",
+    "apps/api/docs/local-server-guide.md",
+    "apps/api/docs/history/README.md",
+    "apps/api/docs/history/2026-10-28-analysis-foundation.md",
+    "docs/tasks/PAYSE-ANALYSIS-32-20261028.json",
+    "docs/data-model.md"
+  ],
+  "acceptance": [
+    "관련 이슈 #22, #23, #32: 분석 계약·최소 저장 구조와 인증/금융 설정의 경계를 명시한다.",
+    "AI 보존 지정·사용자 삭제/동일 근거 재보존 차단·달력3개월·최초 커밋 채택·식별 만료 후 복구 확정 정책을 반영한다.",
+    "현재 금융 v3·원천·모바일·계산·실제 DB를 변경하지 않는다. 신규 HTTP/DDL은 작성안이며 구현 완료로 표시하지 않는다.",
+    "로컬 PC 서버 가이드와 검증된 단일 적용 패키지를 제공한다."
+  ],
+  "readBefore": [
+    "docs/mvp-scope.md",
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/data-contracts.md",
+    "docs/database-schema.md",
+    "docs/api-contract.md",
+    "docs/api-response-models.md",
+    "docs/payse-execution-contract.md",
+    "apps/api/AGENT.md",
+    "apps/api/src/AGENTS.md",
+    "apps/api/docs/llm-execution.md",
+    "apps/api/docs/auth-database.md",
+    "apps/api/docs/spring-bootstrap.md",
+    "docs/data-model.md",
+    "docs/development-workflow.md",
+    "docs/toolchain.md"
+  ]
+}

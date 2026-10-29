@@ -15,6 +15,8 @@ from pathlib import Path
 from uuid import UUID, uuid5
 
 import sys
+import transaction_labels
+from card_returns import add_returns
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from reference_data.banks import load_bank_directory
 from reference_data.institutions import institution_rows
@@ -28,13 +30,7 @@ CARDS = [(row['code'],row['name']) for row in institution_rows() if row['kind']=
 SCHEMA = 'PAYSE-DRAFT-3'
 RULE = 'PAYSE-CALC-1'
 FIXTURE_VERSION = 'PAYSE-FIXTURE-3'
-TRANSACTION_NAMES = {
-    'expense': '생활비 결제', 'salary': '한빛테크 급여', 'telecom': '휴대폰 요금',
-    'daily': '동네마트', 'living': '생활비', 'rent': '월세', 'interest': '예금이자',
-    'subscription': '정기구독', 'debit': '국민카드 체크결제',
-    'card_payment': '카드 결제대금', 'bill_purchase': '생활용품점',
-    'repair': '가전수리비', 'shock': '자동차수리비', 'old_purchase': '가전제품점',
-}
+PLAN_LABELS = {'telecom': '휴대폰 요금', 'rent': '월세'}
 
 
 def uid(key: str) -> str:
@@ -64,6 +60,8 @@ def make_snapshot(alias: str, as_of: str = '2026-10-19T12:00:00+09:00') -> dict:
     """2026-10-19: Create a complete one-year development fixture for one synthetic owner.
 
     2026-10-23: Use natural labels and capture recurrence evidence from created IDs.
+    2026-10-28: Separate fictional counterparties/methods from saved plan labels.
+    2026-10-29: Add three linked card return cases without changing existing source facts.
     """
     user_id = uid(alias)
     today = date.fromisoformat(as_of[:10])
@@ -91,10 +89,10 @@ def make_snapshot(alias: str, as_of: str = '2026-10-19T12:00:00+09:00') -> dict:
     transactions=[]
     telecom_evidence=[]
     relations=[]
-    def add_transaction(key, day, amount, account=None, card=None, kind='account_entry', direction='out', name=None, classification='expense', **extra):
+    def add_transaction(key, day, amount, account=None, card=None, kind='account_entry', direction='out', classification='expense', **extra):
         """2026-10-19: Append a confirmed date-only source fact with explicit accounting semantics."""
-        name = TRANSACTION_NAMES['expense'] if name is None else name
-        row={**source('transaction',key),'transactionId':entity_id('transaction',key),'accountId':account,'cardId':card,'recordKind':kind,'amountKRW':amount,'direction':direction,'status':'posted','merchantName':name,'description':name,'purchaseDate':day if kind=='card_purchase' else None,'withdrawalDate':day if kind=='account_entry' and direction=='out' else None,'refundDate':day if kind=='card_refund' else None,'bookingDate':day if kind=='account_entry' else None,'occurredAt':None,'occurredAtBasis':None,'balanceReflected':True if kind=='account_entry' else None,'reflectionReason':'reflected' if kind=='account_entry' else 'not_applicable','originalTransactionId':None,'payseTransactionType':classification,'installmentCurrent':None,'installmentTotal':None}
+        name, description = transaction_labels.display(key, alias)
+        row={**source('transaction',key),'transactionId':entity_id('transaction',key),'accountId':account,'cardId':card,'recordKind':kind,'amountKRW':amount,'direction':direction,'status':'posted','merchantName':name,'description':description,'purchaseDate':day if kind=='card_purchase' else None,'withdrawalDate':day if kind=='account_entry' and direction=='out' else None,'refundDate':day if kind=='card_refund' else None,'cancellationDate':day if kind=='card_cancellation' else None,'bookingDate':day if kind=='account_entry' else None,'occurredAt':None,'occurredAtBasis':None,'balanceReflected':True if kind=='account_entry' else None,'reflectionReason':'reflected' if kind=='account_entry' else 'not_applicable','originalTransactionId':None,'payseTransactionType':classification,'installmentCurrent':None,'installmentTotal':None}
         row.update(extra)
         transactions.append(row)
         return row['transactionId']
@@ -104,41 +102,43 @@ def make_snapshot(alias: str, as_of: str = '2026-10-19T12:00:00+09:00') -> dict:
             """2026-10-19: Limit source generation to the annual window and confirmed asOf day."""
             return start <= value <= today
         if offset < 0 and available(month_shift(month,0,25)):
-            add_transaction(f'salary/{month:%Y-%m}',month_shift(month,0,25).isoformat(),3000000,accounts[0]['accountId'],direction='in',name=TRANSACTION_NAMES['salary'],classification='income')
+            add_transaction(f'salary/{month:%Y-%m}',month_shift(month,0,25).isoformat(),3000000,accounts[0]['accountId'],direction='in',classification='income')
         for i in (0,2,3):
             day=month_shift(month,0,15)
             if available(day):
-                transaction_id=add_transaction(f'account-expense/{i}/{month:%Y-%m}',day.isoformat(),[50000,0,30000,20000][i],accounts[i]['accountId'],name=TRANSACTION_NAMES['telecom'] if i==0 else TRANSACTION_NAMES['daily'])
+                transaction_id=add_transaction(f'account-expense/{i}/{month:%Y-%m}',day.isoformat(),[50000,0,30000,20000][i],accounts[i]['accountId'])
                 if i==0:
                     telecom_evidence.append(transaction_id)
         if available(month_shift(month,0,15)):
-            add_transaction(f'living/{month:%Y-%m}',month_shift(month,0,15).isoformat(),1800000,accounts[0]['accountId'],name=TRANSACTION_NAMES['living'])
-            add_transaction(f'rent-history/{month:%Y-%m}',month_shift(month,0,15).isoformat(),1200000,accounts[0]['accountId'],name=TRANSACTION_NAMES['rent'])
+            add_transaction(f'living/{month:%Y-%m}',month_shift(month,0,15).isoformat(),1800000,accounts[0]['accountId'])
+            add_transaction(f'rent-history/{month:%Y-%m}',month_shift(month,0,15).isoformat(),1200000,accounts[0]['accountId'])
         for i in (1,5):
             day=month_shift(month,0,15)
             if available(day):
-                add_transaction(f'interest/{i}/{month:%Y-%m}',day.isoformat(),1000,accounts[i]['accountId'],direction='in',name=TRANSACTION_NAMES['interest'],classification='income')
+                add_transaction(f'interest/{i}/{month:%Y-%m}',day.isoformat(),1000,accounts[i]['accountId'],direction='in',classification='income')
         for i,card in enumerate(cards):
             day=month_shift(month,0,12)
             if available(day):
-                purchase_id=add_transaction(f'card-purchase/{i}/{month:%Y-%m}',day.isoformat(),10000*(i+1),card=card['cardId'],kind='card_purchase',name=TRANSACTION_NAMES['subscription'])
+                purchase_id=add_transaction(f'card-purchase/{i}/{month:%Y-%m}',day.isoformat(),10000*(i+1),card=card['cardId'],kind='card_purchase')
                 if i==3:
-                    withdrawal_id=add_transaction(f'debit-bank/{month:%Y-%m}',day.isoformat(),40000,accounts[2]['accountId'],name=TRANSACTION_NAMES['debit'])
+                    withdrawal_id=add_transaction(f'debit-bank/{month:%Y-%m}',day.isoformat(),40000,accounts[2]['accountId'])
                     relations.append({'kind':'card_account_pair','fromId':purchase_id,'toId':withdrawal_id,'evidenceRef':f'fixture-debit/{month:%Y-%m}'})
                 elif available(month_shift(month,1,10)) and not (i==0 and offset==-1):
-                    add_transaction(f'historical-card-payment/{i}/{month:%Y-%m}',month_shift(month,1,10).isoformat(),10000*(i+1),accounts[0]['accountId'],name=TRANSACTION_NAMES['card_payment'],classification='card_payment')
+                    add_transaction(f'historical-card-payment/{i}/{month:%Y-%m}',month_shift(month,1,10).isoformat(),10000*(i+1),accounts[0]['accountId'],classification='card_payment')
+    # 현재 월의 사건을 아직 작성할 수 없는 기준일에는 직전 월의 합성 사례를 쓴다.
+    add_returns(add_transaction, cards, month_shift(today, 0 if today.day >= 15 else -1, 1))
     prior=month_shift(today,-1,15).isoformat()
-    purchase_id=add_transaction('bill-purchase',prior,100000,card=cards[0]['cardId'],kind='card_purchase',name=TRANSACTION_NAMES['bill_purchase'])
+    purchase_id=add_transaction('bill-purchase',prior,100000,card=cards[0]['cardId'],kind='card_purchase')
     payday=month_shift(today,0,10).isoformat()
-    payment_id=add_transaction('bill-payment',payday,110000,accounts[0]['accountId'],name=TRANSACTION_NAMES['card_payment'],classification='card_payment')
+    payment_id=add_transaction('bill-payment',payday,110000,accounts[0]['accountId'],classification='card_payment')
     statement={**source('statement','paid'),'statementId':entity_id('statement','paid'),'cardId':cards[0]['cardId'],'amountKRW':110000,'dueDate':payday,'periodStart':month_shift(today,-1,1).isoformat(),'periodEnd':month_shift(today,-1,31).isoformat(),'includedTransactionRefs':[purchase_id,entity_id('transaction',f'card-purchase/0/{month_shift(today,-1,1):%Y-%m}')],'detailCompleteness':'complete'}
-    partial_payment_id=add_transaction('repair-partial',month_shift(today,0,16).isoformat(),40000,accounts[0]['accountId'],name=TRANSACTION_NAMES['repair'])
-    outgoing_id=add_transaction('internal-out',month_shift(today,0,17).isoformat(),50000,accounts[0]['accountId'],name='본인 계좌 이체',classification='internal_transfer')
-    incoming_id=add_transaction('internal-in',month_shift(today,0,17).isoformat(),50000,accounts[1]['accountId'],direction='in',name='본인 계좌 이체',classification='internal_transfer')
+    partial_payment_id=add_transaction('repair-partial',month_shift(today,0,16).isoformat(),40000,accounts[0]['accountId'])
+    outgoing_id=add_transaction('internal-out',month_shift(today,0,17).isoformat(),50000,accounts[0]['accountId'],classification='internal_transfer')
+    incoming_id=add_transaction('internal-in',month_shift(today,0,17).isoformat(),50000,accounts[1]['accountId'],direction='in',classification='internal_transfer')
     relations.append({'kind':'internal_transfer','fromId':outgoing_id,'toId':incoming_id,'evidenceRef':'fixture-owned-transfer-1'})
     plan_id=entity_id('plan','telecom');revision_id=entity_id('revision','telecom-v1')
     first_month=f'{today:%Y-%m}'
-    revision={'userId':user_id,'revisionId':revision_id,'planId':plan_id,'effectiveFromMonth':first_month,'label':TRANSACTION_NAMES['telecom'],'amountKRW':50000,'monthlyDay':25,'paymentTiming':'immediate','scheduleBasis':'withdrawal','withdrawalAccountId':accounts[0]['accountId'],'cardId':None,'status':'active','scheduleOverrides':[]}
+    revision={'userId':user_id,'revisionId':revision_id,'planId':plan_id,'effectiveFromMonth':first_month,'label':PLAN_LABELS['telecom'],'amountKRW':50000,'monthlyDay':25,'paymentTiming':'immediate','scheduleBasis':'withdrawal','withdrawalAccountId':accounts[0]['accountId'],'cardId':None,'status':'active','scheduleOverrides':[]}
     revision['isCurrent']=True
     plan={'userId':user_id,'planId':plan_id,'firstOccurrenceMonth':first_month}
     obligations=[]
@@ -150,7 +150,7 @@ def make_snapshot(alias: str, as_of: str = '2026-10-19T12:00:00+09:00') -> dict:
     reserves=[{'userId':user_id,'reserveId':entity_id('reserve','emergency'),'accountId':accounts[0]['accountId'],'label':'현재 비상금','amountKRW':400000,'cancelledAt':None}]
     allocation={'userId':user_id,'allocationId':entity_id('allocation','repair'),'reserveId':reserves[0]['reserveId'],'obligationId':entity_id('obligation','repair'),'amountKRW':100000,'releasedKRW':40000,'releaseEvidence':[{'settlementLinkId':entity_id('settlement','repair'),'amountKRW':40000,'writeReceiptId':entity_id('receipt','initial-settlement')}]}
     evidence=telecom_evidence[-3:]
-    decisions=[{'userId':user_id,'decisionId':entity_id('decision','telecom'),'candidateKey':'fixture/telecom/three-months','ruleVersion':RULE,'sourceVersion':approval_version,'evidenceTransactionIds':evidence,'normalizedName':TRANSACTION_NAMES['telecom'],'decision':'approved','planId':plan_id}]
+    decisions=[{'userId':user_id,'decisionId':entity_id('decision','telecom'),'candidateKey':'fixture/telecom/three-months','ruleVersion':RULE,'sourceVersion':approval_version,'evidenceTransactionIds':evidence,'normalizedName':PLAN_LABELS['telecom'],'decision':'approved','planId':plan_id}]
     coverage=[{'targetKind':kind,'targetId':item[field],'requestedStart':start.isoformat(),'requestedEnd':today.isoformat(),'status':'complete','coveredRanges':[{'start':start.isoformat(),'end':today.isoformat()}],'missingRanges':[]} for kind,items,field in [('account',accounts,'accountId'),('card',cards,'cardId')] for item in items]
     snapshot={'userId':user_id,'schemaVersion':SCHEMA,'currency':'KRW','dataVersion':'1','sourceVersion':version,'ruleVersion':RULE,'asOf':as_of,'institutions':institutions,'institutionLinks':[{'userId':user_id,'linkId':entity_id('link',i['code']),'institutionCode':i['code'],'consentedAt':as_of,'disconnectedAt':None} for i in institutions],'coverage':coverage,'accounts':accounts,'cards':cards,'transactions':sorted(transactions,key=lambda x:x['transactionId']),'statements':[statement],'settings':{'salary':{'salaryDay':25,'salaryAmountKRW':3000000,'salaryAccountId':accounts[0]['accountId'],'receiptEvidence':[]},'cardPlans':[]},'obligations':obligations,'reserves':reserves,'allocations':[allocation],'settlements':settlements,'recurringPlans':[plan],'recurringDecisions':decisions,'recurringPlanRevisions':[revision],'occurrenceOverrides':[],'relatedTransactions':[],'referenceResolutions':[],'transactionRelations':relations,'occurrenceLinks':[{'recurrenceKey':f'{plan_id}:{first_month}','purchaseTransactionId':None,'statementId':None,'obligationId':entity_id('obligation','telecom'),'evidenceRef':'fixture-materialized-telecom'}],'page':{'nextCursor':None,'dataVersion':'1','sourceVersion':version}}
     return snapshot
@@ -215,7 +215,7 @@ def make_demo_snapshot(base: dict) -> dict:
     })
     snapshot['recurringPlanRevisions'].append({
         'userId': snapshot['userId'], 'revisionId': revision_id, 'planId': plan_id,
-        'effectiveFromMonth': '2026-10', 'label': TRANSACTION_NAMES['rent'],
+        'effectiveFromMonth': '2026-10', 'label': PLAN_LABELS['rent'],
         'amountKRW': 300000, 'monthlyDay': 22, 'paymentTiming': 'immediate',
         'scheduleBasis': 'withdrawal', 'withdrawalAccountId': rent['withdrawalAccountId'],
         'cardId': None, 'status': 'active', 'scheduleOverrides': [], 'isCurrent': True,
@@ -224,7 +224,7 @@ def make_demo_snapshot(base: dict) -> dict:
         'userId': snapshot['userId'], 'decisionId': uid('alpha/demo-ready/decision/rent'),
         'candidateKey': 'fixture/demo-ready/rent/three-months', 'ruleVersion': RULE,
         'sourceVersion': snapshot['sourceVersion'], 'evidenceTransactionIds': rent_evidence,
-        'normalizedName': TRANSACTION_NAMES['rent'], 'decision': 'approved', 'planId': plan_id,
+        'normalizedName': PLAN_LABELS['rent'], 'decision': 'approved', 'planId': plan_id,
     })
     rent.update(recurringPlanId=plan_id, recurrenceKey=recurrence_key, planRevisionId=revision_id)
     snapshot['occurrenceLinks'].append({
@@ -251,6 +251,7 @@ def build() -> tuple[dict, dict, dict]:
     2026-10-23: Resolve templates by owned IDs/relations, preserving scenario facts.
     2026-10-26: Add a manually supplied future schedule and an otherwise equal absent-source case.
     2026-10-26: Add an independent everyday-spending demo without changing existing cases.
+    2026-10-28: Add installment/edge cases; revise source display text without changing financial facts.
     """
     cases={};catalog={'fixtureVersion':FIXTURE_VERSION,'schemaVersion':SCHEMA,'ruleVersion':RULE,'cases':[],'events':[],'localVectors':[]}
     def add_case(name,snapshot,goal,expected):
@@ -283,14 +284,14 @@ def build() -> tuple[dict, dict, dict]:
     shock=copy.deepcopy(base)
     repair_link=owned_row(base,'settlements','linkId',uid('alpha/settlement/repair'))
     expense=copy.deepcopy(owned_row(base,'transactions','transactionId',repair_link['transactionId']))
-    expense.update(transactionId=uid('alpha/transaction/shock-1'),sourceRef='fixture/alpha/transaction/shock-1',accountId=base['accounts'][0]['accountId'],amountKRW=1700000,purchaseDate=None,withdrawalDate='2026-10-19',bookingDate='2026-10-19',merchantName=TRANSACTION_NAMES['shock'],description=TRANSACTION_NAMES['shock'],payseTransactionType='expense',occurredAt='2026-10-19T12:01:00+09:00',occurredAtBasis='withdrawal')
+    expense.update(transactionId=uid('alpha/transaction/shock-1'),sourceRef='fixture/alpha/transaction/shock-1',accountId=base['accounts'][0]['accountId'],amountKRW=1700000,purchaseDate=None,withdrawalDate='2026-10-19',bookingDate='2026-10-19',payseTransactionType='expense',occurredAt='2026-10-19T12:01:00+09:00',occurredAtBasis='withdrawal')
     shock['transactions'].append(expense);shock['accounts'][0]['balanceKRW']-=1700000
     update_versions(shock,base['sourceVersion']+':shock','2','2026-10-19T12:01:00+09:00')
     add_case('alpha-shock',shock,'준비 사건으로 잔액 하락; 기존 보호액 유지',{'compareTo':'alpha-ready','accountBalanceKRW':-200000,'reserveAmountKRW':400000,'sourceEventOnceOnly':True})
     catalog['events'].append({'eventId':'fixture/shock-1','userId':base['userId'],'beforeCase':'alpha-ready','afterCase':'alpha-shock','sourceVersionBefore':base['sourceVersion'],'sourceVersionAfter':shock['sourceVersion']})
     refund=copy.deepcopy(base)
     original=copy.deepcopy(owned_row(base,'transactions','transactionId',uid('alpha/transaction/bill-purchase')))
-    original.update(transactionId=uid('alpha/transaction/old-purchase'),sourceRef='fixture/alpha/transaction/old-purchase',cardId=base['cards'][0]['cardId'],purchaseDate='2025-09-15',amountKRW=200000,merchantName=TRANSACTION_NAMES['old_purchase'],description=TRANSACTION_NAMES['old_purchase'])
+    original.update(transactionId=uid('alpha/transaction/old-purchase'),sourceRef='fixture/alpha/transaction/old-purchase',cardId=base['cards'][0]['cardId'],purchaseDate='2025-09-15',amountKRW=200000)
     returned=copy.deepcopy(original);returned.update(transactionId=uid('alpha/transaction/partial-refund'),sourceRef='fixture/alpha/transaction/partial-refund',recordKind='card_refund',purchaseDate=None,refundDate='2026-10-05',direction='in',amountKRW=80000,originalTransactionId=original['transactionId'])
     refund['relatedTransactions']=[original];refund['transactions'].append(returned)
     update_versions(refund,base['sourceVersion']+':refund','2')
@@ -314,7 +315,7 @@ def build() -> tuple[dict, dict, dict]:
     purchase_month=month_shift(date.fromisoformat(base['asOf'][:10]),-4,1)
     purchase=copy.deepcopy(owned_row(base,'transactions','transactionId',uid(f'alpha/transaction/card-purchase/1/{purchase_month:%Y-%m}')))
     purchase.update(transactionId=uid('alpha/transaction/cancelled-approval'),sourceRef='fixture/alpha/transaction/cancelled-approval',purchaseDate='2026-10-18',status='cancelled',amountKRW=90000)
-    cancellation=copy.deepcopy(purchase);cancellation.update(transactionId=uid('alpha/transaction/cancellation'),sourceRef='fixture/alpha/transaction/cancellation',recordKind='card_cancellation',purchaseDate=None,direction='in',originalTransactionId=purchase['transactionId'],occurredAt='2026-10-18T14:00:00+09:00',occurredAtBasis='cancellation')
+    cancellation=copy.deepcopy(purchase);cancellation.update(transactionId=uid('alpha/transaction/cancellation'),sourceRef='fixture/alpha/transaction/cancellation',recordKind='card_cancellation',purchaseDate=None,cancellationDate='2026-10-18',direction='in',originalTransactionId=purchase['transactionId'],occurredAt='2026-10-18T14:00:00+09:00',occurredAtBasis='cancellation')
     cancelled['transactions'] += [purchase,cancellation]
     update_versions(cancelled,base['sourceVersion']+':cancelled-approval','2')
     add_case('cancelled-approval',cancelled,'미성립 승인 취소는 지급·환불과 별개',{'originalTransactionId':purchase['transactionId'],'extraNetConsumptionKRW':0})
@@ -363,8 +364,26 @@ def build() -> tuple[dict, dict, dict]:
          'flutterExpected': {'b': 2000000, 'e': 300000, 'r': 400000, 'o': 0, 'u': 1300000},
          'expectationScope': '독립 Flutter 검사 기대값; 서버 응답·서버 계산 결과가 아님'},
     )
+    # 2026-10-28: Existing snapshots stay unchanged; explicit demo profiles use ordinary tables.
+    from demo_cases import make_cases
+    for name, snapshot, goal, expected in make_cases(
+            make_demo_snapshot(base), beta, make_snapshot('gamma'), uid):
+        update_versions(snapshot, snapshot['sourceVersion'] + ':' + name, '1')
+        add_case(name, snapshot, goal, expected)
+    # 거래 표시 근거가 변경된 새 원천 버전이다. 승인 당시의 버전은 그대로 둔다.
+    for snapshot in cases.values():
+        if 'transactions' in snapshot:
+            transaction_labels.apply(snapshot)
+            update_versions(snapshot, snapshot['sourceVersion'] + ':reversals-1:labels-1', snapshot['dataVersion'])
+    # 현재 사례 전이를 가리키는 포인터는 과거 승인 기록과 달리 개정 원천에 맞춘다.
+    for event in catalog['events']:
+        event['sourceVersionBefore'] = cases[event['beforeCase']]['sourceVersion']
+        event['sourceVersionAfter'] = cases[event['afterCase']]['sourceVersion']
     for entry in catalog['cases']:
         snapshot=cases[entry['id']]
+        entry['preparedReversalIds'] = sorted(row['transactionId'] for row in snapshot.get('transactions', [])
+            if '/transaction/card-return/' in row['sourceRef']
+            and row['recordKind'] in ('card_cancellation', 'card_refund'))
         if 'accounts' in snapshot and all(coverage_row['status']=='complete' for coverage_row in snapshot['coverage']):
             entry['ledgerOpeningBalances']=[{'accountId':account['accountId'],'balanceKRW':account['balanceKRW']-sum((1 if transaction['direction']=='in' else -1)*transaction['amountKRW'] for transaction in snapshot['transactions'] if transaction['recordKind']=='account_entry' and transaction['accountId']==account['accountId'] and transaction['balanceReflected'] is True),'purpose':'검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음'} for account in snapshot['accounts']]
     catalog['localVectors']=[{'id':'same-day-no-time','scope':'Flutter 후속 검증 입력','incomeKRW':300000,'outflowKRW':400000,'date':'2026-10-25','timestamps':None,'expected':'일 마감 순액은 -100000; 일중 최초 부족 시각은 미상'}, {'id':'simulation-count-boundary','scope':'Flutter 후속 검증 입력','counts':[0,1,5,6],'expected':['결과 해제','계산 허용','계산 허용','거절']}, {'id':'three-salary-boundaries','scope':'Flutter 후속 검증 입력','asOf':'2027-01-31T12:00:00+09:00','paydays':['2027-02-28','2027-03-31','2027-04-30'],'expected':'반열린 3구간, 종료 상한 2027-04-30; 실제 거래/회차 자동 생성 금지'}]
