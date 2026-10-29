@@ -1,0 +1,34 @@
+{
+  "id": "PAYSE-MOBILE-FIXTURE-SYNC-132-20261029",
+  "role": "integration",
+  "baseCommit": "4e4fee779d338140c5717d789c0a025dbe05150f",
+  "branch": "feat/integration/fixture-sync-132",
+  "allowedPaths": [
+    "docs/tasks/PAYSE-MOBILE-FIXTURE-SYNC-132-20261029.json",
+    "apps/mobile/assets/fixtures/alpha-ready.json",
+    "apps/mobile/assets/fixtures/alpha-shock.json",
+    "apps/mobile/assets/fixtures/beta-ready.json",
+    "apps/mobile/assets/fixtures/demo-ready.json",
+    "apps/mobile/assets/fixtures/gamma-month-end.json",
+    "apps/mobile/assets/fixtures/salary-wait.json",
+    "apps/mobile/test/data/fake_repository_test.dart",
+    "apps/mobile/test/app/payse_app_test.dart"
+  ],
+  "acceptance": [
+    "목적: #132(A)로 바뀐 v3 공통 더미 원본(apps/api/fixtures/generated/snapshots/)을 앱 에셋 사본 6개에 그대로 복사해 사본 동일성 테스트(apps/mobile/test/data/fixture_copy_test.dart)를 다시 맞춘다. 2026-10-29 혜연 지시(#29 진행 계획 2단계). 확정된 A 원본을 그대로 옮기는 앱 작업이며 원본·생성기·계약은 바꾸지 않는다",
+    "대상: alpha-ready·alpha-shock·beta-ready·demo-ready·gamma-month-end·salary-wait. alpha-unconnected는 원본과 이미 같아 그대로 둔다",
+    "범위 밖: 앱 코드·파서·가짜 서버 변경, 아래 범위 조정 외 테스트 변경, 공통 더미 원본·생성기 변경, v4(generated-v4/) 반영, B의 생활 흐름 데이터 등록. 새 원본을 앱이 읽지 못하면 이 명세에서 코드를 고치지 않고 BLOCKED로 보고한다",
+    "범위 조정(2026-10-29 혜연 승인): 예전 더미 값을 그대로 적은 테스트 2개의 기대값만 새 원본에 맞춘다. fake_repository_test의 alpha-ready sourceVersion('…:base:reversals-1:labels-1')·거래 수(199), payse_app_test의 개발 설정 미리보기 demo-ready 거래 수('거래 202건'). 검사하는 성질(정수 금액·기준 시각·버전 보존·건수 표시)과 다른 기대값은 바꾸지 않는다",
+    "완료 조건: 6개 사본이 원본과 바이트 단위로 같다. 원본 형식은 PAYSE-DRAFT-3 그대로다. flutter test 전체 통과(사본 동일성 7건 포함). 개발 빌드의 데모알파(demo-ready) 홈 쓸 수 있는 돈이 1,300,000원으로 유지된다(기존 앱 진입·홈 계산 테스트로 확인). npm run verify -- --task 이 명세 PASS",
+    "에뮬레이터 화면 확인은 사용자 확인 항목이다"
+  ],
+  "readBefore": [
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/FLUTTER_TRANSITION.md",
+    "docs/data-model.md",
+    "apps/api/fixtures/docs/dummy-data.md",
+    "docs/demo/realism/README.md",
+    "docs/harness/AGENT_REVIEW.md"
+  ]
+}
