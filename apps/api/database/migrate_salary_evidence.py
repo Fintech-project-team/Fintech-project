@@ -60,9 +60,12 @@ def read_regular(path):
 
 
 def snapshot_query():
-    """2026-10-23: Hash all rows and preserve only the approved salary/version differences."""
+    """2026-10-23: Hash all rows and preserve only the approved salary/version differences.
+
+    2026-10-29: Keep the pre-cancellation-date table contract for this historical transition.
+    """
     pairs = []
-    for table in sorted(common.table_contract(HERE / '001_initial.sql')):
+    for table in sorted(common.table_contract(common.FROZEN_COMMON)):
         expression = 'to_jsonb(t)'
         if table == 'source_contexts':
             expression = "(to_jsonb(t)-'source_version'-'schema_version'-'salary_evidence')||jsonb_build_object('salary_evidence',COALESCE((SELECT jsonb_agg(e.value-'payMonth' ORDER BY e.n) FROM jsonb_array_elements(t.salary_evidence) WITH ORDINALITY e(value,n)),'[]'::jsonb))"
@@ -175,7 +178,7 @@ def apply_plan(psql, database, backup, expected_sha256, timeout_seconds, lock_ti
     updated = transformed_sources(state, archive['mapping'])
     guard_digest, guards = target_guards()
     require(guard_digest == archive['targetGuardSha256'], 'Reviewed target functions changed')
-    tables = common.table_contract(HERE / '001_initial.sql')
+    tables = common.table_contract(common.FROZEN_COMMON)
     locks = 'LOCK TABLE ' + ','.join('payse.' + table for table in sorted(tables)) + ' IN ACCESS EXCLUSIVE MODE;'
     prefix = transaction_prefix(lock_timeout_ms) + "SET LOCAL client_encoding='UTF8';\nSET LOCAL standard_conforming_strings=on;\n" + locks + '\nSET CONSTRAINTS ALL DEFERRED;\n'
     sql = 'DECLARE original jsonb; result jsonb; BEGIN\n'

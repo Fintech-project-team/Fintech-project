@@ -12,13 +12,13 @@
 
 금융 필드 사전은 [데이터 모델](../../../../docs/data-model.md), 물리 저장은 [DB 사전](../../../../docs/database-schema.md), 입력·이름 규칙은 [공통 API 계약](../../../../docs/api-contract.md)이 기준이다.
 
-인증 내부 설계는 [#21](https://github.com/Fintech-project-team/Fintech-project/issues/21), 세션·조회 구현은 [#22](https://github.com/Fintech-project-team/Fintech-project/issues/22), 설정 저장 구현은 [#23](https://github.com/Fintech-project-team/Fintech-project/issues/23)에 대응한다. 실제 Java 업무 API·기존 DB migration·파쇄 운영 작업은 미구현이며 상세 구현 범위를 해당 작업에 명시한다. Flutter Fake 구현을 실제 HTTP 연동 완료로 해석하지 않는다.
+인증 내부 설계는 [#21](https://github.com/Fintech-project-team/Fintech-project/issues/21), 세션·조회 구현은 [#22](https://github.com/Fintech-project-team/Fintech-project/issues/22), 설정 저장 구현은 [#23](https://github.com/Fintech-project-team/Fintech-project/issues/23)에 대응한다. 실제 Java 로그인·재확인·로그아웃 HTTP는 [인증 DB·HTTP](../auth-database.md)의 명시적 실행 조건에서 구현했다. 금융 조회·설정·탈퇴 HTTP, 기존 DB migration·파쇄 운영 적용은 완료하지 않았다. Flutter Fake 구현을 실제 HTTP 연동 완료로 해석하지 않는다.
 
 ## 기준 문서와 책임
 
 공통 제품 범위는 [제품 기준](../../../../docs/product-baseline.md), 논리 필드·관계는 [데이터 모델](../../../../docs/data-model.md), HTTP 입력·성공/오류·인증·쓰기/멱등·탈퇴는 [API 계약](../../../../docs/api-contract.md), 부분 연결·페이지는 [응답 계약](../../../../docs/api-response-models.md), 물리 저장은 [DB 사전](../../../../docs/database-schema.md)이 각각 단일 기준이다. 이 폴더에는 [인증 내부 설계](auth-design.md)와 [인증 검증](auth-verification.md)·[인계 체크리스트](review-checklist.md)를 둔다.
 
-경로·페이지 크기·DTO·본문 한도·입력 정규화 중 ‘제안’ 표시는 상위 계약에서 유지한다. 문서 규격 존재가 실제 API 구현·기기 통합·기존 DB 이행 완료를 뜻하지 않는다. 프론트의 A 확인 표시는 담당자 간 연결 검토이며 이미 확정된 제품 정책을 다시 선택하는 절차가 아니다.
+상위 계약의 제안은 확정 결정 없이 구현값으로 간주하지 않는다. 인증 본문 4096바이트는 사용자 확정에 따라 [서비스 경계](../service-boundaries.md)에 반영했으며, 공통 계약의 제안 표기 정정은 담당자 인계 대상으로 남겼다. 문서 규격 존재가 실제 API 구현·기기 통합·기존 DB 이행 완료를 뜻하지 않는다. 프론트의 A 확인 표시는 담당자 간 연결 검토이며 이미 확정된 제품 정책을 다시 선택하는 절차가 아니다.
 
 ## 버전 경계와 프론트 영향
 

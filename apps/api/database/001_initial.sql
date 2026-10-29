@@ -289,6 +289,7 @@ CREATE TABLE payse.financial_transactions (
   purchase_date date,
   withdrawal_date date,
   refund_date date,
+  cancellation_date date,
   booking_date date,
   occurred_at timestamptz,
   occurred_at_basis text,
@@ -333,6 +334,14 @@ CREATE TABLE payse.financial_transactions (
   CHECK (purchase_date IS NULL OR isfinite(purchase_date)),
   CHECK (withdrawal_date IS NULL OR isfinite(withdrawal_date)),
   CHECK (refund_date IS NULL OR isfinite(refund_date)),
+  CONSTRAINT cancellation_date_valid CHECK (
+    cancellation_date IS NULL
+    OR (record_kind = 'card_cancellation'
+      AND isfinite(cancellation_date)
+      AND (occurred_at IS NULL
+        OR (occurred_at_basis = 'cancellation'
+          AND (occurred_at AT TIME ZONE 'Asia/Seoul')::date = cancellation_date)))
+  ),
   CHECK (booking_date IS NULL OR isfinite(booking_date)),
   CHECK (occurred_at IS NULL OR isfinite(occurred_at)),
   CHECK (source_ref IS NULL OR length(btrim(source_ref)) > 0),
@@ -376,6 +385,8 @@ COMMENT ON COLUMN payse.financial_transactions.purchase_date IS '확인된 이�
 COMMENT ON COLUMN payse.financial_transactions.withdrawal_date IS '확인된 계좌 출금일; 입금일 전용 금지';
 
 COMMENT ON COLUMN payse.financial_transactions.refund_date IS '확인된 환불 반영일';
+
+COMMENT ON COLUMN payse.financial_transactions.cancellation_date IS '확인된 승인 취소일; 시각 미확보 가능, 미상은 null';
 
 COMMENT ON COLUMN payse.financial_transactions.booking_date IS '입금도 포함한 계좌 기장일';
 
@@ -446,22 +457,71 @@ COMMENT ON COLUMN payse.card_statements.period_end IS '확인된 이용기간 �
 COMMENT ON COLUMN payse.card_statements.detail_completeness IS 'complete/partial/unavailable';
 
 CREATE TABLE payse.statement_items (
+  id uuid NOT NULL,
   user_id uuid NOT NULL,
+  source_ref text NOT NULL,
+  source_version text NOT NULL,
   statement_id uuid NOT NULL,
   card_id uuid NOT NULL,
-  transaction_id uuid NOT NULL,
-  PRIMARY KEY (user_id, statement_id, transaction_id),
+  transaction_id uuid,
+  label text,
+  merchant_name text,
+  purchase_date date,
+  original_used_amount_krw payse.nonnegative_money,
+  billed_principal_krw payse.nonnegative_money,
+  fee_or_adjustment_amount_krw payse.money,
+  billed_amount_krw payse.money,
+  installment_months integer,
+  installment_round integer,
+  PRIMARY KEY (id),
+  UNIQUE (user_id, id),
+  UNIQUE (user_id, source_ref),
+  FOREIGN KEY (user_id, source_version) REFERENCES payse.source_contexts(user_id, source_version) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
   FOREIGN KEY (user_id, statement_id, card_id) REFERENCES payse.card_statements(user_id, id, card_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
-  FOREIGN KEY (user_id, transaction_id, card_id) REFERENCES payse.financial_transactions(user_id, id, card_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+  FOREIGN KEY (user_id, transaction_id, card_id) REFERENCES payse.financial_transactions(user_id, id, card_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+  CONSTRAINT statement_item_source_ref CHECK (length(btrim(source_ref)) > 0),
+  CONSTRAINT statement_item_source_version CHECK (length(btrim(source_version)) > 0),
+  CONSTRAINT statement_item_purchase_date CHECK (purchase_date IS NULL OR isfinite(purchase_date)),
+  CONSTRAINT statement_item_installment_months CHECK (installment_months IS NULL OR installment_months > 0),
+  CONSTRAINT statement_item_installment_round CHECK (installment_round IS NULL OR installment_round > 0),
+  CONSTRAINT statement_item_installment_order CHECK (
+    installment_months IS NULL
+    OR installment_round IS NULL
+    OR installment_round <= installment_months
+  )
 );
+
+COMMENT ON COLUMN payse.statement_items.id IS '청구 항목의 안정된 내부 식별자; 한 구매의 여러 청구 항목을 구별';
 
 COMMENT ON COLUMN payse.statement_items.user_id IS '인증 세션에서 정한 소유자; 다른 사용자 참조 차단';
 
-COMMENT ON COLUMN payse.statement_items.statement_id IS '청구 참조';
+COMMENT ON COLUMN payse.statement_items.source_ref IS '기관·청구·원천 항목을 구분하는 안정된 키; 표시명이나 배열 순서로 생성 금지';
 
-COMMENT ON COLUMN payse.statement_items.card_id IS '교차 카드 참조를 복합 FK로 차단';
+COMMENT ON COLUMN payse.statement_items.source_version IS '사용자 현재 원천 묶음 버전; 청구 항목을 별도 권위로 복사하지 않음';
 
-COMMENT ON COLUMN payse.statement_items.transaction_id IS '확보된 포함 구매/환불 참조';
+COMMENT ON COLUMN payse.statement_items.statement_id IS '소유 청구서 참조; 같은 구매를 서로 다른 청구서에 연결 가능';
+
+COMMENT ON COLUMN payse.statement_items.card_id IS '청구서·연결 거래의 같은 카드 관계를 복합 FK로 검증';
+
+COMMENT ON COLUMN payse.statement_items.transaction_id IS '확보한 원거래 참조; 독립 청구 항목은 null, 가짜 거래 생성 금지';
+
+COMMENT ON COLUMN payse.statement_items.label IS '청구 원천의 항목 표시명; 미상은 null';
+
+COMMENT ON COLUMN payse.statement_items.merchant_name IS '청구 원천의 가맹점 표시명; 거래 원문을 덮어쓰지 않음';
+
+COMMENT ON COLUMN payse.statement_items.purchase_date IS '청구 원천이 확인한 이용일; 결제일이나 회차로 역산 금지';
+
+COMMENT ON COLUMN payse.statement_items.original_used_amount_krw IS '청구 원천이 확인한 최초 이용금액; 원거래 금액의 자동 복사 아님';
+
+COMMENT ON COLUMN payse.statement_items.billed_principal_krw IS '해당 청구 항목의 확인된 원금; 미상은 null';
+
+COMMENT ON COLUMN payse.statement_items.fee_or_adjustment_amount_krw IS '해당 항목의 확인된 가산 또는 음수 감산; 미상은 null';
+
+COMMENT ON COLUMN payse.statement_items.billed_amount_krw IS '해당 항목의 확인된 최종 청구액; 환급 등 음수 허용, 합계 자동 산출 아님';
+
+COMMENT ON COLUMN payse.statement_items.installment_months IS '해당 청구 원천에 명시된 전체 할부 개월; 미상은 null';
+
+COMMENT ON COLUMN payse.statement_items.installment_round IS '해당 청구 원천에 명시된 회차; 거래의 현재 회차를 복사하지 않음';
 
 CREATE TABLE payse.transaction_relations (
   user_id uuid NOT NULL,
@@ -876,6 +936,12 @@ WHERE statement_id IS NOT NULL AND status = 'active';
 
 CREATE UNIQUE INDEX active_settlement_pair ON payse.settlement_links(user_id, obligation_id, transaction_id)
 WHERE invalidated_at IS NULL;
+
+-- 청구별 항목 조회와 원거래에서 청구 목록으로 역조회하는 경로를 지원한다.
+CREATE INDEX statement_items_by_statement ON payse.statement_items(user_id, statement_id, id);
+
+CREATE INDEX statement_items_by_transaction ON payse.statement_items(user_id, transaction_id, statement_id)
+  WHERE transaction_id IS NOT NULL;
 
 CREATE INDEX transactions_by_account_date ON payse.financial_transactions(user_id, account_id, booking_date, id);
 

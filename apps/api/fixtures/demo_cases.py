@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import copy
 from datetime import date
+import transaction_labels
 
 
 def one(rows, purpose):
@@ -16,7 +17,7 @@ def one(rows, purpose):
     return matches[0]
 
 
-def add_transaction(snapshot, alias, make_id, key, amount, day, label,
+def add_transaction(snapshot, alias, make_id, key, amount, day,
                     *, account_id=None, card_id=None, incoming=False, installment=None):
     """2026-10-28: 명시된 합성 거래를 추가한다. 사용: make_cases.
 
@@ -36,13 +37,14 @@ def add_transaction(snapshot, alias, make_id, key, amount, day, label,
                  'transaction owner')
     if target['userId'] != snapshot['userId']:
         raise ValueError('Foreign transaction source')
+    merchant, method = transaction_labels.display('demo-edge/' + key, alias)
     row = {
         'userId': snapshot['userId'], 'sourceRef': f'fixture/{alias}/transaction/demo-edge/{key}',
         'sourceVersion': snapshot['sourceVersion'], 'transactionId': identity,
         'accountId': account_id, 'cardId': card_id,
         'recordKind': 'card_purchase' if is_card else 'account_entry',
         'amountKRW': amount, 'direction': 'in' if incoming else 'out', 'status': 'posted',
-        'merchantName': label, 'description': label,
+        'merchantName': merchant, 'description': method,
         'purchaseDate': day if is_card else None,
         'withdrawalDate': day if not is_card and not incoming else None,
         'refundDate': None, 'bookingDate': day if not is_card else None,
@@ -75,28 +77,28 @@ def make_cases(alpha, beta, gamma, make_id):
     for alias, case_id, baseline, description in definitions:
         snapshot = copy.deepcopy(baseline)
         ids = {}
-        for institution, key, amount, day, label, counts in (
-            ('card.hyundai', 'appliance', 180000, '2026-10-18', '생활가전 매장', (1, 3)),
-            ('card.samsung', 'computer', 360000, '2026-08-18', '누리컴퓨터', (2, 6)),
+        for institution, key, amount, day, counts in (
+            ('card.hyundai', 'appliance', 180000, '2026-10-18', (1, 3)),
+            ('card.samsung', 'computer', 360000, '2026-08-18', (2, 6)),
         ):
             card = one((row for row in snapshot['cards'] if row['institutionCode'] == institution), key)
             if card['cardType'] != 'credit':
                 raise ValueError('Installment source must be a credit card')
-            ids[key] = add_transaction(snapshot, alias, make_id, key, amount, day, label,
+            ids[key] = add_transaction(snapshot, alias, make_id, key, amount, day,
                                        card_id=card['cardId'], installment=counts)
         account_id = snapshot['settings']['salary']['salaryAccountId']
         if alias == 'beta':
-            for key, amount, day, label, incoming in (
-                ('side-income', 785000, '2026-10-10', '새봄디자인', True),
-                ('medical', 687400, '2026-10-12', '푸른의원', False),
-                ('purchase-a', 8900, '2026-10-18', '동네편의점', False),
-                ('purchase-b', 8900, '2026-10-18', '동네편의점', False),
+            for key, amount, day, incoming in (
+                ('side-income', 785000, '2026-10-10', True),
+                ('medical', 687400, '2026-10-12', False),
+                ('purchase-a', 8900, '2026-10-18', False),
+                ('purchase-b', 8900, '2026-10-18', False),
             ):
-                ids[key] = add_transaction(snapshot, alias, make_id, key, amount, day, label,
+                ids[key] = add_transaction(snapshot, alias, make_id, key, amount, day,
                                            account_id=account_id, incoming=incoming)
         if alias == 'gamma':
             ids['ambiguous-income'] = add_transaction(
-                snapshot, alias, make_id, 'ambiguous-income', 3000000, '2026-09-25', '입금',
+                snapshot, alias, make_id, 'ambiguous-income', 3000000, '2026-09-25',
                 account_id=account_id, incoming=True,
             )
         snapshot['transactions'].sort(key=lambda row: row['transactionId'])

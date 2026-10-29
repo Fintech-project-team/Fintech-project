@@ -1,5 +1,6 @@
 """Review, archive and apply the common-user schema transition on an explicit DB.
 
+This historical transition uses its frozen column contract; later additive migrations run separately.
 The batch installer never runs this tool. Take a full DB backup first. Removed
 scenario receipts are preserved in the review archive; all remaining rows stay intact.
 """
@@ -17,6 +18,7 @@ FORMAT='PAYSE-COMMON-STORAGE-1'
 RENAMES={'demo_users':'users','user_settings':'user_attributes'}
 LEGACY=HERE.parent/'tests/legacy/001_initial.sql'
 # This historical transition preserves v2 evidence; v3 requires a separate reviewed mapping.
+FROZEN_COMMON=HERE/'migrations/001_common_storage.v2.sql'
 FROZEN_GUARDS=HERE/'migrations/002_storage_guards.v2.sql'
 
 
@@ -30,8 +32,11 @@ def table_contract(path):
 
 
 def snapshot_query(legacy):
-    """2026-10-23: Archive removed records and digest every retained row under its common name."""
-    contract=table_contract(LEGACY if legacy else HERE/'001_initial.sql')
+    """2026-10-23: Archive removed records and digest every retained row under its common name.
+
+    2026-10-29: Use the frozen target columns; later additive migrations remain separate.
+    """
+    contract=table_contract(LEGACY if legacy else FROZEN_COMMON)
     pairs=[]
     for table in sorted(contract):
         if table=='demo_event_receipts':continue
@@ -51,8 +56,11 @@ def snapshot_query(legacy):
 
 
 def validate(snapshot, legacy):
-    """2026-10-23: Validate historical v2 guards; later salary-format migration is separate."""
-    require(snapshot['columns']==table_contract(LEGACY if legacy else HERE/'001_initial.sql'),'Unexpected schema; separate review required')
+    """2026-10-23: Validate historical v2 guards; later salary-format migration is separate.
+
+    2026-10-29: Validate against the reviewed historical column set, not new-install DDL.
+    """
+    require(snapshot['columns']==table_contract(LEGACY if legacy else FROZEN_COMMON),'Unexpected schema; separate review required')
     expected_sql=(HERE.parent/'tests/legacy/002_storage_guards.sql' if legacy else FROZEN_GUARDS).read_text(encoding='utf-8')
     known={name:body for name,body in re.findall(r'CREATE FUNCTION payse\.(\w+)\([^;]*?AS \$\$(.*?)\$\$;',expected_sql,re.S)}
     found={}
