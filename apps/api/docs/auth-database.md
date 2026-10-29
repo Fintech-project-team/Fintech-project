@@ -1,6 +1,6 @@
 # 인증 DB 접근과 요청 제한 저장
 
-담당은 A다. [인증 설계](v0.6/auth-design.md)의 DB 부분을 [003_auth_access.sql](../database/003_auth_access.sql)로 구현한다. 외부 요청·오류·제한 수치의 단일 기준은 [HTTP 계약](../../../docs/api-contract.md)이다. Java Repository·트랜잭션 기반과 AuthService의 세션 생성·종료·재확인을 구현하고 AuthController에서 HTTP로 연결한다. 세션 전이는 [004_auth_sessions.sql](../database/004_auth_sessions.sql)을 사용한다. 금융 조회·설정 저장·탈퇴·파쇄는 미구현이다.
+담당은 A다. [인증 설계](v0.6/auth-design.md)의 DB 부분을 [003_auth_access.sql](../database/003_auth_access.sql)로 구현한다. 외부 요청·오류·제한 수치의 단일 기준은 [HTTP 계약](../../../docs/api-contract.md)이다. Java Repository·트랜잭션 기반과 AuthService의 세션 생성·종료·재확인을 구현하고 AuthController에서 HTTP로 연결한다. 세션 전이는 [004_auth_sessions.sql](../database/004_auth_sessions.sql)을 사용한다. 금융 조회·설정 저장은 이 인증 문맥과 [007 최소 쓰기 권한](../database/007_financial_access.sql)을 재사용한다. 실행·검증은 [금융 API 인계](history/2026-10-29-financial-api-handoff.md), 탈퇴·파쇄는 별도 미구현 범위다.
 
 ## 적용과 보존
 
@@ -49,15 +49,15 @@ runtime은 신뢰된 서버 역할이다. PostgreSQL의 사용자 설정값은 �
 
 ## Java 호출 기반
 
-`auth.AuthRepository`는 위 기반 함수 5개와 아래 세션 함수 3개를 `JdbcTemplate` 파라미터로 호출한다. `recordIp`는 허용 여부/재시도 시각, `retryAt`·`recordFailure`는 nullable 재시도 시각, `findCode`는 코드 대조용 `StoredCode` 후보, `authorize`는 현재 트랜잭션의 `Session` 소유자를 반환한다. 이 객체들은 서버 내부 자료이며 외부 JSON 응답이 아니다. `StoredCode.toString()`은 verifier와 사용자 ID를 숨긴다.
+`auth.mapper.AuthRepository`는 위 기반 함수 5개와 아래 세션 함수 3개를 JPA `EntityManager`의 native SQL·파라미터 바인딩으로 호출한다. 기존 SQL 함수·권한·실행 순서는 유지한다. `recordIp`는 허용 여부/재시도 시각, `retryAt`·`recordFailure`는 nullable 재시도 시각, `findCode`는 코드 대조용 `StoredCode` 후보, `authorize`는 현재 트랜잭션의 `Session` 소유자를 반환한다. 이 객체들은 서버 내부 자료이며 외부 JSON 응답이 아니다. `StoredCode.toString()`은 verifier와 사용자 ID를 숨긴다.
 
-`auth.AuthTransactions.run`은 같은 DataSource의 JDBC 트랜잭션 관리자를 사용한다. 기존 트랜잭션·동기화·바인딩된 연결 안에서의 중첩 실행을 거절하고 READ COMMITTED·읽기/쓰기·`SET LOCAL ROLE payse_runtime`을 적용한다. 콜백 후 같은 연결의 `SELECT 1`로 DB가 오류 상태인지 확인하고 커밋·연결 반환까지 성공해야 결과를 돌려준다. 요청별 상태는 콜백 지역값에 둔다. SQL/트랜잭션 장애는 원문·원인 체인이 없는 `AuthStoreException`이며 인증 불일치나 빈 결과로 바꾸지 않는다. Repository가 DB 조회/결과 해석 장애를 발견하면 rollback-only를 표시하므로 호출자가 예외를 잡아도 정상 커밋할 수 없다.
+`auth.AuthTransactions.run`은 같은 EntityManagerFactory·DataSource의 `JpaTransactionManager`를 사용한다. 기존 트랜잭션·동기화·바인딩된 EntityManager/연결 안에서의 중첩 실행을 거절하고 READ COMMITTED·읽기/쓰기·`SET LOCAL ROLE payse_runtime`을 적용한다. 콜백 후 `flush`하고 같은 연결의 `SELECT 1`로 DB가 오류 상태인지 확인한다. 커밋·연결 반환까지 성공해야 결과를 돌려주며 EntityManager는 트랜잭션마다 분리한다. 요청별 상태는 콜백 지역값에 둔다. SQL/트랜잭션 장애는 원문·원인 체인이 없는 `AuthStoreException`이며 인증 불일치나 빈 결과로 바꾸지 않는다. Repository가 DB 조회/결과 해석 장애를 발견하면 실제 EntityTransaction에 rollback-only를 표시하므로 호출자가 예외를 잡아도 정상 커밋할 수 없다.
 
 호출 예시는 `transactions.run(() -> repository.recordIp(ipKey))`를 끝낸 뒤 별도 `run`에서 조합 제한→자격 비교→실패 기록을 처리하는 순서다. 실패 대조는 결과값을 반환해 커밋하고, 이후 HTTP 오류로 변환한다. 토큰 확인 후 금융 조회는 하나의 `run` 안에서 수행한다. 콜백에서 외부 API/LLM 호출·비동기 스레드 전환·직접 COMMIT/ROLLBACK/SET ROLE·예외를 잡은 뒤 금융 작업 계속하기는 허용하지 않는다. 인증 서비스의 순서는 아래 구현 절을 따르며 HTTP 경계의 순서 집행은 격리 PostgreSQL을 사용하는 AuthHttpTest로 검증한다.
 
 Spring의 `database` 프로필에서만 Repository·Transactions 두 bean을 등록한다. 기존 무DB 시작·생존 확인과 업무 HTTP 차단을 유지하며, 등록 자체가 로그인 API 개방이나 시드 활성화를 의미하지 않는다. `findCode`는 계정 활성/기존 세션/사용자 잠금 뒤 재검사를 완료하지 않으므로 자격 후보를 로그인 성공으로 반환하면 안 된다. 서버 저장 name을 포함한 세션 발급은 아래 004 전이와 AuthService에서 처리한다.
 
-트랜잭션 실행 방식은 [Spring TransactionTemplate](https://docs.spring.io/spring-framework/reference/data-access/transaction/programmatic.html), 파라미터 바인딩·동일 연결 사용은 [Spring JDBC](https://docs.spring.io/spring-framework/reference/data-access/jdbc/core.html)를 따른다. 운영에서 JDBC 파라미터/DB 원문 오류를 출력하는 추적 로그를 켜지 않는다. `toString` 숨김만으로 임의 직렬화나 추적 로그까지 차단되는 것은 아니다.
+트랜잭션 실행 방식은 [Spring TransactionTemplate](https://docs.spring.io/spring-framework/reference/data-access/transaction/programmatic.html)과 [JpaTransactionManager](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/orm/jpa/JpaTransactionManager.html)를 따른다. 운영에서 Hibernate SQL·바인딩·추출값·DB 원문 오류 추적 로그를 켜지 않는다. `toString` 숨김만으로 임의 직렬화나 추적 로그까지 차단되는 것은 아니다.
 
 ## 검증과 미연결 부분
 
