@@ -2,20 +2,20 @@
 
 [기준·범위](../apps/api/docs/v0.6/README.md) · [응답](api-response-models.md) · [인계·검증](../apps/api/docs/v0.6/review-checklist.md). 경로는 배포 prefix를 제외한 상대 경로다. HTTPS, UTF-8 JSON, `Authorization: Bearer <opaque-token>`, 인증·금융 응답 `Cache-Control: no-store`를 사용한다.
 
-현재 실행 Java는 bootstrap·생존 확인과 명시적인 database+auth 프로필의 세션 생성·종료·재확인 HTTP 경로를 제공한다. 금융 조회·설정 저장·탈퇴·LLM 경로는 아직 제공하지 않는다. 실행 조건과 실제 검증 범위는 [인증 구현 인계](../apps/api/docs/history/2026-10-28-auth-http-handoff.md)를 따른다.
+실행 Java는 `database,auth` 프로필에서 세션 생성·종료·재확인을 제공하고, `finance`를 함께 활성화하면 아래 §3·§4의 금융 조회·연결·설정 저장을 제공한다. 금융 공개 응답은 v3다. v4 공개 전환은 Flutter 공동 검증 후 진행하며 탈퇴·LLM HTTP는 이 구현에 포함하지 않는다. [인증 구현](../apps/api/docs/history/2026-10-28-auth-http-handoff.md)과 [금융 API 인계](../apps/api/docs/history/2026-10-29-financial-api-handoff.md)에서 실행 조건·검증 범위를 확인한다.
 
 ## 1. 공통 타입·검증
 
 공통 ID·Version·금액·Date/Time은 [데이터 모델 §1](data-model.md#1-읽는-방법과-공통-규칙)이 단일 기준이다. 아래는 HTTP 입력에만 추가하는 제약이다.
 
-| 타입  | 규칙                                                                         |
-| ----- | ---------------------------------------------------------------------------- |
-| Label | 구현 제한안: trim 후 1~80 grapheme. 공백뿐인 값 거절                         |
-| W     | `expectedDataVersion:Version`, `ruleVersion:string`, `idempotencyKey:string` |
+| 타입  | 규칙                                                                               |
+| ----- | ---------------------------------------------------------------------------------- |
+| Label | 사용자 확정: trim 후 1~80 grapheme. 공백뿐인 값 거절. 계좌 별칭은 §3의 1~12자 규칙 |
+| W     | `expectedDataVersion:Version`, `ruleVersion:string`, `idempotencyKey:string`       |
 
 W는 요청 최상위 필드다. 키는 1~128 ASCII 영숫자·점·밑줄·하이픈이며 UUID 사용을 권장한다. 필드 표의 `?`만 생략 가능하다. `|null`은 명시 null 허용이며 PATCH에서 생략과 구별한다.
 
-알 수 없는 쓰기 키, 숫자 문자열·소수·boolean 금액, 중복 ID, 빈 PATCH, 허용하지 않은 null은 422다. 필드 자동 보정·DB 객체 일괄 바인딩은 하지 않는다. 요청 본문 userId·원천 금액·지급 완료 boolean·기기 PIN을 허용하지 않는다. 인증 본문 상한은 4 KiB(4096바이트)로 확정하며 초과는 413이다. 기타 쓰기 본문 64 KiB는 구현 제한안이다. 응답을 같은 크기로 잘라 반환하지 않는다.
+알 수 없는 쓰기 키, 숫자 문자열·소수·boolean 금액, 중복 ID, 빈 PATCH, 허용하지 않은 null은 422다. 필드 자동 보정·DB 객체 일괄 바인딩은 하지 않는다. 요청 본문 userId·원천 금액·지급 완료 boolean·기기 PIN을 허용하지 않는다. 인증 본문 상한은 4 KiB(4096바이트), 금융 쓰기 본문 상한은 64 KiB(65,536바이트)로 사용자 확정하며 초과는 413이다. 응답을 같은 크기로 잘라 반환하지 않는다.
 
 ## 2. 인증·탈퇴
 
@@ -116,6 +116,8 @@ PIN 생성·확인·재설정은 Flutter의 로컬 잠금이다. PIN 원문·검
 화면 재진입에서 같은 기관 목록을 다시 보내는 **동일 논리 작업**은 같은 본문·버전·키다. 사용자가 목록을 바꿨으면 최신 Snapshot 확인 후 새 키로 저장한다. 집합 교체를 화면 클릭마다 새 키로 반복하지 않는다. 기관 추가/해제 화면의 P1 우선순위를 바꾸지 않는다.
 
 계좌 제외는 그 계좌의 보호 설정·원천·급여 근거를 삭제하지 않는다. 홈 선택과 연결 권한은 별개다. 연결 목록 변경 시 유지된 설정의 숨김·읽기 제한은 응답 모델을 따른다.
+
+금융사 연결 해제는 해당 은행 계좌의 계산 선택(`included`)도 해제한다. 재연결해도 자동으로 다시 선택하지 않으며 사용자가 계좌 선택에서 확정한다. 계좌 원천·급여 근거·예정 지출·모아둘 돈은 보존한다. 연결 변경·선택 해제·영수증·버전 증가는 같은 트랜잭션이다. 이는 현재 Flutter Fake 서버와 일치하도록 사용자가 확정한 동작이다.
 
 ## 4. 예정 지출·모아둘 돈·명시 배정
 

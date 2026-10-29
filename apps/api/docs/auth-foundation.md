@@ -1,6 +1,6 @@
 # 인증 입력·암호 기반
 
-`com.payse.api.auth`는 [인증 설계](v0.6/auth-design.md)의 입력·암호 연산을 담당한다. [외부 API 계약](../../../docs/api-contract.md)을 따른다. 암호 모듈 자체에는 DB 세션/제한 저장이 없다. AuthService·DB 함수·HTTP 연결과 활성화 조건은 [인증 DB·HTTP](auth-database.md)에 정의한다. `auth` 프로필만으로 업무 경로를 열지 않으며 코드 시드는 자동 활성화하지 않는다.
+`com.payse.api.auth.vo`와 `auth.crypto`는 [인증 설계](v0.6/auth-design.md)의 입력·암호 연산을 담당한다. [외부 API 계약](../../../docs/api-contract.md)을 따른다. 암호 모듈 자체에는 DB 세션/제한 저장이 없다. AuthService·DB 함수·HTTP 연결과 활성화 조건은 [인증 DB·HTTP](auth-database.md)에 정의한다. `auth` 프로필만으로 업무 경로를 열지 않으며 코드 시드는 자동 활성화하지 않는다.
 
 ## 책임과 호출 경계
 
