@@ -13,6 +13,7 @@ from uuid import UUID
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'fixtures'))
 from validate import validate_directory, validate_snapshot
+from statement_items import legacy_item_id
 
 CASES = ('alpha-ready', 'beta-ready', 'gamma-month-end')
 UUID_KEYS = frozenset('''owner_id other_owner_id future_owner_id owner_account_id
@@ -36,7 +37,7 @@ ROW_KEYS = {
     'obligations': ('id',), 'reserves': ('id',), 'reserve_allocations': ('id',),
     'settlement_links': ('id',), 'write_receipts': ('id',),
     'card_statements': ('id',),
-    'statement_items': ('user_id', 'statement_id', 'transaction_id'),
+    'statement_items': ('id',),
     'transaction_relations': ('user_id', 'kind', 'from_id', 'to_id'),
     'recurring_plans': ('id',), 'recurring_plan_revisions': ('id',),
     'occurrence_overrides': ('user_id', 'plan_id', 'occurrence_month'),
@@ -231,7 +232,7 @@ def build_from_snapshots(cases, seed_users):
     row('financial_cards', {'id': card['cardId'], 'user_id': owner['userId'], 'withdrawal_account_id': card['withdrawalAccountId']})
     row('card_statements', {'id': statement['statementId'], 'user_id': owner['userId'], 'card_id': card['cardId'], 'amount_krw': statement['amountKRW']})
     for purchase in purchases:
-        row('statement_items', {'user_id': owner['userId'], 'statement_id': statement['statementId'], 'card_id': card['cardId'], 'transaction_id': purchase['transactionId']})
+        row('statement_items', {'id': legacy_item_id(owner['userId'], statement['statementId'], purchase['transactionId']), 'user_id': owner['userId'], 'statement_id': statement['statementId'], 'card_id': card['cardId'], 'transaction_id': purchase['transactionId']})
     row('transaction_relations', {'user_id': owner['userId'], 'kind': transfer['kind'], 'from_id': transfer['fromId'], 'to_id': transfer['toId']})
     for p in [plan, future_plan]:
         row('recurring_plans', {'id': p['planId'], 'user_id': p['userId'], 'first_occurrence_month': p['firstOccurrenceMonth'] + '-01'})

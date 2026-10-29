@@ -40,11 +40,19 @@ class DemoEdgeTests(unittest.TestCase):
         catalog = json.loads((directory / 'catalog.json').read_text(encoding='utf-8'))
         cls.snapshots = {}
         cls.roles = {}
+        cls.returns = {}
         for name in CASES:
             case = one((row for row in catalog['cases'] if row['id'] == name), name)
             snapshot = json.loads((directory / case['file']).read_text(encoding='utf-8'))
             cls.snapshots[name] = one((row for row in snapshots if row['userId'] == snapshot['userId']), name)
             cls.roles[name] = {}
+            cls.returns[name] = []
+            for identity in case['preparedReversalIds']:
+                row = one((item for item in snapshot['transactions'] if item['transactionId'] == identity), 'card return')
+                original = one((item for item in snapshot['transactions'] if item['transactionId'] == row['originalTransactionId']), 'return purchase')
+                if row['userId'] != snapshot['userId'] or original['userId'] != row['userId'] or original['cardId'] != row['cardId']:
+                    raise ValueError('Foreign card return source')
+                cls.returns[name].append(row)
             for key, identity in case['expected']['preparationTransactionIds'].items():
                 row = one((row for row in snapshot['transactions'] if row['transactionId'] == identity), key)
                 if row['userId'] != snapshot['userId']:
@@ -125,6 +133,39 @@ class DemoEdgeTests(unittest.TestCase):
                 WHERE t.user_id = {owner}
                   AND t.id = {quote(transaction['transactionId'])};
                 """), [expected])
+
+    def test_card_returns_preserve_amounts_and_ownership(self):
+        """2026-10-29: 취소/환불 3건이 일반 테이블에서 원결제와 연결되는지 확인한다. 사용: unittest."""
+        for name, returns in self.returns.items():
+            self.assertEqual(len(returns), 3)
+            for row in returns:
+                observed = self.sql(f"""
+                -- 준비한 ID와 소유권으로 원결제 연결·표시 방향·현금 비반영을 조회한다.
+                SELECT jsonb_build_object(
+                    'kind', returned.record_kind,
+                    'amount', returned.amount_krw,
+                    'direction', returned.direction,
+                    'original', original.id,
+                    'sameCard', returned.card_id = original.card_id,
+                    'account', returned.account_id,
+                    'reflection', returned.reflection_reason,
+                    'refundDate', returned.refund_date,
+                    'timeBasis', returned.occurred_at_basis
+                )::text
+                FROM payse.financial_transactions returned
+                JOIN payse.financial_transactions original
+                  ON original.user_id = returned.user_id
+                 AND original.id = returned.original_transaction_id
+                WHERE returned.user_id = {quote(row['userId'])}
+                  AND returned.id = {quote(row['transactionId'])};
+                """)
+                self.assertEqual(len(observed), 1)
+                self.assertEqual(json.loads(observed[0]), {
+                    'kind': row['recordKind'], 'amount': row['amountKRW'], 'direction': 'in',
+                    'original': row['originalTransactionId'], 'sameCard': True, 'account': None,
+                    'reflection': 'not_applicable', 'refundDate': row['refundDate'],
+                    'timeBasis': row['occurredAtBasis'],
+                })
 
     def test_initial_export_has_no_user_plans(self):
         """2026-10-28: 초기 적재는 할부 원천만 추가하고 사용자 설정을 만들지 않는다. 사용: unittest."""

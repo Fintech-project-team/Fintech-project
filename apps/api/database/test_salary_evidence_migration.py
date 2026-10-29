@@ -17,7 +17,7 @@ API = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(API))
 sys.path.insert(0, str(API / 'fixtures'))
 from reference_data.export_sql import export as reference_sql
-from testing.scenarios.export_state import export as scenario_sql
+from legacy_seed import export as scenario_sql
 
 OPTIONS = None
 
@@ -37,7 +37,7 @@ class SalaryEvidenceMigrationTests(unittest.TestCase):
         self.archive = Path(self.temp.name) / 'archive.json'
         self.mapping_path = Path(self.temp.name) / 'mapping.json'
         self.sql('DROP SCHEMA IF EXISTS payse CASCADE;')
-        self.sql((API / 'database/001_initial.sql').read_text(encoding='utf-8'))
+        self.sql(common.FROZEN_COMMON.read_text(encoding='utf-8'))
         self.sql(common.FROZEN_GUARDS.read_text(encoding='utf-8'))
         self.sql(reference_sql())
         source = scenario_sql(API / 'fixtures/generated', ['alpha-ready', 'beta-ready', 'gamma-month-end'])

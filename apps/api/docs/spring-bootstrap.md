@@ -5,8 +5,8 @@
 ## 구현 범위
 
 - `GET /internal/health/live` → `{"status":"UP"}`. 프로세스 생존만 확인하며 DB 준비·로그인·금융 기능 완료를 뜻하지 않는다.
-- 그 외 경로는 401로 차단한다. 가짜 토큰·기본 계정·폼 로그인·서블릿 로그인 세션으로 우회할 수 없다. 쿠키/Basic 인증이 없고 업무 경로를 모두 차단하는 초기화에서는 CSRF 토큰 세션을 만들지 않는다. 후속 인증을 쿠키 방식으로 바꾸는 경우 CSRF 방어를 재설계해야 한다.
-- 내부 AuthService·DB 세션 생성/종료/재확인·인증 제한은 [인증 DB](auth-database.md)에 구현되어 있다. 공개 HTTP 인증 연결·조회/저장·LLM 호출은 후속 구현이다. 기존 401/403/409/422 계약은 변경하지 않는다. 이 PC의 단계별 준비는 [Windows 서버 가이드](local-server-guide.md)를 따른다.
+- 기본 실행은 그 외 경로를 차단한다. `database`+`auth` 및 필수 설정이 준비되면 로그인·재확인·로그아웃 세 경로만 허용한다. 인증은 Bearer와 서비스의 DB 검증을 사용하며 기본 계정·폼 로그인·쿠키/Basic 세션을 만들지 않는다. 후속 쿠키 인증 도입 시 CSRF 방어를 재설계한다.
+- 인증 HTTP·AuthService·DB 전이·제한은 [인증 DB](auth-database.md)를 따른다. 금융 조회/저장·탈퇴·LLM HTTP는 후속 구현이다. 이 PC의 단계별 준비는 [Windows 서버 가이드](local-server-guide.md)를 따르며 코드 구현을 외부 HTTPS 배포 완료로 해석하지 않는다.
 - Spring JDBC와 PostgreSQL 드라이버를 준비한다. 기본 실행은 DB 없이 가능하다. `database` 프로필을 명시하면 환경변수로 실제 PostgreSQL에 연결한다.
 - 기존 SQL/더미를 앱 기동 시 자동 적용하지 않는다. Flyway 마이그레이션 편입은 기존 BEGIN/COMMIT·역할/권한·이력 관리 검증과 함께 후속 작업으로 진행한다. 운영 스키마 자동 생성/수정은 없다.
 

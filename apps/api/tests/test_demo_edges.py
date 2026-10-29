@@ -128,7 +128,7 @@ class DemoEdgeTests(unittest.TestCase):
         card_id = self.transactions('demo-installments')['appliance']['cardId']
         for key, day in [('appliance', '2026-10-18'), ('future', '2026-10-20')]:
             with self.assertRaises(ValueError):
-                add_transaction(snapshot, 'alpha', uid, key, 100, day, '매장', card_id=card_id)
+                add_transaction(snapshot, 'alpha', uid, key, 100, day, card_id=card_id)
 
     def test_selected_initial_export_uses_ordinary_structure(self):
         """2026-10-28: 새 사례도 일반 사용자·속성·거래 구조만 사용한다. 사용: unittest."""

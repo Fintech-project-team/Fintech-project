@@ -1,6 +1,6 @@
 # 인증 DB 접근과 요청 제한 저장
 
-담당은 A다. [인증 설계](v0.6/auth-design.md)의 DB 부분을 [003_auth_access.sql](../database/003_auth_access.sql)로 구현한다. 외부 요청·오류·제한 수치의 단일 기준은 [HTTP 계약](../../../docs/api-contract.md)이다. Java Repository·트랜잭션 기반과 AuthService의 세션 생성·종료·재확인을 구현한다. 세션 전이는 별도 [004_auth_sessions.sql](../database/004_auth_sessions.sql)에서 제공한다. 실제 HTTP 연결·탈퇴·파쇄는 미구현이다.
+담당은 A다. [인증 설계](v0.6/auth-design.md)의 DB 부분을 [003_auth_access.sql](../database/003_auth_access.sql)로 구현한다. 외부 요청·오류·제한 수치의 단일 기준은 [HTTP 계약](../../../docs/api-contract.md)이다. Java Repository·트랜잭션 기반과 AuthService의 세션 생성·종료·재확인을 구현하고 AuthController에서 HTTP로 연결한다. 세션 전이는 [004_auth_sessions.sql](../database/004_auth_sessions.sql)을 사용한다. 금융 조회·설정 저장·탈퇴·파쇄는 미구현이다.
 
 ## 적용과 보존
 
@@ -53,7 +53,7 @@ runtime은 신뢰된 서버 역할이다. PostgreSQL의 사용자 설정값은 �
 
 `auth.AuthTransactions.run`은 같은 DataSource의 JDBC 트랜잭션 관리자를 사용한다. 기존 트랜잭션·동기화·바인딩된 연결 안에서의 중첩 실행을 거절하고 READ COMMITTED·읽기/쓰기·`SET LOCAL ROLE payse_runtime`을 적용한다. 콜백 후 같은 연결의 `SELECT 1`로 DB가 오류 상태인지 확인하고 커밋·연결 반환까지 성공해야 결과를 돌려준다. 요청별 상태는 콜백 지역값에 둔다. SQL/트랜잭션 장애는 원문·원인 체인이 없는 `AuthStoreException`이며 인증 불일치나 빈 결과로 바꾸지 않는다. Repository가 DB 조회/결과 해석 장애를 발견하면 rollback-only를 표시하므로 호출자가 예외를 잡아도 정상 커밋할 수 없다.
 
-호출 예시는 `transactions.run(() -> repository.recordIp(ipKey))`를 끝낸 뒤 별도 `run`에서 조합 제한→자격 비교→실패 기록을 처리하는 순서다. 실패 대조는 결과값을 반환해 커밋하고, 이후 HTTP 오류로 변환한다. 토큰 확인 후 금융 조회는 하나의 `run` 안에서 수행한다. 콜백에서 외부 API/LLM 호출·비동기 스레드 전환·직접 COMMIT/ROLLBACK/SET ROLE·예외를 잡은 뒤 금융 작업 계속하기는 허용하지 않는다. 인증 서비스의 순서는 아래 구현 절을 따르며 HTTP 경계의 순서 집행은 후속 검증 대상이다.
+호출 예시는 `transactions.run(() -> repository.recordIp(ipKey))`를 끝낸 뒤 별도 `run`에서 조합 제한→자격 비교→실패 기록을 처리하는 순서다. 실패 대조는 결과값을 반환해 커밋하고, 이후 HTTP 오류로 변환한다. 토큰 확인 후 금융 조회는 하나의 `run` 안에서 수행한다. 콜백에서 외부 API/LLM 호출·비동기 스레드 전환·직접 COMMIT/ROLLBACK/SET ROLE·예외를 잡은 뒤 금융 작업 계속하기는 허용하지 않는다. 인증 서비스의 순서는 아래 구현 절을 따르며 HTTP 경계의 순서 집행은 격리 PostgreSQL을 사용하는 AuthHttpTest로 검증한다.
 
 Spring의 `database` 프로필에서만 Repository·Transactions 두 bean을 등록한다. 기존 무DB 시작·생존 확인과 업무 HTTP 차단을 유지하며, 등록 자체가 로그인 API 개방이나 시드 활성화를 의미하지 않는다. `findCode`는 계정 활성/기존 세션/사용자 잠금 뒤 재검사를 완료하지 않으므로 자격 후보를 로그인 성공으로 반환하면 안 된다. 서버 저장 name을 포함한 세션 발급은 아래 004 전이와 AuthService에서 처리한다.
 
@@ -75,13 +75,13 @@ Spring의 `database` 프로필에서만 Repository·Transactions 두 bean을 등
 | `auth_open_session(userId,digest)` | 활성 계정·활성 세션 부재를 재검사하고 저장된 사용자/세션/이름/발급 시각을 반환. 기존 세션은 종료하지 않는다.                      |
 | `auth_end_session(digest)`         | 기존 authorize로 사용자·세션을 잠금 재확인한 후 현재 세션의 ended_at만 저장하고 사용자 문맥을 비움. 무효 토큰은 false.            |
 
-`AuthService`는 `database`와 `auth` 프로필이 모두 있을 때 등록된다. 실제 HTTP 경로는 계속 차단돼 있으며 이 서비스 등록만으로 로그인 API를 개방하지 않는다. 필요한 서버 비밀은 기존 auth 프로필 설정으로 주입한다. 기존 DISABLED 시드를 자동 활성화하거나 새 사용자·금융 자료를 생성하지 않는다.
+`AuthService`와 인증 HTTP는 `database`와 `auth` 프로필이 모두 있을 때 등록된다. DB·auth 비밀 설정 외에 `PAYSE_AUTH_PEER_MODE=direct`와 `server.forward-headers-strategy=none`을 요구한다. 기본 바인딩은 127.0.0.1이며 명시한 세 인증 경로만 허용한다. Forwarded/X-Forwarded-For/X-Real-IP를 신뢰하지 않는다. 신뢰 프록시·외부 HTTPS 배포는 후속 운영 설정이다. 기존 DISABLED 시드를 자동 활성화하거나 새 사용자·금융 자료를 생성하지 않는다.
 
 - `login`: IP 기록을 먼저 커밋·연결 반환 → 입력 검증 → 조합 잠금·차단 확인 → 사용자 잠금·현재 코드 대조 → 세션 생성. 이름과 issuedAt은 DB 저장 결과이며 토큰은 커밋이 성공한 뒤에만 반환한다.
-- `reverify`: IP 기록·조합 제한 뒤 현재 토큰의 소유자 한 명만 잠근다. 입력 자격의 소유자와 코드를 비교하며 다른 사용자를 추가로 잠그지 않는다. 실패 시 기존 세션은 유지하며 성공에도 새 토큰·세션을 만들지 않는다.
+- `reverify`: IP 기록 커밋 → 별도 트랜잭션에서 토큰 유효성 확인·잠금 반환 → 본문 검증 → 조합 제한 → 최종 토큰/계정 재검증·자격 대조 순서다. IP 제한은 429, 저장소 오류는 503으로 유지하며, IP 제한에 걸리지 않은 무효 토큰은 본문보다 우선하여 401 SESSION_INVALID로 거절한다. 사전 사용자 잠금을 보유한 채 조합 잠금을 기다리지 않는다. 최종 대조는 토큰 소유자만 잠그고 다른 사용자를 추가로 잠그지 않는다. 실패 시 기존 세션 유지, 성공 시 새 토큰·세션 없음은 그대로다.
 - `logout`: 현재 세션만 명시 종료한다. 이미 무효인 토큰은 SESSION_INVALID이고 금융 자료·설정은 유지한다.
 - 자격 실패는 `AuthResult.Failure`로 반환하여 제한 기록을 커밋한다. 기존 세션/비활성 때문에 거절된 정확한 자격은 실패 횟수를 늘리지 않는다. 저장·커밋 장애는 `AuthStoreException`이며 HTTP 어댑터가 503으로 변환해야 한다.
-- `rejectMalformed`는 해석할 수 없는 인증 본문도 IP에 한 번 세기 위한 서비스 진입점이다. 후속 HTTP 어댑터는 동일 요청에서 이 메서드와 login/reverify를 중복 호출하지 않아야 한다. 본문 제한·JSON 파싱·신뢰 프록시·Bearer 해석·Retry-After·no-store 처리는 HTTP 구현에서 검증한다.
+- HTTP는 `login/reverify`의 지연 입력 콜백으로 본문을 전달하여 IP 커밋 뒤 파싱한다. 기존 `rejectMalformed`와 중복 호출하지 않는다. `AuthHttpInput`은 UTF-8 application/json·중복 키·4096바이트·허용 필드/타입·단일 Bearer를 검사한다. `AuthHttpResponse`는 공개 오류 매핑·올림한 Retry-After·no-store·401 Bearer 헤더를 담당한다. 내부 AuthResult를 그대로 JSON으로 반환하지 않는다.
 
 `AuthResult`는 HTTP DTO가 아닌 내부 결과다. Login에는 최초 성공에 필요한 토큰만, Verified에는 기존 userId/sessionId만, Failure에는 오류 종류와 제한 시각만 둔다. 토큰·코드·이름 원문을 예외나 자동 문자열 표현에 포함하지 않는다. 인증 함수에 금융 dataVersion 변경이나 급여 계산을 추가하지 않는다.
 
