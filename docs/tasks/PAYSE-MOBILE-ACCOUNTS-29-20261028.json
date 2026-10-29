@@ -1,7 +1,7 @@
 {
   "id": "PAYSE-MOBILE-ACCOUNTS-29-20261028",
   "role": "integration",
-  "baseCommit": "57d5057d54a1ef26630021a46d3368f3a6d9818c",
+  "baseCommit": "96b90c942379af2c248eb9ff152ccb86df35ef40",
   "branch": "feat/integration/accounts-tab",
   "allowedPaths": [
     "docs/tasks/PAYSE-MOBILE-ACCOUNTS-29-20261028.json",
