@@ -1,11 +1,14 @@
 import '../../data/financial_snapshot.dart';
 
 /// 2026-10-22: 01-1·01-2에서 계좌를 부르는 이름(예: "국민 입출금 ····0001"). 계좌 번호는 끝 4자리만 쓴다.
+/// 2026-10-28: 사용자가 정한 계좌 이름이 있으면 '기관 상품' 대신 그 이름을 쓰고 끝 4자리로 계좌를 구분한다(예: "생활비 ····0001").
 String accountLabel(FinancialSnapshot snapshot, Account account) {
   final masked = account.maskedNumber;
   final last4 = masked.length <= 4
       ? masked
       : masked.substring(masked.length - 4);
+  final nickname = account.nickname;
+  if (nickname != null) return '$nickname ····$last4';
   return '${institutionName(snapshot, account.institutionCode)} '
       '${productTypeLabel(account.productType)} ····$last4';
 }

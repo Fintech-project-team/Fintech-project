@@ -162,4 +162,13 @@ void main() {
     expect(productTypeLabel('time_deposit'), '예금');
     expect(productTypeLabel('savings'), '적금');
   });
+
+  test('account label puts a saved name first and keeps the last four', () {
+    final snapshot = betaSnapshot(
+      {...betaBanks},
+      mutate: (source) =>
+          ((source['accounts']! as List).first as Map)['nickname'] = '생활비',
+    );
+    expect(accountLabel(snapshot, snapshot.accounts!.first), '생활비 ····0001');
+  });
 }
