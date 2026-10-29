@@ -1,0 +1,30 @@
+{
+  "id": "PAYSE-DEMO-REALISM-20261029",
+  "role": "allocation",
+  "baseCommit": "57d5057d54a1ef26630021a46d3368f3a6d9818c",
+  "branch": "docs/allocation/demo-realism-handoff",
+  "allowedPaths": ["docs/demo/realism/", "docs/tasks/PAYSE-DEMO-REALISM-20261029.json"],
+  "changePaths": [
+    "docs/demo/realism/README.md",
+    "docs/demo/realism/life_like_demo.py",
+    "docs/demo/realism/realism_check.py",
+    "docs/demo/realism/balance_check.py",
+    "docs/tasks/PAYSE-DEMO-REALISM-20261029.json"
+  ],
+  "acceptance": [
+    "목적: 공통 더미 현실성 개선 요청 자료를 git으로 A에게 전달한다(2026-10-29 혜연 결정: 슬랙 대신 git 공유, A가 생성기 반영). 기존 회귀 사례를 포함한 모든 사례가 대상이며 새 사례 추가 방식이 아니다",
+    "산출물: docs/demo/realism/README.md(요청·진행 순서·기준선·규칙 명세·합격 기준·하지 말 것·A 결정 사항·실행 방법), 규칙 참고 구현 life_like_demo.py, 합격 기준 검사 realism_check.py, 잔액 상세 balance_check.py",
+    "범위 밖: apps/api/의 생성기·공통 더미·테스트, 공통 계약·DB, 앱 에셋·Flutter 코드, 청구 항목(statements[].items) 계약. 샘플 JSON은 올리지 않으며 스크립트로 재생성한다",
+    "검증: life_like_demo.py 출력이 B 로컬 사본과 바이트 단위로 같음, realism_check.py가 develop 사례 폴더에서 실행됨, 필수 검사(npm run verify) 통과"
+  ],
+  "readBefore": [
+    "docs/mvp-scope.md",
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/harness/COMMIT_PR_POLICY.md",
+    "docs/demo/README.md",
+    "docs/data-model.md"
+  ]
+}
