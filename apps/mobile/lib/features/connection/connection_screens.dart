@@ -863,21 +863,30 @@ Widget _reloadButton(ConnectionFlowController controller) =>
 class AccountSelectScreen extends StatelessWidget {
   /// 2026-10-22: 흐름 상태 [controller], 뒤로 [onBack], 저장 성공 뒤 [onSaved]로 만든다.
   /// 2026-10-23: [devEntry]는 개발 빌드에서만 목록 끝에 붙는 개발 설정 진입이며 릴리스에서는 null이다.
+  /// 2026-10-29: [onUnchanged]가 있으면 선택이 현재 계산 포함 계좌와 같을 때 저장하지 않고 그것을 부른다(계좌 탭 진입).
   const AccountSelectScreen({
     super.key,
     required this.controller,
     required this.onSaved,
     this.onBack,
+    this.onUnchanged,
     this.devEntry,
   });
 
   final ConnectionFlowController controller;
   final VoidCallback? onBack;
   final VoidCallback onSaved;
+  final VoidCallback? onUnchanged;
   final Widget? devEntry;
 
   /// 2026-10-22: 선택을 저장하고 성공하면 다음 화면으로 넘긴다.
+  /// 2026-10-29: 계좌 탭에서 열었고 선택이 바뀌지 않았으면 저장하지 않고 돌아간다.
   Future<void> _save() async {
+    final unchanged = onUnchanged;
+    if (unchanged != null && !controller.selectionChanged) {
+      unchanged();
+      return;
+    }
     if (await controller.saveSelection()) onSaved();
   }
 

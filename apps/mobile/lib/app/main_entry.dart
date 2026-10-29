@@ -152,6 +152,16 @@ class _MainEntryState extends State<MainEntry> {
     if (mounted) setState(() => _record = record);
   }
 
+  /// 2026-10-29: 계좌 탭에서 저장에 성공해 받은 [snapshot]을 홈 셸의 스냅샷으로 삼는다. 진행 중 새로고침 응답은 버린다.
+  void _applySaved(FinancialSnapshot snapshot) {
+    if (!mounted) return;
+    setState(() {
+      _refreshes++;
+      _refresh = HomeRefresh.idle;
+      _refreshed = snapshot;
+    });
+  }
+
   /// 2026-10-28: 코치마크 기록 [record]를 사용자 [userId]로 남긴다.
   Future<void> _saveCoachmark(String userId, CoachmarkRecord record) async {
     await _coachmarks?.save(userId, record);
@@ -267,6 +277,12 @@ class _MainEntryState extends State<MainEntry> {
             onCoachmarkRecord: _coachmarks == null
                 ? null
                 : (record) => _saveCoachmark(snapshot.userId, record),
+            accountsWriter: (
+              repository: widget.financial,
+              policy: widget.policy,
+              onSessionInvalid: widget.onSessionInvalid,
+              onSnapshot: _applySaved,
+            ),
           ),
         ),
         EntryDestination.connect || EntryDestination.chooseAccounts => Builder(
