@@ -93,6 +93,19 @@ def protect(mode, content):
                content=content)
 
 
+def initial_sql(directory, *, demo_state=False):
+    """2026-10-30: 검증된 기본 원천 또는 명시한 시연의 일반 사용자 상태 SQL을 만든다. 사용: init·검사."""
+    sys.path[:0] = [str(API / 'fixtures'), str(API)]
+    from export_sql import export as financial, load_sources
+    if not demo_state:
+        return financial(directory)
+    from testing.scenarios.export_state import export as scenario
+    # 계정·initialCase·원천 소유 관계와 manifest는 기존 검증기로 확인한다.
+    # 시나리오 이름·사용자 ID를 별도 목록으로 복제하거나 제품 DB에 플래그를 저장하지 않는다.
+    _, seeds = load_sources(directory)
+    return scenario(directory, [seed['initialCase'] for seed in seeds.values()])
+
+
 class DevServer:
     """2026-10-29: 소유한 개발 폴더의 DB·JAR·비밀만 관리한다. 사용: main."""
 
@@ -208,8 +221,11 @@ class DevServer:
             self.db_identity()
             run([self.binary('pg_ctl'), '-D', self.data, '-w', '-t', '30', '-m', 'fast', 'stop'], timeout=40)
 
-    def init(self, pg_bin, pg_port, api_port):
-        """2026-10-29: 새 경로에만 초기 DB·일반 시드·키를 준비한다. 사용: init CLI."""
+    def init(self, pg_bin, pg_port, api_port, *, demo_state=False):
+        """2026-10-29: 새 경로에만 초기 DB·일반 시드·키를 준비한다. 사용: init CLI.
+
+        2026-10-30: 명시한 --demo-state만 연결·설정 포함 시연을 적재하며 기존 기본 적재는 유지한다.
+        """
         if self.home.exists() or pg_port == api_port or not all(1024 <= p <= 65535 for p in (pg_port, api_port)):
             raise ValueError('Initialization requires a new directory and two distinct nonprivileged ports')
         pg_bin = Path(pg_bin).resolve(strict=True)
@@ -218,6 +234,8 @@ class DevServer:
                 raise ValueError('PostgreSQL binaries are incomplete')
         port_free(pg_port)
         port_free(api_port)
+        # 잘못된 시드·선택은 폴더 생성이나 DB 시작 전에 실패시킨다.
+        prepared = initial_sql(API / 'fixtures/generated', demo_state=demo_state)
         self.home.parent.mkdir(parents=True, exist_ok=True)
         self.home.mkdir()
         sid = next(csv.reader(run(['whoami', '/user', '/fo', 'csv', '/nh']).splitlines()))[1]
@@ -250,9 +268,8 @@ class DevServer:
                 self.sql(filename=API / 'database' / name)
             sys.path[:0] = [str(API / 'fixtures'), str(API)]
             from reference_data.export_sql import export as institutions
-            from export_sql import export as financial
             self.sql(institutions())
-            self.sql(financial(API / 'fixtures/generated'))
+            self.sql(prepared)
             self.sql(f"""
                 BEGIN;
                 CREATE ROLE {LOGIN}
@@ -506,22 +523,35 @@ class DevServer:
                 'apiUrl': self.base_url, 'phase': self.state['phase']}
 
 
-def main():
-    """2026-10-29: 초기화와 반복 실행을 명시적으로 구분한다. 사용: 직접 CLI."""
+def parse_args(argv=None):
+    """2026-10-30: 시연 초기화 옵션을 init에만 허용하고 기존 서버 명령 오용을 거절한다. 사용: main·검사."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=('init', 'start', 'stop', 'restart', 'status', 'verify'))
     parser.add_argument('--home', type=Path, default=Path(os.environ.get('LOCALAPPDATA', '.')) / 'PAYSE/development/api-v3')
     parser.add_argument('--pg-bin', type=Path)
     parser.add_argument('--pg-port', type=int, default=15432)
     parser.add_argument('--api-port', type=int, default=18080)
-    args = parser.parse_args()
+    parser.add_argument('--demo-state', action='store_true',
+                        help='init only: prepare each seed initialCase with its connected user state')
+    args = parser.parse_args(argv)
+    if args.demo_state and args.command != 'init':
+        parser.error('--demo-state is only allowed with init; existing databases are not reseeded')
+    return args
+
+
+def main():
+    """2026-10-29: 초기화와 반복 실행을 명시적으로 구분한다. 사용: 직접 CLI.
+
+    2026-10-30: --demo-state를 새 init에만 전달하고 나머지 명령의 기존 동작은 유지한다.
+    """
+    args = parse_args()
     if os.name != 'nt':
         raise ValueError('This local manager is for Windows only')
     server = DevServer(args.home)
     if args.command == 'init':
         if args.pg_bin is None:
             raise ValueError('--pg-bin is required for initialization')
-        server.init(args.pg_bin, args.pg_port, args.api_port)
+        server.init(args.pg_bin, args.pg_port, args.api_port, demo_state=args.demo_state)
     else:
         server.load()
     if args.command in ('start', 'restart'):

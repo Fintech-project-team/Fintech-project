@@ -105,6 +105,18 @@ python -B apps/api/database/test_session_service.py --pg-bin "C:\Program Files\P
 
 일반 Gradle 검사에서 전용 DB 환경이 없으면 실제 PostgreSQL 검사는 SKIPPED다. 전용 실행기의 결과를 함께 확인하며 이 서비스 검사만으로 HTTP API·모바일 통합이 통과한 것으로 기록하지 않는다. `AuthJdbcTest`·`SessionJdbcTest`는 기존 클래스명을 유지하지만 제품 호출은 JPA 트랜잭션을 사용한다. 운영 시드의 인증 코드를 자동 활성화하지 않는다.
 
+## 급여 회차별 안내 저장
+
+`python -B apps/api/database/test_salary_notice_service.py --pg-bin <PostgreSQL bin> --work-dir <새 폴더>`는 신규 폐기 DB만 준비해 009 SQL, 최소 권한·사용자 격리·회차별 독립·동시 닫기·원자 롤백·실제 취소·로그아웃 경합과 기존 인증·금융 HTTP 회귀를 실행한다. 전체 실행은 `SalaryNoticeHttpTest`를 포함한 필수 Java suite와 skipped 0을 요구한다. `--sql-only`는 SQL만 검사하며 HTTP 통과를 뜻하지 않는다.
+
+Java 검사는 테스트용 인증 코드와 명시 원천 준비 변경을 각 검사에 구분해 적용한다. 각 검사 종료 시 금융 원천·설정·버전 불변을 먼저 대조한 뒤 합성 시드를 복원하고, 전체 실행기는 처음 준비한 DB 자료와 다시 대조한다. 실행 중인 기존 DB와 모바일 파일은 변경하지 않는다. 기능 계약·적용 순서는 [급여 안내](salary-notices.md)를 참조한다.
+
+## 계좌 거래 상태 제약
+
+`python -B apps/api/database/test_account_status.py --pg-bin <PostgreSQL bin> --work-dir <새 폴더>`는 폐기용 PostgreSQL에서 신규 001과 기존 DB용 010의 동일 제약·기존 행 보존·미지원 상태 거절·동시 쓰기·실패/취소 롤백을 검사한다. 계좌는 posted/unknown만 허용하며 카드 상태와 잔액 반영 값은 바꾸지 않는다.
+
+신규 001에 이미 같은 제약이 있으므로 010을 추가 실행하지 않는다. 기존 DB에 approved/cancelled 계좌 행이 있으면 010은 전체 롤백한다. 값을 임의 변환하지 않고 원천 의미를 확인한다. 이 검사는 실행 중인 개발 DB에 이행을 적용하지 않는다.
+
 ## 취소 날짜와 원거래 JOIN
 
 `python -B apps/api/database/test_cancellation_date.py --pg-bin <PostgreSQL bin> --work-dir <새 폴더>`는 새 소유 클러스터에서 신규 001·기존 DB용 005의 동일 제약, 기존 행 보존, 재실행 거절, 중간 실패 롤백을 검사한다. 실제 DB 주소를 받지 않는다. 과거 구조/급여 이행 검사는 frozen 001_common_storage.v2.sql 및 테스트 전용 legacy_seed.py의 175컬럼 입력을 사용한다. legacy_seed는 운영 적재 경로가 아니다.

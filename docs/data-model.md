@@ -2,7 +2,7 @@
 
 v1.0 논리 필드·타입·관계·수정 권한의 단일 기준이다. [#17 데이터 명세서](https://github.com/Fintech-project-team/Fintech-project/issues/17)에 대응한다. 이 문서의 모델을 API와 Flutter가 함께 사용한다. 실제 HTTP 생략/페이지 규칙은 [응답 계약](api-response-models.md), 요청·오류·인증은 [API 계약](api-contract.md), 물리 저장은 [DB 사전](database-schema.md)을 따른다.
 
-기존 PAYSE-DRAFT-3와 공동 적용 준비용 PAYSE-DRAFT-4 원본을 구분한다. 초기 SQL·생성/검증 및 인증 HTTP는 구현돼 있으며 금융 조회 HTTP·v4 모바일 통합은 미완료다. 기존 DB의 이름/청구 항목 전환은 별도 실행이다. JSON Schema/OpenAPI 완성본을 대신하지 않는다. 공동 변경은 [문서 공유 기준](development-notes.md)에 따라 영향받는 담당자가 확인한다.
+기존 PAYSE-DRAFT-3와 공동 적용 준비용 PAYSE-DRAFT-4 원본을 구분한다. 초기 SQL·생성/검증·인증 HTTP와 v3 금융 조회 HTTP는 구현돼 있다. v4 공개 전환은 API·Flutter 공동 검증 후 진행한다. 기존 DB의 이름/청구 항목 전환은 별도 실행이다. JSON Schema/OpenAPI 완성본을 대신하지 않는다. 공동 변경은 [문서 공유 기준](development-notes.md)에 따라 영향받는 담당자가 확인한다.
 
 ## 1. 읽는 방법과 공통 규칙
 
@@ -74,7 +74,7 @@ Snapshot의 `institutions: Institution[]`, `institutionLinks: InstitutionLink[]`
 | accountId / cardId                             | ID → Account / Card                                       | null 각각      | 적어도 하나 필수. 같은 사용자만 참조                                                                                                                       | account_id/card_id                          |
 | recordKind                                     | account_entry/card_purchase/card_refund/card_cancellation | 필수           | 원천: 계좌 내역/카드 구매/환불/취소. 취소를 새 현금 출금으로 해석 금지                                                                                     | 원천 JSON 또는 정규화 컬럼                  |
 | amountKRW / direction                          | 금액 / in·out                                             | 필수           | 원천: 비음수 크기. 계좌 내역은 현금 유입/유출, 카드 내역은 환급/사용 방향이며 계좌 출금 명령 아님                                                          | amount_krw/direction                        |
-| status                                         | approved/posted/cancelled/unknown                         | 필수           | 원천: 확인 단계. posted 카드 기록도 은행 출금 완료 증거가 아님                                                                                             | status                                      |
+| status                                         | approved/posted/cancelled/unknown                         | 필수           | 원천: 확인 단계. account_entry는 posted/unknown만 허용. posted 카드 기록도 은행 출금 완료 증거가 아님                                                      | status                                      |
 | merchantName / description                     | 문자열 각각                                               | null           | 원천 표시값, 사용자 수정 불가                                                                                                                              | 원천 JSON 또는 조회 컬럼                    |
 | purchaseDate / withdrawalDate / refundDate     | 날짜 각각                                                 | null           | 원천: 이용일/실제 출금일/환불 반영일. 서로 복제해 채우지 않음                                                                                              | 대응 date 컬럼                              |
 | cancellationDate                               | 날짜                                                      | 생략/null 허용 | 확인된 승인 취소일. card_cancellation에서만 사용하며 시각 미확보도 허용                                                                                    | financial_transactions.cancellation_date    |
@@ -97,6 +97,8 @@ Snapshot의 `institutions: Institution[]`, `institutionLinks: InstitutionLink[]`
 승인 취소 30,000원은 `amountKRW=30000`, `direction=in`, `recordKind=card_cancellation`으로 표현한다. 이 방향만으로 계좌 입금·소득·잔액 증가를 확정하지 않는다. originalTransactionId는 원거래가 식별될 때만 제공하며 null일 수 있다. ID가 있어도 현재 페이지·DB에서 원거래를 확보했다는 뜻은 아니다. 원거래 상세를 찾을 때 표시명·날짜·금액 추정 대신 같은 사용자 ID 관계를 사용한다. 공개 범위는 [응답 접근 규칙](api-response-models.md)을 따른다.
 
 계좌·카드·거래·청구는 공통 userId/sourceRef/sourceVersion을 상속한다. 계좌 반영 판단에는 해당 Account.asOf도 함께 사용한다. 반영 여부를 다른 기준시각에 재사용하지 않는다. 계좌 입금의 업무일은 bookingDate이며, 소비 귀속일 선택은 기존 구매일 우선·출금일 대체 규칙을 유지한다. occurredAtBasis가 지칭하는 날짜와 시각이 충돌하면 정상 확정 자료로 처리하지 않는다. 방향과 상태는 **PAYSE 제안 코드**이며 외부 공급자 값으로 주장하지 않는다. 취소 건은 취소 사실만, 환불 건은 실제 확인된 환불 금액만 표현한다. 부분 환불을 원구매 전액 취소로 바꾸지 않는다. 계좌 내역과 카드 기록이 같은 경제적 사건인지 확정할 때는 원천/청구/정산 근거를 사용하고 동일 금액·날짜로 합치지 않는다.
+
+계좌 내역(`account_entry`)의 `posted`는 확정 기록, `unknown`은 처리 상태 미확인이다. 계좌의 `approved`·`cancelled`는 지원하지 않으며 원천 검증에서 거절한다. 미지원 상태를 `posted`·`unknown`으로 자동 변환하거나 별도 입출금으로 만들어 보충하지 않는다. 카드 기록의 기존 상태 값은 유지한다. `status`와 `reflectionReason`은 별개이므로 `posted`만으로 잔액 반영을 확정하거나 `unknown`을 미반영으로 바꾸지 않는다.
 
 ## v4 청구 항목
 

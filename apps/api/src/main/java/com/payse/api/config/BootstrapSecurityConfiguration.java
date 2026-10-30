@@ -24,6 +24,7 @@ public class BootstrapSecurityConfiguration {
      * @usedBy Spring Security FilterChainProxy
      * @modified 2026-10-28 - 명시한 프로필에서 세 인증 경로만 허용
      * @modified 2026-10-29 - 금융 경로는 database+auth+finance에서 서비스 권한 검사를 거쳐 제공
+     * @modified 2026-10-30 - salary-notices 활성 시에만 회차별 안내 조회·닫기 경로 제공
      * @param http Spring이 제공하는 보안 구성기
      * @param environment DB/인증 프로필 활성 여부
      * @return 인증의 자격 검사는 서비스에 위임하고 다른 경로는 차단하는 필터 체인
@@ -52,6 +53,10 @@ public class BootstrapSecurityConfiguration {
                     authorize.requestMatchers(HttpMethod.PATCH, "/account-selection", "/accounts/{id}", "/settings",
                         "/obligations/{id}", "/reserves/{id}").permitAll();
                     authorize.requestMatchers(HttpMethod.DELETE, "/obligations/{id}", "/reserves/{id}").permitAll();
+                    if (environment.matchesProfiles("salary-notices")) {
+                        authorize.requestMatchers(HttpMethod.GET, "/salary-notices/{payMonth}").permitAll();
+                        authorize.requestMatchers(HttpMethod.PUT, "/salary-notices/{payMonth}/dismissal").permitAll();
+                    }
                 }
                 authorize.anyRequest().denyAll();
             })
