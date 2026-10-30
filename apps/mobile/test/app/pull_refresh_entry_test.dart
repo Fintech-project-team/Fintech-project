@@ -99,20 +99,22 @@ Future<TestGesture> _drag(WidgetTester tester, Finder list, double dy) async {
   return gesture;
 }
 
-/// 2026-10-30: 손가락 [gesture]를 [dy]만큼 20dp씩 옮긴다.
+/// 2026-10-30: 손가락 [gesture]를 [dy]만큼 40dp씩(마지막은 남은 만큼) 옮긴다.
 Future<void> _move(WidgetTester tester, TestGesture gesture, double dy) async {
-  final step = dy.sign * 20;
-  for (var moved = 0.0; moved.abs() < dy.abs(); moved += step) {
-    await gesture.moveBy(Offset(0, step));
+  var left = dy.abs();
+  while (left > 0) {
+    final step = left < 40 ? left : 40.0;
+    await gesture.moveBy(Offset(0, dy.sign * step));
     await tester.pump(const Duration(milliseconds: 16));
+    left -= step;
   }
 }
 
 /// 2026-10-30: 손을 떼고 1초 동안 프레임을 돌린다.
 Future<void> _up(WidgetTester tester, TestGesture gesture) async {
   await gesture.up();
-  for (var i = 0; i < 20; i++) {
-    await tester.pump(const Duration(milliseconds: 50));
+  for (var i = 0; i < 10; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
   }
 }
 
@@ -154,12 +156,20 @@ class _Gate extends ScriptedRepository {
   }
 }
 
+/// 2026-10-30: 연결·계좌 선택을 마친 Snapshot JSON(페이지 없음·100건 페이지). 테스트마다 다시 만들지 않도록 한 번만 만든다.
+late Map<String, Object?> _plain;
+late Map<String, Object?> _pagedJson;
+
 void main() {
+  setUpAll(() async {
+    _plain = await _json(await _connected());
+    _pagedJson = await _json(await _connected(pageSize: 100));
+  });
+
   testWidgets('빠른 성공: 문구 없이 회전 → 체크와 문구로 전환, 1.5초 뒤 접힘, 늦은 진행 문구 없음, 조건 유지', (
     tester,
   ) async {
-    final real = await _connected();
-    final json = await _json(real);
+    final json = _plain;
     final repo = _Gate()
       ..loadResults.add(FinancialOk(json))
       ..loadResults.add(FinancialOk(json));
@@ -192,8 +202,7 @@ void main() {
   testWidgets('느린 성공: 1초 전에는 회전만, 1초가 지나면 새로고침 중… 페이드인, 끝나면 체크로 전환', (
     tester,
   ) async {
-    final real = await _connected();
-    final json = await _json(real);
+    final json = _plain;
     final repo = _Gate()
       ..loadResults.add(FinancialOk(json))
       ..loadResults.add(FinancialOk(json));
@@ -233,8 +242,7 @@ void main() {
   });
 
   testWidgets('놓는 순간·문구 유무로 목록과 아이콘 위치가 바뀌지 않는다', (tester) async {
-    final real = await _connected();
-    final json = await _json(real);
+    final json = _plain;
     final repo = _Gate()
       ..loadResults.add(FinancialOk(json))
       ..loadResults.add(FinancialOk(json));
@@ -279,8 +287,7 @@ void main() {
   });
 
   testWidgets('당긴 채 유지: 기준을 넘겨도 손을 떼기 전에는 요청하지 않고, 뗄 때 한 번 요청', (tester) async {
-    final real = await _connected();
-    final json = await _json(real);
+    final json = _plain;
     final repo = _Gate()
       ..loadResults.add(FinancialOk(json))
       ..loadResults.add(FinancialOk(json));
@@ -288,8 +295,8 @@ void main() {
     final list = find.byKey(const ValueKey('transactions-list'));
     final gesture = await _drag(tester, list, 600);
     expect(find.byKey(const ValueKey('pull-armed')), findsOneWidget);
-    for (var i = 0; i < 30; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
+    for (var i = 0; i < 3; i++) {
+      await tester.pump(const Duration(seconds: 1));
     }
     expect(repo.loads, 1, reason: '3초 동안 당긴 채 유지해도 요청 없음');
     expect(find.byKey(const ValueKey('refresh-spin')), findsNothing);
@@ -299,20 +306,21 @@ void main() {
   });
 
   testWidgets('당겼다 되돌리기: 기준 아래로 되돌린 뒤 놓으면 취소', (tester) async {
-    final real = await _connected();
-    final json = await _json(real);
+    final json = _plain;
     final repo = _Gate()..loadResults.add(FinancialOk(json));
     await _openTab(tester, repo);
     final list = find.byKey(const ValueKey('transactions-list'));
-    final gesture = await _drag(tester, list, 600);
-    expect(find.byKey(const ValueKey('pull-armed')), findsOneWidget);
-    await _move(tester, gesture, -560);
-    expect(find.byKey(const ValueKey('pull-armed')), findsNothing);
+    final gesture = await _drag(tester, list, 120);
     expect(
       find.byKey(const ValueKey('pull-arc')),
       findsOneWidget,
       reason: '당긴 만큼만 찬 원',
     );
+    expect(find.byKey(const ValueKey('pull-armed')), findsNothing);
+    await _move(tester, gesture, 480);
+    expect(find.byKey(const ValueKey('pull-armed')), findsOneWidget);
+    await _move(tester, gesture, -570);
+    expect(find.byKey(const ValueKey('pull-armed')), findsNothing);
     await _up(tester, gesture);
     await tester.pumpAndSettle();
     expect(repo.loads, 1, reason: '요청 없음');
@@ -323,8 +331,7 @@ void main() {
   testWidgets('실패: 성공 표시 없이 접히고 이전 정보 유지 + 띠, 스크린리더에 실패 알림, 다시 시도 성공', (
     tester,
   ) async {
-    final real = await _connected();
-    final json = await _json(real);
+    final json = _plain;
     final next = Map<String, Object?>.of(json)
       ..['asOf'] = '2026-10-20T09:00:00+09:00'
       ..['dataVersion'] = '99';
@@ -381,8 +388,7 @@ void main() {
   });
 
   testWidgets('성공 표시 중에도 목록을 스크롤하고 거래를 누를 수 있다', (tester) async {
-    final real = await _connected();
-    final json = await _json(real);
+    final json = _plain;
     final repo = _Gate()
       ..loadResults.add(FinancialOk(json))
       ..loadResults.add(FinancialOk(json));
@@ -401,10 +407,8 @@ void main() {
   testWidgets('Snapshot은 받았지만 거래 페이지가 실패하면 새 Snapshot을 어디에도 반영하지 않는다', (
     tester,
   ) async {
-    final real = await _connected();
-    final paged = await _connected(pageSize: 100);
-    final json = await _json(real);
-    final next = Map<String, Object?>.of(await _json(paged))
+    final json = _plain;
+    final next = Map<String, Object?>.of(_pagedJson)
       ..['asOf'] = '2026-10-20T09:00:00+09:00';
     final repo = _Gate()
       ..loadResults.add(FinancialOk(json))
@@ -434,8 +438,7 @@ void main() {
   });
 
   testWidgets('계좌별 거래 화면도 당겨서 새로고침하고 응답 기준 시각으로 바뀐다', (tester) async {
-    final real = await _connected();
-    final json = await _json(real);
+    final json = _plain;
     final next = Map<String, Object?>.of(json)
       ..['asOf'] = '2026-10-20T09:00:00+09:00'
       ..['dataVersion'] = '99';

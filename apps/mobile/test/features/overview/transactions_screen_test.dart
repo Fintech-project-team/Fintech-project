@@ -90,7 +90,7 @@ Future<void> _sheet(
 }
 
 /// 2026-10-30: 거래를 [pageSize]씩 나누는 가짜 서버에 데모알파를 모두 연결한 저장소와 원본 Snapshot JSON을 반환한다.
-Future<(FakeUserFinancialRepository, Map<String, Object?>)> _paged() async {
+Future<(FakeUserFinancialRepository, Map<String, Object?>)> _makePaged() async {
   final auth = FakeAuthRepository(accounts: devDemoAccounts);
   final server = FakeFinancialServer(
     sessions: auth,
@@ -116,7 +116,16 @@ Future<(FakeUserFinancialRepository, Map<String, Object?>)> _paged() async {
   return (repo, json);
 }
 
+/// 2026-10-30: [_makePaged] 결과. 테스트마다 다시 연결하지 않도록 한 번만 만든다.
+late (FakeUserFinancialRepository, Map<String, Object?>) _pagedCache;
+
+/// 2026-10-30: 한 번 만든 페이지 저장소와 원본 Snapshot JSON 사본.
+(FakeUserFinancialRepository, Map<String, Object?>) _paged() =>
+    (_pagedCache.$1, Map<String, Object?>.of(_pagedCache.$2));
+
 void main() {
+  setUpAll(() async => _pagedCache = await _makePaged());
+
   group('02-4 거래 내역 목록', () {
     final s = _source('demo-ready');
     final cancel = s.transactions!.firstWhere(
@@ -392,7 +401,7 @@ void main() {
 
   group('거래 페이지 수집', () {
     testWidgets('다음 페이지까지 모두 받아 목록에 보인다', (tester) async {
-      final (repo, json) = await _paged();
+      final (repo, json) = _paged();
       final first = FinancialSnapshot.fromJson(json);
       final inFirst = {for (final t in first.transactions!) t.transactionId};
       final later = FinancialSnapshot.fromJson(readSource('demo-ready'))
@@ -416,7 +425,7 @@ void main() {
     testWidgets('불러오기 실패: 처음이면 조회 실패와 다시 시도, 성공 뒤 실패면 이전 내역과 안내 띠', (
       tester,
     ) async {
-      final (real, json) = await _paged();
+      final (real, json) = _paged();
       final first = FinancialSnapshot.fromJson(json);
       final pages = <FinancialOutcome<Map<String, Object?>>>[];
       String? cursor = first.nextTransactionCursor;
@@ -475,7 +484,7 @@ void main() {
     });
 
     testWidgets('세션이 끝나면 세션 무효 처리로 보낸다', (tester) async {
-      final (real, json) = await _paged();
+      final (real, json) = _paged();
       final scripted = ScriptedRepository()
         ..pageResults.add(const FinancialSessionInvalid());
       var invalid = 0;
