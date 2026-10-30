@@ -91,9 +91,11 @@ void main() {
       await tester.tap(
         find.descendant(
           of: find.byType(NavigationBar),
-          matching: find.text('계좌'),
+          matching: find.text('계좌·카드'),
         ),
       );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('inner-tab-accounts')));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.byKey(const ValueKey('account-rename-$_hanaDemand')),
@@ -164,6 +166,86 @@ void main() {
         findsWidgets,
         reason: '정기예금 1,000,000원이 계산에 더해진 새 Snapshot으로 다시 계산',
       );
+    },
+  );
+
+  testWidgets(
+    '계좌·카드 탭: 안쪽 탭은 다른 하단 탭에 다녀와도 유지, 계좌 행은 그 계좌 거래 내역을 열고 돌아오면 스크롤 유지',
+    (tester) async {
+      tester.view.physicalSize = const Size(1170, 2532);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      final repo = await _connected();
+      final records = MemoryFirstCalcRecordStore();
+      await records.save(
+        devDemoAccounts.first.userId,
+        FirstCalcRecord.explained,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildPayseTheme(),
+          home: MainEntry(
+            financial: repo,
+            policy: instantPolicy(),
+            reloadKey: 0,
+            devEntryBuilder: (_) => null,
+            onSessionInvalid: () {},
+            firstCalcRecords: records,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      Future<void> bottom(String label) async {
+        await tester.tap(
+          find.descendant(
+            of: find.byType(NavigationBar),
+            matching: find.text(label),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await bottom('계좌·카드');
+      expect(find.byKey(const ValueKey('transactions-list')), findsOneWidget);
+      expect(find.byKey(const ValueKey('chip-means')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('inner-tab-accounts')));
+      await tester.pumpAndSettle();
+      await bottom('홈');
+      await bottom('계좌·카드');
+      expect(find.byKey(const ValueKey('accounts-list')), findsOneWidget);
+      expect(find.byKey(const ValueKey('chip-means')), findsNothing);
+
+      final list = find.descendant(
+        of: find.byKey(const ValueKey('accounts-list')),
+        matching: find.byType(Scrollable),
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('account-open-$_hanaDemand')),
+        120,
+        scrollable: list,
+      );
+      final offset = tester.state<ScrollableState>(list).position.pixels;
+      await tester.tap(find.byKey(const ValueKey('account-open-$_hanaDemand')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('account-tx-title')), findsOneWidget);
+      expect(find.byKey(const ValueKey('chip-means')), findsNothing);
+      expect(find.byKey(const ValueKey('chip-type')), findsOneWidget);
+      expect(find.text('모아결식품 해솔길점'), findsOneWidget);
+      expect(find.text('새온결플러스'), findsNothing, reason: '다른 거래 수단 제외');
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(
+        tester.state<ScrollableState>(list).position.pixels,
+        offset,
+        reason: '계좌 관리 스크롤 유지',
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('accounts-meta')),
+        -120,
+        scrollable: list,
+      );
+      expect(find.text('계산에 포함한 계좌 4개 · 10월 19일 12:00 기준'), findsOneWidget);
     },
   );
 }
