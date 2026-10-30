@@ -10,6 +10,7 @@ import '../features/overview/first_calc_screen.dart';
 import '../features/overview/home_calculation.dart';
 import '../features/overview/home_coachmark.dart';
 import '../features/overview/home_screen.dart';
+import '../features/overview/salary_notice.dart';
 import '../features/overview/slide_switch.dart';
 import '../shared/design/payse_tokens.dart';
 import 'placeholder_screens.dart';
@@ -28,6 +29,8 @@ class AppShell extends StatefulWidget {
   /// 콜백이 없으면 코치마크를 띄우지 않는다.
   /// 2026-10-29: [accountsWriter]는 계좌 탭의 저장 연결(세션 저장소·세션 무효·저장 뒤 Snapshot 반영)이며 없으면 계좌 탭에서
   /// 저장할 수 없다.
+  /// 2026-10-29: [salaryNoticeFolded]는 이 사용자가 접은 월급 입금 확인 안내 키, [onSalaryNoticeFolded]는 접기·펴기를 기기에
+  /// 남기는 콜백이다. 홈 안내의 '월급 정보 확인'은 [accountsWriter]로 저장한다.
   const AppShell({
     super.key,
     required this.snapshot,
@@ -39,6 +42,8 @@ class AppShell extends StatefulWidget {
     this.coachmarkRecord,
     this.onCoachmarkRecord,
     this.accountsWriter,
+    this.salaryNoticeFolded,
+    this.onSalaryNoticeFolded,
   });
 
   final FinancialSnapshot snapshot;
@@ -50,6 +55,8 @@ class AppShell extends StatefulWidget {
   final CoachmarkRecord? coachmarkRecord;
   final ValueChanged<CoachmarkRecord>? onCoachmarkRecord;
   final AccountsWriter? accountsWriter;
+  final String? salaryNoticeFolded;
+  final ValueChanged<String?>? onSalaryNoticeFolded;
 
   static const List<String> tabTitles = ['홈', '계좌', '계획', '내 정보'];
 
@@ -75,6 +82,25 @@ class _AppShellState extends State<AppShell> {
   bool _coachClosed = false;
   final HomeCoachTargets _coachTargets = HomeCoachTargets();
   final GlobalKey _navKey = GlobalKey(debugLabel: 'coach-nav');
+  late String? _salaryNoticeFolded = widget.salaryNoticeFolded;
+
+  /// 2026-10-29: 월급 입금 확인 안내를 접거나(키) 다시 편다(null). 화면은 바로 바꾸고 기록은 콜백에 맡긴다.
+  void _foldSalaryNotice(String? key) {
+    setState(() => _salaryNoticeFolded = key);
+    widget.onSalaryNoticeFolded?.call(key);
+  }
+
+  /// 2026-10-29: 홈 안내에서 월급 정보 편집 화면을 연다. 저장 알림은 '계산 내역 보기' 띠 위에 띄운다.
+  void _editSalary(BuildContext context, AccountsWriter writer) {
+    openSalaryEditor(
+      context,
+      snapshot: widget.snapshot,
+      repository: writer.repository,
+      onSessionInvalid: writer.onSessionInvalid,
+      onSnapshot: writer.onSnapshot,
+      bottomGap: PayseSize.primaryBandHeight + PayseSpace.x3,
+    );
+  }
 
   /// 2026-10-27: U가 계산된 결과면 반환한다. 아니면 null이다.
   static HomeCalculationReady? _explainable(HomeCalculation calculation) =>
@@ -196,6 +222,14 @@ class _AppShellState extends State<AppShell> {
                 : HomeSalaryRecord.none,
             onShowFirstCalc: () => setState(() => _replay = true),
             coachTargets: _coachTargets,
+            salaryNotice: (
+              foldedKey: _salaryNoticeFolded,
+              onFoldedKey: _foldSalaryNotice,
+              onEdit: switch (widget.accountsWriter) {
+                final writer? => () => _editSalary(context, writer),
+                null => null,
+              },
+            ),
           ),
           AccountsScreen(
             snapshot: widget.snapshot,

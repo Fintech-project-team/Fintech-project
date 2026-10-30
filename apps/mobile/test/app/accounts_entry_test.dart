@@ -103,6 +103,10 @@ void main() {
           matching: find.byType(Scrollable),
         ),
       );
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('account-row-$_hanaDemand')),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('account-rename-$_hanaDemand')),
       );

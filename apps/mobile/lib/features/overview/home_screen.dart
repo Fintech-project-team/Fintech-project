@@ -11,6 +11,7 @@ import 'composition_bar.dart';
 import 'cycle_moon.dart';
 import 'home_calculation.dart';
 import 'home_skeleton.dart';
+import 'salary_notice.dart';
 
 /// 2026-10-23: 02-1 홈. 공유 계산 결과 [calculation]만 표시하며 금액을 직접 계산하지 않는다.
 /// 데이터 오류·예상하지 못한 오류에서는 이전 금액을 보이지 않고 [onReload]로 다시 불러온다.
@@ -20,6 +21,8 @@ class HomeScreen extends StatelessWidget {
   /// [refresh]는 새로고침 진행 상태로, 홈 상태(음수·입금 대기·정보 부족)와 따로 관리한다.
   /// 2026-10-27: [onShowFirstCalc]는 '처음 계산 과정을 단계별로 보기'를 눌렀을 때 01-3을 다시 보인다.
   /// 2026-10-28: [coachTargets]가 있으면 02-1a 코치마크가 강조할 금액 영역·'계산 내역 보기'에 위치 키를 붙인다.
+  /// 2026-10-29: [salaryNotice]는 월급 입금 확인 안내의 접힘 기록·월급 정보 확인 연결이다. 없으면 안내를 펼친 채 보이고
+  /// 버튼은 아무것도 하지 않는다.
   const HomeScreen({
     super.key,
     required this.calculation,
@@ -28,6 +31,7 @@ class HomeScreen extends StatelessWidget {
     this.refresh = HomeRefresh.idle,
     this.onShowFirstCalc,
     this.coachTargets,
+    this.salaryNotice,
   });
 
   final HomeCalculation calculation;
@@ -36,6 +40,7 @@ class HomeScreen extends StatelessWidget {
   final HomeRefresh refresh;
   final VoidCallback? onShowFirstCalc;
   final HomeCoachTargets? coachTargets;
+  final SalaryNoticeControl? salaryNotice;
 
   static const String amountLabel = '다음 월급일까지\n쓸 수 있는 돈';
 
@@ -53,6 +58,7 @@ class HomeScreen extends StatelessWidget {
         refreshFailed: failed,
         onShowFirstCalc: onShowFirstCalc,
         coachTargets: coachTargets,
+        salaryNotice: salaryNotice,
       ),
       HomeCalculationDataError() || HomeCalculationUnexpectedError()
           when failed =>
@@ -76,7 +82,7 @@ class HomeScreen extends StatelessWidget {
 
 /// 2026-10-28: 02-1a 코치마크가 강조할 홈 위젯의 위치 키. 앱 셸이 만들고 홈이 붙인다.
 class HomeCoachTargets {
-  /// 2026-10-28: 금액 영역 시작(라벨) [amountTop], 끝(구성 바 또는 '월급 입금 확인하기') [amountBottom],
+  /// 2026-10-28: 금액 영역 시작(라벨) [amountTop], 끝(구성 바 또는 월급 입금 확인 안내) [amountBottom],
   /// '계산 내역 보기' [detail] 키를 새로 만든다.
   HomeCoachTargets()
     : amountTop = GlobalKey(debugLabel: 'coach-amount-top'),
@@ -124,6 +130,7 @@ class _HomeReady extends StatelessWidget {
     required this.refreshFailed,
     this.onShowFirstCalc,
     this.coachTargets,
+    this.salaryNotice,
   });
 
   final HomeCalculationReady calculation;
@@ -132,6 +139,7 @@ class _HomeReady extends StatelessWidget {
   final bool refreshFailed;
   final VoidCallback? onShowFirstCalc;
   final HomeCoachTargets? coachTargets;
+  final SalaryNoticeControl? salaryNotice;
 
   /// 2026-10-26: 머리·주기 줄·금액·상태 안내·장부를 스크롤 영역에 두고 '계산 내역 보기' 띠 버튼을 화면 아래에 고정한다.
   @override
@@ -153,6 +161,14 @@ class _HomeReady extends StatelessWidget {
     final resolved =
         u != null && record == HomeSalaryRecord.resolvedAfterFirstCalc;
     final payDay = result.salaryCycle?.previousPayDate?.date;
+    final salaryNotice = reported
+        ? null
+        : salaryNoticeOf(calculation.snapshot, result);
+    final control = this.salaryNotice;
+    final folded =
+        salaryNotice != null && control?.foldedKey == salaryNotice.key;
+    final waiting =
+        result.placementTotals?[calc.ObligationPlacement.awaitingSalary];
 
     final notice = <Widget>[];
     if (u != null && u < 0) {
@@ -164,9 +180,7 @@ class _HomeReady extends StatelessWidget {
           message: '모아둘 돈과 예정 지출을 모두 확보하려면 ${formatKrw(-u)}이 더 필요해요.',
         ),
       );
-    } else if (awaiting) {
-      final waiting =
-          result.placementTotals?[calc.ObligationPlacement.awaitingSalary];
+    } else if (awaiting && salaryNotice == null) {
       notice.add(
         StatusNotice(
           key: const ValueKey('home-awaiting-notice'),
@@ -247,28 +261,58 @@ class _HomeReady extends StatelessWidget {
                       ),
                     ),
                   ],
-                  if (absent) ...[
-                    const SizedBox(height: PayseSpace.x5),
-                    _target(
-                      coachTargets?.amountBottom,
-                      const _WideOutlinedButton(
-                        key: ValueKey('home-salary-check-button'),
-                        label: '월급 입금 확인하기',
-                        onPressed: null,
-                      ),
-                    ),
-                  ],
                   if (showBar)
                     _target(
                       absent ? null : coachTargets?.amountBottom,
                       CompositionBar(result: result, showLegend: false),
                     ),
+                  if (salaryNotice?.kind == SalaryNoticeKind.awaiting &&
+                      waiting != null)
+                    _padded(
+                      Padding(
+                        padding: const EdgeInsets.only(top: PayseSpace.x3),
+                        child: Text(
+                          '입금 확인 후 반영할 지출 ${formatKrw(waiting.totalKrw)}'
+                          '(${waiting.count}건)은 아직 빼지 않았어요.',
+                          key: const ValueKey('home-awaiting-caption'),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            height: 20 / 14,
+                            color: PayseColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (salaryNotice != null && folded)
+                    KeyedSubtree(
+                      key: absent ? coachTargets?.amountBottom : null,
+                      child: _padded(
+                        Padding(
+                          padding: const EdgeInsets.only(top: PayseSpace.x1),
+                          child: SalaryNoticeFolded(
+                            onOpen: () => control?.onFoldedKey(null),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (salaryNotice != null && !folded) ...[
+                    const SizedBox(height: PayseSpace.x5),
+                    KeyedSubtree(
+                      key: absent ? coachTargets?.amountBottom : null,
+                      child: SalaryNoticeBand(
+                        key: const ValueKey('home-salary-notice'),
+                        notice: salaryNotice,
+                        onEdit: control?.onEdit,
+                        onLater: () => control?.onFoldedKey(salaryNotice.key),
+                      ),
+                    ),
+                  ],
                   if (notice.isNotEmpty) ...[
                     const SizedBox(height: PayseSpace.x5),
                     ...notice,
                   ],
                   SizedBox(
-                    height: notice.isNotEmpty
+                    height: notice.isNotEmpty || salaryNotice != null
                         ? PayseSpace.x5
                         : absent
                         ? PayseSpace.x6
