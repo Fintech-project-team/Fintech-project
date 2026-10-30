@@ -12,6 +12,7 @@ import '../connection/connection_screens.dart';
 import 'account_rename_sheet.dart';
 import 'home_calculation.dart';
 import 'home_screen.dart' show asOfLabel;
+import 'salary_notice.dart';
 
 /// 2026-10-29: 계좌 탭에서 저장에 쓰는 세션 연결. 세션 저장소 [repository], 01-1 재사용에 쓰는 표시 정책 [policy],
 /// 세션 무효 처리 [onSessionInvalid], 저장 뒤 최신 Snapshot을 앱에 반영하는 [onSnapshot]이다.
@@ -83,6 +84,37 @@ class AccountsScreen extends StatelessWidget {
       ),
     );
     if (next != null) w.onSnapshot(next);
+  }
+
+  /// 2026-10-29: 월급 정보 줄 설명. 저장된 값만 '매월 D일 · 금액 · 기관 ····끝 4자리'로 잇는다.
+  String _salaryText(SalarySetting salary) {
+    final id = salary.salaryAccountId;
+    final account = id == null ? null : accountById(snapshot, id);
+    return [
+      if (salary.salaryDay case final day?) '매월 $day일' else '월급일 미입력',
+      if (salary.salaryAmountKrw case final amount?)
+        formatKrw(amount)
+      else
+        '금액 미입력',
+      if (salary.salaryAccountRestricted)
+        '월급 계좌 정보를 볼 수 없어요'
+      else if (account != null)
+        '${institutionName(snapshot, account.institutionCode)} '
+            '····${lastFour(account.maskedNumber)}',
+    ].join(' · ');
+  }
+
+  /// 2026-10-29: 월급 정보 편집 화면을 연다. 저장하면 응답 Snapshot으로 앱을 다시 계산한다.
+  void _editSalary(BuildContext context) {
+    final w = writer;
+    if (w == null) return;
+    openSalaryEditor(
+      context,
+      snapshot: snapshot,
+      repository: w.repository,
+      onSessionInvalid: w.onSessionInvalid,
+      onSnapshot: w.onSnapshot,
+    );
   }
 
   /// 2026-10-29: 잔액 요약·버튼·금융사별 계좌 목록을 반환한다. 계산 포함 계좌가 있는 금융사를 먼저, 묶음 안에서는
@@ -208,18 +240,33 @@ class AccountsScreen extends StatelessWidget {
           ),
           const SizedBox(height: PayseSpace.x6),
           const Divider(height: 1, color: PayseColors.dividerSection),
-          for (final g in ordered) ...[
-            const SizedBox(height: PayseSpace.x3),
-            Container(
-              constraints: const BoxConstraints(minHeight: 44),
-              alignment: Alignment.centerLeft,
-              child: Text(g.name, style: PayseTypography.sectionTitle),
+          if (snapshot.settings?.salary case final salary?)
+            _SalaryRow(
+              text: _salaryText(salary),
+              onTap: writer == null ? null : () => _editSalary(context),
             ),
-            for (final a in g.accounts)
+          for (final (i, g) in ordered.indexed) ...[
+            const SizedBox(height: PayseSpace.x6),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Text(
+                g.name,
+                style: const TextStyle(
+                  fontSize: 15,
+                  height: 22 / 15,
+                  fontWeight: FontWeight.w700,
+                  color: PayseColors.textPrimary,
+                ),
+              ),
+            ),
+            for (final (j, a) in g.accounts.indexed)
               _AccountRow(
                 key: ValueKey('account-row-${a.accountId}'),
                 snapshot: snapshot,
                 account: a,
+                divider: j == g.accounts.length - 1 && i < ordered.length - 1
+                    ? PayseColors.dividerSection
+                    : PayseColors.dividerRow,
                 onRename: writer == null ? null : () => _rename(context, a),
               ),
           ],
@@ -229,19 +276,21 @@ class AccountsScreen extends StatelessWidget {
   }
 }
 
-/// 2026-10-29: 계좌 한 줄. 이름(별명이 있으면 별명)·월급 계좌 라벨 → 보조 줄(별명이면 원래 이름, 끝 4자리, 모아둘 돈,
-/// 결제 카드. 조각 중간에서 줄을 바꾸지 않음)·계산에서 제외 라벨 … 잔액 · 연필(48×48). 행 자체는 누를 수 없다.
+/// 2026-10-29: 계좌 한 줄. 이름(별명이 있으면 별명)·월급 계좌·계산에서 제외 라벨 → 보조 줄(별명이면 원래 이름, 끝 4자리,
+/// 모아둘 돈, 결제 카드) … 잔액 · 연필(48×48). 아래 선은 [divider](은행 끝이면 진한 선). 행 자체는 누를 수 없다.
 class _AccountRow extends StatelessWidget {
   /// 2026-10-29: Snapshot [snapshot]의 계좌 [account], 이름 바꾸기 [onRename]으로 만든다.
   const _AccountRow({
     super.key,
     required this.snapshot,
     required this.account,
+    required this.divider,
     required this.onRename,
   });
 
   final FinancialSnapshot snapshot;
   final Account account;
+  final Color divider;
   final VoidCallback? onRename;
 
   /// 2026-10-29: 보조 줄 조각을 반환한다. 데이터로 확인되는 정보만 쓴다.
@@ -278,8 +327,8 @@ class _AccountRow extends StatelessWidget {
     return Container(
       constraints: const BoxConstraints(minHeight: 64),
       padding: const EdgeInsets.symmetric(vertical: PayseSpace.x3),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: PayseColors.dividerRow)),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: divider)),
       ),
       child: Row(
         children: [
@@ -308,29 +357,19 @@ class _AccountRow extends StatelessWidget {
                         background: PayseColors.moonYellowSoft,
                         color: PayseColors.textPrimary,
                       ),
-                  ],
-                ),
-                Wrap(
-                  key: ValueKey('account-detail-${a.accountId}'),
-                  runSpacing: PayseSpace.x1,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    for (final (i, part) in details.indexed)
-                      Text(
-                        i == 0 ? part : ' · $part',
-                        style: PayseTypography.caption,
+                    if (excluded)
+                      _Tag(
+                        '계산에서 제외',
+                        key: ValueKey('account-excluded-${a.accountId}'),
+                        background: PayseColors.surfaceMuted,
+                        color: PayseColors.textSecondary,
                       ),
                   ],
                 ),
-                if (excluded) ...[
-                  const SizedBox(height: PayseSpace.x1),
-                  _Tag(
-                    '계산에서 제외',
-                    key: ValueKey('account-excluded-${a.accountId}'),
-                    background: PayseColors.surfaceMuted,
-                    color: PayseColors.textSecondary,
-                  ),
-                ],
+                _Details(
+                  key: ValueKey('account-detail-${a.accountId}'),
+                  parts: details,
+                ),
               ],
             ),
           ),
@@ -358,6 +397,103 @@ class _AccountRow extends StatelessWidget {
             icon: const Icon(Icons.edit_outlined, size: 20),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 2026-10-29: 계좌 보조 줄. 한 줄에 다 들어가면 ' · '로 이어 한 줄, 아니면 첫 조각(계좌 번호) 다음에서 줄을 바꿔
+/// 나머지를 둘째 줄에 잇는다.
+class _Details extends StatelessWidget {
+  /// 2026-10-29: 조각 [parts]로 만든다. 첫 조각은 계좌 번호다.
+  const _Details({super.key, required this.parts});
+
+  final List<String> parts;
+
+  /// 2026-10-29: 보조 줄을 반환한다.
+  @override
+  Widget build(BuildContext context) {
+    final style = DefaultTextStyle.of(context).style
+        .merge(PayseTypography.caption);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final full = parts.join(' · ');
+        final painter = TextPainter(
+          text: TextSpan(text: full, style: style),
+          textScaler: MediaQuery.textScalerOf(context),
+          textDirection: TextDirection.ltr,
+          maxLines: 1,
+        )..layout(maxWidth: constraints.maxWidth);
+        final fits = !painter.didExceedMaxLines;
+        painter.dispose();
+        if (fits || parts.length == 1) {
+          return Text(full, style: PayseTypography.caption);
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(parts.first, style: PayseTypography.caption),
+            Text(parts.skip(1).join(' · '), style: PayseTypography.caption),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// 2026-10-29: 계좌 목록 위 '월급 정보' 줄. 누르면 월급 정보 편집 화면을 연다. 위아래 여백은 24dp로 같고, 아래는 은행 묶음과
+/// 나누는 진한 선이다.
+class _SalaryRow extends StatelessWidget {
+  /// 2026-10-29: 설명 [text]와 누르기 [onTap]으로 만든다.
+  const _SalaryRow({required this.text, required this.onTap});
+
+  final String text;
+  final VoidCallback? onTap;
+
+  /// 2026-10-29: 월급 정보 줄을 반환한다.
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      child: InkWell(
+        key: const ValueKey('accounts-salary'),
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 64),
+          padding: const EdgeInsets.symmetric(vertical: PayseSpace.x6),
+          decoration: const BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: PayseColors.dividerSection),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '월급 정보',
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 1.47,
+                        fontWeight: FontWeight.w600,
+                        color: PayseColors.textPrimary,
+                      ),
+                    ),
+                    Text(text, style: PayseTypography.caption),
+                  ],
+                ),
+              ),
+              const SizedBox(width: PayseSpace.x2),
+              const Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: PayseColors.textSecondary,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

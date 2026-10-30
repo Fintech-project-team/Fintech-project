@@ -1,0 +1,53 @@
+{
+  "id": "PAYSE-MOBILE-SALARY-NOTICE-29-20261029",
+  "role": "integration",
+  "baseCommit": "341b60105a37ab655d48412b431b0a48ace71c4c",
+  "branch": "feat/integration/salary-notice",
+  "allowedPaths": [
+    "docs/tasks/PAYSE-MOBILE-SALARY-NOTICE-29-20261029.json",
+    "apps/mobile/lib/main.dart",
+    "apps/mobile/lib/data/salary_notice_store.dart",
+    "apps/mobile/test/data/salary_notice_store_test.dart",
+    "apps/mobile/lib/app/payse_app.dart",
+    "apps/mobile/lib/app/main_entry.dart",
+    "apps/mobile/lib/app/app_shell.dart",
+    "apps/mobile/test/app/",
+    "apps/mobile/lib/features/overview/home_screen.dart",
+    "apps/mobile/lib/features/overview/accounts_screen.dart",
+    "apps/mobile/lib/features/overview/salary_notice.dart",
+    "apps/mobile/test/features/overview/",
+    "apps/mobile/lib/features/connection/salary_settings_screen.dart",
+    "apps/mobile/test/features/connection/",
+    "apps/mobile/docs/screen-rules-update.md",
+    "docs/design.md",
+    "apps/mobile/pubspec.yaml",
+    "apps/mobile/pubspec.lock",
+    "docs/toolchain.md"
+  ],
+  "acceptance": [
+    "목적: 29-1 후속 월급 입금 확인 안내(2026-10-29 혜연 확정 정책). 서버 API·DB·공통 데이터 계약·계산 패키지·어댑터는 바꾸지 않는다. 입금 대기·정보 부족 판정은 계산 결과(salaryCycle.state·insufficient·placementTotals)를 그대로 쓰고 화면에서 다시 판정·추정하지 않는다. 2026-10-29 혜연 결정: 29-1 수정분을 341b601로 커밋하고 그 위에서 이어서 진행(29-1 PR이 hyeyeon-dev에 merge되기 전이므로 이 작업 PR은 29-1 뒤에 올린다)",
+    "진행 순서: ① 시안(홈 큰 안내·접힌 표시·원인별 안내, 계좌 탭 월급 정보 진입, 저장 알림)을 docs/design.md 규격으로 만들어 혜연 승인 → ② 기기 접힘 기록 저장소와 단위 테스트 → ③ 승인된 시안으로 화면 구현. 시안 승인 전에는 화면 코드를 쓰지 않는다. 시안 승인(2026-10-29 혜연): 캔버스 'PAYSE 계좌 탭·계좌 이름 시안' 5줄 ①~⑥과 ⑦-B(은행명 15/700 textPrimary, 은행 사이 1px dividerSection 한 번·같은 은행 계좌 사이 1px dividerRow·마지막 은행 아래 dividerRow, 구분선→은행명 24dp, 월급 정보 아래도 같음, '계산에서 제외'는 이름 옆 라벨, 세부 정보가 한 줄에 안 들어가면 계좌 번호 다음에서 줄바꿈). 계산 불가 홈의 비활성 '월급 입금 확인하기' 버튼은 뺀다. 범위 추가: 앱 시작점에서 기기 저장 구현을 넘기기 위해 apps/mobile/lib/main.dart",
+    "큰 안내 대상: (가) 입금 대기(awaitingDeposit)이고 확인 회차 예정일(previousPayDate)이 오늘보다 이전(2026-10-29 혜연 결정: 월급일 당일에는 기존 '월급 입금 확인 전이에요' 안내만 두고 다음 날부터 큰 안내), (나) 지난 회차 입금 근거 없음(receiptEvidenceAbsent, 계산 불가). 제목 '월급 입금 확인이 필요해요', 본문 '{M월 D일}에 예정된 월급의 입금 여부를 확인하지 못했어요. 월급 정보가 바뀌었다면 수정해 주세요.', 버튼 [월급 정보 확인][나중에 확인]. 날짜는 계산 결과의 회차 예정일만 쓰고 없으면 날짜 없는 문장. 월급 계좌 연결 제한·금융사 미연결로 근거를 볼 수 없는 경우는 그 원인 문장(기존 01-2 문구 기준)으로 안내한다. 정상·입금 대기·정보 부족 표시는 합치지 않는다",
+    "나중에 확인: 큰 안내만 접고 금액 근처에 작은 '월급 입금 확인 필요' 표시를 남기며 누르면 다시 연다. 계산 결과·월급 설정·입금 확인 상태는 바꾸지 않는다. 접힘 기록 키는 사용자 ID + 확인 회차(예정일) + 안내 종류(가/나/원인) + 월급 설정(월급일·예상 금액·월급 계좌)이며, 키가 같으면 화면 재진입·로그인 뒤에도 접힌 채 두고 키가 바뀌면 다시 펼친다. 문제가 해결되면(입금 확인) 안내와 표시를 지운다. 모든 회차를 끄는 설정은 만들지 않는다",
+    "기기 기록: FirstCalcRecordStore와 같은 경계의 SalaryNoticeStore 인터페이스를 두고, 앱 재실행 뒤에도 남는 기기 저장 구현을 PayseApp이 소유한다(2026-10-29 혜연 결정). 저장은 Flutter 공식 shared_preferences 패키지를 apps/mobile/pubspec.yaml·pubspec.lock에 추가해 쓰며 docs/toolchain.md에 기록하고, 새 의존성이라 성현(A) 확인을 받는다. 사용자 ID별로 구분해 다른 사용자에게 이어지지 않는다. 재설치·다른 기기에서는 다시 나타날 수 있다. 테스트는 메모리 구현을 쓴다",
+    "월급 정보 확인: 기존 월급 편집 화면(salary_settings_screen.dart, 01-2 '확인·수정'과 같은 화면)을 홈 안내와 계좌 탭에서 연다. 기존 값을 채우고 바뀐 항목만 저장(기존 SalaryPatch). 새 월급 계좌는 계산 포함 계좌로 한정(기존). 저장 성공 시 '월급 정보를 저장했어요' 알림 후 응답 Snapshot으로 앱 셸을 다시 계산하며 입금 확인·계산 정상화로 표현하지 않는다. 새 입력 항목(첫 월급 예정일·적용 시작 회차)은 추가하지 않는다. 내 정보(03-6)는 탭 구현 단계(29 후속)에서 같은 화면을 연결한다",
+    "금액 제한 유지: 안내를 접어도 계산 불가는 '아직 계산할 수 없어요'(0원·이전 금액 대체 없음), 입금 대기면 금액 근처에 계산 결과의 반영 대기 지출 금액·건수와 기존 '계산 내역 보기' 경로를 남긴다",
+    "월급 계좌 계산 제외: 막거나 '계산 불가' 경고를 추가하지 않는다(2026-10-29 검증: 제외해도 월급 근거·계산 유지). 기존 모아둘 돈 해제 안내는 유지. 금융사 추가·해제는 구현하지 않는다",
+    "검증: 위젯·단위 테스트로 정책 검증 사례 1~8(예정일 경과 미확인, 접힘 재진입 유지·계산 불변, 새 회차·설정 변경 재표시, 입금 확인 뒤 제거·재계산, 월급 계좌 변경 뒤 과거 근거 보존, 계산 제외와 미연결 구분, 접어도 계산 불가·반영 대기 설명 유지, 사용자 간 미전파)와 320dp·글자 1.3배 넘침 없음. 실기기 확인은 사용자 확인 항목",
+    "범위 밖: 사용자 답변 수집(늦어짐·첫 월급 다음 달·이미 받음), 홈 계산 기간 이월, 예상 월급 선가산, 서버·계약·계산 정책 변경, 금융사 추가·해제, 내 정보 탭 구현"
+  ],
+  "readBefore": [
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/calculation-rules.md",
+    "docs/data-contracts.md",
+    "docs/v0.6-screen-rules.md",
+    "apps/mobile/docs/screen-rules-update.md",
+    "docs/design.md",
+    "docs/app-architecture.md",
+    "docs/harness/AGENT_REVIEW.md",
+    "docs/toolchain.md"
+  ]
+}

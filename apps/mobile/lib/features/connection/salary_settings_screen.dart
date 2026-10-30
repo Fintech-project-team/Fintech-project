@@ -22,11 +22,16 @@ class SalarySettingsScreen extends StatefulWidget {
     required this.controller,
     required this.onSnapshot,
     required this.onBack,
+    this.onSaved,
   });
 
   final SalarySettingsController controller;
   final ValueChanged<FinancialSnapshot> onSnapshot;
   final VoidCallback onBack;
+
+  /// 2026-10-29: 저장 성공 뒤 화면을 닫고 알림을 연 화면에 맡기는 진입(홈 안내·계좌 탭)에서 쓴다. 없으면 이 화면에 남아
+  /// 저장 알림을 띄운다(01-2 '확인·수정').
+  final ValueChanged<FinancialSnapshot>? onSaved;
 
   /// 2026-10-28: 화면 상태 객체를 반환한다.
   @override
@@ -62,10 +67,16 @@ class _SalarySettingsScreenState extends State<SalarySettingsScreen> {
   }
 
   /// 2026-10-28: 저장한다. 성공하면 입력칸을 저장 값으로 맞추고 01-2에 새 Snapshot을 넘기며 저장했다고 알린다.
+  /// 2026-10-29: [SalarySettingsScreen.onSaved]가 있으면 그쪽에 응답 Snapshot을 넘기고 끝낸다.
   /// 알림은 아래 버튼을 가리지 않게 버튼 위에 띄운다.
   Future<void> _save() async {
     final next = await _c.submit();
     if (!mounted || next == null) return;
+    final saved = widget.onSaved;
+    if (saved != null) {
+      saved(next);
+      return;
+    }
     _amount.text = groupDigits(_c.amountDigits);
     widget.onSnapshot(next);
     ScaffoldMessenger.maybeOf(context)

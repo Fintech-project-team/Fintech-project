@@ -8,9 +8,11 @@ import 'package:payse/data/connection/fake_financial_server.dart';
 import 'package:payse/data/connection/financial_api.dart';
 import 'package:payse/data/financial_snapshot.dart';
 import 'package:payse/features/connection/connection_screens.dart';
+import 'package:payse/features/connection/salary_settings_screen.dart';
 import 'package:payse/features/overview/accounts_screen.dart';
 import 'package:payse/features/overview/home_calculation.dart';
 import 'package:payse/shared/design/payse_theme.dart';
+import 'package:payse/shared/design/payse_tokens.dart';
 
 import '../../data/connection/connection_test_utils.dart';
 import '../connection/connection_test_support.dart';
@@ -163,7 +165,7 @@ List<String> _bankOrder(WidgetTester tester, List<String> names) =>
 
 const _banks = ['국민은행', '신한은행', '하나은행', '기업은행', '카카오뱅크'];
 
-/// 2026-10-29: 계좌 [id] 보조 줄 조각을 이어 붙인 글자를 반환한다.
+/// 2026-10-29: 계좌 [id] 보조 줄을 반환한다. 두 줄로 나뉘었으면 ' · '로 잇는다.
 String _detail(WidgetTester tester, String id) => tester
     .widgetList<Text>(
       find.descendant(
@@ -172,7 +174,7 @@ String _detail(WidgetTester tester, String id) => tester
       ),
     )
     .map((t) => t.data)
-    .join();
+    .join(' · ');
 
 /// 2026-10-29: 계좌 [id]의 이름 바꾸기 시트를 연다.
 Future<void> _openRename(WidgetTester tester, String id) async {
@@ -305,6 +307,106 @@ void main() {
         _kbDemand,
       ], reason: '데이터 순서는 입출금→정기예금이지만 포함한 정기예금이 먼저');
       expect(_bankOrder(tester, _banks).first, '국민은행');
+    });
+
+    testWidgets('bank groups: 계산에서 제외 next to the name, '
+        'a strong line only between banks, number line first', (tester) async {
+      final pretendard = FontLoader('Pretendard');
+      for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold']) {
+        pretendard.addFont(rootBundle.load('assets/fonts/Pretendard-$w.otf'));
+      }
+      await pretendard.load();
+      final (repo, snapshot) = await _connected();
+      await _pump(tester, repo, snapshot);
+      final name = tester.getRect(
+        find.descendant(
+          of: find.byKey(const ValueKey('account-row-$_kbDeposit')),
+          matching: find.text('정기예금'),
+        ),
+      );
+      final tag = tester.getRect(
+        find.byKey(const ValueKey('account-excluded-$_kbDeposit')),
+      );
+      expect(tag.left, greaterThan(name.right), reason: '이름 옆 라벨');
+      expect(tag.center.dy, closeTo(name.center.dy, 4));
+
+      Color line(String id) {
+        final box = tester.widget<Container>(
+          find
+              .descendant(
+                of: find.byKey(ValueKey('account-row-$id')),
+                matching: find.byType(Container),
+              )
+              .first,
+        );
+        final border = (box.decoration! as BoxDecoration).border! as Border;
+        return border.bottom.color;
+      }
+
+      expect(line(_kbDemand), PayseColors.dividerRow, reason: '같은 은행 계좌 사이');
+      expect(line(_kbDeposit), PayseColors.dividerSection, reason: '은행 끝');
+      expect(
+        line(_shinhanSavings),
+        PayseColors.dividerRow,
+        reason: '마지막 은행 아래는 연한 선',
+      );
+
+      final kb = tester
+          .widgetList<Text>(
+            find.descendant(
+              of: find.byKey(const ValueKey('account-detail-$_kbDemand')),
+              matching: find.byType(Text),
+            ),
+          )
+          .map((t) => t.data)
+          .toList();
+      expect(kb, [
+        '····0001',
+        '모아둘 돈 400,000원 · 카드 3장 결제',
+      ], reason: '한 줄에 안 들어가면 계좌 번호 다음에서 줄바꿈');
+    });
+
+    testWidgets('월급 정보 opens the salary editor; saving returns with a notice', (
+      tester,
+    ) async {
+      final (repo, snapshot) = await _connected();
+      await _pump(tester, repo, snapshot);
+      final row = find.byKey(const ValueKey('accounts-salary'));
+      expect(
+        find.descendant(of: row, matching: find.text('월급 정보')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: row,
+          matching: find.text('매월 25일 · 3,000,000원 · 국민은행 ····0001'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      expect(find.byType(SalarySettingsScreen), findsOneWidget);
+      await tester.enterText(
+        find.descendant(
+          of: find.byKey(const ValueKey('salary-amount')),
+          matching: find.byType(TextField),
+        ),
+        '3100000',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('salary-save')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SalarySettingsScreen), findsNothing);
+      expect(find.text('월급 정보를 저장했어요'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: row,
+          matching: find.text('매월 25일 · 3,100,000원 · 국민은행 ····0001'),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('a row itself opens nothing in 29-1', (tester) async {

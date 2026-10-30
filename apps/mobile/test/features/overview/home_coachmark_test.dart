@@ -215,9 +215,9 @@ void main() {
     );
     final hole = painter(tester).hole!;
     final check = tester.getRect(
-      find.byKey(const ValueKey('home-salary-check-button')),
+      find.byKey(const ValueKey('home-salary-notice')),
     );
-    expect(hole.bottom, check.bottom + 8, reason: '월급 입금 확인하기까지');
+    expect(hole.bottom, check.bottom + 8, reason: '월급 입금 확인 안내까지');
     expect(hole.top, tester.getRect(find.byType(AmountHero)).top - 8);
   });
 

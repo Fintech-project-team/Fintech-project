@@ -464,20 +464,14 @@ void main() {
       await _tapRefresh(tester);
       expect(find.byKey(const ValueKey('home-loading')), findsOneWidget);
       expect(find.text('월급 입금 확인 필요'), findsNothing, reason: '로딩 틀로 가림');
-      expect(
-        find.byKey(const ValueKey('home-salary-check-button')),
-        findsNothing,
-      );
+      expect(find.byKey(const ValueKey('home-salary-notice')), findsNothing);
 
       await _finish(tester, hold, const FinancialUnavailable());
       expect(find.byKey(const ValueKey('home-refresh-failed')), findsOneWidget);
       expect(find.text('월급 입금 확인 필요'), findsOneWidget);
       expect(find.text('아직 계산할 수 없어요'), findsOneWidget);
       expect(reason, findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('home-salary-check-button')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('home-salary-notice')), findsOneWidget);
       expect(find.text('다시 시도'), findsOneWidget, reason: '다시 시도는 띠 하나에만');
     },
   );
