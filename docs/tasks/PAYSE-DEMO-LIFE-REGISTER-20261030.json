@@ -1,0 +1,38 @@
+{
+  "id": "PAYSE-DEMO-LIFE-REGISTER-20261030",
+  "role": "integration",
+  "baseCommit": "f8297e093b7a8d8c8c59658b07bb577500f33f4c",
+  "branch": "feat/integration/demo-life",
+  "allowedPaths": [
+    "docs/tasks/PAYSE-DEMO-LIFE-REGISTER-20261030.json",
+    "apps/api/fixtures/life_cases.py",
+    "apps/api/fixtures/generate.py",
+    "apps/api/fixtures/generated/",
+    "apps/api/fixtures/generated-v4/",
+    "docs/demo/realism/",
+    "apps/mobile/assets/fixtures/demo-life.json",
+    "apps/mobile/pubspec.yaml",
+    "apps/mobile/lib/data/fixture_scenario.dart",
+    "apps/mobile/lib/app/dev/dev_user_fixtures.dart",
+    "apps/mobile/test/",
+    "apps/api/tests/test_fixtures.py",
+    "apps/api/tests/test_billing_cases.py"
+  ],
+  "acceptance": [
+    "목적: B가 만든 데모알파 생활 흐름 데이터(저장소 밖 Desktop/payse-work/demo-data, 887건·:life-2)를 공통 더미의 별도 사례로 등록한다(2026-10-30 혜연 지시, 29-2 전에 진행). 근거: docs/demo/realism/README.md §0 A·B 합의, 2026-10-29 A가 확정한 B 작업 범위(허용·보존·A 담당·별도 합의·검증)",
+    "등록 방식(A 확인 필요): 생성 규칙을 apps/api/fixtures/life_cases.py로 옮기고 generate.build()에 사례 'demo-life'를 add_case 한 줄로 등록한다. 입력은 같은 build의 demo-ready 결과이며 근거 거래 36건의 ID·금액·날짜·계좌·분류는 그대로, 나머지는 고정 시드로 다시 만든다. v4는 기존 billing_cases.py 변환(legacy_items, 값 미상 항목)을 그대로 거친다. generated/·generated-v4/는 기존 도구로 다시 생성하며 기존 사례 파일은 바이트 단위로 바뀌지 않아야 한다(catalog·manifest에 새 사례만 추가). 생성 결과를 손으로 고치지 않는다",
+    "보존: 기존 v3 21개·v4 24개 사례, server-seeds의 기본 사례(initialCase)와 identity_contract.py는 바꾸지 않는다(기본 사례 선택 연결은 A). 더미 전용 테이블·컬럼·계약·Java API·DB 권한은 범위 밖",
+    "앱: apps/mobile/assets/fixtures/demo-life.json(generated-v4 사본)과 FixtureScenario 추가, pubspec 자산 등록. 앱 개발용 데모알파 기본 사례를 demo-life로 바꿀지는 혜연 결정에 따른다(dev_user_fixtures.dart)",
+    "검증: 생성 재현성(두 번 생성 결과 동일), manifest 해시, 기존 사례 불변, apps/api 파이썬 테스트(python -B -m unittest discover -s apps/api/tests)와 validate, realism_check·balance_check 합격, 앱 fixture_copy_test·계산 테스트(데모알파 홈 U 1,300,000 유지), 하네스. A 테스트 중 새 사례 때문에 실패하는 사례 수(v3 21→22, v4 24→25)와 원천 버전 끝(demo-life만 ':labels-1:life-2') 검사만 고친다(2026-10-30 성현 승인). 그 밖의 A 테스트는 고치지 않는다",
+    "범위 밖: 기본 사례 서버 연결(A), 데모베타·데모감마 작성(후속), DB 적재 SQL 생성·폐기용 DB 검증(다음 단계), 29-2 화면"
+  ],
+  "readBefore": [
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/demo/realism/README.md",
+    "apps/api/fixtures/docs/dummy-data.md",
+    "apps/api/tests/README.md",
+    "docs/harness/AGENT_REVIEW.md"
+  ]
+}

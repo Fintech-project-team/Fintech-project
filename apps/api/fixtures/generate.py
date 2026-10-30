@@ -375,6 +375,15 @@ def build() -> tuple[dict, dict, dict]:
         if 'transactions' in snapshot:
             transaction_labels.apply(snapshot)
             update_versions(snapshot, snapshot['sourceVersion'] + ':reversals-1:labels-1', snapshot['dataVersion'])
+    # 2026-10-30: B 생활 흐름 사례(demo-life). 표시 개정을 마친 demo-ready에서 만들며 거래명·적요는 생성 규칙대로 둔다.
+    from life_cases import make_life_snapshot
+    add_case(
+        'demo-life', make_life_snapshot(cases['demo-ready']),
+        '생활 흐름 시연(B 작성): demo-ready 근거 거래 보존, 1년 생활 거래·체크카드 짝·본인 이체·할부·부분 환불·승인 취소',
+        {'baseCase': 'demo-ready', 'transactionCount': 887,
+         'flutterExpected': {'b': 2000000, 'e': 300000, 'r': 400000, 'o': 0, 'u': 1300000},
+         'expectationScope': '독립 Flutter 검사 기대값; 서버 응답·서버 계산 결과가 아님'},
+    )
     # 현재 사례 전이를 가리키는 포인터는 과거 승인 기록과 달리 개정 원천에 맞춘다.
     for event in catalog['events']:
         event['sourceVersionBefore'] = cases[event['beforeCase']]['sourceVersion']

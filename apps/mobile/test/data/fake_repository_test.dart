@@ -81,8 +81,10 @@ void main() {
       expect(snapshot.dataVersion, '1');
       expect(
         snapshot.sourceVersion,
-        'fixture-3:alpha:2026-10-19:base:reversals-1:labels-1',
+        'fixture-3:alpha:2026-10-19:base:reversals-1:labels-1:billing-4',
       );
+      expect(snapshot.schemaVersion, 'PAYSE-DRAFT-4');
+      expect(snapshot.statements, isNotEmpty);
       expect(snapshot.ruleVersion, 'PAYSE-CALC-1');
       expect(snapshot.accounts, hasLength(6));
       expect(snapshot.cards, hasLength(4));
