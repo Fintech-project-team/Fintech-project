@@ -6,6 +6,8 @@
 
 ## 1. 공통 타입·검증
 
+급여 건별 큰 안내의 닫기 상태는 [급여 안내 API](../apps/api/docs/salary-notices.md)로 분리한다. 해당 기능의 구현·연동 시 필수 참조한다. `salary-notices` 프로필에서 `GET /salary-notices/{payMonth}`와 `PUT /salary-notices/{payMonth}/dismissal`을 제공하며, 사용자+명목 회차별 기록만 저장한다. 기존 v3 Snapshot·receiptEvidence·금융 dataVersion·write_receipts는 변경하지 않는다.
+
 공통 ID·Version·금액·Date/Time은 [데이터 모델 §1](data-model.md#1-읽는-방법과-공통-규칙)이 단일 기준이다. 아래는 HTTP 입력에만 추가하는 제약이다.
 
 | 타입  | 규칙                                                                               |

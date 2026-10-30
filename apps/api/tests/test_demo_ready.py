@@ -103,13 +103,16 @@ class DemoReadyTests(unittest.TestCase):
             self.assertEqual(self.cases[name]['settings']['salary']['receiptEvidence'], [])
 
     def test_initial_import_keeps_settings_empty(self):
-        """2026-10-26: 알파 기본 원본 변경 후에도 설정 적재는 명시 선택인지 검사한다. 사용: unittest."""
+        """2026-10-26: 알파 기본 원본 변경 후에도 설정 적재는 명시 선택인지 검사한다. 사용: unittest.
+
+        2026-10-30: 앱과 같은 demo-life를 기본으로 하되 일반 초기 적재의 빈 설정 원칙을 유지한다.
+        """
         snapshots, seeds = load_sources(API / 'fixtures/generated')
         alpha = [row for row in snapshots if row['userId'] == uid('alpha')]
         self.assertEqual(len(alpha), 1)
         demo = alpha[0]
-        self.assertEqual(seeds[demo['userId']]['initialCase'], 'demo-ready')
-        self.assertEqual(demo, self.cases['demo-ready'])
+        self.assertEqual(seeds[demo['userId']]['initialCase'], 'demo-life')
+        self.assertEqual(demo, self.cases['demo-life'])
         rows = financial_rows(demo, seeds[demo['userId']])
         attributes, = [row for table, row in rows if table == 'user_attributes']
         self.assertIsNone(attributes['salary_day'])

@@ -41,12 +41,19 @@ final class FinancialShape {
      * 금융 배열과 중첩 공개 필드를 검사한다. 누락된 취소일만 기존 v3의 선택 필드로 허용한다.
      * @created 2026-10-29
      * @usedBy FinancialProjection.Context 생성자
+     * @modified 2026-10-30 - 계좌 원천 상태를 posted/unknown으로 제한하고 카드 상태는 유지
      */
     static void validate(ObjectNode source) {
         FIELDS.forEach((group, fields) -> {
             for (ObjectNode row : rows(source, group)) {
                 boolean transaction = group.equals("transactions") || group.equals("relatedTransactions");
                 keys(row, fields, transaction ? Set.of("cancellationDate") : Set.of());
+                if (transaction && row.path("recordKind").asString("").equals("account_entry")) {
+                    JsonNode status = row.get("status");
+                    if (!status.isString() || !Set.of("posted", "unknown").contains(status.asString())) {
+                        throw unavailable();
+                    }
+                }
             }
         });
         ObjectNode settings = objectAt(source, "settings");

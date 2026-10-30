@@ -312,6 +312,11 @@ CREATE TABLE payse.financial_transactions (
   CHECK (record_kind IN ('account_entry', 'card_purchase', 'card_refund', 'card_cancellation')),
   CHECK (direction IN ('in', 'out')),
   CHECK (status IN ('approved', 'posted', 'cancelled', 'unknown')),
+  -- 2026-10-30: 계좌 내역에는 확정 기록·미확인만 허용하며 카드 상태 범위는 유지한다.
+  CONSTRAINT account_entry_status_valid CHECK (
+    record_kind <> 'account_entry'
+    OR status IN ('posted', 'unknown')
+  ),
   CHECK (reflection_reason IN ('reflected', 'not_reflected', 'not_applicable', 'unknown')),
   CHECK (account_id IS NOT NULL OR reflection_reason IN ('not_applicable', 'unknown')),
   CHECK ((occurred_at IS NULL
