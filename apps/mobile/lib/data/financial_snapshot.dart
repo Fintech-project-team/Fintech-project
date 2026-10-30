@@ -728,6 +728,169 @@ class Coverage {
   );
 }
 
+/// 2026-10-30: v4 청구 항목(docs/data-model.md#v4-청구-항목). 원천 값을 그대로 담고 null을 0으로 바꾸거나 합계를 채우지 않는다.
+class StatementItem {
+  /// 2026-10-30: 파싱된 필드로 만든다. [transactionRestricted]면 거래 연결이 연결 권한 때문에 생략됐다.
+  const StatementItem({
+    required this.itemId,
+    required this.transactionId,
+    required this.transactionRestricted,
+    required this.label,
+    required this.merchantName,
+    required this.purchaseDate,
+    required this.originalUsedAmountKrw,
+    required this.billedPrincipalKrw,
+    required this.feeOrAdjustmentAmountKrw,
+    required this.billedAmountKrw,
+    required this.installmentMonths,
+    required this.installmentRound,
+  });
+
+  final String itemId;
+
+  /// 2026-10-30: 같은 카드의 연결 거래. null이면 연결 없음(연회비·독립 조정) 또는 연결 제한([transactionRestricted])이다.
+  final String? transactionId;
+  final bool transactionRestricted;
+  final String? label;
+  final String? merchantName;
+  final String? purchaseDate;
+  final int? originalUsedAmountKrw;
+  final int? billedPrincipalKrw;
+
+  /// 2026-10-30: 가산은 양수, 할인·차감은 음수다.
+  final int? feeOrAdjustmentAmountKrw;
+
+  /// 2026-10-30: 이 항목의 최종 청구 기여 금액. 환급·차감은 음수다.
+  final int? billedAmountKrw;
+  final int? installmentMonths;
+  final int? installmentRound;
+
+  static const Set<String> _keys = {
+    'itemId',
+    'userId',
+    'sourceRef',
+    'sourceVersion',
+    'transactionId',
+    'label',
+    'merchantName',
+    'purchaseDate',
+    'originalUsedAmountKRW',
+    'billedPrincipalKRW',
+    'feeOrAdjustmentAmountKRW',
+    'billedAmountKRW',
+    'installmentMonths',
+    'installmentRound',
+  };
+
+  /// 2026-10-30: 키 집합·형식·부호·할부 순서를 검사하며 한 항목을 읽는다. transactionId 키 생략은 제한 표식으로
+  /// 부모에서 확인한다.
+  static StatementItem _parse(_Fields f) {
+    final restricted = !f.map.containsKey('transactionId');
+    final expected = restricted
+        ? (_keys.toSet()..remove('transactionId'))
+        : _keys;
+    final keys = f.map.keys.toSet();
+    if (keys.length != expected.length || !keys.containsAll(expected)) {
+      throw SnapshotFormatException(f.path, '청구 항목 키 구성이 계약과 다름');
+    }
+    for (final key in ['itemId', 'userId', 'sourceRef', 'sourceVersion']) {
+      if (f.string(key).trim().isEmpty) {
+        throw SnapshotFormatException('${f.path}.$key', '빈 문자열 불가');
+      }
+    }
+    int? count(String key) {
+      final v = f.map[key];
+      if (v == null) return null;
+      if (v is! int || v < 1 || v > 2147483647) {
+        throw f._wrong(key, v, '양의 정수 또는 null');
+      }
+      return v;
+    }
+
+    final months = count('installmentMonths');
+    final round = count('installmentRound');
+    if (months != null && round != null && round > months) {
+      throw SnapshotFormatException(f.path, '할부 회차가 개월 수보다 큼');
+    }
+    return StatementItem(
+      itemId: f.string('itemId'),
+      transactionId: restricted ? null : f.stringOrNull('transactionId'),
+      transactionRestricted: restricted,
+      label: f.stringOrNull('label'),
+      merchantName: f.stringOrNull('merchantName'),
+      purchaseDate: f.businessDateOrNull('purchaseDate'),
+      originalUsedAmountKrw: f.nonNegativeKrwOrNull('originalUsedAmountKRW'),
+      billedPrincipalKrw: f.nonNegativeKrwOrNull('billedPrincipalKRW'),
+      feeOrAdjustmentAmountKrw: f.krwOrNull('feeOrAdjustmentAmountKRW'),
+      billedAmountKrw: f.krwOrNull('billedAmountKRW'),
+      installmentMonths: months,
+      installmentRound: round,
+    );
+  }
+}
+
+/// 2026-10-30: 카드 청구서. v3에는 [items]가 없고(null) v4에는 항상 있다. 청구 총액은 원천 값 그대로다.
+class Statement {
+  /// 2026-10-30: 파싱된 필드로 만든다.
+  const Statement({
+    required this.statementId,
+    required this.cardId,
+    required this.amountKrw,
+    required this.dueDate,
+    required this.includedTransactionRefs,
+    required this.detailCompleteness,
+    required this.items,
+  });
+
+  final String statementId;
+  final String cardId;
+  final int amountKrw;
+  final String dueDate;
+  final List<String> includedTransactionRefs;
+  final String detailCompleteness;
+  final List<StatementItem>? items;
+
+  /// 2026-10-30: 한 청구서를 읽는다. [v4]면 items가 필수이고 includedTransactionRefs는 항목의 공개 거래 ID를 첫 출현 순으로
+  /// 중복 제거한 값이어야 한다. v3에 items가 있으면 형식 오류다.
+  static Statement _parse(_Fields f, {required bool v4}) {
+    final List<StatementItem>? items;
+    if (v4) {
+      items = f.list('items', StatementItem._parse);
+    } else {
+      if (f.map.containsKey('items')) {
+        throw SnapshotFormatException(
+          '${f.path}.items',
+          'v3 청구에는 items가 없어야 함',
+        );
+      }
+      items = null;
+    }
+    final refs = f.stringList('includedTransactionRefs');
+    if (items != null) {
+      final derived = {for (final item in items) ?item.transactionId}.toList();
+      final same =
+          derived.length == refs.length &&
+          Iterable<int>.generate(refs.length)
+              .every((k) => refs[k] == derived[k]);
+      if (!same) {
+        throw SnapshotFormatException(
+          '${f.path}.includedTransactionRefs',
+          '청구 항목의 거래 연결과 다름',
+        );
+      }
+    }
+    return Statement(
+      statementId: f.string('statementId'),
+      cardId: f.string('cardId'),
+      amountKrw: f.krw('amountKRW', allowNegative: false),
+      dueDate: f.businessDate('dueDate'),
+      includedTransactionRefs: refs,
+      detailCompleteness: f.string('detailCompleteness'),
+      items: items,
+    );
+  }
+}
+
 /// 2026-10-22: 부분 연결 제한 표식 하나(docs/api-response-models.md §2.1). 숨긴 대상의 ID·개수·금액은 담지 않는다.
 class AccessRestriction {
   /// 2026-10-22: 공개 위치 [ownerType]·[ownerId]·[field]와 비공개 자원 종류 [targetKind]로 만든다.
@@ -744,7 +907,8 @@ class AccessRestriction {
   final String targetKind;
 
   /// 2026-10-22: 등록 조합·ownerId 규칙을 검사하며 한 표식을 읽는다. 맞지 않으면 형식 오류다.
-  static AccessRestriction _parse(_Fields f) {
+  /// 2026-10-30: [v4]면 v4 전용 조합(statementItem)도 받는다.
+  static AccessRestriction _parse(_Fields f, {bool v4 = false}) {
     final ownerType = f.string('ownerType');
     final ownerId = f.stringOrNull('ownerId');
     final field = f.string('field');
@@ -755,6 +919,7 @@ class AccessRestriction {
       field: field,
       targetKind: targetKind,
       reason: f.string('reason'),
+      v4: v4,
     );
     if (!valid) {
       throw SnapshotFormatException(f.path, '등록되지 않은 제한 조합');
@@ -794,14 +959,21 @@ class FinancialSnapshot {
     this.referenceResolutions,
     this.hasMoreTransactions = false,
     this.accessRestrictions = const [],
+    this.statements,
   });
 
   /// 2026-10-26: 이 앱이 읽는 형식. 원본(PAYSE-DRAFT-3, 개발용 원본 직접 보기)과 HTTP 표현(PAYSE-API-0.6-3).
   /// v2에는 필수 payMonth가 없어 받지 않는다(날짜로 회차를 채우는 변환 없음).
+  /// 2026-10-30: v4(PAYSE-DRAFT-4·PAYSE-API-0.6-4, 청구 항목 포함)도 읽는다. v3는 기존 경로 그대로다.
   static const Set<String> supportedSchemas = {
     'PAYSE-DRAFT-3',
     'PAYSE-API-0.6-3',
+    'PAYSE-DRAFT-4',
+    'PAYSE-API-0.6-4',
   };
+
+  /// 2026-10-30: 청구 항목(items)이 필수인 v4 형식.
+  static const Set<String> v4Schemas = {'PAYSE-DRAFT-4', 'PAYSE-API-0.6-4'};
 
   final String userId;
   final String schemaVersion;
@@ -818,6 +990,9 @@ class FinancialSnapshot {
   final List<Account>? accounts;
   final List<PaymentCard>? cards;
   final List<SourceTransaction>? transactions;
+
+  /// 2026-10-30: 공개된 카드 청구서. null이면 원문에 묶음이 없는 것(연결 전)이다. v4만 청구 항목을 담는다.
+  final List<Statement>? statements;
 
   /// 2026-10-22: 확정 사용자 설정·모아둘 돈·예정 지출. null이면 원문에 해당 묶음이 없는 것(연결 전)이다.
   final FinancialSettings? settings;
@@ -847,7 +1022,7 @@ class FinancialSnapshot {
   /// 2026-10-22: 미연결 카드의 계획 결제일이 응답에서 생략됐으면 true다.
   bool get cardPlansRestricted => isRestricted('settings', null, 'cardPlans');
 
-  /// 2026-10-22: HTTP 표현(PAYSE-API-0.6-3) 연결 후 응답의 필수 키(docs/api-response-models.md §1).
+  /// 2026-10-22: HTTP 표현(PAYSE-API-0.6-3·0.6-4) 연결 후 응답의 필수 키(docs/api-response-models.md §1).
   /// 연결 전 응답에는 이 키들이 없어야 한다(머리 7개+institutions·institutionLinks·coverage의 10개만).
   static const List<String> connectedApiKeys = [
     'accounts',
@@ -911,9 +1086,13 @@ class FinancialSnapshot {
     }
     final links = f._required('institutionLinks', '배열');
     if (links is! List) throw f._wrong('institutionLinks', links, '배열');
-    if (schema == 'PAYSE-API-0.6-3') _checkApiShape(f, links.isNotEmpty);
+    final v4 = v4Schemas.contains(schema);
+    if (schema.startsWith('PAYSE-API-')) _checkApiShape(f, links.isNotEmpty);
     final restrictions =
-        f.listOrAbsent('accessRestrictions', AccessRestriction._parse) ??
+        f.listOrAbsent(
+          'accessRestrictions',
+          (item) => AccessRestriction._parse(item, v4: v4),
+        ) ??
         const <AccessRestriction>[];
     _checkRestrictionOwners(f, restrictions);
     final cards = f.listOrAbsent('cards', PaymentCard._parse);
@@ -934,6 +1113,11 @@ class FinancialSnapshot {
       }
     }
     final accounts = f.listOrAbsent('accounts', Account._parse);
+    final statements = f.listOrAbsent(
+      'statements',
+      (item) => Statement._parse(item, v4: v4),
+    );
+    _checkStatementItems(statements, restrictions, marked);
     final settings = f.map.containsKey('settings')
         ? FinancialSettings._parse(
             _Fields.of(f._required('settings', '객체'), r'$.settings'),
@@ -978,7 +1162,48 @@ class FinancialSnapshot {
       allocations: allocations,
       settlements: settlements,
       restrictions: restrictions,
+      statements: statements,
     );
+  }
+
+  /// 2026-10-30: 거래 연결이 생략된 청구 항목마다 statementItem·부모 statement/includedTransactionRefs 표식이 있는지,
+  /// statementItem 표식이 실제로 생략된 공개 항목만 가리키는지 검사한다. 숨긴 ID를 다른 값으로 대신하지 않는다.
+  static void _checkStatementItems(
+    List<Statement>? statements,
+    List<AccessRestriction> restrictions,
+    bool Function(String type, String? id, String field) marked,
+  ) {
+    final omitted = <String>{};
+    for (final s in statements ?? const <Statement>[]) {
+      final hidden = [
+        for (final item in s.items ?? const <StatementItem>[])
+          if (item.transactionRestricted) item.itemId,
+      ];
+      for (final id in hidden) {
+        if (!marked('statementItem', id, 'transactionId')) {
+          throw const SnapshotFormatException(
+            r'$.statements',
+            '청구 항목 거래 연결 생략에 제한 표식이 없음',
+          );
+        }
+      }
+      if (hidden.isNotEmpty &&
+          !marked('statement', s.statementId, 'includedTransactionRefs')) {
+        throw const SnapshotFormatException(
+          r'$.statements',
+          '청구 거래 참조 생략에 제한 표식이 없음',
+        );
+      }
+      omitted.addAll(hidden);
+    }
+    for (final r in restrictions) {
+      if (r.ownerType == 'statementItem' && !omitted.contains(r.ownerId)) {
+        throw const SnapshotFormatException(
+          r'$.accessRestrictions',
+          '제한 표식의 청구 항목이 공개되지 않았거나 연결이 생략되지 않음',
+        );
+      }
+    }
   }
 
   /// 2026-10-23: 배정·지급 연결이 응답에 공개된 보호액·의무만 가리키는지 검사한다.
@@ -1086,6 +1311,7 @@ class FinancialSnapshot {
     required List<Allocation>? allocations,
     required List<Settlement>? settlements,
     required List<AccessRestriction> restrictions,
+    required List<Statement>? statements,
   }) {
     final page = f.map['page'];
     return FinancialSnapshot(
@@ -1117,6 +1343,7 @@ class FinancialSnapshot {
       ),
       hasMoreTransactions: page is Map && page['nextCursor'] != null,
       accessRestrictions: restrictions,
+      statements: statements,
     );
   }
 

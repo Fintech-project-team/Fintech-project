@@ -44,9 +44,18 @@ class ProjectionState {
 
 /// 2026-10-22: 원본 fixture(PAYSE-DRAFT-3)와 사용자 상태로 HTTP Snapshot(PAYSE-API-0.6-3)을 만든다
 /// (docs/api-response-models.md §1.1·§2). 원본은 바꾸지 않고 새 객체를 만든다. 상태·화면 전역값을 읽지 않는다.
+/// 2026-10-30: v4 원본(PAYSE-DRAFT-4)은 청구 항목을 담아 PAYSE-API-0.6-4로 투영한다. v3는 기존 경로 그대로다.
 abstract final class SnapshotProjector {
   static const String sourceSchema = 'PAYSE-DRAFT-3';
   static const String apiSchema = 'PAYSE-API-0.6-3';
+  static const String sourceSchemaV4 = 'PAYSE-DRAFT-4';
+  static const String apiSchemaV4 = 'PAYSE-API-0.6-4';
+
+  /// 2026-10-30: 원본 형식별 응답 형식.
+  static const Map<String, String> _apiSchemaOf = {
+    sourceSchema: apiSchema,
+    sourceSchemaV4: apiSchemaV4,
+  };
 
   static const List<String> _headerKeys = [
     'userId',
@@ -64,7 +73,8 @@ abstract final class SnapshotProjector {
     ProjectionState state,
   ) {
     final src = _deepCopy(source);
-    if (src['schemaVersion'] != sourceSchema) {
+    final api = _apiSchemaOf[src['schemaVersion']];
+    if (api == null) {
       throw const SnapshotContractException(
         r'$.schemaVersion',
         '지원하지 않는 원본 형식',
@@ -83,7 +93,7 @@ abstract final class SnapshotProjector {
     }
     final header = <String, Object?>{
       for (final key in _headerKeys) key: src[key],
-      'schemaVersion': apiSchema,
+      'schemaVersion': api,
       'dataVersion': state.dataVersion,
     };
     final partial = _Partial(src, state, header)
@@ -112,7 +122,7 @@ abstract final class SnapshotProjector {
   /// 2026-10-22: [source] 원본이 연결 가능한 지원 형식(연결 후 키 모두 포함)이고 타입·소유자·참조가 계약과 맞는지
   /// 검사한다. 맞지 않으면 [SnapshotContractException]을 던진다. 서버가 원본을 처음 열 때 쓰며 원본을 바꾸지 않는다.
   static void validate(Map<String, Object?> source) {
-    if (source['schemaVersion'] != sourceSchema) {
+    if (!_apiSchemaOf.containsKey(source['schemaVersion'])) {
       throw const SnapshotContractException(
         r'$.schemaVersion',
         '지원하지 않는 원본 형식',
@@ -154,9 +164,13 @@ abstract final class SnapshotProjector {
 class _Partial {
   /// 2026-10-22: 깊이 복사한 원본 [src], 사용자 [state], 공통 머리 [header]로 만든다.
   _Partial(this.src, this.state, this.header)
-    : connected = state.connectedCodes;
+    : connected = state.connectedCodes,
+      v4 = src['schemaVersion'] == SnapshotProjector.sourceSchemaV4;
 
   final Map<String, Object?> src;
+
+  /// 2026-10-30: 청구 항목(items)이 있는 v4 원본이면 true다.
+  final bool v4;
   final ProjectionState state;
   final Map<String, Object?> header;
   final Set<String> connected;
@@ -198,6 +212,7 @@ class _Partial {
       field: field,
       targetKind: targetKind,
       reason: 'not_connected',
+      v4: v4,
     );
     if (!valid) {
       throw SnapshotContractException(
@@ -462,6 +477,115 @@ class _Partial {
     }
   }
 
+  static const Set<String> _itemKeys = {
+    'itemId',
+    'userId',
+    'sourceRef',
+    'sourceVersion',
+    'transactionId',
+    'label',
+    'merchantName',
+    'purchaseDate',
+    'originalUsedAmountKRW',
+    'billedPrincipalKRW',
+    'feeOrAdjustmentAmountKRW',
+    'billedAmountKRW',
+    'installmentMonths',
+    'installmentRound',
+  };
+
+  /// 2026-10-30: 청구 항목 원천을 검사한다(apps/api/fixtures/statement_items.py와 같은 규칙). v3는 items가 없어야 하고,
+  /// v4는 모든 청구에 items 배열이 있어야 한다. 키 구성·형식·부호·할부 순서·소유자·원천 버전·ID와 sourceRef 중복·
+  /// 같은 사용자·같은 카드 거래 연결·includedTransactionRefs 파생 일치를 확인하며 값을 고치지 않는다.
+  void _checkItems(String userId) {
+    void need(bool ok, String reason) {
+      if (!ok) throw SnapshotContractException('statements.items', reason);
+    }
+
+    final cardOf = <String, Object?>{
+      for (final key in const ['transactions', 'relatedTransactions'])
+        for (final t in _optional(key))
+          t['transactionId'] as String: t['cardId'],
+    };
+    final version = header['sourceVersion'];
+    final itemIds = <String>{};
+    final sourceRefs = <String>{};
+    const limit = 9000000000000;
+    bool money(Object? v, {required bool signed}) =>
+        v == null || v is int && v <= limit && v >= (signed ? -limit : 0);
+    bool count(Object? v) => v == null || v is int && v > 0 && v <= 2147483647;
+    for (final s in _optional('statements')) {
+      if (!v4) {
+        need(!s.containsKey('items'), 'v3 청구에는 items가 없어야 함');
+        continue;
+      }
+      need(s['items'] is List, 'v4 청구에는 items 배열이 필요함');
+      need(s['sourceVersion'] == version, '청구 원천 버전이 다름');
+      final derived = <String>[];
+      for (final raw in s['items']! as List) {
+        need(raw is Map, '항목이 객체가 아님');
+        final item = (raw as Map).cast<String, Object?>();
+        final keys = item.keys.toSet();
+        need(
+          keys.length == _itemKeys.length && keys.containsAll(_itemKeys),
+          '항목 키 구성이 계약과 다름',
+        );
+        for (final key in const [
+          'itemId',
+          'userId',
+          'sourceRef',
+          'sourceVersion',
+        ]) {
+          need(_typed(item[key], 'id'), '$key 형식이 아님');
+        }
+        need(item['userId'] == userId, '다른 사용자 항목');
+        need(item['sourceVersion'] == s['sourceVersion'], '항목 원천 버전이 부모와 다름');
+        need(itemIds.add(item['itemId']! as String), '항목 ID 중복');
+        need(sourceRefs.add(item['sourceRef']! as String), '항목 sourceRef 중복');
+        for (final key in const ['label', 'merchantName']) {
+          need(item[key] == null || item[key] is String, '$key 형식이 아님');
+        }
+        final date = item['purchaseDate'];
+        need(
+          date == null ||
+              date is String && RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(date),
+          '이용일 형식이 아님',
+        );
+        need(
+          money(item['originalUsedAmountKRW'], signed: false) &&
+              money(item['billedPrincipalKRW'], signed: false),
+          '원이용·청구 원금은 0 이상 원화 정수 또는 null',
+        );
+        need(
+          money(item['feeOrAdjustmentAmountKRW'], signed: true) &&
+              money(item['billedAmountKRW'], signed: true),
+          '조정액·청구액 범위 초과',
+        );
+        final months = item['installmentMonths'];
+        final round = item['installmentRound'];
+        need(count(months) && count(round), '할부 개월·회차 형식이 아님');
+        need(
+          months == null || round == null || (round as int) <= (months as int),
+          '할부 회차가 개월 수보다 큼',
+        );
+        final tx = item['transactionId'];
+        if (tx != null) {
+          need(_typed(tx, 'id'), 'transactionId 형식이 아님');
+          need(cardOf.containsKey(tx), '원본에 없는 거래 연결');
+          need(cardOf[tx] == s['cardId'], '다른 카드 거래 연결');
+          if (!derived.contains(tx)) derived.add(tx as String);
+        }
+      }
+      final refs = (s['includedTransactionRefs'] as List?) ?? const [];
+      need(
+        refs.length == derived.length &&
+            Iterable<int>.generate(refs.length)
+                .every((i) => refs[i] == derived[i]),
+        'includedTransactionRefs가 항목 연결과 다름',
+      );
+    }
+  }
+
   /// 2026-10-22: 공개 판정 전에 원본을 검증한다. 모든 자원 행의 userId가 응답 사용자와 같아야 하고,
   /// 필수 부모·참조(계좌·카드·청구·의무·보호·정산·계획·버전·거래)가 원본 안에 실제로 있어야 한다.
   /// 모순된 원본은 다른 값으로 대체하지 않고 계약 오류로 거절한다.
@@ -544,6 +668,7 @@ class _Partial {
         need(transactions.contains(ref), 'statements.includedTransactionRefs');
       }
     }
+    _checkItems(userId);
     for (final o in _optional('obligations')) {
       need(
         accounts.contains(o['withdrawalAccountId']),
@@ -939,6 +1064,11 @@ class _Partial {
         continue;
       }
       _visibleStatements.add(id);
+      if (v4) {
+        _items(s);
+        out.add(s);
+        continue;
+      }
       final refs =
           (s['includedTransactionRefs'] as List?)?.cast<String>() ??
           const <String>[];
@@ -953,6 +1083,34 @@ class _Partial {
       out.add(s);
     }
     return out;
+  }
+
+  /// 2026-10-30: 공개 청구 [s]의 항목에서 미연결 거래 연결은 transactionId 키만 생략하고 statementItem 표식을 남긴다.
+  /// 실제 연결 없음(null)은 그대로 두며, includedTransactionRefs는 남은 연결에서 첫 출현 순으로 다시 만든다.
+  void _items(Map<String, Object?> s) {
+    final id = s['statementId'] as String;
+    final refs = <String>[];
+    var hidden = false;
+    for (final raw in s['items']! as List) {
+      final item = raw as Map;
+      final tx = item['transactionId'] as String?;
+      if (tx != null && !_visibleTransactions.contains(tx)) {
+        item.remove('transactionId');
+        hidden = true;
+        _restrict(
+          'statementItem',
+          item['itemId'] as String,
+          'transactionId',
+          'transaction',
+        );
+      } else if (tx != null && !refs.contains(tx)) {
+        refs.add(tx);
+      }
+    }
+    s['includedTransactionRefs'] = refs;
+    if (hidden) {
+      _restrict('statement', id, 'includedTransactionRefs', 'transaction');
+    }
   }
 
   /// 2026-10-22: 계획 버전을 출금 계좌 연결로 공개 판정하고, 미연결 카드는 cardId 키만 생략한다.
