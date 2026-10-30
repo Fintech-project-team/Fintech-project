@@ -638,7 +638,48 @@ class SourceTransaction {
     this.sourceVersion,
     this.accountRestricted = false,
     this.cardRestricted = false,
+    this.description,
+    this.refundDate,
+    this.cancellationDate,
+    this.occurredAt,
+    this.occurredAtBasis,
+    this.originalTransactionId,
+    this.installmentCurrent,
+    this.installmentTotal,
   });
+
+  /// 2026-10-30: 계약 열거값(docs/data-model.md). 그 밖의 값은 형식 오류다. 계좌 내역의 approved·cancelled도 허용 값이다.
+  static const Set<String> recordKinds = {
+    'account_entry',
+    'card_purchase',
+    'card_refund',
+    'card_cancellation',
+  };
+  static const Set<String> directions = {'in', 'out'};
+  static const Set<String> statuses = {
+    'approved',
+    'posted',
+    'cancelled',
+    'unknown',
+  };
+
+  /// 2026-10-30: 원천 표시 설명(화면 '거래 내용'). null은 미제공이다.
+  final String? description;
+
+  /// 2026-10-30: 환불 반영일·승인 취소일. 다른 날짜를 복사해 채우지 않는다.
+  final String? refundDate;
+  final String? cancellationDate;
+
+  /// 2026-10-30: 이 기록 자체의 확인 시각과 그 기준(purchase·booking·withdrawal·refund·cancellation). 없으면 날짜만 보인다.
+  final String? occurredAt;
+  final String? occurredAtBasis;
+
+  /// 2026-10-30: 근거가 있는 취소·환불의 원거래 ID. null이면 원거래 연결이 없거나 공개되지 않았다(추정해 채우지 않음).
+  final String? originalTransactionId;
+
+  /// 2026-10-30: 확인된 원문 할부 회차·전체 회차.
+  final int? installmentCurrent;
+  final int? installmentTotal;
 
   final String transactionId;
   final String? accountId;
@@ -678,10 +719,10 @@ class SourceTransaction {
       transactionId: f.string('transactionId'),
       accountId: accountId,
       cardId: cardId,
-      recordKind: f.string('recordKind'),
+      recordKind: f.oneOf('recordKind', recordKinds),
       amountKrw: f.krw('amountKRW', allowNegative: false),
-      direction: f.string('direction'),
-      status: f.string('status'),
+      direction: f.oneOf('direction', directions),
+      status: f.oneOf('status', statuses),
       merchantName: f.string('merchantName'),
       bookingDate: f.businessDateOrNull('bookingDate'),
       purchaseDate: f.businessDateOrNull('purchaseDate'),
@@ -698,7 +739,23 @@ class SourceTransaction {
       sourceVersion: f.stringOrNull('sourceVersion'),
       accountRestricted: !f.map.containsKey('accountId'),
       cardRestricted: !f.map.containsKey('cardId'),
+      description: f.stringOrNull('description'),
+      refundDate: f.businessDateOrNull('refundDate'),
+      cancellationDate: f.businessDateOrNull('cancellationDate'),
+      occurredAt: f.timestampOrNull('occurredAt'),
+      occurredAtBasis: f.stringOrNull('occurredAtBasis'),
+      originalTransactionId: f.stringOrNull('originalTransactionId'),
+      installmentCurrent: _count(f, 'installmentCurrent'),
+      installmentTotal: _count(f, 'installmentTotal'),
     );
+  }
+
+  /// 2026-10-30: null 허용 양의 정수 [key]를 읽는다. 0·음수·정수가 아닌 값은 형식 오류다.
+  static int? _count(_Fields f, String key) {
+    final v = f.map[key];
+    if (v == null) return null;
+    if (v is! int || v < 1) throw f._wrong(key, v, '양의 정수 또는 null');
+    return v;
   }
 }
 
@@ -711,6 +768,7 @@ class Coverage {
     required this.status,
     required this.requestedStart,
     required this.requestedEnd,
+    this.missingRanges = const [],
   });
 
   final String targetKind;
@@ -719,13 +777,50 @@ class Coverage {
   final String requestedStart;
   final String requestedEnd;
 
+  /// 2026-10-30: 확보하지 못한 날짜 구간(양 끝 포함). 키가 없으면 빈 목록이다.
+  final List<({String start, String end})> missingRanges;
+
   static Coverage _parse(_Fields f) => Coverage(
     targetKind: f.string('targetKind'),
     targetId: f.string('targetId'),
     status: f.string('status'),
     requestedStart: f.businessDate('requestedStart'),
     requestedEnd: f.businessDate('requestedEnd'),
+    missingRanges:
+        f.listOrAbsent(
+          'missingRanges',
+          (r) => (start: r.businessDate('start'), end: r.businessDate('end')),
+        ) ??
+        const [],
   );
+}
+
+/// 2026-10-30: GET /transactions의 TransactionPage(docs/api-response-models.md §1). 거래 목록·조회 범위·다음 cursor·자료 버전만 읽는다.
+class TransactionPage {
+  /// 2026-10-30: 파싱된 필드로 만든다.
+  const TransactionPage({
+    required this.transactions,
+    required this.coverage,
+    required this.nextCursor,
+    required this.dataVersion,
+  });
+
+  final List<SourceTransaction> transactions;
+  final List<Coverage> coverage;
+  final String? nextCursor;
+  final String dataVersion;
+
+  /// 2026-10-30: 디코드된 JSON [json]을 읽는다. 형식이 맞지 않으면 SnapshotFormatException이다.
+  factory TransactionPage.fromJson(Object? json) {
+    final f = _Fields.of(json, r'$');
+    final page = _Fields.of(f._required('page', '객체'), r'$.page');
+    return TransactionPage(
+      transactions: f.list('transactions', SourceTransaction._parse),
+      coverage: f.list('coverage', Coverage._parse),
+      nextCursor: page.stringOrNull('nextCursor'),
+      dataVersion: page.string('dataVersion'),
+    );
+  }
 }
 
 /// 2026-10-30: v4 청구 항목(docs/data-model.md#v4-청구-항목). 원천 값을 그대로 담고 null을 0으로 바꾸거나 합계를 채우지 않는다.
@@ -958,6 +1053,7 @@ class FinancialSnapshot {
     this.relatedTransactions,
     this.referenceResolutions,
     this.hasMoreTransactions = false,
+    this.nextTransactionCursor,
     this.accessRestrictions = const [],
     this.statements,
   });
@@ -1011,6 +1107,9 @@ class FinancialSnapshot {
 
   /// 2026-10-23: 거래 다음 페이지가 남아 있으면 true다. 받지 못한 거래를 '없음'으로 판단하지 않는다.
   final bool hasMoreTransactions;
+
+  /// 2026-10-30: 다음 거래 페이지 cursor. null이면 받을 페이지가 없다.
+  final String? nextTransactionCursor;
 
   /// 2026-10-22: 주 계좌가 미연결이라 일부 모아둘 돈이 응답에서 생략됐으면 true다.
   bool get reservesRestricted => isRestricted('response', null, 'reserves');
@@ -1342,6 +1441,9 @@ class FinancialSnapshot {
         ReferenceResolution._parse,
       ),
       hasMoreTransactions: page is Map && page['nextCursor'] != null,
+      nextTransactionCursor: page is Map && page['nextCursor'] is String
+          ? page['nextCursor']! as String
+          : null,
       accessRestrictions: restrictions,
       statements: statements,
     );
