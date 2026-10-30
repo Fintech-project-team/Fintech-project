@@ -80,7 +80,7 @@ void main() {
       );
       await connectAndChooseAccounts(tester);
 
-      for (final label in ['홈', '계좌', '계획', '내 정보']) {
+      for (final label in ['홈', '계좌·카드', '계획', '내 정보']) {
         expect(
           find.descendant(
             of: find.byType(NavigationBar),

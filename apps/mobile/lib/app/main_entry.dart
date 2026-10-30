@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/connection/financial_api.dart';
+import '../data/connection/transaction_history.dart';
 import '../data/connection/user_snapshot_repository.dart';
 import '../data/first_calc_record_store.dart';
 import '../data/salary_notice_store.dart';
@@ -12,6 +13,7 @@ import '../features/connection/connection_illustration.dart';
 import '../features/connection/connection_page.dart';
 import '../features/connection/connection_presentation_policy.dart';
 import '../features/overview/home_screen.dart' show HomeRefresh;
+import '../features/overview/pull_refresh.dart';
 import '../features/overview/slide_switch.dart';
 import '../shared/design/payse_tokens.dart';
 import '../shared/design/primary_button.dart';
@@ -92,6 +94,8 @@ class _MainEntryState extends State<MainEntry> {
   HomeRefresh _refresh = HomeRefresh.idle;
   SnapshotLoadResult? _override;
   int _refreshes = 0;
+  TransactionHistoryReady? _history;
+  Future<PullRefreshResult>? _pulling;
 
   /// 2026-10-21: 현재 스냅샷을 조회한다.
   /// 2026-10-22: 예상하지 못한 예외는 Flutter 오류로 보고한 뒤 다시 던져 다시 시도 화면을 보인다.
@@ -163,6 +167,7 @@ class _MainEntryState extends State<MainEntry> {
   }
 
   /// 2026-10-29: 계좌 탭에서 저장에 성공해 받은 [snapshot]을 홈 셸의 스냅샷으로 삼는다. 진행 중 새로고침 응답은 버린다.
+  /// 2026-10-30: 당겨서 새로고침 응답도 버린다. 거래 내역은 새 자료 버전으로 화면이 다시 받는다.
   void _applySaved(FinancialSnapshot snapshot) {
     if (!mounted) return;
     setState(() {
@@ -170,6 +175,65 @@ class _MainEntryState extends State<MainEntry> {
       _refresh = HomeRefresh.idle;
       _refreshed = snapshot;
     });
+  }
+
+  /// 2026-10-30: 아래로 당겨 새로고침(29-2 명세 '새로고침 반영 기준'). 진행 중이면 같은 요청을 기다린다.
+  Future<PullRefreshResult> _pullRefresh() =>
+      _pulling ??= _pull().whenComplete(() => _pulling = null);
+
+  /// 2026-10-30: Snapshot과 그 자료 버전의 거래 페이지를 끝까지 받은 뒤에만 홈·계좌 관리·거래 내역에 한 번에 반영한다.
+  /// 하나라도 실패하면 아무것도 바꾸지 않는다. 인위적인 대기는 두지 않는다. 진행 중 홈 새로고침 응답은 버리고, 반영 전에
+  /// 저장 결과가 먼저 오면 이 응답을 버린다. 세션 무효·연결 상태 변경은 진입 처리([_applyRefresh])를 따른다.
+  Future<PullRefreshResult> _pull() async {
+    final id = ++_refreshes;
+    if (_refresh == HomeRefresh.loading) {
+      setState(() => _refresh = HomeRefresh.idle);
+    }
+    final SnapshotLoadResult loaded;
+    try {
+      loaded = await _load();
+    } catch (_) {
+      return const PullRefreshFailed();
+    }
+    if (!mounted || id != _refreshes) return const PullRefreshSkipped();
+    final FinancialSnapshot snapshot;
+    switch (loaded) {
+      case SnapshotLoaded(snapshot: final s)
+          when entryDestination(s) == EntryDestination.home:
+        snapshot = s;
+      case SnapshotLoaded(snapshot: final s)
+          when entryDestination(s) == EntryDestination.unreadable:
+        return const PullRefreshFailed();
+      case SnapshotLoaded():
+      case SnapshotLoadFailed(:final error)
+          when error is FinancialLoadError && error.sessionInvalid:
+        setState(() => _applyRefresh(loaded));
+        return const PullRefreshSkipped();
+      case SnapshotLoadFailed() || SnapshotFormatInvalid():
+        return const PullRefreshFailed();
+    }
+    final collected = snapshot.nextTransactionCursor == null
+        ? TransactionHistoryReady(
+            snapshot: snapshot,
+            transactions: snapshot.transactions ?? const [],
+            coverage: snapshot.coverage,
+          )
+        : await TransactionHistoryCollector(widget.financial).collect(snapshot);
+    if (!mounted || id != _refreshes) return const PullRefreshSkipped();
+    switch (collected) {
+      case TransactionHistoryReady():
+        setState(() {
+          _refreshed = collected.snapshot;
+          _history = collected;
+          _refresh = HomeRefresh.idle;
+        });
+        return PullRefreshDone(collected);
+      case TransactionHistorySessionInvalid():
+        widget.onSessionInvalid();
+        return const PullRefreshSkipped();
+      case TransactionHistoryFailed():
+        return const PullRefreshFailed();
+    }
   }
 
   /// 2026-10-29: 월급 입금 확인 안내 접힘 [key](null이면 펼침)를 사용자 [userId]로 남긴다.
@@ -188,6 +252,7 @@ class _MainEntryState extends State<MainEntry> {
   void _resetRefresh() {
     _refreshes++;
     _refreshed = null;
+    _history = null;
     _override = null;
     _refresh = HomeRefresh.idle;
   }
@@ -286,6 +351,8 @@ class _MainEntryState extends State<MainEntry> {
             snapshot: _refreshed ?? snapshot,
             onReload: _refreshHome,
             refresh: _refresh,
+            onPullRefresh: _pullRefresh,
+            history: _history,
             devEntry: widget.devEntryBuilder(context),
             firstCalcRecord: _record,
             onFirstCalcRecord: (record) => _saveRecord(snapshot.userId, record),

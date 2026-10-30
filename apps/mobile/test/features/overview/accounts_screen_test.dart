@@ -362,8 +362,9 @@ void main() {
           .toList();
       expect(kb, [
         '····0001',
-        '모아둘 돈 400,000원 · 카드 3장 결제',
-      ], reason: '한 줄에 안 들어가면 계좌 번호 다음에서 줄바꿈');
+        '모아둘 돈 400,000원',
+        '카드 3장 결제',
+      ], reason: '한 줄에 안 들어가면 계좌 번호 / 모아둘 돈 / 카드 결제 의미 단위로 줄바꿈');
     });
 
     testWidgets('월급 정보 opens the salary editor; saving returns with a notice', (

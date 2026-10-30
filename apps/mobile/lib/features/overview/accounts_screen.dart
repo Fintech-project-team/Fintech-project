@@ -12,6 +12,7 @@ import '../connection/connection_screens.dart';
 import 'account_rename_sheet.dart';
 import 'home_calculation.dart';
 import 'home_screen.dart' show asOfLabel;
+import 'pull_refresh.dart';
 import 'salary_notice.dart';
 
 /// 2026-10-29: 계좌 탭에서 저장에 쓰는 세션 연결. 세션 저장소 [repository], 01-1 재사용에 쓰는 표시 정책 [policy],
@@ -25,19 +26,27 @@ typedef AccountsWriter = ({
 
 /// 2026-10-29: 02-3 계좌 관리(29-1 단독). 계산에 포함한 계좌 잔액·계좌 수·기준 시각 → '계산에 포함할 계좌 바꾸기' →
 /// 금융사별 계좌 목록(이름·끝 4자리·보조 정보·잔액·연필). 계산에서 제외한 계좌도 보이되 흐리게 두고 표시를 붙인다.
-/// 잔액 합계는 홈 계산 결과(B)를 그대로 쓰고 화면에서 더하지 않는다. 계좌 행은 이 단계에서 누를 수 없다.
+/// 잔액 합계는 홈 계산 결과(B)를 그대로 쓰고 화면에서 더하지 않는다. 2026-10-30: '계좌·카드' 탭의 '계좌 관리'로 들어가며
+/// 제목은 그 탭이 보인다. 계좌 행을 누르면 그 계좌의 거래 내역을 연다(29-2).
 class AccountsScreen extends StatelessWidget {
   /// 2026-10-29: 현재 Snapshot [snapshot], 홈 계산 [calculation], 저장 연결 [writer](없으면 연필·바꾸기 비활성)로 만든다.
+  /// 2026-10-30: 계좌 행 누르기 [onOpenAccount](없으면 행을 누를 수 없음)를 더했다.
   const AccountsScreen({
     super.key,
     required this.snapshot,
     required this.calculation,
     this.writer,
+    this.onOpenAccount,
+    this.onRefresh,
   });
 
   final FinancialSnapshot snapshot;
   final HomeCalculation calculation;
   final AccountsWriter? writer;
+  final ValueChanged<Account>? onOpenAccount;
+
+  /// 2026-10-30: 아래로 당겨 새로고침(시안 R-5·R-6). 없으면 당겨도 새로고침하지 않는다.
+  final PullRefresh? onRefresh;
 
   /// 2026-10-29: 계좌 [account]의 이름 바꾸기 시트를 열고, 저장되면 앱에 반영한 뒤 알림을 보인다.
   Future<void> _rename(BuildContext context, Account account) async {
@@ -142,134 +151,138 @@ class AccountsScreen extends StatelessWidget {
     ];
     return SafeArea(
       bottom: false,
-      child: ListView(
-        key: const ValueKey('accounts-list'),
-        padding: const EdgeInsets.fromLTRB(
-          PayseSpace.screenHorizontal,
-          PayseSpace.x6,
-          PayseSpace.screenHorizontal,
-          PayseSpace.x6,
-        ),
-        children: [
-          const Text(
-            '계좌',
-            style: TextStyle(
-              fontSize: 24,
-              height: 1.42,
-              fontWeight: FontWeight.w700,
-              color: PayseColors.textPrimary,
+      child: PullRefreshScrollView(
+        scrollKey: const ValueKey('accounts-list'),
+        onRefresh: onRefresh,
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              PayseSpace.screenHorizontal,
+              PayseSpace.x5,
+              PayseSpace.screenHorizontal,
+              PayseSpace.x6,
             ),
-          ),
-          const SizedBox(height: PayseSpace.x5),
-          const Text(
-            '계산에 포함한 계좌 잔액',
-            style: TextStyle(
-              fontSize: 16,
-              height: 1.5,
-              fontWeight: FontWeight.w600,
-              color: PayseColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: PayseSpace.x1),
-          b == null
-              ? const Text(
-                  '확인할 수 없어요',
-                  key: ValueKey('accounts-total-unknown'),
+            sliver: SliverList.list(
+              children: [
+                const Text(
+                  '계산에 포함한 계좌 잔액',
                   style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: PayseColors.textSecondary,
+                    fontSize: 16,
+                    height: 1.5,
+                    fontWeight: FontWeight.w600,
+                    color: PayseColors.textPrimary,
                   ),
-                )
-              : FittedBox(
-                  alignment: Alignment.centerLeft,
-                  fit: BoxFit.scaleDown,
-                  child: Text.rich(
-                    key: const ValueKey('accounts-total'),
-                    semanticsLabel: spokenKrw(b),
-                    TextSpan(
-                      text: formatKrwDigits(b),
-                      children: const [
-                        TextSpan(
-                          text: '원',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.36,
+                ),
+                const SizedBox(height: PayseSpace.x1),
+                b == null
+                    ? const Text(
+                        '확인할 수 없어요',
+                        key: ValueKey('accounts-total-unknown'),
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: PayseColors.textSecondary,
+                        ),
+                      )
+                    : FittedBox(
+                        alignment: Alignment.centerLeft,
+                        fit: BoxFit.scaleDown,
+                        child: Text.rich(
+                          key: const ValueKey('accounts-total'),
+                          semanticsLabel: spokenKrw(b),
+                          TextSpan(
+                            text: formatKrwDigits(b),
+                            children: const [
+                              TextSpan(
+                                text: '원',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.36,
+                                ),
+                              ),
+                            ],
+                          ),
+                          style: const TextStyle(
+                            fontSize: 32,
+                            height: 1.2,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -1.28,
+                            color: PayseColors.textPrimary,
+                            fontFeatures: PayseTypography.tabular,
                           ),
                         ),
-                      ],
+                      ),
+                const SizedBox(height: PayseSpace.x2),
+                Text(
+                  '계산에 포함한 계좌 $included개 · ${asOfLabel(snapshot.asOf)}',
+                  key: const ValueKey('accounts-meta'),
+                  style: PayseTypography.caption,
+                ),
+                const SizedBox(height: PayseSpace.x4),
+                SizedBox(
+                  height: PayseSize.touchMin,
+                  child: OutlinedButton(
+                    key: const ValueKey('accounts-change-selection'),
+                    onPressed: writer == null
+                        ? null
+                        : () => _changeSelection(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: PayseColors.textPrimary,
+                      side: const BorderSide(color: PayseColors.borderStrong),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(PayseRadius.sm),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    style: const TextStyle(
-                      fontSize: 32,
-                      height: 1.2,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1.28,
-                      color: PayseColors.textPrimary,
-                      fontFeatures: PayseTypography.tabular,
-                    ),
+                    child: const Text('계산에 포함할 계좌 바꾸기'),
                   ),
                 ),
-          const SizedBox(height: PayseSpace.x2),
-          Text(
-            '계산에 포함한 계좌 $included개 · ${asOfLabel(snapshot.asOf)}',
-            key: const ValueKey('accounts-meta'),
-            style: PayseTypography.caption,
-          ),
-          const SizedBox(height: PayseSpace.x4),
-          SizedBox(
-            height: PayseSize.touchMin,
-            child: OutlinedButton(
-              key: const ValueKey('accounts-change-selection'),
-              onPressed: writer == null
-                  ? null
-                  : () => _changeSelection(context),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: PayseColors.textPrimary,
-                side: const BorderSide(color: PayseColors.borderStrong),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(PayseRadius.sm),
-                ),
-                textStyle: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              child: const Text('계산에 포함할 계좌 바꾸기'),
+                const SizedBox(height: PayseSpace.x6),
+                const Divider(height: 1, color: PayseColors.dividerSection),
+                if (snapshot.settings?.salary case final salary?)
+                  _SalaryRow(
+                    text: _salaryText(salary),
+                    onTap: writer == null ? null : () => _editSalary(context),
+                  ),
+                for (final (i, g) in ordered.indexed) ...[
+                  const SizedBox(height: PayseSpace.x6),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: Text(
+                      g.name,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 22 / 15,
+                        fontWeight: FontWeight.w700,
+                        color: PayseColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  for (final (j, a) in g.accounts.indexed)
+                    _AccountRow(
+                      key: ValueKey('account-row-${a.accountId}'),
+                      snapshot: snapshot,
+                      account: a,
+                      divider:
+                          j == g.accounts.length - 1 && i < ordered.length - 1
+                          ? PayseColors.dividerSection
+                          : PayseColors.dividerRow,
+                      onRename: writer == null
+                          ? null
+                          : () => _rename(context, a),
+                      onOpen: switch (onOpenAccount) {
+                        final open? => () => open(a),
+                        null => null,
+                      },
+                    ),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: PayseSpace.x6),
-          const Divider(height: 1, color: PayseColors.dividerSection),
-          if (snapshot.settings?.salary case final salary?)
-            _SalaryRow(
-              text: _salaryText(salary),
-              onTap: writer == null ? null : () => _editSalary(context),
-            ),
-          for (final (i, g) in ordered.indexed) ...[
-            const SizedBox(height: PayseSpace.x6),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 2),
-              child: Text(
-                g.name,
-                style: const TextStyle(
-                  fontSize: 15,
-                  height: 22 / 15,
-                  fontWeight: FontWeight.w700,
-                  color: PayseColors.textPrimary,
-                ),
-              ),
-            ),
-            for (final (j, a) in g.accounts.indexed)
-              _AccountRow(
-                key: ValueKey('account-row-${a.accountId}'),
-                snapshot: snapshot,
-                account: a,
-                divider: j == g.accounts.length - 1 && i < ordered.length - 1
-                    ? PayseColors.dividerSection
-                    : PayseColors.dividerRow,
-                onRename: writer == null ? null : () => _rename(context, a),
-              ),
-          ],
         ],
       ),
     );
@@ -277,21 +290,24 @@ class AccountsScreen extends StatelessWidget {
 }
 
 /// 2026-10-29: 계좌 한 줄. 이름(별명이 있으면 별명)·월급 계좌·계산에서 제외 라벨 → 보조 줄(별명이면 원래 이름, 끝 4자리,
-/// 모아둘 돈, 결제 카드) … 잔액 · 연필(48×48). 아래 선은 [divider](은행 끝이면 진한 선). 행 자체는 누를 수 없다.
+/// 모아둘 돈, 결제 카드) … 잔액 · 연필(48×48). 아래 선은 [divider](은행 끝이면 진한 선). 2026-10-30: 이름부터 '›'까지가
+/// 한 버튼(계좌 거래 내역 열기)이고, 세로 구분선 뒤의 연필은 따로 누른다.
 class _AccountRow extends StatelessWidget {
-  /// 2026-10-29: Snapshot [snapshot]의 계좌 [account], 이름 바꾸기 [onRename]으로 만든다.
+  /// 2026-10-29: Snapshot [snapshot]의 계좌 [account], 이름 바꾸기 [onRename], 거래 내역 열기 [onOpen]으로 만든다.
   const _AccountRow({
     super.key,
     required this.snapshot,
     required this.account,
     required this.divider,
     required this.onRename,
+    required this.onOpen,
   });
 
   final FinancialSnapshot snapshot;
   final Account account;
   final Color divider;
   final VoidCallback? onRename;
+  final VoidCallback? onOpen;
 
   /// 2026-10-29: 보조 줄 조각을 반환한다. 데이터로 확인되는 정보만 쓴다.
   List<String> _details() {
@@ -326,65 +342,98 @@ class _AccountRow extends StatelessWidget {
     final details = _details();
     return Container(
       constraints: const BoxConstraints(minHeight: 64),
-      padding: const EdgeInsets.symmetric(vertical: PayseSpace.x3),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: divider)),
       ),
       child: Row(
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: PayseSpace.x2,
-                  runSpacing: PayseSpace.x1,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+            child: InkWell(
+              key: ValueKey('account-open-${a.accountId}'),
+              onTap: onOpen,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: PayseSpace.x3),
+                child: Row(
                   children: [
-                    Text(
-                      name,
-                      style: TextStyle(
-                        fontSize: 15,
-                        height: 1.47,
-                        fontWeight: FontWeight.w600,
-                        color: color,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: PayseSpace.x2,
+                            runSpacing: PayseSpace.x1,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                name,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  height: 1.47,
+                                  fontWeight: FontWeight.w600,
+                                  color: color,
+                                ),
+                              ),
+                              if (salary)
+                                _Tag(
+                                  '월급 계좌',
+                                  key: ValueKey(
+                                    'account-salary-${a.accountId}',
+                                  ),
+                                  background: PayseColors.moonYellowSoft,
+                                  color: PayseColors.textPrimary,
+                                ),
+                              if (excluded)
+                                _Tag(
+                                  '계산에서 제외',
+                                  key: ValueKey(
+                                    'account-excluded-${a.accountId}',
+                                  ),
+                                  background: PayseColors.surfaceMuted,
+                                  color: PayseColors.textSecondary,
+                                ),
+                            ],
+                          ),
+                          _Details(
+                            key: ValueKey('account-detail-${a.accountId}'),
+                            parts: details,
+                          ),
+                        ],
                       ),
                     ),
-                    if (salary)
-                      _Tag(
-                        '월급 계좌',
-                        key: ValueKey('account-salary-${a.accountId}'),
-                        background: PayseColors.moonYellowSoft,
-                        color: PayseColors.textPrimary,
+                    const SizedBox(width: PayseSpace.x3),
+                    Text(
+                      balance == null ? '잔액 미확인' : formatKrw(balance),
+                      semanticsLabel: balance == null
+                          ? '잔액 미확인'
+                          : spokenKrw(balance),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: balance == null
+                            ? PayseColors.textSecondary
+                            : color,
+                        fontFeatures: PayseTypography.tabular,
                       ),
-                    if (excluded)
-                      _Tag(
-                        '계산에서 제외',
-                        key: ValueKey('account-excluded-${a.accountId}'),
-                        background: PayseColors.surfaceMuted,
+                    ),
+                    if (onOpen != null) ...[
+                      const SizedBox(width: PayseSpace.x2),
+                      const Icon(
+                        Icons.chevron_right,
+                        size: 16,
                         color: PayseColors.textSecondary,
                       ),
+                    ],
                   ],
                 ),
-                _Details(
-                  key: ValueKey('account-detail-${a.accountId}'),
-                  parts: details,
-                ),
-              ],
+              ),
             ),
           ),
-          const SizedBox(width: PayseSpace.x2),
-          Text(
-            balance == null ? '잔액 미확인' : formatKrw(balance),
-            semanticsLabel: balance == null ? '잔액 미확인' : spokenKrw(balance),
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: balance == null ? PayseColors.textSecondary : color,
-              fontFeatures: PayseTypography.tabular,
-            ),
+          Container(
+            width: 1,
+            height: 24,
+            margin: const EdgeInsets.only(left: PayseSpace.x4, right: 4),
+            color: PayseColors.border,
           ),
-          const SizedBox(width: PayseSpace.x1),
           IconButton(
             key: ValueKey('account-rename-${a.accountId}'),
             tooltip: '$name 이름 바꾸기',
@@ -402,8 +451,8 @@ class _AccountRow extends StatelessWidget {
   }
 }
 
-/// 2026-10-29: 계좌 보조 줄. 한 줄에 다 들어가면 ' · '로 이어 한 줄, 아니면 첫 조각(계좌 번호) 다음에서 줄을 바꿔
-/// 나머지를 둘째 줄에 잇는다.
+/// 2026-10-29: 계좌 보조 줄. 한 줄에 다 들어가면 ' · '로 이어 한 줄로 쓴다. 2026-10-30: 넘치면 의미 단위(계좌 번호 /
+/// 모아둘 돈 / 카드 결제)마다 줄을 바꾼다.
 class _Details extends StatelessWidget {
   /// 2026-10-29: 조각 [parts]로 만든다. 첫 조각은 계좌 번호다.
   const _Details({super.key, required this.parts});
@@ -432,8 +481,7 @@ class _Details extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(parts.first, style: PayseTypography.caption),
-            Text(parts.skip(1).join(' · '), style: PayseTypography.caption),
+            for (final p in parts) Text(p, style: PayseTypography.caption),
           ],
         );
       },
