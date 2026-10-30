@@ -148,7 +148,7 @@ void main() {
     await tester.scrollUntilVisible(find.text('계좌 6개'), 200);
     expect(find.text('계좌 6개'), findsOneWidget);
     expect(find.text('카드 4장'), findsOneWidget);
-    expect(find.text('거래 196건'), findsOneWidget);
+    expect(find.text('거래 202건'), findsOneWidget);
     expect(find.text('기준 시각 2026-10-19T12:00:00+09:00'), findsOneWidget);
 
     await tester.scrollUntilVisible(
