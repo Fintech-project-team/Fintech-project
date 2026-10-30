@@ -23,11 +23,12 @@
     "snapshots/demo-installments.json": "e6e01d88498946da0b55db2565416b7431c11dd3df9238a0f3e9c26966407e0d",
     "snapshots/beta-cashflow-edge.json": "2bbbcf5a93be5f4d22053506737a714c1facbedb78cbaecf44558337bec0b695",
     "snapshots/gamma-ai-misread.json": "872c926e2913e41b87f0e24b8e7bbe8a76e9e9b63e02074c8c87e0149c27fe91",
+    "snapshots/demo-life.json": "8795491afbafa96922e110a28ddbbbc45d8a1b6d65e137c608a9b3f68224bbea",
     "snapshots/alpha-billing-items.json": "c3f4f425a8adfa22c8ca8545a8b3b8c3418feb3b3cd0e9e4a56e19ae6267d482",
     "snapshots/beta-billing-items.json": "87a9b82339b81b48b5af34e70813a2a9fdf5ebc7a47dc709f7036fc73a606941",
     "snapshots/gamma-billing-items.json": "441c46efe374c1567abff7572675a600acb32238d30fef223fe17274eb1679e2",
     "server-seeds.json": "5b0b3401930cbe794606df5bcf42693bc6556aa861d0daa2ed6d37924172e617",
-    "catalog.json": "aea22035539983681e0466b667cd19c1efc5a7934faa47446d4aa4b0c5a2f1bc",
+    "catalog.json": "645ebca4f93cf04944e3797d8aa1449401fa676834b39b04a051e3bb0cce7a3f",
     "bank-directory.json": "097a9a5100f4d6a19c37b60f49ba5f6fc8075bb3fc00456433000294b7513640"
   }
 }

@@ -75,14 +75,18 @@ class FixtureTests(unittest.TestCase):
                         self.assertNotEqual(row['description'], original['description'])
 
     def test_plan_labels_and_approval_versions_stay_separate(self):
-        """2026-10-28: 원천 개정이 사용자 계획명이나 과거 승인 버전을 덮지 않는다. 사용: unittest."""
-        for snapshot in self.cases.values():
+        """2026-10-28: 원천 개정이 사용자 계획명이나 과거 승인 버전을 덮지 않는다. 사용: unittest.
+
+        2026-10-30: 거래명 정리 뒤 생활 흐름을 더한 demo-life는 ':labels-1:life-2'로 끝난다.
+        """
+        for name, snapshot in self.cases.items():
             for revision in snapshot.get('recurringPlanRevisions', []):
                 self.assertIn(revision['label'], {'휴대폰 요금', '월세'})
             for decision in snapshot.get('recurringDecisions', []):
                 self.assertFalse(decision['sourceVersion'].endswith(':labels-1'))
             if 'transactions' in snapshot:
-                self.assertTrue(snapshot['sourceVersion'].endswith(':labels-1'))
+                suffix = ':labels-1:life-2' if name == 'demo-life' else ':labels-1'
+                self.assertTrue(snapshot['sourceVersion'].endswith(suffix))
 
     def test_unknown_source_requires_authoring(self):
         """2026-10-28: 미정 사건을 임의의 일반 거래명으로 숨기지 않는다. 사용: unittest."""
@@ -298,8 +302,9 @@ class FixtureTests(unittest.TestCase):
 
         2026-10-26: Include the independent eighteenth demo case; used by unittest.
         2026-10-28: Include three separate installment/edge cases, preserving the prior eighteen.
+        2026-10-30: demo-life 생활 흐름 사례를 더해 22개.
         """
-        self.assertEqual(validate_directory(FIXTURES/'generated'),21)
+        self.assertEqual(validate_directory(FIXTURES/'generated'),22)
         for name,snapshot in self.cases.items():
             stored=json.loads((FIXTURES/'generated'/'snapshots'/f'{name}.json').read_text(encoding='utf-8'))
             self.assertEqual(stored,snapshot)
@@ -309,10 +314,11 @@ class FixtureTests(unittest.TestCase):
         """2026-10-26: Verify the expanded bundle remains deterministic; used by unittest.
 
         2026-10-28: Check the twenty-one-case bundle including the new independent scenarios.
+        2026-10-30: demo-life 생활 흐름 사례를 더해 22개.
         """
         with temporary_directory() as temp:
             a,b=Path(temp)/'a',Path(temp)/'b';write_files(a);write_files(b)
-            self.assertEqual(validate_directory(a),21)
+            self.assertEqual(validate_directory(a),22)
             for p in a.rglob('*.json'):
                 self.assertEqual(p.read_bytes(),(b/p.relative_to(a)).read_bytes())
 
