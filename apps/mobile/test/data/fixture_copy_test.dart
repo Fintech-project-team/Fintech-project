@@ -4,13 +4,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:payse/data/fixture_scenario.dart';
 
 /// 2026-10-20: 앱 에셋 복사본이 apps/api 원본과 바이트 단위로 같은지 검사한다.
+/// 2026-10-30: 앱 사본은 v4 준비본(generated-v4, 청구 항목 포함)과 비교한다.
 /// 원본이 바뀌면 이 테스트가 실패한다. 복사본을 자동으로 덮어쓰지 않으며,
 /// 변경 내용을 확인한 사람이 원본을 assets/fixtures/에 다시 복사해 동기화한다.
 void main() {
   for (final scenario in FixtureScenario.values) {
     test('asset copy of ${scenario.fileStem} matches apps/api original', () {
       final original = File(
-        '../api/fixtures/generated/snapshots/${scenario.fileStem}.json',
+        '../api/fixtures/generated-v4/snapshots/${scenario.fileStem}.json',
       );
       final copy = File('assets/fixtures/${scenario.fileStem}.json');
 
