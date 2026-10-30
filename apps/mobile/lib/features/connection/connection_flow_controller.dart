@@ -316,6 +316,16 @@ class ConnectionFlowController extends ChangeNotifier {
   /// 2026-10-22: 1개 이상 골랐으면 true를 반환한다(0개 선택 불가).
   bool get canSaveSelection => _selectedAccounts.isNotEmpty;
 
+  /// 2026-10-29: 고른 계좌가 현재 Snapshot의 계산 포함 계좌와 다르면 true를 반환한다(계좌 탭에서 다시 고를 때 쓴다).
+  bool get selectionChanged {
+    final included = {
+      for (final a in accounts)
+        if (a.included) a.accountId,
+    };
+    return included.length != _selectedAccounts.length ||
+        !included.containsAll(_selectedAccounts);
+  }
+
   /// 2026-10-22: 계좌 [accountId]에 연결된 유효한 모아둘 돈을 반환한다(취소된 것은 제외).
   List<Reserve> reservesOf(String accountId) => [
     for (final r in _snapshot.reserves ?? const <Reserve>[])

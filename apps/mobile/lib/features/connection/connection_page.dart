@@ -195,6 +195,9 @@ Future<bool?> showConnectionConfirm(
                   onPressed: () => Navigator.of(context).pop(false),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(48),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: PayseSpace.x2,
+                    ),
                     foregroundColor: PayseColors.textPrimary,
                     side: const BorderSide(color: PayseColors.borderStrong),
                     shape: shape,
@@ -207,6 +210,9 @@ Future<bool?> showConnectionConfirm(
                   onPressed: () => Navigator.of(context).pop(true),
                   style: FilledButton.styleFrom(
                     minimumSize: const Size.fromHeight(48),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: PayseSpace.x2,
+                    ),
                     backgroundColor: PayseColors.charcoal,
                     foregroundColor: PayseColors.onCharcoal,
                     shape: shape,
@@ -218,7 +224,13 @@ Future<bool?> showConnectionConfirm(
                 final scaler = MediaQuery.textScalerOf(context);
                 double width(String text) {
                   final painter = TextPainter(
-                    text: TextSpan(text: text, style: label),
+                    text: TextSpan(
+                      text: text,
+                      style:
+                          Theme.of(context).textTheme.labelLarge
+                              ?.merge(label) ??
+                          label,
+                    ),
                     textScaler: scaler,
                     textDirection: TextDirection.ltr,
                     maxLines: 1,
@@ -229,8 +241,8 @@ Future<bool?> showConnectionConfirm(
                 }
 
                 final fits =
-                    width(secondaryLabel) + 48 <= half &&
-                    width(primaryLabel) + 48 <= half;
+                    width(secondaryLabel) + PayseSpace.x4 <= half &&
+                    width(primaryLabel) + PayseSpace.x4 <= half;
                 if (!fits) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,

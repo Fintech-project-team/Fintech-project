@@ -21,17 +21,20 @@ class ProjectionState {
   /// 현재 자료 버전 [dataVersion]으로 만든다.
   /// 2026-10-28: [salarySettings]는 사용자가 저장한 월급 설정 필드(salaryDay·salaryAmountKRW·salaryAccountId)이며
   /// 원본 settings.salary의 같은 키를 덮는다. 입금 근거(receiptEvidence)는 담지 않는다.
+  /// 2026-10-28: [accountNicknames]는 사용자가 저장한 계좌 이름(계좌 ID → 이름, null은 해제)이며 원본 계좌의 nickname을 덮는다.
   const ProjectionState({
     required this.institutionLinks,
     required this.selectedAccountIds,
     required this.dataVersion,
     this.salarySettings = const {},
+    this.accountNicknames = const {},
   });
 
   final List<Map<String, Object?>> institutionLinks;
   final Set<String>? selectedAccountIds;
   final String dataVersion;
   final Map<String, Object?> salarySettings;
+  final Map<String, String?> accountNicknames;
 
   /// 2026-10-22: 연결된 기관 코드 집합을 반환한다.
   Set<String> get connectedCodes => {
@@ -70,6 +73,14 @@ abstract final class SnapshotProjector {
     final settings = src['settings'];
     final salary = settings is Map ? settings['salary'] : null;
     if (salary is Map) salary.addAll(state.salarySettings);
+    final accounts = src['accounts'];
+    if (accounts is List) {
+      for (final a in accounts) {
+        if (a is Map && state.accountNicknames.containsKey(a['accountId'])) {
+          a['nickname'] = state.accountNicknames[a['accountId']];
+        }
+      }
+    }
     final header = <String, Object?>{
       for (final key in _headerKeys) key: src[key],
       'schemaVersion': apiSchema,

@@ -5,6 +5,7 @@ import 'package:payse_calculation/payse_calculation.dart' as calc;
 import '../data/coachmark_record_store.dart';
 import '../data/financial_snapshot.dart';
 import '../data/first_calc_record_store.dart';
+import '../features/overview/accounts_screen.dart';
 import '../features/overview/first_calc_screen.dart';
 import '../features/overview/home_calculation.dart';
 import '../features/overview/home_coachmark.dart';
@@ -14,6 +15,7 @@ import '../shared/design/payse_tokens.dart';
 import 'placeholder_screens.dart';
 
 /// 2026-10-20: 하단 탭(홈·계좌·계획·내 정보) 골격. 각 탭은 기능 화면이 들어갈 자리다.
+/// 2026-10-29: 계좌 탭은 02-3 계좌 관리다(29-1).
 /// 2026-10-21: PIN 확인 뒤 금융사 연결을 마친 사용자의 첫 화면으로 쓴다(main_entry.dart).
 /// 2026-10-23: 진입 조회에 성공한 [snapshot]으로 홈 계산을 한 번 수행해 탭들이 같은 결과를 쓰게 한다.
 class AppShell extends StatefulWidget {
@@ -24,6 +26,8 @@ class AppShell extends StatefulWidget {
   /// 콜백이 없으면 01-3을 자동으로 띄우지 않는다.
   /// 2026-10-28: [coachmarkRecord]는 이 사용자의 02-1a 코치마크 기록, [onCoachmarkRecord]는 기록을 남기는 콜백이다.
   /// 콜백이 없으면 코치마크를 띄우지 않는다.
+  /// 2026-10-29: [accountsWriter]는 계좌 탭의 저장 연결(세션 저장소·세션 무효·저장 뒤 Snapshot 반영)이며 없으면 계좌 탭에서
+  /// 저장할 수 없다.
   const AppShell({
     super.key,
     required this.snapshot,
@@ -34,6 +38,7 @@ class AppShell extends StatefulWidget {
     this.onFirstCalcRecord,
     this.coachmarkRecord,
     this.onCoachmarkRecord,
+    this.accountsWriter,
   });
 
   final FinancialSnapshot snapshot;
@@ -44,6 +49,7 @@ class AppShell extends StatefulWidget {
   final ValueChanged<FirstCalcRecord>? onFirstCalcRecord;
   final CoachmarkRecord? coachmarkRecord;
   final ValueChanged<CoachmarkRecord>? onCoachmarkRecord;
+  final AccountsWriter? accountsWriter;
 
   static const List<String> tabTitles = ['홈', '계좌', '계획', '내 정보'];
 
@@ -191,7 +197,11 @@ class _AppShellState extends State<AppShell> {
             onShowFirstCalc: () => setState(() => _replay = true),
             coachTargets: _coachTargets,
           ),
-          const TabPlaceholder(title: '계좌'),
+          AccountsScreen(
+            snapshot: widget.snapshot,
+            calculation: _calculation,
+            writer: widget.accountsWriter,
+          ),
           const TabPlaceholder(title: '계획'),
           TabPlaceholder(title: '내 정보', footer: widget.devEntry),
         ],
