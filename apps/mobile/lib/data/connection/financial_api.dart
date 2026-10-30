@@ -2,6 +2,8 @@
 /// 화면·ViewModel은 이 인터페이스만 쓰고 예외 대신 [FinancialOutcome]을 받는다.
 library;
 
+import 'package:flutter/widgets.dart' show StringCharacters;
+
 /// 2026-10-22: 금융 쓰기 공통 필드 W. 같은 논리 작업의 재시도에는 같은 값을 다시 보낸다.
 class WriteContext {
   /// 2026-10-22: 기대 자료 버전 [expectedDataVersion], 규칙 버전 [ruleVersion], 작업 키 [idempotencyKey]로 만든다.
@@ -40,6 +42,24 @@ class SalaryPatch {
     if (salaryAmountKrw != null) 'salaryAmountKRW': salaryAmountKrw!.value,
     if (salaryDay != null) 'salaryDay': salaryDay!.value,
   };
+}
+
+/// 2026-10-28: PATCH /accounts/{accountId}의 계좌 이름(nickname) 제약(api-contract §3). 앱 입력 검사와 가짜 서버가 같이 쓴다.
+/// 앞뒤 공백을 지운 뒤 보이는 글자(grapheme) 1~12자이며, PC 키보드 특수문자 32종과 공백만으로 이뤄지면 안 된다.
+/// 이모지만인 이름과 다른 계좌와 같은 이름은 허용한다. null(원래 이름으로 되돌리기)은 이 검사 대상이 아니다.
+abstract final class AccountNicknameRule {
+  static const int maxLength = 12;
+  static const String specials = r"""!@#$%^&*()-_=+[]{}\|;:'",.<>/?`~""";
+
+  /// 2026-10-28: [nickname]을 앞뒤 공백을 지우고 보이는 글자 수로 센 값을 반환한다.
+  static int length(String nickname) => nickname.trim().characters.length;
+
+  /// 2026-10-28: [nickname]이 저장할 수 있는 이름이면 true를 반환한다.
+  static bool isValid(String nickname) {
+    final chars = nickname.trim().characters;
+    if (chars.isEmpty || chars.length > maxLength) return false;
+    return chars.any((c) => c.trim().isNotEmpty && !specials.contains(c));
+  }
 }
 
 /// 2026-10-22: 쓰기로 바뀐 자원 하나(ChangedRef).
@@ -173,6 +193,14 @@ abstract interface class UserFinancialRepository {
     WriteContext write,
   );
 
+  /// 2026-10-28: PATCH /accounts/{accountId}. 계좌 [accountId]의 이름을 [nickname]으로 [write]로 저장한다.
+  /// null은 이름 해제(원래 이름으로 되돌리기)다. 잔액·상품명·계산에는 영향이 없다.
+  Future<FinancialOutcome<WriteSuccess>> updateAccountNickname(
+    String accountId,
+    String? nickname,
+    WriteContext write,
+  );
+
   /// 2026-10-22: 세션이 끝났음을 알린다. 이후 요청과 진행 중 요청의 늦은 응답을 반영하지 않는다.
   void close();
 }
@@ -205,6 +233,14 @@ class UnavailableUserFinancialRepository implements UserFinancialRepository {
   @override
   Future<FinancialOutcome<WriteSuccess>> updateSalarySettings(
     SalaryPatch salary,
+    WriteContext write,
+  ) async => const FinancialUnavailable();
+
+  /// 2026-10-28: 저장하지 않고 서비스 불가를 반환한다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> updateAccountNickname(
+    String accountId,
+    String? nickname,
     WriteContext write,
   ) async => const FinancialUnavailable();
 

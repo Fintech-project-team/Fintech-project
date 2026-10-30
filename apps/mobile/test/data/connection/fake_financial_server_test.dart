@@ -849,6 +849,259 @@ void main() {
       );
     });
   });
+
+  group('PATCH /accounts nickname', () {
+    const kbDemand = '6069b37a-abf5-56fc-8bf0-153f5301fd1c';
+    const hanaDemand = '48feba1a-c98e-5d0e-91e1-23d8e1ef00fc';
+    const kbDeposit = '2c56e23d-2e82-59ed-8fce-21459e226167';
+
+    /// 2026-10-28: 알파 전체 연결 뒤 국민·하나 입출금을 고른 토큰을 반환한다(자료 버전 3).
+    Future<String> connected(_World world) async {
+      final token = await world.login(0);
+      ok(
+        await world.server.postInstitutionLinks(token, _allAlpha, w('1', 'l')),
+      );
+      ok(
+        await world.server.patchAccountSelection(token, [
+          kbDemand,
+          hanaDemand,
+        ], w('2', 's')),
+      );
+      return token;
+    }
+
+    /// 2026-10-28: Snapshot에서 계좌 [accountId]의 행을 반환한다.
+    Map<String, Object?> accountOf(
+      Map<String, Object?> snapshot,
+      String accountId,
+    ) => rows(
+      snapshot,
+      'accounts',
+    ).singleWhere((a) => a['accountId'] == accountId);
+
+    test(
+      'saves the trimmed name, bumps the version and reports the account',
+      () async {
+        final world = _World();
+        final token = await connected(world);
+        final before = ok(await world.server.getSnapshot(token));
+
+        final saved = ok(
+          await world.server.patchAccount(
+            token,
+            kbDemand,
+            '  생활비 ',
+            w('3', 'n'),
+          ),
+        );
+        expect(saved.replayed, isFalse);
+        expect(saved.receipt.resultVersion, '4');
+        expect(saved.receipt.changedRefs.map((r) => (r.resource, r.id)), [
+          ('account', kbDemand),
+        ]);
+        final account = accountOf(saved.snapshot, kbDemand);
+        final original = accountOf(before, kbDemand);
+        expect(account['nickname'], '생활비');
+        expect(account['productName'], original['productName']);
+        expect(account['balanceKRW'], original['balanceKRW']);
+        expect(saved.snapshot['sourceVersion'], before['sourceVersion']);
+        expect(saved.snapshot['asOf'], before['asOf']);
+        expect(
+          accountOf(saved.snapshot, hanaDemand)['nickname'],
+          isNull,
+          reason: '다른 계좌는 그대로',
+        );
+      },
+    );
+
+    test('null clears the name back to the original', () async {
+      final world = _World();
+      final token = await connected(world);
+      ok(await world.server.patchAccount(token, kbDemand, '여행', w('3', 'a')));
+      final cleared = ok(
+        await world.server.patchAccount(token, kbDemand, null, w('4', 'b')),
+      );
+      expect(accountOf(cleared.snapshot, kbDemand)['nickname'], isNull);
+      expect(cleared.snapshot['dataVersion'], '5');
+    });
+
+    test('emoji only, 12 graphemes and duplicate names are allowed', () async {
+      final world = _World();
+      final token = await connected(world);
+      ok(await world.server.patchAccount(token, kbDemand, '💰💰', w('3', 'a')));
+      const family = '👨‍👩‍👧‍👦';
+      ok(
+        await world.server.patchAccount(
+          token,
+          hanaDemand,
+          '$family가나다라마바사아자차카',
+          w('4', 'b'),
+        ),
+      );
+      final dup = ok(
+        await world.server.patchAccount(token, kbDeposit, '💰💰', w('5', 'c')),
+      );
+      expect(accountOf(dup.snapshot, kbDemand)['nickname'], '💰💰');
+      expect(accountOf(dup.snapshot, kbDeposit)['nickname'], '💰💰');
+    });
+
+    test(
+      'a connected account excluded from the calculation can be renamed',
+      () async {
+        final world = _World();
+        final token = await connected(world);
+        final saved = ok(
+          await world.server.patchAccount(token, kbDeposit, '비상금', w('3', 'n')),
+        );
+        expect(accountOf(saved.snapshot, kbDeposit)['nickname'], '비상금');
+      },
+    );
+
+    test('422 for empty, too long or specials only; nothing changes', () async {
+      final world = _World();
+      final token = await connected(world);
+      final cases = ['', '   ', '가나다라마바사아자차카타파', '!!!', '! @ #', r'\|'];
+      var i = 0;
+      for (final name in cases) {
+        expect(
+          await world.server.patchAccount(
+            token,
+            kbDemand,
+            name,
+            w('3', 'k${i++}'),
+          ),
+          isA<FinancialInvalid<WriteSuccess>>(),
+          reason: name,
+        );
+      }
+      final now = ok(await world.server.getSnapshot(token));
+      expect(now['dataVersion'], '3');
+      expect(accountOf(now, kbDemand)['nickname'], isNull);
+    });
+
+    test(
+      '403 for an unknown account or one of an unlinked institution',
+      () async {
+        final world = _World();
+        final token = await world.login(0);
+        ok(await world.server.postInstitutionLinks(token, [_kb], w('1', 'l')));
+        expect(
+          await world.server.patchAccount(token, hanaDemand, '하나', w('2', 'a')),
+          isA<FinancialForbidden<WriteSuccess>>(),
+        );
+        expect(
+          await world.server.patchAccount(token, 'no-such', '없음', w('2', 'b')),
+          isA<FinancialForbidden<WriteSuccess>>(),
+        );
+        final now = ok(await world.server.getSnapshot(token));
+        expect(now['dataVersion'], '2');
+      },
+    );
+
+    test('same key and body replays; another body or account is 409', () async {
+      final world = _World();
+      final token = await connected(world);
+      final first = ok(
+        await world.server.patchAccount(token, kbDemand, '월급', w('3', 'n')),
+      );
+      final again = ok(
+        await world.server.patchAccount(token, kbDemand, '월급', w('3', 'n')),
+      );
+      expect(again.replayed, isTrue);
+      expect(again.receipt.receiptId, first.receipt.receiptId);
+      expect(again.snapshot['dataVersion'], '4');
+      expect(
+        await world.server.patchAccount(token, kbDemand, '생활', w('3', 'n')),
+        isA<FinancialIdempotencyConflict<WriteSuccess>>(),
+      );
+      expect(
+        await world.server.patchAccount(token, kbDemand, null, w('3', 'n')),
+        isA<FinancialIdempotencyConflict<WriteSuccess>>(),
+      );
+      expect(
+        await world.server.patchAccount(token, hanaDemand, '월급', w('3', 'n')),
+        isA<FinancialIdempotencyConflict<WriteSuccess>>(),
+        reason: '경로가 다르면 다른 요청',
+      );
+    });
+
+    test(
+      'stale data and rule versions are 409 kinds and change nothing',
+      () async {
+        final world = _World();
+        final token = await connected(world);
+        expect(
+          await world.server.patchAccount(token, kbDemand, '가', w('2', 'a')),
+          isA<FinancialStaleData<WriteSuccess>>(),
+        );
+        expect(
+          await world.server.patchAccount(
+            token,
+            kbDemand,
+            '가',
+            w('3', 'b', rule: 'X'),
+          ),
+          isA<FinancialRuleVersionMismatch<WriteSuccess>>(),
+        );
+        final now = ok(await world.server.getSnapshot(token));
+        expect(now['dataVersion'], '3');
+        expect(accountOf(now, kbDemand)['nickname'], isNull);
+      },
+    );
+
+    test('names survive re-login, later writes and other users', () async {
+      final world = _World();
+      final token = await connected(world);
+      ok(await world.server.patchAccount(token, kbDemand, '생활비', w('3', 'n')));
+      ok(
+        await world.server.patchSettings(
+          token,
+          const SalaryPatch(salaryDay: (value: 5)),
+          w('4', 'p'),
+        ),
+      );
+      ok(
+        await world.server.patchAccountSelection(token, [
+          kbDemand,
+        ], w('5', 's2')),
+      );
+      await world.auth.endSession(token);
+      final second = await world.login(0);
+      final again = ok(await world.server.getSnapshot(second));
+      expect(accountOf(again, kbDemand)['nickname'], '생활비');
+      expect(again['dataVersion'], '6');
+
+      final beta = await world.login(1);
+      ok(
+        await world.server.postInstitutionLinks(beta, const [
+          'bank.kb',
+        ], w('1', 'bl')),
+      );
+      final betaSnap = ok(await world.server.getSnapshot(beta));
+      expect(
+        rows(betaSnap, 'accounts').map((a) => a['nickname']),
+        everyElement(isNull),
+      );
+    });
+
+    test('the session repository sends the name and drops late responses after close', () async {
+      final world = _World();
+      final token = await connected(world);
+      final repo = FakeUserFinancialRepository(
+        server: world.server,
+        accessToken: token,
+      );
+      final saved = ok(
+        await repo.updateAccountNickname(kbDemand, '생활비', w('3', 'n')),
+      );
+      expect(accountOf(saved.snapshot, kbDemand)['nickname'], '생활비');
+      repo.close();
+      expect(
+        await repo.updateAccountNickname(kbDemand, null, w('4', 'm')),
+        isA<FinancialSessionInvalid<WriteSuccess>>(),
+      );
+    });
+  });
 }
 
 /// 2026-10-22: 조회에서 버전 1의 옛 스냅샷을 돌려주는 서버(늦게 도착한 응답 흉내).
