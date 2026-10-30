@@ -79,11 +79,16 @@ void main() {
       final snapshot = (result as SnapshotLoaded).snapshot;
       expect(snapshot.asOf, '2026-10-19T12:00:00+09:00');
       expect(snapshot.dataVersion, '1');
-      expect(snapshot.sourceVersion, 'fixture-3:alpha:2026-10-19:base');
+      expect(
+        snapshot.sourceVersion,
+        'fixture-3:alpha:2026-10-19:base:reversals-1:labels-1:billing-4',
+      );
+      expect(snapshot.schemaVersion, 'PAYSE-DRAFT-4');
+      expect(snapshot.statements, isNotEmpty);
       expect(snapshot.ruleVersion, 'PAYSE-CALC-1');
       expect(snapshot.accounts, hasLength(6));
       expect(snapshot.cards, hasLength(4));
-      expect(snapshot.transactions, hasLength(193));
+      expect(snapshot.transactions, hasLength(199));
       expect(snapshot.accounts!.first.balanceKrw, 1500000);
       expect(snapshot.accounts!.first.nickname, isNull);
       expect(

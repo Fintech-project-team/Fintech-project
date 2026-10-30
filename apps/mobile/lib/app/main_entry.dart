@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/connection/financial_api.dart';
 import '../data/connection/user_snapshot_repository.dart';
 import '../data/first_calc_record_store.dart';
+import '../data/salary_notice_store.dart';
 import '../data/coachmark_record_store.dart';
 import '../data/financial_snapshot.dart';
 import '../data/financial_snapshot_repository.dart';
@@ -27,6 +28,7 @@ class MainEntry extends StatefulWidget {
   /// 2026-10-23: 세션 금융 저장소 [financial]과 연결 표시 정책 [policy], 진입 로딩 제목의 사용자 이름 [userName]을 받는다.
   /// 2026-10-27: [firstCalcRecords]는 01-3 첫 계산 기록 저장소다. 앱이 넘기며, 없으면 이 화면 동안만 쓰는 메모리 저장소다.
   /// 2026-10-28: [coachmarkRecords]는 02-1a 코치마크 기록 저장소다. 없으면 코치마크를 띄우지 않는다.
+  /// 2026-10-29: [salaryNotices]는 홈 월급 입금 확인 안내 접힘 기록 저장소다. 없으면 이 화면 동안만 쓰는 메모리 저장소다.
   const MainEntry({
     super.key,
     required this.financial,
@@ -37,6 +39,7 @@ class MainEntry extends StatefulWidget {
     this.userName,
     this.firstCalcRecords,
     this.coachmarkRecords,
+    this.salaryNotices,
   });
 
   final UserFinancialRepository financial;
@@ -47,6 +50,7 @@ class MainEntry extends StatefulWidget {
   final String? userName;
   final FirstCalcRecordStore? firstCalcRecords;
   final CoachmarkRecordStore? coachmarkRecords;
+  final SalaryNoticeStore? salaryNotices;
 
   /// 2026-10-21: 조회 상태 객체를 반환한다.
   @override
@@ -79,6 +83,9 @@ class _MainEntryState extends State<MainEntry> {
   FirstCalcRecord? _record;
   late final CoachmarkRecordStore? _coachmarks = widget.coachmarkRecords;
   CoachmarkRecord? _coachmark;
+  late final SalaryNoticeStore _salaryNotices =
+      widget.salaryNotices ?? MemorySalaryNoticeStore();
+  String? _salaryNotice;
   late Future<SnapshotLoadResult> _result = _load();
   int _loads = 0;
   FinancialSnapshot? _refreshed;
@@ -98,6 +105,7 @@ class _MainEntryState extends State<MainEntry> {
       if (result is SnapshotLoaded) {
         _record = await _records.read(result.snapshot.userId);
         _coachmark = await _coachmarks?.read(result.snapshot.userId);
+        _salaryNotice = await _salaryNotices.read(result.snapshot.userId);
       }
       return result;
     } catch (error, stack) {
@@ -137,11 +145,13 @@ class _MainEntryState extends State<MainEntry> {
     }
     final record = await _records.read(snapshot.userId);
     final coachmark = await _coachmarks?.read(snapshot.userId);
+    final salaryNotice = await _salaryNotices.read(snapshot.userId);
     if (!mounted) return;
     setState(() {
       _resetRefresh();
       _record = record;
       _coachmark = coachmark;
+      _salaryNotice = salaryNotice;
       _override = SnapshotLoaded(snapshot);
     });
   }
@@ -150,6 +160,22 @@ class _MainEntryState extends State<MainEntry> {
   Future<void> _saveRecord(String userId, FirstCalcRecord record) async {
     await _records.save(userId, record);
     if (mounted) setState(() => _record = record);
+  }
+
+  /// 2026-10-29: 계좌 탭에서 저장에 성공해 받은 [snapshot]을 홈 셸의 스냅샷으로 삼는다. 진행 중 새로고침 응답은 버린다.
+  void _applySaved(FinancialSnapshot snapshot) {
+    if (!mounted) return;
+    setState(() {
+      _refreshes++;
+      _refresh = HomeRefresh.idle;
+      _refreshed = snapshot;
+    });
+  }
+
+  /// 2026-10-29: 월급 입금 확인 안내 접힘 [key](null이면 펼침)를 사용자 [userId]로 남긴다.
+  Future<void> _saveSalaryNotice(String userId, String? key) async {
+    _salaryNotice = key;
+    await _salaryNotices.save(userId, key);
   }
 
   /// 2026-10-28: 코치마크 기록 [record]를 사용자 [userId]로 남긴다.
@@ -267,6 +293,15 @@ class _MainEntryState extends State<MainEntry> {
             onCoachmarkRecord: _coachmarks == null
                 ? null
                 : (record) => _saveCoachmark(snapshot.userId, record),
+            accountsWriter: (
+              repository: widget.financial,
+              policy: widget.policy,
+              onSessionInvalid: widget.onSessionInvalid,
+              onSnapshot: _applySaved,
+            ),
+            salaryNoticeFolded: _salaryNotice,
+            onSalaryNoticeFolded: (key) =>
+                _saveSalaryNotice(snapshot.userId, key),
           ),
         ),
         EntryDestination.connect || EntryDestination.chooseAccounts => Builder(

@@ -109,11 +109,14 @@ class BillingCaseTests(unittest.TestCase):
         self.assertEqual(len({row['id'] for row in rows}), len(rows))
 
     def test_prepared_bundle(self):
-        """2026-10-29: 별도 v4 묶음의 manifest·원천·저장된 생성본을 확인한다. 사용: unittest."""
+        """2026-10-29: 별도 v4 묶음의 manifest·원천·저장된 생성본을 확인한다. 사용: unittest.
+
+        2026-10-30: demo-life 생활 흐름 사례를 더해 25개.
+        """
         with temporary_directory() as temp:
             directory = Path(temp) / 'billing'
             write_files(directory)
-            self.assertEqual(validate_directory(directory), 24)
+            self.assertEqual(validate_directory(directory), 25)
             published = Path(__file__).resolve().parents[1] / 'fixtures/generated-v4'
             for source in directory.rglob('*.json'):
                 actual = published / source.relative_to(directory)

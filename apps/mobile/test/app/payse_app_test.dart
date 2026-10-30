@@ -132,7 +132,7 @@ void main() {
     expect(find.textContaining('개발 설정'), findsNothing);
   });
 
-  testWidgets('dev settings preview shows demo-ready counts and switches', (
+  testWidgets('dev settings preview shows demo-life counts and switches', (
     tester,
   ) async {
     await openSignedIn(tester, devTools: true);
@@ -148,7 +148,7 @@ void main() {
     await tester.scrollUntilVisible(find.text('계좌 6개'), 200);
     expect(find.text('계좌 6개'), findsOneWidget);
     expect(find.text('카드 4장'), findsOneWidget);
-    expect(find.text('거래 196건'), findsOneWidget);
+    expect(find.text('거래 887건'), findsOneWidget, reason: '기본은 생활 흐름 시연');
     expect(find.text('기준 시각 2026-10-19T12:00:00+09:00'), findsOneWidget);
 
     await tester.scrollUntilVisible(

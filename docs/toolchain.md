@@ -18,6 +18,7 @@
 - 팀원마다 임의의 latest로 초기화하지 않는다. Flutter/Dart와 상태 관리·라우터 패키지 선택은 작업 범위 안에서 결정한다.
 - Node 의존성은 루트 package-lock.json으로, Flutter 앱 의존성은 앱 pubspec.lock으로 공유한다. 기존 Node 잠금 파일을 삭제하지 않는다.
 - 루트 package-lock.json은 기존 공통 Node 도구와 workspace를 유지한다. Flutter 앱은 apps/mobile/pubspec.yaml·pubspec.lock으로 별도 관리하며 서버는 API 전용 Gradle Wrapper와 gradle.lockfile로 별도 관리한다.
+- Flutter 앱 패키지는 pubspec.yaml에 버전을 고정한다. 2026-10-29 `shared_preferences` 2.5.6(Flutter 공식, 홈 월급 입금 확인 안내 접힘 기록을 기기에 남김)을 추가했다.
 - 기존 유효한 환경은 재사용한다. Node 의존성이 바뀌었거나 최초 준비 시 `npm ci`, Flutter 앱 최초 준비 또는 잠금 파일 변경 시 `flutter pub get --enforce-lockfile`을 사용한다. 초기 lockfile 생성·SDK 변경은 integration 초기화 작업에서 처리한다.
 - 명령은 각 도구가 요구하는 루트에서 실행한다. 기존 하네스는 저장소 루트, Flutter는 pubspec이 있는 앱 루트다. Windows에서는 필요한 경우 npm.cmd를 사용한다.
 

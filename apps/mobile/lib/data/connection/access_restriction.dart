@@ -41,16 +41,25 @@ const Map<String, Set<String>> registeredRestrictions = {
   'recurringPlanRevision/cardId': {'card'},
 };
 
+/// 2026-10-30: v4(PAYSE-API-0.6-4)에서만 쓰는 제한 조합. v3 등록 표에 소급해 넣지 않는다.
+const Map<String, Set<String>> v4Restrictions = {
+  'statementItem/transactionId': {'transaction'},
+};
+
 /// 2026-10-22: [ownerType]·[ownerId]·[field]·[targetKind]·[reason] 조합이 등록 표와 ownerId 규칙(response·settings는 null,
 /// 그 외는 공개 자원 ID)에 맞으면 true를 반환한다.
+/// 2026-10-30: [v4]면 [v4Restrictions] 조합도 허용한다.
 bool isValidRestriction({
   required String ownerType,
   required String? ownerId,
   required String field,
   required String targetKind,
   required String reason,
+  bool v4 = false,
 }) {
-  final allowed = registeredRestrictions['$ownerType/$field'];
+  final allowed =
+      registeredRestrictions['$ownerType/$field'] ??
+      (v4 ? v4Restrictions['$ownerType/$field'] : null);
   if (allowed == null || !allowed.contains(targetKind)) return false;
   if (reason != 'not_connected') return false;
   final rootOwner = ownerType == 'response' || ownerType == 'settings';

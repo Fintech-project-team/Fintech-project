@@ -7,11 +7,11 @@ import '../financial_snapshot.dart' show maxAbsKrw;
 import 'financial_api.dart';
 import 'snapshot_projector.dart';
 
-/// 2026-10-22: 사용자 ID에 해당하는 불변 원본(PAYSE-DRAFT-3) JSON을 읽는 경계. 실제 API 도입 시 서버 쪽 책임이다.
+/// 2026-10-22: 사용자 ID에 해당하는 불변 원본(PAYSE-DRAFT-3·4) JSON을 읽는 경계. 실제 API 도입 시 서버 쪽 책임이다.
 typedef UserSourceLoader = Future<Map<String, Object?>> Function(String userId);
 
 /// 2026-10-22: 금융 조회·연결 쓰기를 흉내 내는 앱 수명 가짜 서버(서버 장부 역할). 사용자별 불변 원본과 가변 상태
-/// (연결 기록·계좌 선택·월급 설정·자료 버전·작업 영수증)를 분리해 재로그인까지 상태를 유지한다. 메모리 구현이며 실제 서버 영속화가 아니다.
+/// (연결 기록·계좌 선택·월급 설정·계좌 이름·자료 버전·작업 영수증)를 분리해 재로그인까지 상태를 유지한다. 메모리 구현이며 실제 서버 영속화가 아니다.
 class FakeFinancialServer {
   /// 2026-10-22: 토큰→사용자 [sessions], 원본 [loadSource], 시각 [now], 난수 [random]으로 만든다.
   FakeFinancialServer({
@@ -112,6 +112,7 @@ class FakeFinancialServer {
         institutionLinks: links,
         selectedAccountIds: keptSelection,
         salarySettings: state.salarySettings,
+        accountNicknames: state.accountNicknames,
         changed: [
           for (final l in links)
             ChangedRef(resource: 'institutionLink', id: l['linkId'] as String),
@@ -151,6 +152,7 @@ class FakeFinancialServer {
         institutionLinks: state.institutionLinks,
         selectedAccountIds: next,
         salarySettings: state.salarySettings,
+        accountNicknames: state.accountNicknames,
         changed: [
           for (final id in {...next, ...before})
             if (next.contains(id) != before.contains(id))
@@ -200,6 +202,7 @@ class FakeFinancialServer {
           institutionLinks: state.institutionLinks,
           selectedAccountIds: state.selectedAccountIds,
           salarySettings: {...state.salarySettings, ...fields},
+          accountNicknames: state.accountNicknames,
           changed: [
             ChangedRef(resource: 'settings', id: source['userId'] as String),
           ],
@@ -207,6 +210,42 @@ class FakeFinancialServer {
       },
     );
   }
+
+  /// 2026-10-28: PATCH /accounts/{accountId}. 연결 범위의 계좌 이름만 바꾼다(계산 제외 계좌 포함). 앞뒤 공백을 지운 이름이
+  /// [AccountNicknameRule]에 맞지 않으면 422, 연결 밖·없는 계좌는 403이다. null은 이름 해제이며 잔액·상품명은 그대로 둔다.
+  Future<FinancialOutcome<WriteSuccess>> patchAccount(
+    String accessToken,
+    String accountId,
+    String? nickname,
+    WriteContext write,
+  ) => _write(
+    accessToken: accessToken,
+    method: 'PATCH',
+    path: '/accounts/$accountId',
+    body: {'nickname': nickname},
+    write: write,
+    apply: (source, state) {
+      final reachable = {
+        for (final a in (source['accounts'] as List?) ?? const [])
+          if (state.connectedCodes.contains((a as Map)['institutionCode']))
+            a['accountId'] as String,
+      };
+      if (!reachable.contains(accountId)) return const FinancialForbidden();
+      if (nickname != null && !AccountNicknameRule.isValid(nickname)) {
+        return const FinancialInvalid();
+      }
+      return FinancialOk((
+        institutionLinks: state.institutionLinks,
+        selectedAccountIds: state.selectedAccountIds,
+        salarySettings: state.salarySettings,
+        accountNicknames: {
+          ...state.accountNicknames,
+          accountId: nickname?.trim(),
+        },
+        changed: [ChangedRef(resource: 'account', id: accountId)],
+      ));
+    },
+  );
 
   /// 2026-10-22: 금융 쓰기 공통 절차(§5). 형식 → 같은 키 replay/충돌 → 규칙·자료 버전 → 소유권·제약 → 상태·영수증·버전을
   /// 한 번에 확정한다. 중간 실패는 아무것도 바꾸지 않는다.
@@ -287,6 +326,7 @@ class FakeFinancialServer {
       selectedAccountIds: change.value.selectedAccountIds,
       dataVersion: nextVersion,
       salarySettings: change.value.salarySettings,
+      accountNicknames: change.value.accountNicknames,
     );
     final projected = _project(source, nextState);
     if (projected is! FinancialOk<Map<String, Object?>>) {
@@ -413,6 +453,7 @@ typedef _Change = ({
   List<Map<String, Object?>> institutionLinks,
   Set<String>? selectedAccountIds,
   Map<String, Object?> salarySettings,
+  Map<String, String?> accountNicknames,
   List<ChangedRef> changed,
 });
 
@@ -506,6 +547,18 @@ class FakeUserFinancialRepository implements UserFinancialRepository {
   ) async => _closed
       ? const FinancialSessionInvalid()
       : _accepted(await server.patchSettings(accessToken, salary, write));
+
+  /// 2026-10-28: 계좌 이름을 저장한다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> updateAccountNickname(
+    String accountId,
+    String? nickname,
+    WriteContext write,
+  ) async => _closed
+      ? const FinancialSessionInvalid()
+      : _accepted(
+          await server.patchAccount(accessToken, accountId, nickname, write),
+        );
 
   /// 2026-10-22: 쓰기 성공의 Snapshot 버전을 기록한다. 닫힌 세션의 늦은 응답은 세션 무효, 낮은 버전 응답은 서비스 불가로 바꿔 반영하지 않게 한다.
   FinancialOutcome<WriteSuccess> _accepted(

@@ -23,7 +23,7 @@ DIRECTORY = Path(__file__).resolve().parent
 API = DIRECTORY.parent
 sys.path.insert(0, str(API))
 sys.path.insert(0, str(API / 'fixtures'))
-from export_sql import export as initial_sql
+from export_sql import export as initial_sql, load_sources
 from reference_data.export_sql import export as institution_sql
 from testing.scenarios.export_state import export as scenario_sql
 from validate import validate_directory
@@ -87,20 +87,28 @@ class DemoReadyTests(unittest.TestCase):
     database = 'payse_fixture_auth_demo_ready'
     initial_database = 'payse_fixture_auth_demo_initial'
     regression_database = 'payse_fixture_auth_demo_regression'
+    demo_database = 'payse_fixture_auth_demo_selected'
 
     @classmethod
     def setUpClass(cls):
-        """2026-10-26: 세 검사 DB에 원천·시나리오를 준비한다. 사용: unittest."""
+        """2026-10-26: 원천·선택 시나리오를 독립 DB에 준비한다. 사용: unittest.
+
+        2026-10-30: 신규 서버의 initialCase 시연 적재를 별도 DB에서 검사한다.
+        """
         if cls.cluster is None:
             raise unittest.SkipTest('Run explicitly with --pg-bin and a new --work-dir')
         cls.fixtures = API / 'fixtures' / 'generated'
         cls.roles = prepare_roles(cls.fixtures)
+        initial_sources, seeds = load_sources(cls.fixtures)
+        cls.initial_sources = {source['userId']: source for source in initial_sources}
+        demo_cases = [seed['initialCase'] for seed in seeds.values()]
         cls.selected_sql = scenario_sql(cls.fixtures, ['demo-ready', 'beta-ready'])
         cls.original_sql = scenario_sql(cls.fixtures, ['alpha-ready', 'beta-ready', 'gamma-month-end'])
         for database, seed in (
             (cls.initial_database, initial_sql(cls.fixtures)),
             (cls.database, cls.selected_sql),
             (cls.regression_database, cls.original_sql),
+            (cls.demo_database, scenario_sql(cls.fixtures, demo_cases)),
         ):
             cls.cluster.sql('CREATE DATABASE ' + database + ';')
             cls.cluster.load(DIRECTORY / '001_initial.sql', database)
@@ -172,7 +180,10 @@ class DemoReadyTests(unittest.TestCase):
         self.assertEqual(self.fingerprint(self.database), before)
 
     def test_initial_export_keeps_settings_empty(self):
-        """2026-10-26: 기본 적재에 사용자 계획·설정이 없는지 검사한다. 사용: unittest."""
+        """2026-10-26: 기본 적재에 사용자 계획·설정이 없는지 검사한다. 사용: unittest.
+
+        2026-10-30: 현재 initialCase 원천과 비교하고 별도 demo-ready 회귀와 구분한다.
+        """
         owner = quote(self.roles['owner'])
         state = self.json_row(f"""
         -- 기본 적재는 급여 원천 근거를 보존하지만 사용자 설정을 만들지 않는다.
@@ -226,10 +237,59 @@ class DemoReadyTests(unittest.TestCase):
         self.assertEqual(state['userCount'], 3)
         self.assertEqual(state['attributes'], {'salary_day': None, 'salary_amount_krw': None,
                          'salary_account_id': None, 'card_plan_overrides': []})
-        self.assertEqual(state['proof'], [self.roles['proof']])
-        self.assertEqual(state['sourceVersion'], self.roles['demo']['sourceVersion'])
+        initial = self.initial_sources[self.roles['owner']]
+        self.assertEqual(state['proof'], initial['settings']['salary']['receiptEvidence'])
+        self.assertEqual(state['sourceVersion'], initial['sourceVersion'])
         for key in ('connections', 'selectedAccounts', 'plans', 'obligations', 'reserves', 'settlements'):
             self.assertEqual(state[key], 0, key)
+
+    def test_server_demo_matches_selected_sources(self):
+        """2026-10-30: 신규 시연 DB의 계좌·거래·급여 설정·계획을 선택 원본과 대조한다. 사용: unittest."""
+        before = self.fingerprint(self.demo_database)
+        for user_id, source in self.initial_sources.items():
+            owner = quote(user_id)
+            actual = self.json_row(f"""
+            -- 계산 결과를 생성하지 않고 시연에서 읽을 원천과 확정 설정만 비교한다.
+            SELECT jsonb_build_object(
+              'salary', (
+                SELECT jsonb_build_object('salaryDay', salary_day,
+                  'salaryAmountKRW', salary_amount_krw, 'salaryAccountId', salary_account_id)
+                FROM payse.user_attributes WHERE user_id = {owner}
+              ),
+              'accounts', (
+                SELECT jsonb_agg(jsonb_build_array(id, balance_krw, included) ORDER BY id)
+                FROM payse.financial_accounts WHERE user_id = {owner}
+              ),
+              'transactions', (
+                SELECT jsonb_agg(jsonb_build_array(id, amount_krw, booking_date, withdrawal_date,
+                  purchase_date, refund_date, cancellation_date) ORDER BY id)
+                FROM payse.financial_transactions WHERE user_id = {owner}
+              ),
+              'obligations', (
+                SELECT coalesce(jsonb_agg(jsonb_build_array(id, amount_krw, due_date) ORDER BY id), '[]'::jsonb)
+                FROM payse.obligations WHERE user_id = {owner}
+              ),
+              'reserves', (
+                SELECT coalesce(jsonb_agg(jsonb_build_array(id, amount_krw) ORDER BY id), '[]'::jsonb)
+                FROM payse.reserves WHERE user_id = {owner}
+              ),
+              'links', (SELECT count(*) FROM payse.institution_links WHERE user_id = {owner})
+            );
+            """, self.demo_database)
+            self.assertEqual(actual['salary'], {key: source['settings']['salary'][key]
+                for key in ('salaryDay', 'salaryAmountKRW', 'salaryAccountId')})
+            self.assertEqual(actual['accounts'], sorted([row['accountId'], row['balanceKRW'], row['included']]
+                for row in source['accounts']))
+            transactions = source['transactions'] + source['relatedTransactions']
+            self.assertEqual(actual['transactions'], sorted([row['transactionId'], row['amountKRW'],
+                row['bookingDate'], row['withdrawalDate'], row['purchaseDate'], row['refundDate'],
+                row.get('cancellationDate')] for row in transactions))
+            self.assertEqual(actual['obligations'], sorted([row['obligationId'], row['amountKRW'], row['dueDate']]
+                for row in source['obligations']))
+            self.assertEqual(actual['reserves'], sorted([row['reserveId'], row['amountKRW']]
+                for row in source['reserves']))
+            self.assertEqual(actual['links'], len(source['institutionLinks']))
+        self.assertEqual(self.fingerprint(self.demo_database), before)
 
     def test_selected_scenario_preserves_source_and_relations(self):
         """2026-10-26: 월세·완료 청구·통신비·보호 관계와 잔액을 검사한다. 사용: unittest."""

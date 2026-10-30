@@ -1,9 +1,9 @@
 {
   "userId": "f0a4be6c-01d7-53eb-ab2c-74675b22fd8c",
-  "schemaVersion": "PAYSE-DRAFT-3",
+  "schemaVersion": "PAYSE-DRAFT-4",
   "currency": "KRW",
   "dataVersion": "1",
-  "sourceVersion": "fixture-3:alpha:2026-10-19:base",
+  "sourceVersion": "fixture-3:alpha:2026-10-19:base:billing-4",
   "ruleVersion": "PAYSE-CALC-1",
   "asOf": "2026-10-19T12:00:00+09:00",
   "institutions": [

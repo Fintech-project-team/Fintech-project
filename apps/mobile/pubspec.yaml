@@ -12,6 +12,7 @@ dependencies:
     sdk: flutter
   payse_calculation:
     path: ../../packages/payse_calculation
+  shared_preferences: 2.5.6
 
 dev_dependencies:
   flutter_test:
@@ -23,6 +24,7 @@ flutter:
   assets:
     - assets/fonts/OFL.txt
     - assets/fixtures/demo-ready.json
+    - assets/fixtures/demo-life.json
     - assets/fixtures/alpha-ready.json
     - assets/fixtures/alpha-shock.json
     - assets/fixtures/salary-wait.json

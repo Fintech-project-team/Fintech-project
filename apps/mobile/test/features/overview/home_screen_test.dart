@@ -83,10 +83,7 @@ void main() {
     expect(find.byKey(const ValueKey('composition-bar')), findsOneWidget);
     expect(find.byType(ColorChipLabel), findsNothing, reason: '홈 구성 바는 범례가 없다');
     expect(find.textContaining('다시 빼지 않아요'), findsNothing);
-    expect(
-      find.byKey(const ValueKey('home-salary-check-button')),
-      findsNothing,
-    );
+    expect(find.byKey(const ValueKey('home-salary-notice')), findsNothing);
     expect(find.byKey(const ValueKey('home-first-calc-button')), findsNothing);
     expect(find.byKey(const ValueKey('home-negative-notice')), findsNothing);
   });
@@ -162,7 +159,7 @@ void main() {
       );
     }
     expect(find.byKey(const ValueKey('composition-bar')), findsNothing);
-    expectDisabledButton(tester, 'home-salary-check-button');
+    expect(find.byKey(const ValueKey('home-salary-notice')), findsOneWidget);
     expect(find.byKey(const ValueKey('home-reported-label')), findsNothing);
     expect(find.byKey(const ValueKey('home-detail-button')), findsOneWidget);
   });
@@ -185,9 +182,9 @@ void main() {
     );
     expect(find.text('0원'), findsNothing);
     expect(
-      find.byKey(const ValueKey('home-salary-check-button')),
+      find.byKey(const ValueKey('home-salary-notice')),
       findsNothing,
-      reason: '월급 입금 확인하기는 지난 회차 근거 부재에만 둔다',
+      reason: '월급 입금 확인 안내는 지난 회차 근거 부재에만 둔다',
     );
   });
 
@@ -267,9 +264,7 @@ void main() {
     expect(find.text('월급 입금 확인 전'), findsOneWidget);
   });
 
-  testWidgets('정보 부족·미입금 내가 확인한 상태(입력 예시): 상태 라벨과 안내, 비활성 확인 버튼', (
-    tester,
-  ) async {
+  testWidgets('정보 부족·미입금 내가 확인한 상태(입력 예시): 상태 라벨과 안내', (tester) async {
     await tester.pumpWidget(
       home(
         calculate(readSource('alpha-ready')),
@@ -291,7 +286,11 @@ void main() {
     expect(find.text('9/25에 예정된 월급의 입금 여부를 확인할 정보가 없어요.'), findsNothing);
     expect(find.text(AmountHero.unavailableText), findsOneWidget);
     expectRow('home-row-balance', '2,000,000원');
-    expectDisabledButton(tester, 'home-salary-check-button');
+    expect(
+      find.byKey(const ValueKey('home-salary-notice')),
+      findsNothing,
+      reason: '내가 확인한 상태는 별도 안내라 월급 입금 확인 안내를 겹쳐 보이지 않는다',
+    );
   });
 
   testWidgets('미입금 기록이 있어도 계산이 가능해지면 표시하지 않는다', (tester) async {
@@ -302,10 +301,7 @@ void main() {
       ),
     );
     expect(find.byKey(const ValueKey('home-reported-label')), findsNothing);
-    expect(
-      find.byKey(const ValueKey('home-salary-check-button')),
-      findsNothing,
-    );
+    expect(find.byKey(const ValueKey('home-salary-notice')), findsNothing);
   });
 
   testWidgets('나중에 해결한 뒤(입력 예시): 다시 보기 콜백이 없으면 첫 계산 과정 버튼이 비활성', (
@@ -720,10 +716,7 @@ void main() {
       expect(find.text('아직 계산할 수 없어요'), findsOneWidget);
       expect(find.text('9/25에 예정된 월급의 입금 여부를 확인할 정보가 없어요.'), findsOneWidget);
       expect(find.text('다시 시도'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('home-salary-check-button')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('home-salary-notice')), findsOneWidget);
       expect(moonLit(tester), isNull);
     });
 

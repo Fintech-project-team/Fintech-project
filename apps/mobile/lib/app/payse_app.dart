@@ -13,6 +13,7 @@ import '../data/connection/financial_api.dart';
 import '../data/financial_snapshot_repository.dart';
 import '../data/coachmark_record_store.dart';
 import '../data/first_calc_record_store.dart';
+import '../data/salary_notice_store.dart';
 import '../data/fixture_scenario.dart';
 import '../data/snapshot_source.dart';
 import '../features/auth/auth_flows.dart';
@@ -41,6 +42,8 @@ class PayseApp extends StatefulWidget {
   /// 만든다. 생략하면 실제 난수·시간을 쓴다(테스트에서 바꿔 끼움).
   /// 2026-10-27: [firstCalcRecords]는 01-3 첫 계산 기록 저장소다(기본은 앱 실행 동안 유지되는 메모리 구현).
   /// 2026-10-28: [coachmarkRecords]는 02-1a 코치마크 기록 저장소다. 기본은 없음이며 코치마크를 띄우지 않는다.
+  /// 2026-10-29: [salaryNotices]는 홈 월급 입금 확인 안내 접힘 기록 저장소다. 앱 시작점이 기기 저장소를 넘기며, 없으면
+  /// 앱 실행 동안 유지되는 메모리 구현이다.
   const PayseApp({
     super.key,
     this.snapshotSource,
@@ -55,6 +58,7 @@ class PayseApp extends StatefulWidget {
     this.presentationPolicy,
     this.firstCalcRecords,
     this.coachmarkRecords,
+    this.salaryNotices,
   });
 
   final SnapshotSource? snapshotSource;
@@ -74,6 +78,7 @@ class PayseApp extends StatefulWidget {
 
   final FirstCalcRecordStore? firstCalcRecords;
   final CoachmarkRecordStore? coachmarkRecords;
+  final SalaryNoticeStore? salaryNotices;
 
   /// 2026-10-20: 앱 루트 상태 객체를 반환한다. 인자 없음.
   @override
@@ -100,6 +105,8 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
   late final FakeFinancialServer? _financialServer = _defaultFinancialServer();
   late final FirstCalcRecordStore _firstCalcRecords =
       widget.firstCalcRecords ?? MemoryFirstCalcRecordStore();
+  late final SalaryNoticeStore _salaryNotices =
+      widget.salaryNotices ?? MemorySalaryNoticeStore();
   UserFinancialRepository _financial =
       const UnavailableUserFinancialRepository();
   int _financialSession = 0;
@@ -329,6 +336,7 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
         userName: _userName,
         firstCalcRecords: _firstCalcRecords,
         coachmarkRecords: widget.coachmarkRecords,
+        salaryNotices: _salaryNotices,
         devEntryBuilder: _devEntryOrNull,
         onSessionInvalid: _onFinancialSessionInvalid,
       ),
