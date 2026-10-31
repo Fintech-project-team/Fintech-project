@@ -19,8 +19,13 @@ class FakeFinancialServer {
     required this.loadSource,
     DateTime Function()? now,
     Random? random,
+    this.transactionPageSize,
   }) : _now = now ?? DateTime.now,
        _random = random ?? Random.secure();
+
+  /// 2026-10-30: 거래 페이지 크기(계약 최대 100). null이면 Snapshot에 거래를 모두 담고 nextCursor는 null이다(기본, 홈 계산이
+  /// 모든 근거 거래를 한 번에 받는 현재 앱 흐름 유지). 값이 있으면 transactionId 오름차순으로 나눠 GET /transactions로 넘긴다.
+  final int? transactionPageSize;
 
   final SessionResolver sessions;
   final UserSourceLoader loadSource;
@@ -53,7 +58,110 @@ class FakeFinancialServer {
       return const FinancialSessionInvalid();
     }
     final (source, ledger) = opened;
-    return _project(source, ledger.state);
+    final projected = _project(source, ledger.state);
+    if (projected case FinancialOk(:final value)) {
+      return FinancialOk(_firstPage(value, userId));
+    }
+    return projected;
+  }
+
+  /// 2026-10-30: GET /transactions?cursor. cursor는 'tx1|userId|dataVersion|마지막 transactionId'이며 앱은 해석하지 않는다.
+  /// 형식이 틀리면 400, 다른 사용자 cursor는 403, 그 사이 자료 버전이 바뀌었으면 409다. 같은 투영에서 다음 페이지를 자른다.
+  Future<FinancialOutcome<Map<String, Object?>>> getTransactionPage(
+    String accessToken,
+    String cursor,
+  ) async {
+    final userId = sessions.userIdForToken(accessToken);
+    if (userId == null) return const FinancialSessionInvalid();
+    final parts = cursor.split('|');
+    if (parts.length != 4 || parts[0] != 'tx1' || parts[3].isEmpty) {
+      return const FinancialInvalid();
+    }
+    if (parts[1] != userId) return const FinancialForbidden();
+    final opened = await _open(userId);
+    if (opened == null) return const FinancialUnavailable();
+    final (source, ledger) = opened;
+    if (parts[2] != ledger.state.dataVersion) return const FinancialStaleData();
+    final projected = _project(source, ledger.state);
+    if (projected is! FinancialOk<Map<String, Object?>>) return projected;
+    final all = _sortedTransactions(projected.value);
+    final start = all.indexWhere(
+      (t) => (t['transactionId']! as String).compareTo(parts[3]) > 0,
+    );
+    final rest = start < 0
+        ? const <Map<String, Object?>>[]
+        : all.sublist(start);
+    final size = transactionPageSize ?? rest.length;
+    final page = rest.take(size).toList();
+    final more = rest.length > size;
+    final v = projected.value;
+    return FinancialOk({
+      for (final key in const [
+        'userId',
+        'schemaVersion',
+        'currency',
+        'dataVersion',
+        'sourceVersion',
+        'ruleVersion',
+        'asOf',
+      ])
+        key: v[key],
+      'transactions': page,
+      'relatedTransactions': const <Object?>[],
+      'referenceResolutions': const <Object?>[],
+      'transactionRelations': const <Object?>[],
+      'occurrenceLinks': const <Object?>[],
+      'coverage': v['coverage'],
+      'page': {
+        'nextCursor': more
+            ? _cursor(userId, ledger.state.dataVersion, page.last)
+            : null,
+        'dataVersion': ledger.state.dataVersion,
+        'sourceVersion': v['sourceVersion'],
+      },
+      'accessRestrictions': const <Object?>[],
+    });
+  }
+
+  /// 2026-10-30: [snapshot]의 거래를 transactionId 오름차순으로 반환한다.
+  static List<Map<String, Object?>> _sortedTransactions(
+    Map<String, Object?> snapshot,
+  ) =>
+      [
+        for (final t in (snapshot['transactions'] as List?) ?? const [])
+          (t as Map).cast<String, Object?>(),
+      ]..sort(
+        (a, b) => (a['transactionId']! as String).compareTo(
+          b['transactionId']! as String,
+        ),
+      );
+
+  /// 2026-10-30: 사용자 [userId]·자료 버전 [version]·마지막 거래 [last]로 다음 페이지 cursor를 만든다.
+  static String _cursor(
+    String userId,
+    String version,
+    Map<String, Object?> last,
+  ) => 'tx1|$userId|$version|${last['transactionId']}';
+
+  /// 2026-10-30: 페이지 크기가 정해졌으면 Snapshot에 첫 페이지 거래만 남기고 nextCursor를 붙인다. 연결 전 Snapshot은 그대로다.
+  Map<String, Object?> _firstPage(
+    Map<String, Object?> snapshot,
+    String userId,
+  ) {
+    final size = transactionPageSize;
+    if (size == null || snapshot['transactions'] is! List) return snapshot;
+    final all = _sortedTransactions(snapshot);
+    if (all.length <= size) return snapshot;
+    final page = all.take(size).toList();
+    final version = snapshot['dataVersion']! as String;
+    return {
+      ...snapshot,
+      'transactions': page,
+      'page': {
+        ...(snapshot['page']! as Map).cast<String, Object?>(),
+        'nextCursor': _cursor(userId, version, page.last),
+      },
+    };
   }
 
   /// 2026-10-22: POST /institution-links. 제공 기관만·중복 없음·계좌를 제공하는 은행 최소 1곳을 검사한다.
@@ -511,6 +619,16 @@ class FakeUserFinancialRepository implements UserFinancialRepository {
       return const FinancialUnavailable();
     }
     return result;
+  }
+
+  /// 2026-10-30: 다음 거래 페이지를 조회한다.
+  @override
+  Future<FinancialOutcome<Map<String, Object?>>> loadTransactionPage(
+    String cursor,
+  ) async {
+    if (_closed) return const FinancialSessionInvalid();
+    final result = await server.getTransactionPage(accessToken, cursor);
+    return _closed ? const FinancialSessionInvalid() : result;
   }
 
   /// 2026-10-22: 연결 기관을 저장한다.

@@ -83,6 +83,17 @@ class ScriptedRepository implements UserFinancialRepository {
   final List<(String, String?, WriteContext)> nicknameCalls = [];
   final List<(List<String>, WriteContext)> linkCalls = [];
   final List<(List<String>, WriteContext)> selectCalls = [];
+  final Queue<FinancialOutcome<Map<String, Object?>>> pageResults = Queue();
+  final List<String> pageCalls = [];
+
+  /// 2026-10-30: 요청을 기록하고 다음 거래 페이지 결과를 반환한다.
+  @override
+  Future<FinancialOutcome<Map<String, Object?>>> loadTransactionPage(
+    String cursor,
+  ) async {
+    pageCalls.add(cursor);
+    return pageResults.removeFirst();
+  }
 
   /// 2026-10-22: 다음 조회 결과를 반환한다.
   @override

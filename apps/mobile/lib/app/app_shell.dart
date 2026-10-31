@@ -3,13 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:payse_calculation/payse_calculation.dart' as calc;
 
 import '../data/coachmark_record_store.dart';
+import '../data/connection/transaction_history.dart';
 import '../data/financial_snapshot.dart';
 import '../data/first_calc_record_store.dart';
+import '../features/overview/accounts_cards_screen.dart';
 import '../features/overview/accounts_screen.dart';
 import '../features/overview/first_calc_screen.dart';
 import '../features/overview/home_calculation.dart';
 import '../features/overview/home_coachmark.dart';
 import '../features/overview/home_screen.dart';
+import '../features/overview/pull_refresh.dart';
 import '../features/overview/salary_notice.dart';
 import '../features/overview/slide_switch.dart';
 import '../shared/design/payse_tokens.dart';
@@ -44,6 +47,8 @@ class AppShell extends StatefulWidget {
     this.accountsWriter,
     this.salaryNoticeFolded,
     this.onSalaryNoticeFolded,
+    this.onPullRefresh,
+    this.history,
   });
 
   final FinancialSnapshot snapshot;
@@ -55,10 +60,15 @@ class AppShell extends StatefulWidget {
   final CoachmarkRecord? coachmarkRecord;
   final ValueChanged<CoachmarkRecord>? onCoachmarkRecord;
   final AccountsWriter? accountsWriter;
+
+  /// 2026-10-30: 계좌·카드 탭의 아래로 당겨 새로고침(없으면 당겨도 새로고침하지 않음)과, 그 새로고침으로 받은 거래 전체
+  /// [history](현재 [snapshot]과 자료 버전이 같을 때만 거래 내역이 그대로 쓴다).
+  final PullRefresh? onPullRefresh;
+  final TransactionHistoryReady? history;
   final String? salaryNoticeFolded;
   final ValueChanged<String?>? onSalaryNoticeFolded;
 
-  static const List<String> tabTitles = ['홈', '계좌', '계획', '내 정보'];
+  static const List<String> tabTitles = ['홈', '계좌·카드', '계획', '내 정보'];
 
   /// 2026-10-20: 선택 탭 상태 객체를 반환한다.
   @override
@@ -231,7 +241,9 @@ class _AppShellState extends State<AppShell> {
               },
             ),
           ),
-          AccountsScreen(
+          AccountsCardsScreen(
+            onRefresh: widget.onPullRefresh,
+            history: widget.history,
             snapshot: widget.snapshot,
             calculation: _calculation,
             writer: widget.accountsWriter,
@@ -248,7 +260,7 @@ class _AppShellState extends State<AppShell> {
           NavigationDestination(icon: Icon(Icons.home_outlined), label: '홈'),
           NavigationDestination(
             icon: Icon(Icons.account_balance_wallet_outlined),
-            label: '계좌',
+            label: '계좌·카드',
           ),
           NavigationDestination(
             icon: Icon(Icons.event_note_outlined),
