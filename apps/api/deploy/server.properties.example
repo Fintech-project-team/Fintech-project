@@ -1,6 +1,7 @@
 # Copy to server.properties outside the source checkout; change installation values here.
 # Relative paths are resolved from the directory where java is started.
-spring.profiles.active=database,auth,finance
+# Requires schema 009 in addition to the existing auth/finance schema.
+spring.profiles.active=database,auth,finance,salary-notices
 # Required secret directory; missing directory or keys must fail startup.
 spring.config.import=configtree:./secrets/
 
@@ -18,7 +19,7 @@ PAYSE_DB_VALIDATION_TIMEOUT_MS=1000
 
 # Must match the verifier key ID already prepared in the selected database.
 PAYSE_AUTH_CODE_KEY_ID=CHANGE_EXISTING_KEY_ID
-# Current API supports direct peer mode only; do not invent a proxy mode.
+# direct ignores forwarded headers. Use loopback-proxy only with the same-host Caddy setup.
 PAYSE_AUTH_PEER_MODE=direct
 
 # No passwords or keys here. Required files in secrets/:

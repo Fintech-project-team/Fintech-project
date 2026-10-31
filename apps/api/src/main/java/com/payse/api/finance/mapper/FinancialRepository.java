@@ -36,6 +36,7 @@ import tools.jackson.databind.node.ObjectNode;
  * @created 2026-10-29
  * @usedBy FinancialService
  * @modified 2026-10-29 - 동일 인증 JPA 문맥의 native Tuple 조회로 전환
+ * @modified 2026-10-30 - 저장된 v4 원천에서 청구 항목의 실제 값과 관계를 조회
  */
 @Repository
 @Profile("database & auth & finance")
@@ -47,11 +48,13 @@ public class FinancialRepository {
     private static final Set<String> TIME_FIELDS = Set.of("asOf", "consentedAt", "disconnectedAt", "cancelledAt",
         "invalidatedAt", "occurredAt");
     private static final Set<String> INTEGER_FIELDS = Set.of("accountCount", "cardCount", "balanceKRW", "amountKRW",
-        "installmentCurrent", "installmentTotal", "salaryDay", "salaryAmountKRW", "allocatedKRW", "releasedKRW", "monthlyDay");
+        "installmentCurrent", "installmentTotal", "salaryDay", "salaryAmountKRW", "allocatedKRW", "releasedKRW", "monthlyDay",
+        "originalUsedAmountKRW", "billedPrincipalKRW", "feeOrAdjustmentAmountKRW", "billedAmountKRW",
+        "installmentMonths", "installmentRound");
     private static final Set<String> BOOLEAN_FIELDS = Set.of("included", "balanceReflected", "isCurrent");
     private static final Set<String> UUID_FIELDS = Set.of("userId", "linkId", "accountId", "cardId", "transactionId",
         "statementId", "obligationId", "reserveId", "allocationId", "planId", "recurringPlanId", "planRevisionId",
-        "revisionId", "decisionId", "fromId", "toId", "withdrawalAccountId", "originalTransactionId", "salaryAccountId");
+        "revisionId", "decisionId", "fromId", "toId", "withdrawalAccountId", "originalTransactionId", "salaryAccountId", "itemId");
     private final EntityManager entityManager;
     private final EntityManagerFactory factory;
     private final JsonMapper mapper = JsonMapper.builder().build();
@@ -71,10 +74,11 @@ public class FinancialRepository {
     }
 
     /**
-     * 소유자 잠금 아래 테이블별 한 번의 조회로 완전한 내부 v3 원본을 조립한다.
+     * 소유자 잠금 아래 테이블별 한 번의 조회로 저장 버전에 맞는 내부 원본을 조립한다.
      * 페이지와 기관별 공개 여부는 후속 투영에서 결정하고 여기서 원천을 누락하지 않는다.
      * @created 2026-10-29
      * @usedBy FinancialService
+     * @modified 2026-10-30 - v3/v4 저장 버전을 보존하고 v4에만 실제 청구 항목을 제공
      * @param owner AuthRepository.authorize가 같은 트랜잭션에서 확정한 사용자
      * @return 현재 DB dataVersion과 변경하지 않은 원천 사실·설정
      */
@@ -90,7 +94,8 @@ public class FinancialRepository {
                 JOIN payse.source_contexts s ON s.user_id = u.id
                 WHERE u.id = ?
                 """, owner);
-            if (!"PAYSE-DRAFT-3".equals(source.path("schemaVersion").asText())) {
+            String schema = source.path("schemaVersion").asText();
+            if (!Set.of("PAYSE-DRAFT-3", "PAYSE-DRAFT-4").contains(schema)) {
                 throw unavailable();
             }
             source.put("currency", "KRW");
@@ -105,7 +110,7 @@ public class FinancialRepository {
             source.set("accounts", accounts(owner));
             source.set("cards", cards(owner));
             source.set("transactions", transactions(owner));
-            source.set("statements", statements(owner));
+            source.set("statements", statements(owner, schema.equals("PAYSE-DRAFT-4")));
             source.set("settings", settings(owner, source.remove("receiptEvidence")));
             source.set("obligations", obligations(owner));
             source.set("reserves", rows("""
@@ -243,12 +248,13 @@ public class FinancialRepository {
     }
 
     /**
-     * 청구와 항목 연결을 각각 한 번 읽어 기존 v3 참조 배열만 조립한다.
-     * v4 항목의 금액·회차를 변경하거나 기존 청구 금액에 더하지 않는다.
+     * 청구와 항목을 각각 한 번 읽고 참조 배열을 파생한다. v4만 실제 항목을 포함한다.
+     * 항목의 금액·회차를 산출하거나 청구 금액에 더하지 않는다.
      * @created 2026-10-29
      * @usedBy FinancialRepository.load
+     * @modified 2026-10-30 - v4 청구 원천 값·null·부호를 보존하고 부모 관계를 검사
      */
-    private ArrayNode statements(UUID owner) {
+    private ArrayNode statements(UUID owner, boolean includeItems) {
         ArrayNode statements = rows("""
             SELECT id AS "statementId", user_id AS "userId", source_ref AS "sourceRef",
               source_version AS "sourceVersion", card_id AS "cardId", amount_krw AS "amountKRW",
@@ -259,16 +265,39 @@ public class FinancialRepository {
             ORDER BY id
             """, owner);
         ArrayNode items = rows("""
-            SELECT statement_id AS "statementId", transaction_id AS "transactionId"
+            SELECT id AS "itemId", user_id AS "userId", source_ref AS "sourceRef",
+              source_version AS "sourceVersion", statement_id AS "statementId", card_id AS "cardId",
+              transaction_id AS "transactionId", label, merchant_name AS "merchantName",
+              purchase_date AS "purchaseDate", original_used_amount_krw AS "originalUsedAmountKRW",
+              billed_principal_krw AS "billedPrincipalKRW",
+              fee_or_adjustment_amount_krw AS "feeOrAdjustmentAmountKRW", billed_amount_krw AS "billedAmountKRW",
+              installment_months AS "installmentMonths", installment_round AS "installmentRound"
             FROM payse.statement_items
             WHERE user_id = ?
             ORDER BY statement_id, id
             """, owner);
+        Map<String, ObjectNode> parents = new LinkedHashMap<>();
         Map<String, LinkedHashSet<String>> refs = new LinkedHashMap<>();
-        for (JsonNode item : items) {
+        for (JsonNode value : statements) {
+            ObjectNode statement = (ObjectNode) value;
+            if (parents.putIfAbsent(statement.path("statementId").asText(), statement) != null) throw unavailable();
+            if (includeItems) statement.putArray("items");
+        }
+        for (JsonNode value : items) {
+            ObjectNode item = (ObjectNode) value;
+            String parentId = item.path("statementId").asText();
+            ObjectNode parent = parents.get(parentId);
+            if (parent == null || !parent.get("userId").equals(item.get("userId"))
+                    || !parent.get("cardId").equals(item.get("cardId"))
+                    || !parent.get("sourceVersion").equals(item.get("sourceVersion"))) throw unavailable();
             if (!item.get("transactionId").isNull()) {
-                refs.computeIfAbsent(item.path("statementId").asText(), ignored -> new LinkedHashSet<>())
+                refs.computeIfAbsent(parentId, ignored -> new LinkedHashSet<>())
                     .add(item.path("transactionId").asText());
+            }
+            if (includeItems) {
+                item.remove("statementId");
+                item.remove("cardId");
+                ((ArrayNode) parent.get("items")).add(item);
             }
         }
         for (JsonNode value : statements) {
@@ -394,6 +423,7 @@ public class FinancialRepository {
      * @created 2026-10-29
      * @usedBy FinancialRepository.rows
      * @modified 2026-10-29 - JDBC 메타데이터 대신 계약별 별칭·Tuple 실제 타입 검증
+     * @modified 2026-10-30 - 청구 항목 ID와 nullable 정수 금액·할부 필드의 타입 검증 추가
      */
     private ObjectNode mapRow(Tuple row) {
         ObjectNode result = mapper.createObjectNode();

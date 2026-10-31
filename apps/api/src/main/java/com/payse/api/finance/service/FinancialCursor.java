@@ -117,9 +117,16 @@ public final class FinancialCursor {
      * 모든 버전·시점·연결·조회 범위를 지문에 묶는다. 연결 순서는 의미 없이 정렬한다.
      * @created 2026-10-29
      * @usedBy FinancialService.snapshot
+     * @modified 2026-10-30 - 원천에 대응하는 공개 v3/v4 버전을 cursor 문맥에 명시
      */
     public String context(ObjectNode source, Set<String> codes) {
-        ObjectNode value = json.createObjectNode().put("apiSchema", "PAYSE-API-0.6-3").put("size", 100);
+        String schema = source.path("schemaVersion").asString("");
+        String apiSchema = switch (schema) {
+            case "PAYSE-DRAFT-3" -> "PAYSE-API-0.6-3";
+            case "PAYSE-DRAFT-4" -> "PAYSE-API-0.6-4";
+            default -> throw FinancialProjection.unavailable();
+        };
+        ObjectNode value = json.createObjectNode().put("apiSchema", apiSchema).put("size", 100);
         for (String field : Set.of("userId", "schemaVersion", "dataVersion", "sourceVersion", "ruleVersion", "asOf", "coverage")) {
             value.set(field, source.get(field));
         }

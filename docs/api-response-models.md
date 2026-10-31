@@ -2,7 +2,7 @@
 
 원천의 필드·타입·null·금액 단위는 [데이터 모델](data-model.md), 논리 관계·`isCurrent`도 같은 데이터 모델이 기준이며 물리 저장은 [DB 사전](database-schema.md)을 따른다. 기존 원본은 `PAYSE-DRAFT-3`, 공동 적용 준비용 청구 항목 원본은 `PAYSE-DRAFT-4`다. 아래 adapter는 권한·페이지를 적용할 HTTP 응답 조립 계약이며, 해당 서버 조회 구현의 존재나 배포 완료를 뜻하지 않는다.
 
-Java 금융 HTTP는 명시적인 `database,auth,finance` 프로필에서 DB의 v3 원천을 `PAYSE-API-0.6-3`으로 제공한다. v4 저장 자료·준비 도구는 보존하되 v4 원천을 v3로 재표기하지 않는다. 지원하지 않는 원천 형식은 503이며 v4 공개는 Flutter와 공동 검증 후 전환한다. 구현·검증 범위는 [금융 API 인계](../apps/api/docs/history/2026-10-29-financial-api-handoff.md)를 따른다.
+Java 금융 HTTP는 명시적인 `database,auth,finance` 프로필에서 DB의 `PAYSE-DRAFT-3`을 `PAYSE-API-0.6-3`으로, `PAYSE-DRAFT-4`를 `PAYSE-API-0.6-4`로 제공한다. 신규 시연 서버는 v4를 사용하고 기존 v3 환경은 유지한다. 원천 버전 이름만 바꾸거나 v4를 v3로 재표기하지 않는다. 지원하지 않는 원천 형식은 503이다. [서버 준비 인계](../apps/api/docs/history/2026-10-30-android-server-handoff.md)에서 실행 검증과 아직 남은 Android 실제 HTTP 연결을 구분한다.
 
 ## 승인 취소일과 원거래 조회
 
@@ -24,7 +24,7 @@ v4는 Statement.items와 `statementItem` 접근 제한을 함께 도입한다. A
 
 ## 1. 전달 버전과 정상 응답
 
-기존 API 계약은 `PAYSE-API-0.6-3`/`PAYSE-DRAFT-3`, 새 공동 적용 계약은 `PAYSE-API-0.6-4`/`PAYSE-DRAFT-4`다. 아직 v4의 모바일 통합·금융 HTTP 배포를 완료한 상태가 아니다. v3은 [데이터 모델의 급여 회차](data-model.md#급여-회차와-예정일)에 따라 payMonth를 필수로 제공한다. v2의 반복 계획·접근 제한 계약은 유지한다. 구 원본/응답을 날짜 기반 payMonth 보충으로 묵시 변환하지 않는다. 소비자는 지원하는 schemaVersion을 명시하고 미지원 버전은 오류로 처리한다. 새 계약 배포와 소비자 버전·필드 파싱의 배포 준비는 별도로 확인한다.
+기존 API 계약은 `PAYSE-API-0.6-3`/`PAYSE-DRAFT-3`, 새 공동 적용 계약은 `PAYSE-API-0.6-4`/`PAYSE-DRAFT-4`다. 신규 로컬 서버는 v4로 제공한다. 외부 Android 실제 HTTP·TLS 통합 완료 여부는 별도 검증한다. v3은 [데이터 모델의 급여 회차](data-model.md#급여-회차와-예정일)에 따라 payMonth를 필수로 제공한다. v2의 반복 계획·접근 제한 계약은 유지한다. 구 원본/응답을 날짜 기반 payMonth 보충으로 묵시 변환하지 않는다. 소비자는 지원하는 schemaVersion을 명시하고 미지원 버전은 오류로 처리한다. 새 계약 배포와 소비자 버전·필드 파싱의 배포 준비는 별도로 확인한다.
 
 같은 원천 버전의 내용을 변경하지 않는다. 원천 형식 전환은 새 sourceVersion과 현재 원천 자원의 참조를 일관되게 갱신하되, 기존 ID·금액·날짜·asOf·사용자 dataVersion·과거 승인 기록의 sourceVersion을 바꾸지 않는다. ruleVersion은 형식 전환만으로 올리지 않는다. 급여 근거가 제한되면 기존 salary.receiptEvidence 부모 키 생략·표식을 그대로 사용하고 payMonth만 우회 공개하지 않는다. 신규 accessRestrictions tuple은 추가하지 않는다.
 
@@ -55,7 +55,7 @@ settings만 객체이고 나머지 금융 복수 키는 배열이다. page는 `{
 
 변환 입력은 인증된 userId, **그 사용자의** 선택된 불변 원본, 하나의 일관된 저장 상태에서 읽은 연결·계좌 선택·사용자 설정, 요청 페이지 문맥이다. 이름·화면 전역 변수로 원본을 선택하지 않는다. userId·원천 선택·종속 소유자 또는 현재 요청의 버전 문맥이 맞지 않으면 오류로 처리하며 다른 계정 원본으로 대체하지 않는다. sourceVersion·asOf는 선택한 원본 기준이고, dataVersion은 현재 저장 상태의 버전이다. 최초 상태는 원본의 초기 dataVersion으로 시작하되 설정 저장으로 증가한 현재 dataVersion이 원본 fixture의 초기 값과 같을 필요는 없다. 불변 fixture의 초기 값으로 현재 버전을 되돌리지 않는다.
 
-최초 연결 전은 현재 연결된 기관이 없는 준비 상태다. 계정별 준비 원본은 `server-seeds.json`의 `initialCase`를 따른다(알파 demo-life, 베타 beta-ready, 감마 gamma-month-end). 각 원본에서 H와 institutions를 구성하되, schemaVersion은 PAYSE-API-0.6-3로, dataVersion은 위 현재 저장 상태 값으로 설정한다. 반환 키는 H 7개+institutions+institutionLinks+coverage **10개뿐**이다. institutionLinks와 coverage는 []다. settings·accounts·cards·transactions·page·accessRestrictions 등 나머지 키를 null·[]로 채우지 않고 생략한다. 기관별 확인된 개수 메타데이터는 그 사용자 원본 값을 유지한다. initialCase는 준비 도구 전용이며 공개 응답 필드나 DB 사용자 속성이 아니다. demo-ready·alpha-ready는 별도 검증 사례로 보존한다.
+최초 연결 전은 현재 연결된 기관이 없는 준비 상태다. 계정별 준비 원본은 `server-seeds.json`의 `initialCase`를 따른다(알파 demo-life, 베타 beta-ready, 감마 gamma-month-end). 각 원본에서 H와 institutions를 구성하되, schemaVersion은 해당 원천에 맞는 PAYSE-API-0.6-3 또는 PAYSE-API-0.6-4로, dataVersion은 위 현재 저장 상태 값으로 설정한다. 반환 키는 H 7개+institutions+institutionLinks+coverage **10개뿐**이다. institutionLinks와 coverage는 []다. settings·accounts·cards·transactions·page·accessRestrictions 등 나머지 키를 null·[]로 채우지 않고 생략한다. 기관별 확인된 개수 메타데이터는 그 사용자 원본 값을 유지한다. initialCase는 준비 도구 전용이며 공개 응답 필드나 DB 사용자 속성이 아니다. demo-ready·alpha-ready는 별도 검증 사례로 보존한다.
 
 세 계정에 같은 변환 책임을 적용하며 연결 전 JSON 파일을 각 계정마다 추가하는 것은 필수가 아니다. 기존 alpha-unconnected는 예시 원본이며 beta/gamma의 대체 원본이 아니다. 원본 fixture를 수정·초기화하지 않고 새 응답 객체를 만든다. 구조 공유는 가능하지만 사용자별 가변 상태를 공유하지 않는다.
 
