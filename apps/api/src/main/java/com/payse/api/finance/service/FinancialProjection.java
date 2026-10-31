@@ -20,7 +20,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * 저장 원천을 변경하지 않고 기관 권한과 v3 공개 관계를 요청별로 투영한다.
+ * 저장 원천을 변경하지 않고 기관 권한과 해당 버전의 공개 관계를 요청별로 투영한다.
  * @created 2026-10-29
  * @usedBy FinancialService
  */
@@ -79,11 +79,13 @@ public final class FinancialProjection {
         private final Map<String, ObjectNode> restrictions = new LinkedHashMap<>();
         private final Map<String, String> institutionKinds = new HashMap<>();
         private final String userId;
+        private final boolean billingItems;
 
         /**
          * 원천 복사본의 사용자·버전·자원 ID와 필수 부모를 조회용 인덱스로 준비한다.
          * @created 2026-10-29
          * @usedBy FinancialProjection.project
+         * @modified 2026-10-30 - 원천 v3/v4와 공개 응답 버전을 일치시켜 청구 항목 계약을 보존
          */
         private Context(ObjectNode input, Set<String> connectedCodes, String dataVersion) {
             if (input == null || connectedCodes == null || dataVersion == null
@@ -91,13 +93,15 @@ public final class FinancialProjection {
             source = input.deepCopy();
             FinancialShape.validate(source);
             connected = Set.copyOf(connectedCodes);
-            if (!"PAYSE-DRAFT-3".equals(text(source, "schemaVersion"))
+            String schema = text(source, "schemaVersion");
+            if (!Set.of("PAYSE-DRAFT-3", "PAYSE-DRAFT-4").contains(schema)
                     || !"KRW".equals(text(source, "currency"))) throw unavailable();
+            billingItems = schema.equals("PAYSE-DRAFT-4");
             userId = id(source, "userId");
             OffsetDateTime.parse(text(source, "asOf"));
             result = object();
             for (String key : HEADERS) result.set(key, required(source, key).deepCopy());
-            result.put("schemaVersion", "PAYSE-API-0.6-3");
+            result.put("schemaVersion", billingItems ? "PAYSE-API-0.6-4" : "PAYSE-API-0.6-3");
             result.put("dataVersion", dataVersion);
             for (ObjectNode institution : rows(source, "institutions")) {
                 String code = text(institution, "code");
@@ -287,14 +291,26 @@ public final class FinancialProjection {
         }
 
         /**
-         * 청구 원천과 포함 거래의 공개 권한을 유지하며 v4 항목을 v3 응답에 추가하지 않는다.
+         * 청구 원천의 버전을 유지하고 청구 항목·포함 거래의 공개 권한을 함께 적용한다.
          * @created 2026-10-29
          * @usedBy Context.build
+         * @modified 2026-10-30 - v4 항목의 nullable 연결·제한 표식과 숨긴 항목 ID 비노출 지원
          */
         private void statements() {
             ArrayNode out = array();
             for (ObjectNode row : all("statements")) {
-                if (!shown("cards", text(row, "cardId"))) { hide("statements", row, "card"); continue; }
+                if (!shown("cards", text(row, "cardId"))) {
+                    hide("statements", row, "card");
+                    if (billingItems) {
+                        for (ObjectNode item : rows(row, "items")) hiddenIds.add(id(item, "itemId"));
+                    }
+                    continue;
+                }
+                if (billingItems) {
+                    statementItems(row);
+                    keep(out, "statements", row);
+                    continue;
+                }
                 ArrayNode refs = array();
                 for (String transaction : strings(row, "includedTransactionRefs")) {
                     if (!indexes.get("transactions").containsKey(transaction)) throw unavailable();
@@ -305,6 +321,33 @@ public final class FinancialProjection {
                 keep(out, "statements", row);
             }
             result.set("statements", out);
+        }
+
+        /**
+         * 공개 청구의 미연결 거래 키만 생략하고 참조 배열을 남은 항목에서 파생한다.
+         * 실제 null 연결·금액·회차는 원천 그대로 유지하며 페이지 위치로 권한을 판단하지 않는다.
+         * @created 2026-10-30
+         * @usedBy Context.statements
+         */
+        private void statementItems(ObjectNode statement) {
+            Set<String> references = new LinkedHashSet<>();
+            boolean restricted = false;
+            for (ObjectNode item : rows(statement, "items")) {
+                String transaction = nullableText(item, "transactionId");
+                if (transaction == null) continue;
+                if (!indexes.get("transactions").containsKey(transaction)) throw unavailable();
+                if (shown("transactions", transaction)) {
+                    references.add(transaction);
+                } else {
+                    item.remove("transactionId");
+                    restrict("statementItem", id(item, "itemId"), "transactionId", "transaction");
+                    restricted = true;
+                }
+            }
+            if (restricted) restrict("statement", id(statement, "statementId"), "includedTransactionRefs", "transaction");
+            ArrayNode refs = array();
+            references.forEach(refs::add);
+            statement.set("includedTransactionRefs", refs);
         }
 
         /**

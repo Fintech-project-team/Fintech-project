@@ -36,10 +36,14 @@ class ServerPackageTests(unittest.TestCase):
         self.directory.cleanup()
 
     def test_only_reviewed_files_are_packaged(self):
-        """2026-10-29: 비밀·DB·로그가 아닌 지정 네 파일과 정확한 JAR만 복사한다. 사용: unittest."""
+        """2026-10-29: 비밀·DB·로그가 아닌 실행 자료와 정확한 JAR만 복사한다. 사용: unittest.
+
+        2026-10-30: Docker·Caddy 설정·빌드 제외 규칙·HTTPS 안내를 배포 묶음에서 검증한다.
+        """
         output = PACKAGE.package(self.jar, self.root / 'moved install')
         self.assertEqual({p.name for p in output.iterdir()},
-                         {'server.jar', 'server.properties.example', 'README.md', 'manifest.json'})
+                         {'server.jar', 'server.properties.example', 'README.md', 'manifest.json',
+                          'Dockerfile', '.dockerignore', 'Caddyfile', 'android-https.md'})
         self.assertEqual((output / 'server.jar').read_bytes(), self.jar.read_bytes())
         manifest = json.loads((output / 'manifest.json').read_text())
         self.assertEqual(manifest['javaMajor'], 21)
@@ -89,7 +93,7 @@ class ServerPackageTests(unittest.TestCase):
         template = (PACKAGE.API / 'deploy/server.properties.example').read_text()
         active = [line for line in template.splitlines() if line and not line.startswith('#')]
         self.assertIn('spring.config.import=configtree:./secrets/', active)
-        self.assertIn('spring.profiles.active=database,auth,finance', active)
+        self.assertIn('spring.profiles.active=database,auth,finance,salary-notices', active)
         self.assertFalse(any(line.startswith('PAYSE_DB_PASSWORD=') for line in active))
         self.assertFalse(any('_KEY_BASE64=' in line for line in active))
         self.assertNotIn('C:\\', template)

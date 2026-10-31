@@ -221,13 +221,17 @@ class DevServer:
             self.db_identity()
             run([self.binary('pg_ctl'), '-D', self.data, '-w', '-t', '30', '-m', 'fast', 'stop'], timeout=40)
 
-    def init(self, pg_bin, pg_port, api_port, *, demo_state=False):
+    def init(self, pg_bin, pg_port, api_port, *, demo_state=False, peer_mode='direct', fixture_schema='v4'):
         """2026-10-29: 새 경로에만 초기 DB·일반 시드·키를 준비한다. 사용: init CLI.
 
-        2026-10-30: 명시한 --demo-state만 연결·설정 포함 시연을 적재하며 기존 기본 적재는 유지한다.
+        2026-10-30: 명시 시연 상태와 신규 환경의 급여 안내 준비를 기록하며 기존 DB는 이행하지 않는다.
         """
         if self.home.exists() or pg_port == api_port or not all(1024 <= p <= 65535 for p in (pg_port, api_port)):
             raise ValueError('Initialization requires a new directory and two distinct nonprivileged ports')
+        if peer_mode not in ('direct', 'loopback-proxy'):
+            raise ValueError('Unsupported authentication peer mode')
+        if fixture_schema not in ('v3', 'v4'):
+            raise ValueError('Unsupported fixture schema')
         pg_bin = Path(pg_bin).resolve(strict=True)
         for name in ('postgres', 'initdb', 'pg_ctl', 'pg_controldata', 'psql'):
             if not (pg_bin / (name + '.exe')).is_file():
@@ -235,14 +239,16 @@ class DevServer:
         port_free(pg_port)
         port_free(api_port)
         # 잘못된 시드·선택은 폴더 생성이나 DB 시작 전에 실패시킨다.
-        prepared = initial_sql(API / 'fixtures/generated', demo_state=demo_state)
+        directory = API / 'fixtures' / ('generated-v4' if fixture_schema == 'v4' else 'generated')
+        prepared = initial_sql(directory, demo_state=demo_state)
         self.home.parent.mkdir(parents=True, exist_ok=True)
         self.home.mkdir()
         sid = next(csv.reader(run(['whoami', '/user', '/fo', 'csv', '/nh']).splitlines()))[1]
         run(['icacls', self.home, '/inheritance:r', '/grant:r', f'*{sid}:(OI)(CI)F'])
         self.state = {'kind': KIND, 'phase': 'preparing', 'home': str(self.home), 'data': str(self.data),
             'pgBin': str(pg_bin), 'pgPort': pg_port, 'apiPort': api_port,
-            'marker': 'payse-dev-' + uuid.uuid4().hex, 'systemId': None, 'apiPid': None}
+            'marker': 'payse-dev-' + uuid.uuid4().hex, 'systemId': None, 'apiPid': None,
+            'peerMode': peer_mode, 'fixtureSchema': fixture_schema}
         self.save()
         values = {'adminPassword': secrets.token_urlsafe(48), 'apiPassword': secrets.token_urlsafe(48),
             'PAYSE_AUTH_CODE_KEY_ID': 'local_dev_1',
@@ -264,8 +270,10 @@ class DevServer:
             self.start_db()
             self.sql('CREATE DATABASE ' + DATABASE + ';', database='postgres')
             for name in ('001_initial.sql', '002_storage_guards.sql', '003_auth_access.sql',
-                         '004_auth_sessions.sql', '007_financial_access.sql'):
+                         '004_auth_sessions.sql', '007_financial_access.sql', '009_salary_notices.sql'):
                 self.sql(filename=API / 'database' / name)
+            self.state['features'] = ['salary-notices']
+            self.state['demoState'] = demo_state
             sys.path[:0] = [str(API / 'fixtures'), str(API)]
             from reference_data.export_sql import export as institutions
             self.sql(institutions())
@@ -300,8 +308,11 @@ class DevServer:
         return java
 
     def provision(self, values):
-        """2026-10-29: 기존 AuthCrypto로 확인한 세 합성 계정만 활성화한다. 사용: 최초 init."""
-        seeds = json.loads((API / 'fixtures/generated/server-seeds.json').read_text(encoding='utf-8'))['users']
+        """2026-10-29: 기존 AuthCrypto로 확인한 세 합성 계정만 활성화한다. 사용: 최초 init.
+
+        2026-10-30: 새 환경에 명시적으로 적재한 v3/v4 시드의 동일 사용자 ID를 사용한다.
+        """
+        seeds = json.loads((self.fixtures() / 'server-seeds.json').read_text(encoding='utf-8'))['users']
         if {row['name'] for row in seeds} != set(DEMO_CODES) or len(seeds) != 3:
             raise ValueError('Reviewed synthetic accounts differ')
         java = self.java()
@@ -372,8 +383,30 @@ class DevServer:
             raise RuntimeError('Recorded PID is not the owned API; no process was stopped')
         return process
 
+    def profiles(self):
+        """2026-10-30: 준비 표식에 있는 기능만 활성화하고 구환경은 자동 이행하지 않는다. 사용: start·verify."""
+        features = self.state.get('features', [])
+        if not isinstance(features, list) or any(item != 'salary-notices' for item in features) \
+                or len(features) != len(set(features)):
+            raise ValueError('Unrecognized prepared server features')
+        return ','.join(['database', 'auth', 'finance', *features])
+
+    def fixtures(self):
+        """2026-10-30: 최초 적재한 형식만 재사용하고 기존 표식 없는 v3 환경을 보존한다. 사용: provision·verify."""
+        version = self.state.get('fixtureSchema', 'v3')
+        if version not in ('v3', 'v4'):
+            raise ValueError('Unrecognized prepared fixture schema')
+        return API / 'fixtures' / ('generated-v4' if version == 'v4' else 'generated')
+
     def start_api(self):
-        """2026-10-29: 보존한 DB·키와 비관리자 역할로 JAR를 시작한다. 사용: start·restart."""
+        """2026-10-29: 보존한 DB·키와 비관리자 역할로 JAR를 시작한다. 사용: start·restart.
+
+        2026-10-30: 신규 준비된 급여 안내만 활성화하며 구환경 프로필은 유지한다.
+        """
+        profiles = self.profiles()
+        peer_mode = self.state.get('peerMode', 'direct')
+        if peer_mode not in ('direct', 'loopback-proxy'):
+            raise ValueError('Unrecognized prepared peer mode')
         self.db_identity()
         if self.process_info():
             return
@@ -386,7 +419,7 @@ class DevServer:
         shutil.copyfile(jars[0], jar)
         values = self.read_secrets()
         environment = {**clean_environment(), **{k: v for k, v in values.items() if k.startswith('PAYSE_')},
-            'SPRING_PROFILES_ACTIVE': 'database,auth,finance', 'PAYSE_AUTH_PEER_MODE': 'direct',
+            'SPRING_PROFILES_ACTIVE': profiles, 'PAYSE_AUTH_PEER_MODE': peer_mode,
             'PAYSE_JDBC_URL': f"jdbc:postgresql://127.0.0.1:{self.state['pgPort']}/{DATABASE}",
             'PAYSE_DB_USER': LOGIN, 'PAYSE_DB_PASSWORD': values['apiPassword'],
             'PAYSE_DB_MAX_POOL_SIZE': '8', 'PAYSE_DB_CONNECTION_TIMEOUT_MS': '5000',
@@ -471,8 +504,13 @@ class DevServer:
         return result
 
     def verify_checks(self):
-        """2026-10-29: 실제 HTTP·재시작·최소 권한·원천 보존을 확인한다. 사용: verify CLI."""
+        """2026-10-29: 실제 HTTP·재시작·최소 권한·원천 보존을 확인한다. 사용: verify CLI.
+
+        2026-10-30: 준비된 급여 안내의 HTTP 저장·재로그인 검사도 수행한다.
+        """
         from dev_verify import verify, VerificationError
+        if self.state.get('peerMode', 'direct') != 'direct':
+            raise ValueError('Use a separate direct verification environment; demo proxy state is not a write test target')
         self.db_identity()
         before = self.fingerprint()
         role = self.sql(f"SELECT NOT rolsuper AND NOT rolbypassrls AND NOT rolinherit "
@@ -483,7 +521,8 @@ class DevServer:
         if role != 't':
             raise RuntimeError('API login role exceeds its boundary')
         try:
-            result = verify(self.base_url, API / 'fixtures/generated', self.restart_api)
+            result = verify(self.base_url, self.fixtures(), self.restart_api,
+                            salary_notices='salary-notices' in self.profiles().split(','))
         except VerificationError as failure:
             report = failure.report or {}
             report['failure'] = str(failure)
@@ -505,13 +544,41 @@ class DevServer:
         return result
 
     def stored_fingerprint(self):
-        """2026-10-29: 설정·영수증·세션의 DB 재시작 보존을 지문으로 확인한다. 사용: verify."""
+        """2026-10-29: 설정·영수증·세션의 DB 재시작 보존을 지문으로 확인한다. 사용: verify.
+
+        2026-10-30: 급여 안내가 준비된 환경에서만 해당 테이블의 보존도 확인한다.
+        """
         digest = hashlib.sha256()
-        for table in ('users', 'user_attributes', 'institution_links', 'obligations', 'reserves',
-                      'reserve_allocations', 'settlement_links', 'write_receipts', 'demo_sessions'):
+        tables = ['users', 'user_attributes', 'institution_links', 'obligations', 'reserves',
+                  'reserve_allocations', 'settlement_links', 'write_receipts', 'demo_sessions']
+        if 'salary-notices' in self.profiles().split(','):
+            tables.append('salary_notice_dismissals')
+        for table in tables:
             rows = self.sql(f'SELECT to_jsonb(t)::text FROM payse.{table} t ORDER BY to_jsonb(t)::text;')
             digest.update((table + '\n' + rows + '\n').encode('utf-8'))
         return digest.hexdigest()
+
+    def smoke(self):
+        """2026-10-30: 시연의 원천·설정·안내를 보존하며 세 계정의 실제 조회를 확인한다. 사용: smoke CLI."""
+        from dev_verify import smoke
+        path = self.home / 'smoke.json'
+        started = datetime.now(timezone.utc).isoformat()
+        path.write_text(json.dumps({'ok': False, 'status': 'RUNNING', 'startedAt': started}), encoding='utf-8')
+        try:
+            self.db_identity()
+            before = self.fingerprint()
+            result = smoke(self.base_url, self.fixtures(),
+                           trusted_proxy=self.state.get('peerMode', 'direct') == 'loopback-proxy')
+            if before != self.fingerprint():
+                raise RuntimeError('Financial source changed during smoke check')
+        except Exception as failure:
+            path.write_text(json.dumps({'ok': False, 'status': 'FAIL', 'startedAt': started,
+                'failureType': type(failure).__name__}, indent=2) + '\n', encoding='utf-8')
+            raise
+        result.update(status='PASS', sourceUnchanged=True, jarSha256=self.state['jarSha256'],
+                      startedAt=started, finishedAt=datetime.now(timezone.utc).isoformat())
+        path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        return result
 
     def status(self):
         """2026-10-29: 비밀 없는 실행 상태만 반환한다. 사용: status CLI."""
@@ -526,16 +593,24 @@ class DevServer:
 def parse_args(argv=None):
     """2026-10-30: 시연 초기화 옵션을 init에만 허용하고 기존 서버 명령 오용을 거절한다. 사용: main·검사."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=('init', 'start', 'stop', 'restart', 'status', 'verify'))
+    parser.add_argument('command', choices=('init', 'start', 'stop', 'restart', 'status', 'verify', 'smoke'))
     parser.add_argument('--home', type=Path, default=Path(os.environ.get('LOCALAPPDATA', '.')) / 'PAYSE/development/api-v3')
     parser.add_argument('--pg-bin', type=Path)
     parser.add_argument('--pg-port', type=int, default=15432)
     parser.add_argument('--api-port', type=int, default=18080)
     parser.add_argument('--demo-state', action='store_true',
                         help='init only: prepare each seed initialCase with its connected user state')
+    parser.add_argument('--peer-mode', choices=('direct', 'loopback-proxy'), default=None,
+                        help='init only: explicit trusted loopback proxy or direct connection')
+    parser.add_argument('--fixture-schema', choices=('v3', 'v4'), default=None,
+                        help='init only: new environments default to v4; existing data is never upgraded')
     args = parser.parse_args(argv)
     if args.demo_state and args.command != 'init':
         parser.error('--demo-state is only allowed with init; existing databases are not reseeded')
+    if args.peer_mode is not None and args.command != 'init':
+        parser.error('--peer-mode is only allowed with init; existing server mode is not changed')
+    if args.fixture_schema is not None and args.command != 'init':
+        parser.error('--fixture-schema is only allowed with init; existing source is not replaced')
     return args
 
 
@@ -551,7 +626,8 @@ def main():
     if args.command == 'init':
         if args.pg_bin is None:
             raise ValueError('--pg-bin is required for initialization')
-        server.init(args.pg_bin, args.pg_port, args.api_port, demo_state=args.demo_state)
+        server.init(args.pg_bin, args.pg_port, args.api_port, demo_state=args.demo_state,
+                    peer_mode=args.peer_mode or 'direct', fixture_schema=args.fixture_schema or 'v4')
     else:
         server.load()
     if args.command in ('start', 'restart'):
@@ -564,6 +640,8 @@ def main():
         server.stop_db()
     elif args.command == 'verify':
         print(json.dumps(server.verify(), ensure_ascii=False, indent=2))
+    elif args.command == 'smoke':
+        print(json.dumps(server.smoke(), ensure_ascii=False, indent=2))
     print(json.dumps(server.status(), ensure_ascii=False, indent=2))
 
 

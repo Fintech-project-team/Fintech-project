@@ -11,7 +11,7 @@ node scripts/harness/run-api.mjs check
 python -B apps/api/tools/package_server.py --output dist/payse-server
 ```
 
-다른 빌드 산출물을 선택할 때는 `--jar <실행-JAR-경로>`를 지정한다. 묶음은 `server.jar`, `server.properties.example`, 이 안내, 파일별 SHA-256을 담은 `manifest.json`만 포함한다. 키·DB·로그·원천 JSON·현재 PC의 설치 경로를 복사하지 않는다. 생성 실패로 일부 파일만 남았다면 새 출력 폴더를 지정하며 기존 자료를 자동 삭제하지 않는다.
+다른 빌드 산출물을 선택할 때는 `--jar <실행-JAR-경로>`를 지정한다. 묶음은 `server.jar`, `server.properties.example`, 이 안내, Dockerfile·.dockerignore·Caddyfile·android-https.md, 파일별 SHA-256을 담은 `manifest.json`만 포함한다. 키·DB·로그·원천 JSON·현재 PC의 설치 경로를 복사하지 않는다. 생성 실패로 일부 파일만 남았다면 새 출력 폴더를 지정하며 기존 자료를 자동 삭제하지 않는다.
 
 ## 2. 설치 환경값 준비
 
@@ -65,6 +65,14 @@ JAR 경로나 설정 파일 경로를 바꾸려면 두 인자를 변경하면 �
 
 ## 외부 접속의 경계
 
-기본값은 loopback이고 방화벽·자동 시작·서비스 계정·TLS·CORS 설정을 자동 변경하지 않는다. 현재 API는 `direct` 모드만 제공하므로 프록시 뒤의 실제 IP를 지원한다고 가정하지 않는다. 임의 전달 헤더 신뢰, 전체 인터넷 공개, 모바일의 인증서 검증 해제는 설치 편의에 포함하지 않는다. 외부/팀원 접속 방식과 프록시 신뢰는 별도 검증 후 구성한다.
+기본값은 loopback이고 방화벽·자동 시작·서비스 계정·TLS·CORS 설정을 자동 변경하지 않는다. 기존 `direct`는 전달 헤더를 무시한다. 동일 호스트 프록시는 `loopback-proxy`를 명시하고 [Android HTTPS](android-https.md)의 바인딩·헤더 재작성·인증서 조건을 모두 지킨다. 임의 전달 헤더 신뢰, 전체 인터넷 공개, 모바일의 인증서 검증 해제는 설치 편의에 포함하지 않는다. 외부/팀원 접속 방식과 프록시 신뢰는 별도 검증 후 구성한다.
 
 설정 파일·환경변수·config tree는 Spring Boot의 기존 외부 설정 기능을 이용한다. 설정 로더를 제품 코드에 중복 구현하지 않는다. [Spring Boot 공식 외부 설정](https://docs.spring.io/spring-boot/reference/features/external-config.html)
+
+## Docker 및 KMS 준비
+
+배포 묶음의 Dockerfile은 검증한 Java 21 이미지 digest를 고정하고 JAR만 복사하여 비관리자 UID 10001로 실행한다. `.dockerignore`로 비밀·DB·로그를 빌드 문맥에서 제외한다. 묶음 폴더에서 `docker build -t payse-api:local .`을 실행한다. 실제 DB 연결은 외부 설정·비밀 파일을 읽기 전용 마운트하여 별도로 준비한다. 호스트 loopback DB는 Docker bridge에서 자동 접근 가능하다고 가정하지 않는다. 이미지 빌드·생존 확인은 컨테이너 DB 연결 완료가 아니다.
+
+Google Cloud KMS는 로컬 프로그램이 아니라 클라우드 키 서비스다. 설치된 gcloud CLI는 프로젝트·리전·키링·키·실행 주체가 정해진 뒤 사용한다. 프로젝트 미준비 상태에서는 로그인·서비스 활성화·키 생성·권한 부여·유료 호출을 하지 않는다. 실제 활성화 때에는 해당 키에만 암복호화 권한을 주고 갱신 가능한 인증 공급자를 기존 GoogleKms 어댑터에 연결한다. CLI 설치나 JAR 포함만으로 암호화 저장이 활성화되지 않는다.
+
+공식 근거: [Docker 비밀 분리](https://docs.docker.com/build/building/secrets/), [Google CLI 설치](https://docs.cloud.google.com/sdk/docs/downloads-versioned-archives), [KMS 최소 권한](https://docs.cloud.google.com/kms/docs/iam).

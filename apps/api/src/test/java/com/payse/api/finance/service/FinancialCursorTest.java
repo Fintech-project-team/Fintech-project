@@ -52,6 +52,7 @@ class FinancialCursorTest {
      * 연결 순서만 바뀌면 동일하지만 원천·연결·조회 범위가 바뀌면 다른 문맥이다.
      * @created 2026-10-29
      * @usedBy JUnit
+     * @modified 2026-10-30 - 유효 v3/v4 원천 버전으로 페이지 문맥 변경을 검증
      */
     @Test
     void bindsEverySourceDimension() {
@@ -60,11 +61,13 @@ class FinancialCursorTest {
         for (String key : Set.of("userId", "schemaVersion", "dataVersion", "sourceVersion", "ruleVersion", "asOf")) {
             source.put(key, key);
         }
+        source.put("schemaVersion", "PAYSE-DRAFT-3");
         source.putArray("coverage").addObject().put("requestedStart", "2025-10-20");
         String before = cursor.context(source, Set.of("bank.a", "card.b"));
         assertEquals(before, cursor.context(source, Set.of("card.b", "bank.a")));
         for (String key : Set.of("userId", "schemaVersion", "dataVersion", "sourceVersion", "ruleVersion", "asOf")) {
-            ObjectNode changed = source.deepCopy().put(key, "changed");
+            ObjectNode changed = source.deepCopy().put(key,
+                key.equals("schemaVersion") ? "PAYSE-DRAFT-4" : "changed");
             assertNotEquals(before, cursor.context(changed, Set.of("bank.a", "card.b")));
         }
         assertNotEquals(before, cursor.context(source, Set.of("bank.a")));
@@ -102,6 +105,30 @@ class FinancialCursorTest {
         assertThrows(IllegalArgumentException.class, () -> new FinancialCursor(new MockEnvironment()));
         assertThrows(IllegalArgumentException.class, () -> new FinancialCursor(new MockEnvironment()
             .withProperty("PAYSE_FINANCE_CURSOR_KEY_BASE64", "bad")));
+    }
+
+    /**
+     * 동일 자료라도 공개 스키마 전환 후 이전 cursor를 이어 쓰지 않는다.
+     * @created 2026-10-30
+     * @usedBy JUnit
+     */
+    @Test
+    void versionTransitionInvalidatesCursor() {
+        FinancialCursor cursor = cursor();
+        ObjectNode source = json.createObjectNode().put("schemaVersion", "PAYSE-DRAFT-3");
+        UUID user = UUID.randomUUID();
+        UUID session = UUID.randomUUID();
+        UUID last = UUID.randomUUID();
+        String v3 = cursor.context(source, Set.of());
+        String encoded = cursor.encode(user, session, v3, last);
+        source.put("schemaVersion", "PAYSE-DRAFT-4");
+        String v4 = cursor.context(source, Set.of());
+        assertNotEquals(v3, v4);
+        var failure = assertThrows(FinancialException.class, () -> cursor.decode(encoded, user, session, v4));
+        assertEquals(409, failure.status());
+        assertEquals("STALE_DATA", failure.code());
+        source.put("schemaVersion", "unregistered");
+        assertEquals(503, assertThrows(FinancialException.class, () -> cursor.context(source, Set.of())).status());
     }
 
     /**

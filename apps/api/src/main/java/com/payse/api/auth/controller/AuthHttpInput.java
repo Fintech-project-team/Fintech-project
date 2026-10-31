@@ -24,38 +24,71 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 인증 HTTP 입력만 제한하여 해석한다. 클라이언트 전달 헤더로 접속 IP를 바꾸지 않는다.
+ * 인증 HTTP 입력만 제한하여 해석한다. 직접 접속과 명시한 loopback 프록시의 IP 경계를 구분한다.
  * @created 2026-10-28
  * @usedBy AuthController
+ * @modified 2026-10-30 - 명시한 loopback 프록시만 단일 전용 IP 헤더를 전달하도록 제한
  */
 @Component
 @Profile("database & auth")
 public final class AuthHttpInput {
     private static final int MAX_BODY_BYTES = 4096;
     private static final Set<String> FIELDS = Set.of("name", "phone", "code");
+    private final boolean loopbackProxy;
     private final JsonMapper mapper = JsonMapper.builder()
         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
 
     /**
-     * 직접 연결 배포 모드와 전달 헤더 미적용을 명시적으로 요구한다.
+     * 접속 모드와 전달 헤더 미적용을 요구하며 프록시 모드는 IPv4 loopback 바인딩만 허용한다.
      * @created 2026-10-28
      * @usedBy Spring 생성자 주입
+     * @modified 2026-10-30 - loopback-proxy의 명시 설정과 바인딩을 시작 시 검증
      */
     public AuthHttpInput(Environment environment) {
-        if (!"direct".equals(environment.getProperty("PAYSE_AUTH_PEER_MODE"))
+        String mode = environment.getProperty("PAYSE_AUTH_PEER_MODE");
+        loopbackProxy = "loopback-proxy".equals(mode);
+        if ((!"direct".equals(mode) && !loopbackProxy)
                 || !"none".equals(environment.getProperty("server.forward-headers-strategy"))) {
-            throw new IllegalStateException("Authentication requires explicit direct peer mode and forwarding disabled");
+            throw new IllegalStateException("Authentication requires an explicit supported peer mode and forwarding disabled");
+        }
+        if (loopbackProxy && !"127.0.0.1".equals(environment.getProperty("server.address"))) {
+            throw new IllegalStateException("Loopback proxy authentication requires an explicit loopback binding");
         }
     }
 
     /**
-     * 서블릿 연결의 숫자 IP만 읽는다. hostname 및 X-Forwarded-For/Forwarded는 사용하지 않는다.
+     * 직접 연결 IP 또는 loopback 프록시가 재작성한 단일 IP만 읽는다. 일반 전달 헤더는 사용하지 않는다.
      * @created 2026-10-28
      * @usedBy AuthController.login, reverify
+     * @modified 2026-10-30 - 전용 프록시 모드에서 연결 원격지와 단일 숫자 IP 헤더를 함께 검증
      */
     public InetAddress peer(HttpServletRequest request) {
-        String address = request.getRemoteAddr();
+        InetAddress remote = numericAddress(request.getRemoteAddr());
+        if (!loopbackProxy) return remote;
+        if (!remote.isLoopbackAddress()) throw new AuthStoreException();
+        var headers = request.getHeaders("X-Payse-Client-IP");
+        if (headers == null || !headers.hasMoreElements()) throw new AuthStoreException();
+        String value = headers.nextElement();
+        if (headers.hasMoreElements() || value == null || value.isEmpty() || value.length() > 45
+                || !value.matches("[0-9A-Fa-f:.]+")) throw new AuthStoreException();
+        // IPv6의 dotted IPv4 꼬리도 숫자 표현으로만 허용한다. hostname·zone·port·목록은 받지 않는다.
+        if (value.contains(":")) {
+            try {
+                return InetAddress.getByName(value);
+            } catch (UnknownHostException failure) {
+                throw new AuthStoreException();
+            }
+        }
+        return numericAddress(value);
+    }
+
+    /**
+     * 기존 직접 연결의 숫자 주소 해석을 유지하며 hostname 조회를 차단한다.
+     * @created 2026-10-30
+     * @usedBy peer
+     */
+    private InetAddress numericAddress(String address) {
         boolean ipv6 = address != null && address.contains(":") && address.matches("[0-9A-Fa-f:]+(%[0-9]+)?");
         boolean ipv4 = address != null && address.matches("[0-9]{1,3}(\\.[0-9]{1,3}){3}");
         if (ipv4) {
