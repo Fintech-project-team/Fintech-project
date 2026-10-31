@@ -8,7 +8,7 @@ from zipfile import BadZipFile, ZipFile
 
 
 API = Path(__file__).resolve().parents[1]
-FILES = ('server.properties.example', 'README.md')
+FILES = ('server.properties.example', 'README.md', 'Dockerfile', '.dockerignore', 'Caddyfile', 'android-https.md')
 
 
 def check_jar(path):
@@ -24,7 +24,10 @@ def check_jar(path):
 
 
 def package(jar, output):
-    """2026-10-29: 기존 폴더를 덮지 않고 지정한 네 파일만 생성한다. 사용: CLI·단위 검사."""
+    """2026-10-29: 기존 폴더를 덮지 않고 허용한 실행 자료만 생성한다. 사용: CLI·단위 검사.
+
+    2026-10-30: Docker·Caddy 설정과 HTTPS 안내를 포함하고 비밀 파일은 계속 제외한다.
+    """
     jar = Path(jar).resolve(strict=True)
     output = Path(output).absolute()
     if output.exists() or output.is_symlink():

@@ -36,6 +36,40 @@ import tools.jackson.databind.node.ObjectNode;
  */
 class FinancialTupleTest {
     /**
+     * 청구 항목의 UUID·부호 있는 금액·할부 정수·null은 SQL 원천 타입대로 옮긴다.
+     * @created 2026-10-30
+     * @usedBy JUnit
+     */
+    @Test
+    void statementItemTypesPreserveUnknownAndSignedValues() throws Exception {
+        UUID item = UUID.randomUUID();
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("itemId", item);
+        values.put("transactionId", null);
+        values.put("originalUsedAmountKRW", 600000L);
+        values.put("billedPrincipalKRW", null);
+        values.put("feeOrAdjustmentAmountKRW", -5000L);
+        values.put("billedAmountKRW", -10000L);
+        values.put("installmentMonths", 6);
+        values.put("installmentRound", 2);
+        ObjectNode result = map(values);
+        assertEquals(item.toString(), result.path("itemId").asString());
+        assertTrue(result.path("transactionId").isNull());
+        assertTrue(result.path("billedPrincipalKRW").isNull());
+        assertEquals(-5000L, result.path("feeOrAdjustmentAmountKRW").asLong());
+        assertEquals(-10000L, result.path("billedAmountKRW").asLong());
+        assertEquals(600000L, result.path("originalUsedAmountKRW").asLong());
+        assertEquals(6, result.path("installmentMonths").asInt());
+        assertEquals(2, result.path("installmentRound").asInt());
+        for (String key : List.of("originalUsedAmountKRW", "billedPrincipalKRW", "feeOrAdjustmentAmountKRW",
+                "billedAmountKRW", "installmentMonths", "installmentRound")) {
+            assertThrows(RuntimeException.class, () -> map(Map.of(key, "100")));
+            assertThrows(RuntimeException.class, () -> map(Map.of(key, new BigDecimal("1.5"))));
+        }
+        assertThrows(RuntimeException.class, () -> map(Map.of("itemId", "not-a-uuid")));
+    }
+
+    /**
      * 동일 JSONB 배열의 문자열·JsonNode·PostgreSQL PGobject 반환을 같은 공개 값으로 옮긴다.
      * @created 2026-10-29
      * @usedBy JUnit

@@ -816,10 +816,11 @@ class FinancialHttpTest {
      * 미지원 원천 형식을 v3로 위장하지 않고 서버 계산 필드 없이 실패한다.
      * @created 2026-10-29
      * @usedBy JUnit
+     * @modified 2026-10-30 - v4 지원 전환 후 미지원 버전 검사에 별도 비지원 형식을 사용
      */
     @Test
     void unsupportedSourceVersion() throws Exception {
-        admin.update("UPDATE payse.source_contexts SET schema_version='PAYSE-DRAFT-4' WHERE user_id=?", owner);
+        admin.update("UPDATE payse.source_contexts SET schema_version='PAYSE-DRAFT-UNSUPPORTED' WHERE user_id=?", owner);
         try { error(send("GET", "/snapshot", null), 503, "TEMPORARILY_UNAVAILABLE"); }
         finally { admin.update("UPDATE payse.source_contexts SET schema_version='PAYSE-DRAFT-3' WHERE user_id=?", owner); }
     }

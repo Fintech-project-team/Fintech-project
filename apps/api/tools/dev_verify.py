@@ -3,6 +3,7 @@
 운영/공유 DB에는 사용하지 않는다. 호출자는 직접 준비한 개발 DB와 loopback API인지 확인한다.
 fixture_dir에는 server-seeds.json과 snapshots/<initialCase>.json이 있어야 한다.
 코드 verifier 준비와 DB 원천 지문 비교는 호출자 책임이다. 이 모듈은 DB에 직접 접속하지 않는다.
+2026-10-30: salary_notices=True는 별도 검증 DB에서만 회차별 안내를 저장한다. 시연 DB에는 실행하지 않는다.
 """
 
 from __future__ import annotations
@@ -44,7 +45,10 @@ class _NoRedirect(HTTPRedirectHandler):
 
 @dataclass(repr=False)
 class _User:
-    """2026-10-29: 한 합성 계정의 검사 문맥을 메모리에만 둔다. 사용처: verify."""
+    """2026-10-29: 한 합성 계정의 검사 문맥을 메모리에만 둔다. 사용처: verify.
+
+    2026-10-30: 안내 기대 상태를 금융 원천과 분리해 재로그인·재시작 시 비교한다.
+    """
 
     seed: dict
     source: dict
@@ -54,13 +58,17 @@ class _User:
     current: dict | None = field(default=None, repr=False)
     before: dict | None = field(default=None, repr=False)
     facts: str | None = field(default=None, repr=False)
+    notices: dict[str, dict] = field(default_factory=dict, repr=False)
 
 
 class _Client:
     """2026-10-29: 외부 전달·응답 로깅 없는 loopback HTTP 클라이언트다. 사용처: verify."""
 
-    def __init__(self, base_url: str):
-        """2026-10-29: 직접 준비한 loopback 주소만 허용한다. 사용처: verify."""
+    def __init__(self, base_url: str, *, trusted_proxy: bool = False):
+        """2026-10-29: 직접 준비한 loopback 주소만 허용한다. 사용처: verify.
+
+        2026-10-30: 프록시 모드의 PC 내부 확인만 명시적으로 loopback 검사 IP를 전달한다.
+        """
         parsed = urlsplit(base_url)
         _require(parsed.scheme in {"http", "https"}
                  and parsed.hostname == "127.0.0.1"
@@ -70,6 +78,7 @@ class _Client:
         self.opener = build_opener(ProxyHandler({}), _NoRedirect())
         self.requests = 0
         self.auth_requests = 0
+        self.trusted_proxy = trusted_proxy
 
     def request(self, method: str, path: str, body: dict | None = None,
                 token: str | None = None) -> tuple[int, dict | None]:
@@ -80,6 +89,8 @@ class _Client:
             _require(self.auth_requests <= 30, "인증 검사 호출 상한")
         payload = None if body is None else json.dumps(body, ensure_ascii=False).encode("utf-8")
         headers = {"Content-Type": "application/json; charset=utf-8"}
+        if self.trusted_proxy:
+            headers['X-Payse-Client-IP'] = '127.0.0.1'
         if token is not None:
             headers["Authorization"] = "Bearer " + token
         request = Request(self.base + path, data=payload, headers=headers, method=method)
@@ -151,7 +162,7 @@ def _users(directory: Path) -> list[_User]:
             _require(isinstance(case, str) and re.fullmatch(r"[a-z0-9][a-z0-9-]*", case) is not None,
                      "초기 사례 경로")
             source = json.loads((directory / "snapshots" / (case + ".json")).read_text(encoding="utf-8"))
-            _require(source["userId"] == seed["userId"] and source["schemaVersion"] == "PAYSE-DRAFT-3",
+            _require(source["userId"] == seed["userId"] and source["schemaVersion"] in {"PAYSE-DRAFT-3", "PAYSE-DRAFT-4"},
                      "초기 사례 소유자와 형식")
             users.append(_User(seed=seed, source=source, code=code))
         return users
@@ -172,11 +183,22 @@ def _login(client: _Client, user: _User) -> None:
     user.session_id = body.get("sessionId")
 
 
+def _api_schema(user: _User) -> str:
+    """2026-10-30: 최초 적재 자료와 같은 공개 버전만 기대한다. 사용처: 조회·쓰기 검증."""
+    versions = {'PAYSE-DRAFT-3': 'PAYSE-API-0.6-3', 'PAYSE-DRAFT-4': 'PAYSE-API-0.6-4'}
+    version = user.source.get('schemaVersion')
+    _require(version in versions, '검증 원천 스키마')
+    return versions[version]
+
+
 def _snapshot(client: _Client, user: _User) -> dict:
-    """2026-10-29: 현재 세션의 v3 스냅샷을 확인한다. 사용처: 조회·쓰기 준비·원복."""
+    """2026-10-29: 현재 세션의 스냅샷을 확인한다. 사용처: 조회·쓰기 준비·원복.
+
+    2026-10-30: v3/v4를 원천 형식별로 검증하며 임의 버전 전환은 거절한다.
+    """
     result = _expect(client.request("GET", "/snapshot", token=user.token), 200, "스냅샷 조회")
     _require(result.get("userId") == user.seed["userId"]
-             and result.get("schemaVersion") == "PAYSE-API-0.6-3", "스냅샷 사용자와 버전")
+             and result.get("schemaVersion") == _api_schema(user), "스냅샷 사용자와 버전")
     _require(isinstance(result.get("dataVersion"), str) and result["dataVersion"].isdigit(), "자료 버전 형식")
     user.current = result
     return result
@@ -184,7 +206,10 @@ def _snapshot(client: _Client, user: _User) -> dict:
 
 def _write(client: _Client, user: _User, path: str, values: dict,
            method: str = "PATCH") -> tuple[dict, dict]:
-    """2026-10-29: 새 논리 작업의 최신 버전과 키로 저장한다. 사용처: 설정·검증 데이터·원복."""
+    """2026-10-29: 새 논리 작업의 최신 버전과 키로 저장한다. 사용처: 설정·검증 데이터·원복.
+
+    2026-10-30: 저장 후에도 최초 적재한 공개 스키마를 유지하는지 확인한다.
+    """
     snapshot = _snapshot(client, user)
     request = {"expectedDataVersion": snapshot["dataVersion"], "ruleVersion": snapshot["ruleVersion"],
                "idempotencyKey": str(uuid.uuid4()), **copy.deepcopy(values)}
@@ -193,7 +218,7 @@ def _write(client: _Client, user: _User, path: str, values: dict,
              "새 작업 영수증")
     _require(result["receipt"]["resultVersion"] == str(int(snapshot["dataVersion"]) + 1), "원자 자료 버전 증가")
     current = result["snapshot"]
-    _require(current["userId"] == user.seed["userId"] and current["schemaVersion"] == "PAYSE-API-0.6-3",
+    _require(current["userId"] == user.seed["userId"] and current["schemaVersion"] == _api_schema(user),
              "저장 응답 소유자와 형식")
     _require(current["sourceVersion"] == snapshot["sourceVersion"] and current["asOf"] == snapshot["asOf"],
              "저장 후 원천 버전과 시점 보존")
@@ -230,7 +255,10 @@ def _normalized(value):
 
 
 def _complete(client: _Client, user: _User) -> tuple[dict, list[dict], int]:
-    """2026-10-29: 후속 페이지를 모두 받고 fixture ID·금액·날짜를 대조한다. 사용처: 원천 보존 확인."""
+    """2026-10-29: 후속 페이지를 모두 받고 fixture ID·금액·날짜를 대조한다. 사용처: 원천 보존 확인.
+
+    2026-10-30: v4 청구 항목의 원천 금액·null·참조까지 같은 형식의 준비 자료와 비교한다.
+    """
     snapshot = _snapshot(client, user)
     seen = set()
     cursors = set()
@@ -251,7 +279,8 @@ def _complete(client: _Client, user: _User) -> tuple[dict, list[dict], int]:
         seen.update(ids)
         transactions.extend(rows)
         _require(page["dataVersion"] == snapshot["dataVersion"]
-                 and page["sourceVersion"] == snapshot["sourceVersion"], "페이지 버전 일관성")
+                 and page["sourceVersion"] == snapshot["sourceVersion"]
+                 and page["schemaVersion"] == snapshot["schemaVersion"], "페이지 버전 일관성")
         cursor = page["page"]["nextCursor"]
         if cursor is None:
             break
@@ -274,7 +303,18 @@ def _complete(client: _Client, user: _User) -> tuple[dict, list[dict], int]:
         original = _one(user.source["accounts"], lambda item: item["accountId"] == row["accountId"], "fixture 계좌 관계")
         _require(row["balanceKRW"] == original["balanceKRW"]
                  and _normalized(row["asOf"]) == _normalized(original["asOf"]), "fixture 잔액과 시점 보존")
-    _require(all("items" not in row for row in snapshot["statements"]), "v3 응답 청구 형식")
+    if _api_schema(user) == 'PAYSE-API-0.6-3':
+        _require(all("items" not in row for row in snapshot["statements"]), "v3 응답 청구 형식")
+    else:
+        for statement in snapshot['statements']:
+            original = _one(user.source['statements'],
+                lambda row: row['statementId'] == statement['statementId'], 'v4 청구 원천 관계')
+            expected_items = {item['itemId']: _normalized(item) for item in original['items']}
+            actual_items = {item['itemId']: _normalized(item) for item in statement['items']}
+            _require(len(actual_items) == len(statement['items']) and actual_items == expected_items,
+                     'v4 청구 항목 원천 보존')
+            references = sorted({item['transactionId'] for item in statement['items'] if item['transactionId'] is not None})
+            _require(sorted(statement['includedTransactionRefs']) == references, 'v4 청구 참조 파생')
     return snapshot, transactions, count
 
 
@@ -374,12 +414,119 @@ def _restore(client: _Client, user: _User, created: dict, account_id: str | None
     return notes
 
 
-def verify(base_url: str, fixture_dir: str | Path, restart_api_callback: Callable[[], None]) -> dict:
+def _notice_months(user: _User) -> tuple[str, str]:
+    """2026-10-30: 원천 회차와 연결 입금을 검증해 안내 대상과 독립 조회 월을 고른다. 사용처: _notice_checks."""
+    source = user.source
+    owner = user.seed["userId"]
+    _require(source["userId"] == owner, "안내 검사 원천 소유자")
+    salary = source["settings"]["salary"]
+    evidence = salary["receiptEvidence"]
+    months = [row["payMonth"] for row in evidence]
+    _require(len(set(months)) == len(months), "안내 검사 회차 유일성")
+    receipt = _one(evidence, lambda row: row["confirmation"] == "confirmed", "안내 검사 확인 회차 단일 근거")
+    month = receipt["payMonth"]
+    _require(isinstance(month, str) and re.fullmatch(r"[0-9]{4}-(?:0[1-9]|1[0-2])", month) is not None
+             and not month.startswith("0000"), "안내 검사 명목 회차 형식")
+    transaction_ids = receipt["transactionIds"]
+    _require(transaction_ids and len(set(transaction_ids)) == len(transaction_ids), "안내 검사 연결 입금 근거")
+    for transaction_id in transaction_ids:
+        transaction = _one(source["transactions"], lambda row: row["transactionId"] == transaction_id,
+                           "안내 검사 입금 관계")
+        _require(transaction["userId"] == owner and transaction["accountId"] == salary["salaryAccountId"]
+                 and transaction["recordKind"] == "account_entry" and transaction["direction"] == "in"
+                 and transaction["balanceReflected"] is True, "안내 검사 급여 계좌 입금 소유권")
+    # 기준 시각의 월은 독립 조회의 입력값일 뿐 급여 회차로 추정하거나 원천에 저장하지 않는다.
+    reference = datetime.fromisoformat(source["asOf"].replace("Z", "+00:00"))
+    _require(reference.tzinfo is not None, "안내 검사 기준 시각 오프셋")
+    other_month = source["asOf"][:7]
+    _require(other_month not in months, "안내 검사 근거 없는 별도 월")
+    return month, other_month
+
+
+def _notice(client: _Client, user: _User, month: str, *, dismiss: bool = False) -> dict:
+    """2026-10-30: 안내 API의 소유자·회차·표식·시각 계약을 확인한다. 사용처: 안내 저장·보존 검사."""
+    path = "/salary-notices/" + month + ("/dismissal" if dismiss else "")
+    result = _expect(client.request("PUT" if dismiss else "GET", path, token=user.token), 200, "급여 안내 요청")
+    _require(set(result) == {"contractVersion", "userId", "payMonth", "dismissed", "dismissedAt"}
+             and result["contractVersion"] == "PAYSE-SALARY-NOTICE-1"
+             and result["userId"] == user.seed["userId"] and result["payMonth"] == month
+             and type(result["dismissed"]) is bool, "급여 안내 응답 계약")
+    if result["dismissed"]:
+        value = result["dismissedAt"]
+        _require(isinstance(value, str), "급여 안내 최초 시각 형식")
+        try:
+            timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            raise VerificationError("급여 안내 최초 시각 형식") from None
+        _require(timestamp.tzinfo is not None, "급여 안내 최초 시각 오프셋")
+    else:
+        _require(result["dismissedAt"] is None, "미저장 안내 시각 없음")
+    return result
+
+
+def _notice_state(client: _Client, user: _User) -> None:
+    """2026-10-30: 저장한 안내와 미저장 회차의 기대 상태를 조회해 대조한다. 사용처: 재로그인·재시작 검사."""
+    for month, expected in user.notices.items():
+        _require(_notice(client, user, month) == expected, "급여 안내 기대 상태 보존")
+
+
+def _notice_checks(client: _Client, user: _User, other: _User) -> None:
+    """2026-10-30: 별도 검증 DB의 안내 저장·멱등성·회차/사용자 독립·금융 불변을 검사한다. 사용처: verify."""
+    month, other_month = _notice_months(user)
+    before = _stored_state(_snapshot(client, user))
+    other_before = _stored_state(_snapshot(client, other))
+    for subject, candidate in ((user, month), (user, other_month), (other, month)):
+        initial = _notice(client, subject, candidate)
+        _require(initial["dismissed"] is False, "신규 검증 DB 안내 미저장")
+        subject.notices[candidate] = initial
+    saved = _notice(client, user, month, dismiss=True)
+    _require(saved["dismissed"] is True, "급여 안내 닫기 저장")
+    user.notices[month] = saved
+    _require(_notice(client, user, month, dismiss=True) == saved, "급여 안내 중복 요청 최초 시각 보존")
+    _notice_state(client, user)
+    _notice_state(client, other)
+    _require(_stored_state(_snapshot(client, user)) == before
+             and _stored_state(_snapshot(client, other)) == other_before, "급여 안내 저장 후 금융 Snapshot 불변")
+
+
+def smoke(base_url: str, fixture_dir: str | Path, *, trusted_proxy: bool = False) -> dict:
+    """2026-10-30: 시연 DB에서 로그인·원천 조회·미저장 안내·로그아웃만 확인한다. 금융·안내 쓰기는 하지 않는다."""
+    client = _Client(base_url, trusted_proxy=trusted_proxy)
+    users = _users(Path(fixture_dir))
+    pages = []
+    try:
+        for user in users:
+            _login(client, user)
+            snapshot, transactions, count = _complete(client, user)
+            for receipt in user.source['settings']['salary']['receiptEvidence']:
+                _require(_notice(client, user, receipt['payMonth'])['dismissed'] is False,
+                         '시연 급여 안내 초기 상태')
+            pages.append({'case': user.seed['initialCase'], 'schema': snapshot['schemaVersion'],
+                          'transactions': len(transactions), 'pages': count})
+    finally:
+        logout_failed = False
+        for user in users:
+            if user.token:
+                try:
+                    _expect(client.request('DELETE', '/demo-sessions/current', token=user.token), 204, '시연 검사 로그아웃')
+                except VerificationError:
+                    logout_failed = True
+                finally:
+                    user.token = None
+        _require(not logout_failed, '시연 검사 로그아웃')
+    return {'status': 'PASS', 'checks': ['three_logins', 'source_pages', 'notice_initial_state', 'three_logouts'],
+            'pages': pages, 'requests': client.requests, 'financialWrites': 0, 'noticeWrites': 0}
+
+
+def verify(base_url: str, fixture_dir: str | Path, restart_api_callback: Callable[[], None],
+           *, salary_notices: bool = False) -> dict:
     """2026-10-29: 실제 개발 API의 계약·재로그인·재시작 보존을 검증한다. 사용처: 로컬 서버 준비 실행기.
 
     callback은 같은 URL·DB·키로 API만 재시작하고 준비 완료 뒤 반환해야 한다.
     응답·토큰·자격은 파일이나 로그에 남기지 않는다. 정상 경로 인증 API 호출은 총 15회다.
     결과에는 검사 이름·건수·검증용 생성 자원 ID·원복 상태만 포함한다.
+    2026-10-30: 명시 활성화한 검증 DB에서 안내 저장·격리·재시작·재로그인 보존을 함께 검사한다.
+    안내 기록은 삭제하지 않으므로 salary_notices=True는 시연 DB에 사용하지 않는다.
     """
     client = _Client(base_url)
     users = _users(Path(fixture_dir))
@@ -411,7 +558,14 @@ def verify(base_url: str, fixture_dir: str | Path, restart_api_callback: Callabl
             user.before = copy.deepcopy(snapshot)
             user.facts = _facts(snapshot, transactions)
             report["pages"].append({"case": user.seed["initialCase"], "transactions": len(transactions), "pages": pages})
-        report["checks"].extend(["three_logins", "single_active_session", "reverify", "institution_links", "v3_pages"])
+        report["checks"].extend(["three_logins", "single_active_session", "reverify", "institution_links",
+                                 "v4_pages_items" if _api_schema(main) == 'PAYSE-API-0.6-4' else "v3_pages"])
+
+        if salary_notices:
+            _notice_checks(client, main, other)
+            report["checks"].extend(["salary_notice_read_write", "salary_notice_idempotency",
+                                     "salary_notice_month_user_isolation", "salary_notice_financial_unchanged"])
+            report["salaryNoticeRecordsRetained"] = True
 
         account_id = _main_account(main, main.before)["accountId"]
         card = _one(main.before["cards"], lambda row: row["cardType"] == "debit", "체크카드 단일 준비 관계")
@@ -502,6 +656,10 @@ def verify(base_url: str, fixture_dir: str | Path, restart_api_callback: Callabl
         restart_api_callback()
         restored = _snapshot(client, main)
         _require(_stored_state(restored) == _stored_state(persisted), "API 재시작 후 세션과 저장 상태 보존")
+        if salary_notices:
+            for user in users:
+                _notice_state(client, user)
+            report["checks"].append("salary_notice_api_restart")
         _expect(client.request("GET", "/transactions?cursor=" + quote(cursor, safe=""), token=main.token),
                 200, "API 재시작 후 cursor 유지")
         replay = _expect(client.request("PATCH", path, replay_request, main.token), 200, "재시작 뒤 동일 작업 재시도")
@@ -512,12 +670,19 @@ def verify(base_url: str, fixture_dir: str | Path, restart_api_callback: Callabl
         _expect(client.request("DELETE", "/demo-sessions/current", token=old_token), 204, "재로그인 전 종료")
         main.token = None
         _expect(client.request("GET", "/snapshot", token=old_token), 401, "종료된 토큰 거절", "SESSION_INVALID")
+        if salary_notices:
+            for month in main.notices:
+                _expect(client.request("GET", "/salary-notices/" + month, token=old_token),
+                        401, "종료된 토큰 급여 안내 거절", "SESSION_INVALID")
         _login(client, main)
         _require(main.token != old_token, "재로그인 토큰 교체")
         old_token = None
         _expect(client.request("GET", "/transactions?cursor=" + quote(cursor, safe=""), token=main.token),
                 403, "이전 세션 cursor 거절", "RESOURCE_FORBIDDEN")
         _require(_stored_state(_snapshot(client, main)) == _stored_state(persisted), "재로그인 후 저장 상태 보존")
+        if salary_notices:
+            _notice_state(client, main)
+            report["checks"].extend(["salary_notice_relogin", "salary_notice_ended_session_401"])
         report["checks"].extend(["api_restart_persistence", "restart_session_cursor", "restart_idempotency", "logout_relogin"])
     except Exception as error:
         failure = str(error) if isinstance(error, VerificationError) else "PAYSE 개발 API 검증 실패: 실행 단계"

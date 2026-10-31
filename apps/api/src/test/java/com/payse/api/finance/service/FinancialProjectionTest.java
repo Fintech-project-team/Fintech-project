@@ -263,12 +263,13 @@ class FinancialProjectionTest {
     }
 
     /**
-     * v4 원천을 v3라고 조용히 표시하거나 새 청구 항목을 구 응답으로 전달하지 않는다.
+     * 청구 항목이 없는 v3 자료의 이름만 v4로 바꿔 정상 원천으로 통과시키지 않는다.
      * @created 2026-10-29
      * @usedBy JUnit
+     * @modified 2026-10-30 - v4 지원 이후에도 필수 청구 항목 없는 버전 재표시를 거절
      */
     @Test
-    void v4RequiresSeparateActivation() throws Exception {
+    void v4RequiresBillingItems() throws Exception {
         ObjectNode source = source("demo-ready");
         source.put("schemaVersion", "PAYSE-DRAFT-4");
         assertUnavailable(() -> projection.project(source, codes(source), "1", null, false));

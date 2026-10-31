@@ -242,7 +242,7 @@ class DevServerTests(unittest.TestCase):
                 patch.object(DEV, 'port_free'), patch.object(DEV, 'run') as run, \
                 self.assertRaises(ValueError):
             DEV.DevServer(self.home).init(binaries, 15432, 18080, demo_state=True)
-        prepare.assert_called_once_with(DEV.API / 'fixtures/generated', demo_state=True)
+        prepare.assert_called_once_with(DEV.API / 'fixtures/generated-v4', demo_state=True)
         run.assert_not_called()
         self.assertFalse(self.home.exists())
 
@@ -268,6 +268,50 @@ class DevServerTests(unittest.TestCase):
             DEV.DevServer(self.home).init(self.root, 15432, 18080, demo_state=True)
         prepare.assert_not_called()
         run.assert_not_called()
+
+    def test_profiles_preserve_legacy_environment(self):
+        """2026-10-30: 표식 없는 구 DB를 이행하거나 급여 안내를 강제하지 않는다. 사용: unittest."""
+        server = DEV.DevServer(self.home)
+        server.state = {}
+        self.assertEqual('database,auth,finance', server.profiles())
+        server.state['features'] = ['salary-notices']
+        self.assertEqual('database,auth,finance,salary-notices', server.profiles())
+
+    def test_unrecognized_feature_is_rejected(self):
+        """2026-10-30: 손상된 준비 표식으로 임의 Spring 프로필을 활성화하지 못한다. 사용: unittest."""
+        server = DEV.DevServer(self.home)
+        for features in (None, 'salary-notices', ['other'], ['salary-notices', 'salary-notices'], [{}]):
+            server.state = {'features': features}
+            with self.subTest(features=features), self.assertRaises(ValueError):
+                server.profiles()
+
+    def test_restart_fingerprint_includes_prepared_notice_only(self):
+        """2026-10-30: 새 DB의 안내 보존을 검사하고 구 DB에는 없는 테이블을 읽지 않는다. 사용: unittest."""
+        server = DEV.DevServer(self.home)
+        for features in ([], ['salary-notices']):
+            server.state = {'features': features}
+            with patch.object(server, 'sql', return_value='{}') as sql:
+                server.stored_fingerprint()
+                queried = [call.args[0] for call in sql.call_args_list]
+                self.assertEqual(bool(features), any('salary_notice_dismissals' in query for query in queried))
+
+    def test_fixture_version_never_relabels_existing_data(self):
+        """2026-10-30: 표식 없는 구환경은 v3, 명시 신규 환경은 v4이며 알 수 없는 버전은 거절한다. 사용: unittest."""
+        server = DEV.DevServer(self.home)
+        server.state = {}
+        self.assertEqual(DEV.API / 'fixtures/generated', server.fixtures())
+        server.state['fixtureSchema'] = 'v4'
+        self.assertEqual(DEV.API / 'fixtures/generated-v4', server.fixtures())
+        server.state['fixtureSchema'] = 'v5'
+        with self.assertRaises(ValueError):
+            server.fixtures()
+
+    def test_preparation_options_do_not_change_existing_server(self):
+        """2026-10-30: 형식·프록시 모드 변경은 새 init에만 허용한다. 사용: unittest."""
+        for option, value in (('--fixture-schema', 'v4'), ('--peer-mode', 'loopback-proxy')):
+            for command in ('start', 'restart', 'verify', 'stop'):
+                with self.subTest(option=option, command=command), redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                    DEV.parse_args([command, option, value])
 
 
 if __name__ == '__main__':

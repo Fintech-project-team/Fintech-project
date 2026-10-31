@@ -75,7 +75,7 @@ Spring의 `database` 프로필에서만 Repository·Transactions 두 bean을 등
 | `auth_open_session(userId,digest)` | 활성 계정·활성 세션 부재를 재검사하고 저장된 사용자/세션/이름/발급 시각을 반환. 기존 세션은 종료하지 않는다.                      |
 | `auth_end_session(digest)`         | 기존 authorize로 사용자·세션을 잠금 재확인한 후 현재 세션의 ended_at만 저장하고 사용자 문맥을 비움. 무효 토큰은 false.            |
 
-`AuthService`와 인증 HTTP는 `database`와 `auth` 프로필이 모두 있을 때 등록된다. DB·auth 비밀 설정 외에 `PAYSE_AUTH_PEER_MODE=direct`와 `server.forward-headers-strategy=none`을 요구한다. 기본 바인딩은 127.0.0.1이며 명시한 세 인증 경로만 허용한다. Forwarded/X-Forwarded-For/X-Real-IP를 신뢰하지 않는다. 신뢰 프록시·외부 HTTPS 배포는 후속 운영 설정이다. 기존 DISABLED 시드를 자동 활성화하거나 새 사용자·금융 자료를 생성하지 않는다.
+`AuthService`와 인증 HTTP는 `database`와 `auth` 프로필이 모두 있을 때 등록된다. DB·auth 비밀 설정 외에 명시한 `PAYSE_AUTH_PEER_MODE`와 `server.forward-headers-strategy=none`을 요구한다. 기본 바인딩은 127.0.0.1이며 명시한 세 인증 경로만 허용한다. `direct`는 Forwarded/X-Forwarded-For/X-Real-IP 및 전용 헤더를 무시한다. `loopback-proxy`는 서버 바인딩 127.0.0.1·실제 loopback 연결에서만 단일 숫자 `X-Payse-Client-IP`를 받는다. 프록시는 외부 전용 헤더를 실제 접속 IP로 덮어쓴다. 누락·위조·중복·hostname·port 값은 fallback 없이 거절한다. 구체 TLS·기기 등록은 [Android HTTPS](../deploy/android-https.md)를 따른다. 기존 DISABLED 시드를 자동 활성화하거나 새 사용자·금융 자료를 생성하지 않는다.
 
 - `login`: IP 기록을 먼저 커밋·연결 반환 → 입력 검증 → 조합 잠금·차단 확인 → 사용자 잠금·현재 코드 대조 → 세션 생성. 이름과 issuedAt은 DB 저장 결과이며 토큰은 커밋이 성공한 뒤에만 반환한다.
 - `reverify`: IP 기록 커밋 → 별도 트랜잭션에서 토큰 유효성 확인·잠금 반환 → 본문 검증 → 조합 제한 → 최종 토큰/계정 재검증·자격 대조 순서다. IP 제한은 429, 저장소 오류는 503으로 유지하며, IP 제한에 걸리지 않은 무효 토큰은 본문보다 우선하여 401 SESSION_INVALID로 거절한다. 사전 사용자 잠금을 보유한 채 조합 잠금을 기다리지 않는다. 최종 대조는 토큰 소유자만 잠그고 다른 사용자를 추가로 잠그지 않는다. 실패 시 기존 세션 유지, 성공 시 새 토큰·세션 없음은 그대로다.

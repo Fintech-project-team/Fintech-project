@@ -2,7 +2,7 @@
 
 [기준·범위](../apps/api/docs/v0.6/README.md) · [응답](api-response-models.md) · [인계·검증](../apps/api/docs/v0.6/review-checklist.md). 경로는 배포 prefix를 제외한 상대 경로다. HTTPS, UTF-8 JSON, `Authorization: Bearer <opaque-token>`, 인증·금융 응답 `Cache-Control: no-store`를 사용한다.
 
-실행 Java는 `database,auth` 프로필에서 세션 생성·종료·재확인을 제공하고, `finance`를 함께 활성화하면 아래 §3·§4의 금융 조회·연결·설정 저장을 제공한다. 금융 공개 응답은 v3다. v4 공개 전환은 Flutter 공동 검증 후 진행하며 탈퇴·LLM HTTP는 이 구현에 포함하지 않는다. [인증 구현](../apps/api/docs/history/2026-10-28-auth-http-handoff.md)과 [금융 API 인계](../apps/api/docs/history/2026-10-29-financial-api-handoff.md)에서 실행 조건·검증 범위를 확인한다.
+실행 Java는 `database,auth` 프로필에서 세션 생성·종료·재확인을 제공하고, `finance`를 함께 활성화하면 아래 §3·§4의 금융 조회·연결·설정 저장을 제공한다. 신규 시연 서버는 v4 원천을 v4로 제공하며 기존 v3 원천은 v3로 유지한다. v4 청구 항목은 상세 정보이며 홈 계산의 청구 의무에 추가 합산하지 않는다. 탈퇴·LLM HTTP는 이 구현에 포함하지 않는다. [서버 준비 인계](../apps/api/docs/history/2026-10-30-android-server-handoff.md)에서 실제 실행·미검증 범위를 확인한다.
 
 ## 1. 공통 타입·검증
 
