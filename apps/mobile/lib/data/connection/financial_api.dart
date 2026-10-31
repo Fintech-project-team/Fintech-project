@@ -201,6 +201,13 @@ abstract interface class UserFinancialRepository {
     WriteContext write,
   );
 
+  /// 2026-10-30: GET /transactions?cursor. Snapshot(첫 페이지)의 page.nextCursor로 다음 TransactionPage JSON을 반환한다.
+  /// 자료 버전이 바뀌었으면 [FinancialStaleData](409), 변조 cursor는 [FinancialInvalid](400), 다른 세션의 cursor는
+  /// [FinancialForbidden](403)이다.
+  Future<FinancialOutcome<Map<String, Object?>>> loadTransactionPage(
+    String cursor,
+  );
+
   /// 2026-10-22: 세션이 끝났음을 알린다. 이후 요청과 진행 중 요청의 늦은 응답을 반영하지 않는다.
   void close();
 }
@@ -242,6 +249,12 @@ class UnavailableUserFinancialRepository implements UserFinancialRepository {
     String accountId,
     String? nickname,
     WriteContext write,
+  ) async => const FinancialUnavailable();
+
+  /// 2026-10-30: 조회하지 않고 서비스 불가를 반환한다.
+  @override
+  Future<FinancialOutcome<Map<String, Object?>>> loadTransactionPage(
+    String cursor,
   ) async => const FinancialUnavailable();
 
   /// 2026-10-22: 상태가 없으므로 할 일이 없다.
