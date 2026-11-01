@@ -1,6 +1,6 @@
 # PAYSE 거래·반복 의미 해석 계약
 
-상태: **분석 전용 계약과 공유 Java 실행 모듈. 실제 분석 HTTP/DB·Flutter 연동은 미완료**. [AI 구조·검사](../../ai/docs/README.md)를 함께 따른다. 금융 Snapshot v4와 원천·설정은 변경하지 않는다. 의미 입력/출력, 평가 또는 Flutter 분석 연동을 개발할 때 이 문서와 [분석 API](analysis-api.md), [실행 상세](llm-execution.md)를 필수 참조한다.
+상태: **분석 전용 계약·공유 Java 모듈·API/DB 연결 및 모의 공급자 검증 완료, Flutter 연동 미검증**. 기본 운영 runtime은 실제 공급자/KMS 전송을 열지 않는다. [AI 구조·검사](../../ai/docs/README.md)를 함께 따른다. 금융 Snapshot v4와 원천·설정은 변경하지 않는다. 의미 입력/출력, 평가 또는 Flutter 분석 연동을 개발할 때 이 문서와 [분석 API](analysis-api.md), [실행 상세](llm-execution.md)를 필수 참조한다.
 
 ## 기준의 범위
 
@@ -40,16 +40,16 @@
 - 반복 suggestedAmountKRW/suggestedDay는 기존 후보를 보존하지만 모델 투영에서 제외한다. 원화 상한은 기존 Money 규칙이다. 모델은 이름을 제안할 수 있으나 금액·날짜·승인·새 후보 ID를 만들 수 없다.
 - 응답 순서는 의미가 없다. itemKey 집합이 정확히 일치해야 하며 누락·중복·허용 밖 ID·필드를 거절한다. 두 종류 모두 형식상 정상 unknown과 통신 실패를 구분한다. 표시 이유는 240자, 반복 이름은 80자 이내의 계약 작성값이며 실제 품질/토큰은 미측정이다.
 
-모델의 confidence 숫자를 정답 확률이나 자동 승인 조건으로 사용하지 않는다. 메모리 중요보존/참조 지정은 기존 정책을 유지하되 해당 메타데이터 DTO·프롬프트는 후속 작업이다. 현재 의미 출력에는 임의 보존 플래그를 추가하지 않는다.
+모델의 confidence 숫자를 정답 확률이나 자동 승인 조건으로 사용하지 않는다. 메모리 중요보존/참조 지정은 같은 공급자 응답의 내부 `{output, memories}` 봉투로 받는다. `output`은 기존 의미 출력 그대로이며, `memories`는 입력 itemKey별 `active`, `isReference`, `important`, `referencePolicy`, `reason`을 가진다. 누락·중복·허용 밖 itemKey 및 important=true/isReference=false를 거절한다. 출력 의미 항목에 플래그를 끼워 넣거나 별도 메타데이터용 모델 호출을 추가하지 않는다. 구조·지침은 `StorageContract`를 따른다. 실제 보존은 API의 사용자·근거·삭제 차단 검증 이후다.
 
 ## Flutter 전달·재사용 경계
 
-모델의 raw 출력은 그대로 공개하지 않는다. 실제 서비스는 검증 후 기억별 암호화 저장에 성공한 결과를 [분석 API](analysis-api.md)의 상태/사용 가능 범위와 함께 전달해야 한다. 이 순서의 HTTP·저장 구현은 아직 없다. 어댑터와 오프라인 계약 검사 통과가 해당 구현의 완료를 뜻하지 않는다.
+모델의 raw 출력은 그대로 공개하지 않는다. 실제 서비스는 검증 후 기억별 암호화 저장에 성공한 결과를 [분석 API](analysis-api.md)의 상태/사용 가능 범위와 함께 전달해야 한다. 이 순서의 HTTP·저장 연결을 추가했으며 실제 DB·HTTP 검사는 별도로 실행한다. 오프라인/모의 공급자 통과는 실제 LLM 정확도·KMS 운영·모바일 통합의 완료를 뜻하지 않는다.
 
-- 작업 상태와 resultAvailability, 현재 응답 context와 최초 분석 provenance를 분리한다. 원래 sourceVersion/asOf를 현재 값으로 덮어 쓰지 않는다. Flutter는 세션 epoch·revision·현재 입력·권한에 맞는 결과만 사용한다.
+- 작업 상태와 resultAvailability, 현재 응답 context와 최초 분석 provenance를 분리한다. 원래 sourceVersion/asOf를 현재 값으로 덮어 쓰지 않는다. 최초 화면의 선택 계좌·epoch/revision은 공개 provenance에 포함하지 않는다. Flutter는 세션 epoch·revision·현재 입력·권한에 맞는 결과만 사용한다.
 - 기본 분류와 세부 의미는 독립 표시 후보다. 금액·급여 확인·청구 의무·계획을 자동 변경하지 않는다. 후보 이름·설명은 식별자나 실행 명령으로 쓰지 않는다.
 - 재사용 지문은 의미 작업·관련 원천/관계·관련 분류·로컬 특징·정책/모델/프롬프트/응답 버전에 의존한다. 전체 dataVersion 상승만으로 유효 결과를 일괄 폐기하지 않는다. 현재 권한/원천은 매번 재검증한다.
-- 양쪽 정규 직렬화·동일 기억 지문, 개별 기억 응답 DTO, 삭제된 기억의 부분 응답은 아직 구현 전이다. 임의 SHA 문자열/JSON key 순서로 공개 계약을 확정하지 않는다. 평가의 UUID는 테스트 식별일 뿐 재사용 지문이 아니다.
+- 정규 JSON·UTF-8 SHA-256의 기억/근거 지문과 개별 기억 응답은 [분석 API](analysis-api.md#21-입력-지문기억-식별)를 따른다. itemKey·epoch/revision·전체 dataVersion·조회 시각은 동일 기억 식별을 바꾸지 않고, 모델/프롬프트 버전은 캐시 자격에만 반영한다. 모든 항목이 불가하면 최상위 missing과 개별 실제 사유를 반환한다. B는 공개 최소 입력의 inputHashHint를 재현하며 서버의 실제 DB 결합 지문은 제출하지 않는다. 서버는 관련 금액·날짜 변경도 캐시/삭제 근거에 반영하지만 모델 입력 필드를 늘리지 않는다. B의 같은 직렬화·응답 파서는 아직 공동 실행 검증 전이다.
 - B는 Snapshot+전체 거래 페이지의 버전·asOf·coverage·관계·제한 정보를 유지하고 첫 Snapshot/후속 페이지의 같은 ID·다른 원천을 거절해야 한다. `nextCursor=null`만으로 완전 자료라고 간주하지 않는다.
 
 읽기 검사에서 확인한 B 보완 대상: [financial_snapshot.dart](../../mobile/lib/data/financial_snapshot.dart)의 nullable merchantName·관계/coverage 보존·enum 검사와 [transaction_history.dart](../../mobile/lib/data/connection/transaction_history.dart)의 첫 Snapshot 중복 대조. 실제 수정·Dart 입력 생성/응답 parser 테스트는 B 담당이다. 현재 반복 features 생성기도 미구현이다.
@@ -69,3 +69,11 @@
 오프라인 도구의 성공은 실제 API·LLM의 정확도 향상 근거가 아니다. 현재 채점 계층은 분석 후보이며, 기존 저장 분류와 후보를 합친 최종 PAYSE 판단 어댑터는 미구현이다. 유효 unknown 결과의 재사용은 처리 완료/실패 구분을 유지하고 기존 분류를 삭제하지 않는다. 입력 압축·개별 결과 사전 검사는 금융 응답 v4·DB·모바일을 변경하지 않으며 운영 권한 검증을 대신하지 않는다.
 
 근거: [OpenAI 평가 지침](https://developers.openai.com/api/docs/guides/evaluation-best-practices)은 업무별 평가·반례·사람 검토, [구조화 출력](https://developers.openai.com/api/docs/guides/structured-outputs)은 형식 준수와 내용 오류의 구분, [최적화 절차](https://developers.openai.com/api/docs/guides/model-optimization)는 기준 평가 후 개선의 참고다. [Plaid 분류 이행 안내](https://plaid.com/docs/transactions/pfc-migration/)는 입금/대출/이체 등 세분류와 버전 분리의 시장 사례이며 PAYSE 코드·한국어 기준·정확도를 검증하는 자료는 아니다.
+
+## API 원천 대조와 지원 경계
+
+`AnalysisEvidence`는 인증된 `FinancialRepository.load` 결과의 전체 거래에서 원천 8개 필드·현재 분류·명시 관계·활성 금융사 연결을 대조한다. 첫100건에 없다는 이유로 존재하지 않는 거래나 미확보 원거래로 취급하지 않는다. 기존 비null 분류와 관련 명시 관계를 빼서 판정 충돌 검사를 우회하지 못한다. 평가용 `verified=true`는 요청·권한·원천 사실의 증명이 아니다.
+
+공개되지 않은 원거래 ID를 unavailableReferences로 복원하거나 생략을 null로 바꾸지 않는다. 미확보 사유만으로 소유·기관 공개 권한을 인정하지 않는다. 현재 DB의 referenceResolutions는 ID·상태·사유만 제공하므로 실제 미확보 원거래를 포함한 입력은 기존 금융 API와 동일하게 503 TEMPORARILY_UNAVAILABLE로 거절한다. 검증 가능한 원천 관계의 권한 근거를 확보한 뒤 해당 경로를 지원해야 하며, 클라이언트의 표식만으로 허용하지 않는다. 미연결 원거래도 현 입력 규격으로 복원하지 않는다. 이 제한을 이유로 금융 원천·계산 규칙을 변경하지 않으며 서버는 로컬 후보 수치를 다시 계산하지 않는다.
+
+현재 금융 페이지 구현의 미확보 원거래 공개/제한 표식과 B의 분석 입력 생성은 별도 호환 확인 대상이다. 이 검증기를 추가한 사실만으로 모든 미확보 사례의 모바일→API 흐름이 완성됐다고 보고하지 않는다.
