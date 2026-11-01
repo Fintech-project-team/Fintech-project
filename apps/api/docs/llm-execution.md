@@ -177,6 +177,12 @@ Jev는 **도입 미확정 후보**다. 공식 공급자 TypeSafe의 문서를 �
 
 ## 구현·검증 시 확인
 
+### 연결 전 구현된 기반
+
+`analysis/service/MemoryPolicy`는 달력3개월·중요보존 예외·탈퇴 후1년과 현재 참조 자격을 구분하는 내부 정책이다. `analysis/crypto/EnvelopeCipher`는 기억마다 독립 256비트 키와 96비트 nonce를 생성하여 JCA `AES/GCM/NoPadding`·128비트 인증 태그로 암호화한다. 알고리즘 형식 버전과 사용자·기억 UUID를 AAD에 바인딩하며, 데이터 키는 `KeyProtector`를 통해 외부에서 감싸도록 분리한다. [JCA Cipher](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/javax/crypto/Cipher.html)의 인증 암호를 사용하며 자체 암호 알고리즘을 만들지 않는다.
+
+두 기반은 아직 Spring 실행 경로·HTTP·DB에 연결되지 않았다. 운영 KMS 구현·활성화도 미완료다. 테스트의 메모리 키 대역은 `src/test`에만 있고 운영 대체 키로 사용할 수 없다. 단위 검사의 성공은 KMS 연동·DB 암호화 저장·백업 파쇄 완료가 아니다. 생성한 임시 키 배열은 사용 후 지우되 Java 런타임·암호 제공자 내부의 모든 메모리 사본 파쇄까지 보장한다고 해석하지 않는다. 폐기 대상 판정과 실제 비가역 파쇄 완료는 계속 구분한다.
+
 공개 계약은 기존 데이터 모델·HTTP·응답 모델에서 A 작성/B 영향 확인으로 확정한다. 기존 키·테이블을 분석 큐로 전용하거나 sourceVersion/v3 필드를 임의 추가하지 않는다. 누락 금융 원천의 임의 생성과 사용자 금융 금액 산출은 서버 구현 범위가 아니다. 서버의 원천 조회·공개·Snapshot 조립 책임은 유지한다.
 
 현재 미구현·문서 충돌·fixture 기준 및 **AT01~AT22는 [공통 계약](../../../docs/payse-execution-contract.md#공통-반례인수-조건)에 남아 있다**. API 입력/출력·권한·중복·예약·timeout·세션 무효화 테스트에는 해당 AT와 G0~G7을 필수 대조한다. Dart 계산·화면 검증은 B 담당이며 API 문서나 하네스 PASS로 대체하지 않는다.

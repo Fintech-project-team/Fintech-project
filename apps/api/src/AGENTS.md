@@ -42,3 +42,5 @@
 예시는 형식만 참고하고 실제 날짜·호출자를 적는다. [초기화 안내](../docs/spring-bootstrap.md), [데이터 계약](../../../docs/data-contracts.md), [필드별 명세](../docs/data-model-draft.md), [DB 설계](../docs/database-design.md), [상태 수명](../../../docs/app-architecture.md)을 함께 따른다.
 
 24. 사용자 기본 정보는 users, 타입이 정해진 사용자 속성은 user_attributes, 금융 소유권은 동일 users.id를 사용한다. 테스트를 위해 전용 사용자/금융 테이블·컬럼·서비스 분기를 추가하지 않는다. 승인된 demo_sessions와 /demo-sessions는 유지한다. 기관 기준정보는 reference_data를 읽고, 검증 사례의 설정·이력은 testing/scenarios 도구에서 명시 선택한다. 기본 금융 적재에 시나리오 설정을 몰래 포함하지 않는다.
+
+25. Java 파일 추가·이동 시 [Java 패키지 배치](../docs/spring-bootstrap.md#java-패키지)를 먼저 확인한다. 기능 안에서 controller/service/mapper를 기본으로 구분하고, 전달 DTO·값 VO·JPA entity를 용도별로 분리한다. mapper는 기존 JPA 저장 계층이며 MyBatis 도입을 뜻하지 않는다. 내부 전용 보조 타입은 불필요하게 공개하지 않고 테스트도 대상 패키지에 둔다. 패키지 이동은 import·엔티티 스캔·검사/문서 참조까지 함께 검증하며 공개 API·SQL·빈 이름을 바꾸지 않는다.

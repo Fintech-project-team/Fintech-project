@@ -4,10 +4,20 @@ spring:
   autoconfigure:
     exclude:
       - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
+      - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
       - org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+  jpa:
+    open-in-view: false
   sql:
     init:
       mode: never
+logging:
+  level:
+    org.hibernate.SQL: 'OFF'
+    org.hibernate.orm.jdbc.bind: 'OFF'
+    org.hibernate.orm.jdbc.extract: 'OFF'
+    org.hibernate.orm.jdbc.error: 'OFF'
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: 'OFF'
 server:
   forward-headers-strategy: none
   address: ${PAYSE_BIND_ADDRESS:127.0.0.1}

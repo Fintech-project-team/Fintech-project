@@ -27,6 +27,7 @@
 
 - `recurring_decisions.plan_id`는 월간 승인으로 등록된 계획을 참조한다.
 - 급여 입금 근거는 원천 사실이므로 `source_contexts.salary_evidence`에 저장하고 응답에서 salary.receiptEvidence로 조립한다.
+- 급여 안내 닫기는 원천과 분리된 `salary_notice_dismissals`에 사용자+payMonth별로 저장한다. 초기 001의 테이블 수와 별개인 009 후속 DDL이며 컬럼·권한·적용 기준은 [급여 안내 저장](../apps/api/docs/salary-notices.md#db와-코드)을 따른다.
 - `balanceReflected`는 reflection_reason에서 파생한다. 둘을 독립 저장하여 상충시키지 않는다.
 - recurrenceKey는 plan ID + `:` + 명목 YYYY-MM이다. DB는 plan_id/occurrence_month를 분리한다. 날짜 보정이 키를 바꾸지 않는다.
 - 이미 저장된 회차는 obligations, 아직 의무로 저장하지 않은 확정 편집은 occurrence_overrides다. 같은 회차가 양쪽에 있으면 거절한다. 승격 시 같은 트랜잭션에서 override를 제거하고 의무를 만든다.
@@ -225,32 +226,32 @@ ID/소유키는 기존 명세의 UUID다. `payse.money`는 음수 허용, `nonne
 
 기장/구매/환불/취소 사실과 별도 PAYSE 분류.
 
-| 컬럼                    | 타입                    | 필수   | 설정 근거                                                               |
-| ----------------------- | ----------------------- | ------ | ----------------------------------------------------------------------- |
-| id                      | uuid                    | 예     | 안정된 내부 식별자; 원천 버전·날짜 변경에도 유지                        |
-| user_id                 | uuid                    | 예     | 인증 세션에서 정한 소유자; 다른 사용자 참조 차단                        |
-| source_ref              | text                    | 예     | 객체별 이름 공간을 가진 원천 키                                         |
-| source_version          | text                    | 예     | 같은 사용자 현재 원천 묶음에 속함                                       |
-| account_id              | uuid                    | 아니오 | 기장 계좌; 카드 전용 기록은 null                                        |
-| card_id                 | uuid                    | 아니오 | 관련 카드; 계좌 전용 기록은 null                                        |
-| record_kind             | text                    | 예     | 원천 사건 종류                                                          |
-| amount_krw              | payse.nonnegative_money | 예     | 거래 크기; 방향과 분리                                                  |
-| direction               | text                    | 예     | in/out; 카드 out이 현금 출금이라는 뜻 아님                              |
-| status                  | text                    | 예     | approved/posted/cancelled/unknown                                       |
-| merchant_name           | text                    | 아니오 | 원천 거래처                                                             |
-| description             | text                    | 아니오 | 원천 설명                                                               |
-| purchase_date           | date                    | 아니오 | 확인된 이용일                                                           |
-| withdrawal_date         | date                    | 아니오 | 확인된 계좌 출금일; 입금일 전용 금지                                    |
-| refund_date             | date                    | 아니오 | 확인된 환불 반영일                                                      |
-| cancellation_date       | date                    | 아니오 | 확인된 승인 취소일. 종류·유한 날짜·동시 제공 시각 일치 CHECK            |
-| booking_date            | date                    | 아니오 | 입금도 포함한 계좌 기장일                                               |
-| occurred_at             | timestamptz             | 아니오 | 확인된 실제 시각만; 날짜만 있으면 null                                  |
-| occurred_at_basis       | text                    | 아니오 | 어느 사실의 시각인지; 시각 없으면 null                                  |
-| reflection_reason       | text                    | 예     | reflected/not_reflected/not_applicable/unknown; boolean은 응답에서 파생 |
-| original_transaction_id | uuid                    | 아니오 | 확인된 원거래; 참조 목록으로 미확보도 보존                              |
-| payse_transaction_type  | text                    | 아니오 | 사용자 정정 분류; 원천 재적재 시 보존                                   |
-| installment_current     | integer                 | 아니오 | 확인된 할부 현재 회차                                                   |
-| installment_total       | integer                 | 아니오 | 확인된 할부 총회차                                                      |
+| 컬럼                    | 타입                    | 필수   | 설정 근거                                                                                                 |
+| ----------------------- | ----------------------- | ------ | --------------------------------------------------------------------------------------------------------- |
+| id                      | uuid                    | 예     | 안정된 내부 식별자; 원천 버전·날짜 변경에도 유지                                                          |
+| user_id                 | uuid                    | 예     | 인증 세션에서 정한 소유자; 다른 사용자 참조 차단                                                          |
+| source_ref              | text                    | 예     | 객체별 이름 공간을 가진 원천 키                                                                           |
+| source_version          | text                    | 예     | 같은 사용자 현재 원천 묶음에 속함                                                                         |
+| account_id              | uuid                    | 아니오 | 기장 계좌; 카드 전용 기록은 null                                                                          |
+| card_id                 | uuid                    | 아니오 | 관련 카드; 계좌 전용 기록은 null                                                                          |
+| record_kind             | text                    | 예     | 원천 사건 종류                                                                                            |
+| amount_krw              | payse.nonnegative_money | 예     | 거래 크기; 방향과 분리                                                                                    |
+| direction               | text                    | 예     | in/out; 카드 out이 현금 출금이라는 뜻 아님                                                                |
+| status                  | text                    | 예     | approved/posted/cancelled/unknown. account_entry는 posted/unknown만 허용; [상태 의미](data-model.md) 참조 |
+| merchant_name           | text                    | 아니오 | 원천 거래처                                                                                               |
+| description             | text                    | 아니오 | 원천 설명                                                                                                 |
+| purchase_date           | date                    | 아니오 | 확인된 이용일                                                                                             |
+| withdrawal_date         | date                    | 아니오 | 확인된 계좌 출금일; 입금일 전용 금지                                                                      |
+| refund_date             | date                    | 아니오 | 확인된 환불 반영일                                                                                        |
+| cancellation_date       | date                    | 아니오 | 확인된 승인 취소일. 종류·유한 날짜·동시 제공 시각 일치 CHECK                                              |
+| booking_date            | date                    | 아니오 | 입금도 포함한 계좌 기장일                                                                                 |
+| occurred_at             | timestamptz             | 아니오 | 확인된 실제 시각만; 날짜만 있으면 null                                                                    |
+| occurred_at_basis       | text                    | 아니오 | 어느 사실의 시각인지; 시각 없으면 null                                                                    |
+| reflection_reason       | text                    | 예     | reflected/not_reflected/not_applicable/unknown; boolean은 응답에서 파생                                   |
+| original_transaction_id | uuid                    | 아니오 | 확인된 원거래; 참조 목록으로 미확보도 보존                                                                |
+| payse_transaction_type  | text                    | 아니오 | 사용자 정정 분류; 원천 재적재 시 보존                                                                     |
+| installment_current     | integer                 | 아니오 | 확인된 할부 현재 회차                                                                                     |
+| installment_total       | integer                 | 아니오 | 확인된 할부 총회차                                                                                        |
 
 ### card_statements
 

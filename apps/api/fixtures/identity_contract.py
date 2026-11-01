@@ -18,7 +18,7 @@ IDENTITY_USERS = tuple(MappingProxyType(row) for row in (
         'phone': '01000000001',
         'legacy_synthetic_name': 'PAYSE 합성 alpha',
         'legacy_display_name': '데모 1',
-        'initial_case': 'demo-ready',
+        'initial_case': 'demo-life',
     },
     {
         'user_id': '87f7bbf9-2355-5210-9325-f25d83a8ff35',

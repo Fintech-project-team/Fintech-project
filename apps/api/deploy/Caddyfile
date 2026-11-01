@@ -1,0 +1,26 @@
+{
+	admin off
+	auto_https off
+}
+
+# External settings only; missing certificates must fail validation/startup.
+# Keep PAYSE_PROXY_BIND=127.0.0.1 until the public address and phone are enrolled.
+https://{$PAYSE_PUBLIC_HOST}:{$PAYSE_TLS_PORT} {
+	bind {$PAYSE_PROXY_BIND}
+	tls {$PAYSE_TLS_CERT} {$PAYSE_TLS_KEY} {
+		client_auth {
+			mode require_and_verify
+			trust_pool file {$PAYSE_CLIENT_CA}
+		}
+	}
+	@unregistered not expression `{http.request.tls.client.fingerprint} == "{$PAYSE_CLIENT_SHA256}"`
+	respond @unregistered 403
+
+	# Only this proxy's numeric peer address is passed to the loopback-only API.
+	reverse_proxy {$PAYSE_API_UPSTREAM} {
+		header_up -Forwarded
+		header_up -X-Forwarded-For
+		header_up -X-Real-IP
+		header_up X-Payse-Client-IP {remote_host}
+	}
+}

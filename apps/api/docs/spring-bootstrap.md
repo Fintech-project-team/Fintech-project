@@ -6,9 +6,11 @@
 
 - `GET /internal/health/live` → `{"status":"UP"}`. 프로세스 생존만 확인하며 DB 준비·로그인·금융 기능 완료를 뜻하지 않는다.
 - 기본 실행은 그 외 경로를 차단한다. `database`+`auth` 및 필수 설정이 준비되면 로그인·재확인·로그아웃 세 경로만 허용한다. 인증은 Bearer와 서비스의 DB 검증을 사용하며 기본 계정·폼 로그인·쿠키/Basic 세션을 만들지 않는다. 후속 쿠키 인증 도입 시 CSRF 방어를 재설계한다.
-- 인증 HTTP·AuthService·DB 전이·제한은 [인증 DB](auth-database.md)를 따른다. 금융 조회/저장·탈퇴·LLM HTTP는 후속 구현이다. 이 PC의 단계별 준비는 [Windows 서버 가이드](local-server-guide.md)를 따르며 코드 구현을 외부 HTTPS 배포 완료로 해석하지 않는다.
-- Spring JDBC와 PostgreSQL 드라이버를 준비한다. 기본 실행은 DB 없이 가능하다. `database` 프로필을 명시하면 환경변수로 실제 PostgreSQL에 연결한다.
+- 인증 HTTP·AuthService·DB 전이·제한은 [인증 DB](auth-database.md)를 따른다. 금융 조회·설정 저장은 `database,auth,finance` 프로필에서 제공하며 [금융 API 인계](history/2026-10-29-financial-api-handoff.md)를 따른다. 탈퇴·LLM HTTP는 별도 후속이다. 이 PC의 단계별 준비는 [Windows 서버 가이드](local-server-guide.md)를 따르며 코드 구현을 외부 HTTPS 배포 완료로 해석하지 않는다.
+- Spring Data JPA·Hibernate와 PostgreSQL 드라이버를 준비한다. 기본 실행은 DB 없이 가능하다. `database` 프로필을 명시하면 환경변수로 실제 PostgreSQL에 연결한다. JPA는 SQL 기반 인증과 복잡한 조회를 native SQL로 유지하고 사용자 설정을 엔티티로 저장한다.
 - 기존 SQL/더미를 앱 기동 시 자동 적용하지 않는다. Flyway 마이그레이션 편입은 기존 BEGIN/COMMIT·역할/권한·이력 관리 검증과 함께 후속 작업으로 진행한다. 운영 스키마 자동 생성/수정은 없다.
+
+JPA 구성은 `JpaConfiguration`이 담당한다. 자동 DDL·OSIV·2차/쿼리 캐시는 비활성화하며 공개 응답에 엔티티를 직접 반환하지 않는다. 엔티티의 원천·소유자 필드는 수정하지 않고 변경된 설정 열만 UPDATE한다. 저장·검증 사이에는 필요한 flush를 명시하며 사용자 버전은 기존 원자 SQL로 변경한다. JPA `@Version`으로 공개 dataVersion 계약을 대체하지 않는다. 상세 전환 근거는 [JPA 인계](history/2026-10-29-jpa-handoff.md)에 있다.
 
 ## 실행과 검사
 
@@ -64,6 +66,36 @@ Java DTO와 Dart 모델은 기존 JSON 이름·날짜 정밀도·금액 단위·
 공통 코드 구조·설정·주석은 [CODE_SPEC](../../../docs/harness/CODE_SPEC.md), API 적용 범위·필수 Java 주석은 [src/AGENTS.md](../src/AGENTS.md)를 따른다. 초기화 안내에서 같은 규칙을 별도로 정의하지 않는다.
 
 객체 수명·생성자 주입·가변 전역 상태 제한은 [앱 구조](../../../docs/app-architecture.md)를 따른다. 실제 기능의 책임·입출력·권한·실패·검사는 [문서 작성 기준](../../../docs/development-notes.md)에 따라 기존 API 상세를 보완한다. bootstrap만을 위해 빈 업무 계층을 생성하지 않는다.
+
+### Java 패키지
+
+실제 소스는 `src/main/java/com/payse/api/`에 둔다. 기능별로 나누고 그 안에 `controller/service/mapper`를 기본으로 둔다. 클래스가 없는 계층은 빈 폴더·위임 클래스·인터페이스로 만들지 않는다. `src/test/java/com/payse/api/`도 검사 대상 패키지를 따른다.
+
+| 경로                                                            | 책임                                                                                       |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `config/`                                                       | Spring 보안·DB·JPA·암호 설정과 bean 생성                                                   |
+| `auth/controller/`, `finance/controller/`, `health/controller/` | HTTP 경로·본문/헤더 파싱·상태 코드/응답 변환                                               |
+| `auth/service/`, `finance/service/`                             | 업무 실행 순서·트랜잭션 호출, 공개 응답·페이지 조립, cursor·요청 지문                      |
+| `auth/mapper/`, `finance/mapper/`                               | 기존 JPA 기반 DB 조회·저장·SQL 함수 호출·권한·제약 확인                                    |
+| `auth/dto/`                                                     | 미검증 입력 AuthInput, 내부 결과 AuthResult, 공개 응답 AuthResponse, 내부 DB 결과 AuthRows |
+| `finance/dto/`                                                  | 계층 간 전달용 PageSlice·StoredReceipt·WriteChange. 공개 HTTP DTO와 구분                   |
+| `health/dto/`                                                   | 생존 확인 응답 HealthResponse                                                              |
+| `auth/vo/`                                                      | 검증된 자격 AuthCredentials, 토큰·검증값 쌍 IssuedToken                                    |
+| `finance/vo/`                                                   | 원거래 값 OriginalTransaction, 거래 연결 TransactionLink와 상태 OriginalState              |
+| `finance/entity/`                                               | 기존 테이블에 매핑되는 JPA 엔티티와 소유자 계약                                            |
+| `auth/crypto/`                                                  | 토큰·코드 암호 연산과 비밀 키 접근                                                         |
+| `finance/validation/`                                           | service와 mapper가 공유하는 금융 입력 형식·허용 필드·단위 검증                             |
+| `auth/error/`, `finance/error/`                                 | 기능의 입력·저장·업무 오류                                                                 |
+
+기본 호출 흐름은 `controller → service → mapper`다. 여기서 mapper는 기존 JPA DB 접근 계층의 폴더명이며 MyBatis·매핑 XML·새 ORM을 도입하지 않는다. 기존 Repository 클래스명과 Spring bean 이름은 유지한다. DTO/VO/entity의 이름 때문에 새 API 필드나 테이블을 추가하지 않는다.
+
+DTO는 데이터 전달용이며 외부 응답인지 내부 전달인지 주석으로 구분한다. `AuthInput`은 미검증 상태, `AuthCredentials`는 검증된 값이므로 합치지 않는다. `AuthResult`와 공개 `AuthResponse`도 필드·역할이 달라 유지한다. `StoredReceipt`의 감사 자료와 `AuthRows`의 verifier는 HTTP에 직접 반환하지 않는다. 가변 JSON 노드를 담는 금융 DTO를 불변 VO라고 취급하지 않는다.
+
+VO는 기존 값·검증·민감 정보의 문자열 숨김을 유지한다. JPA entity는 DB 매핑 전용이며 응답으로 직접 직렬화하지 않는다. `AuthSecrets`는 비밀 키 접근자를 공개하지 않도록 crypto에 유지한다. `FinancialService.WriteResult`·`FinancialProjection.Context`·`WriteStore.Journal`처럼 한 처리 내부의 작업 상태는 외부 DTO/VO로 만들지 않는다.
+
+`FinancialPages`·`FinancialShape`는 service 내부, 쓰기 보조 클래스와 `WriteStore`는 mapper 내부에 둔다. 기존 EntityManager·트랜잭션·권한·DB 제약을 이중화하지 않고 내부 도우미를 일괄 public으로 바꾸지 않는다. JPA 스캔은 entity 클래스의 실제 패키지를 사용한다.
+
+테스트 전용 공통 DB 구성은 `support/JpaTestContext`, 하위 JDBC 연결 검사는 테스트의 `persistence/`, 주석 검사기 검증은 `architecture/`에 둔다. health는 DB·업무 계층이 필요 없으므로 controller/dto만 둔다. 과거 작업 JSON의 당시 경로는 이력으로 보존하고 신규 작업 명세는 현재 경로를 사용한다. `src/modules/`·`src/infrastructure/`는 안내 문서 위치이며 Java 소스 루트가 아니다.
 
 ## 공식 근거
 

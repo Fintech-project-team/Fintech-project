@@ -135,6 +135,9 @@ def validate_snapshot(snapshot: dict) -> None:
         require(transaction['accountId'] is None or transaction['accountId'] in accounts,'foreign account')
         require(transaction['cardId'] is None or transaction['cardId'] in cards,'foreign card')
         require(transaction['recordKind'] in ('account_entry','card_purchase','card_refund','card_cancellation') and transaction['direction'] in ('in','out') and transaction['status'] in ('approved','posted','cancelled','unknown'),'transaction enum')
+        # 2026-10-30: 은행 내역은 확정 기록·미확인만 지원하며 카드 상태는 유지한다.
+        if transaction['recordKind'] == 'account_entry':
+            require(transaction['status'] in ('posted', 'unknown'), 'unsupported account status')
         require((transaction['recordKind']=='account_entry' and transaction['accountId']) or (transaction['recordKind']!='account_entry' and transaction['cardId']),'kind target')
         require(transaction['payseTransactionType'] in (None,'expense','income','internal_transfer','card_payment'),'transaction classification')
         reason=transaction['reflectionReason'];require(reason in ('reflected','not_reflected','not_applicable','unknown'),'reflection enum')

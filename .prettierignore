@@ -17,6 +17,7 @@ docs/references/*.source.md
 # Flutter caches/generated metadata; Dart uses dart format.
 **/.dart_tool/**
 **/.pub-cache/**
+**/.widget_preview/**
 **/.flutter-plugins-dependencies
 apps/mobile/.metadata
 apps/mobile/pubspec.lock
