@@ -386,7 +386,7 @@ void main() {
       final plain = c.accounts[2].accountId;
       c.toggleAccount(plain);
       c.toggleAccount(plain);
-      expect(c.reserveNoticeAccount, isNull, reason: '모아둘 돈이 없는 계좌는 안내 없음');
+      expect(c.reserveNoticeAccount, isNull, reason: '남겨둘 돈이 없는 계좌는 안내 없음');
     });
 
     test(

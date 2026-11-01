@@ -947,7 +947,7 @@ class AccountSelectScreen extends StatelessWidget {
     required int total,
     required int withReserve,
   }) async {
-    const effect = '선택을 해제한 계좌의 잔액과 연결된 모아둘 돈은 계산에서 제외돼요.';
+    const effect = '선택을 해제한 계좌의 잔액과 연결된 남겨둘 돈은 계산에서 제외돼요.';
     final single = total == 1;
     final result = await showConnectionConfirm(
       context,
@@ -956,8 +956,8 @@ class AccountSelectScreen extends StatelessWidget {
           ? '$group 계좌 1개를 선택 해제할까요?'
           : '$group 계좌 $total개를 모두 선택 해제할까요?',
       body: single
-          ? '이 계좌에는 모아둘 돈이 있어요.\n$effect'
-          : '이 중 $withReserve개 계좌에는 모아둘 돈이 있어요.\n$effect',
+          ? '이 계좌에는 남겨둘 돈이 있어요.\n$effect'
+          : '이 중 $withReserve개 계좌에는 남겨둘 돈이 있어요.\n$effect',
       secondaryLabel: '취소',
       secondaryKey: const ValueKey('clear-reserve-cancel'),
       primaryLabel: single ? '선택 해제' : '모두 선택 해제',
@@ -1001,7 +1001,7 @@ class AccountSelectScreen extends StatelessWidget {
               '${institutionName(snapshot, a.institutionCode)} '
                   '${a.nickname != null ? '${a.productName} ' : ''}'
                   '····${a.maskedNumber.substring(a.maskedNumber.length - 4)}',
-              if (controller.reservesOf(a.accountId).isNotEmpty) '모아둘 돈 있음',
+              if (controller.reservesOf(a.accountId).isNotEmpty) '남겨둘 돈 있음',
             ].join(' · '),
             trailing: Text(
               balance == null ? '잔액 미확인' : formatKrw(balance),
@@ -1037,9 +1037,9 @@ class AccountSelectScreen extends StatelessWidget {
                   StatusNotice(
                     key: const ValueKey('reserve-notice'),
                     kind: StatusNoticeKind.warning,
-                    title: '모아둘 돈이 있는 계좌예요',
+                    title: '남겨둘 돈이 있는 계좌예요',
                     message:
-                        '${accountLabel(snapshot, noticeAccount)}을 빼면 이 계좌의 모아둘 돈'
+                        '${accountLabel(snapshot, noticeAccount)}을 빼면 이 계좌의 남겨둘 돈'
                         '(${controller.reservesOf(noticeAccount.accountId).map((r) => r.label).join(', ')})도 '
                         '계산에서 빠져요.',
                   ),
@@ -1061,7 +1061,7 @@ class AccountSelectScreen extends StatelessWidget {
                         key: ValueKey('excluded-reserve-hint'),
                         padding: EdgeInsets.only(top: PayseSpace.x3),
                         child: Text(
-                          '선택하지 않은 계좌의 잔액과 모아둘 돈은 계산에서 제외해요.',
+                          '선택하지 않은 계좌의 잔액과 남겨둘 돈은 계산에서 제외해요.',
                           style: PayseTypography.caption,
                         ),
                       ),
@@ -1332,14 +1332,14 @@ class ConnectionReviewScreen extends StatelessWidget {
                 },
               ),
           ],
-          const _ReviewSection('모아둘 돈', FinanceIconKind.reserve),
+          const _ReviewSection('남겨둘 돈', FinanceIconKind.reserve),
           ..._group(
-            kind: '모아둘 돈',
+            kind: '남겨둘 돈',
             restricted: snapshot.reservesRestricted,
             missing: missing.contains(ReviewMissing.reserves),
             empty: analysisReceived
-                ? '거래 내역에서 모아둘 돈으로 제안할 항목을 찾지 못했어요.'
-                : '등록된 모아둘 돈이 없어요.',
+                ? '거래 내역에서 남겨둘 돈으로 제안할 항목을 찾지 못했어요.'
+                : '등록된 남겨둘 돈이 없어요.',
             rows: [
               for (final r in activeReserves(snapshot))
                 _ReviewRow(
