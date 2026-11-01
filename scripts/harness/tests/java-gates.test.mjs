@@ -48,3 +48,23 @@ test('API-only edits do not demand Flutter checks', () => {
     ['api'],
   );
 });
+
+test('AI Java changes select the API gate and AI rules without changing Flutter ownership', () => {
+  const file = 'apps/ai/src/main/java/com/payse/ai/AnalysisService.java';
+  assert.deepEqual(
+    selectGates([file], policy, true, ['mobile', 'api']).map((gate) => gate.name),
+    ['api'],
+  );
+  assert.ok(policy.roles.data.includes('apps/ai/'));
+  assert.ok(
+    references({ allowedPaths: ['apps/ai/'], readBefore: [] }, [], policy).includes(
+      'apps/ai/AGENTS.md',
+    ),
+  );
+  assert.equal(
+    references({ allowedPaths: ['apps/mobile/'], readBefore: [] }, [], policy).includes(
+      'apps/ai/AGENTS.md',
+    ),
+    false,
+  );
+});

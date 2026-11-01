@@ -30,3 +30,10 @@ DerivedData/
 **/key.properties
 *.jks
 *.keystore
+
+# Java IDE compilation output; source and Gradle resources remain tracked.
+/apps/api/bin/
+/apps/ai/bin/
+
+# Private provider connection values; commit only the blank example.
+/apps/ai/config/llm.properties

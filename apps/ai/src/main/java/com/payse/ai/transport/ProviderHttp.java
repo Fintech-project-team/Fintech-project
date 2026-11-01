@@ -1,4 +1,4 @@
-package com.payse.api.analysis.provider;
+package com.payse.ai.transport;
 
 import java.io.ByteArrayOutputStream;
 import java.net.URI;

@@ -193,10 +193,16 @@ Jev는 **도입 미확정 후보**다. 공식 공급자 TypeSafe의 문서를 �
 
 `analysis/service/MemoryPolicy`는 달력3개월·중요보존 예외·탈퇴 후1년과 현재 참조 자격을 구분하는 내부 정책이다. `analysis/crypto/EnvelopeCipher`는 기억마다 독립 256비트 키와 96비트 nonce를 생성하여 JCA `AES/GCM/NoPadding`·128비트 인증 태그로 암호화한다. 알고리즘 형식 버전과 사용자·기억 UUID를 AAD에 바인딩하며, 데이터 키는 `KeyProtector`를 통해 외부에서 감싸도록 분리한다. [JCA Cipher](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/javax/crypto/Cipher.html)의 인증 암호를 사용하며 자체 암호 알고리즘을 만들지 않는다.
 
-내부 기반은 아직 Spring 실행 경로·분석 HTTP·DB에 연결되지 않았다. `analysis/provider`의 `OpenAiGateway`·`GoogleKms`·`ProviderHttp` REST 어댑터는 구현되어 있으며, 실제 공급자 계정·KMS 권한·자격 갱신 연결과 운영 활성화는 미완료다. 테스트의 메모리 키 대역은 `src/test`에만 있고 운영 대체 키로 사용할 수 없다. 단위 검사의 성공은 KMS 연동·DB 암호화 저장·백업 파쇄 완료가 아니다. 생성한 임시 키 배열은 사용 후 지우되 Java 런타임·암호 제공자 내부의 모든 메모리 사본 파쇄까지 보장한다고 해석하지 않는다. 폐기 대상 판정과 실제 비가역 파쇄 완료는 계속 구분한다.
+내부 기반은 아직 Spring 실행 경로·분석 HTTP·DB에 연결되지 않았다. `apps/ai`의 `AnalysisService`·`OpenAiGateway`·`ProviderHttp`와 API의 `GoogleKms` 어댑터는 구현되어 있으며, 실제 공급자 계정·KMS 권한·자격 갱신 연결과 운영 활성화는 미완료다. 테스트의 메모리 키 대역은 `src/test`에만 있고 운영 대체 키로 사용할 수 없다. 단위 검사의 성공은 KMS 연동·DB 암호화 저장·백업 파쇄 완료가 아니다. 생성한 임시 키 배열은 사용 후 지우되 Java 런타임·암호 제공자 내부의 모든 메모리 사본 파쇄까지 보장한다고 해석하지 않는다. 폐기 대상 판정과 실제 비가역 파쇄 완료는 계속 구분한다.
 
 공급자 어댑터는 loopback 모의 HTTP로 정상·거절·미완료·사용량·JSON 형식·응답 크기·본문 timeout·리디렉션/자동 재시도 금지와 KMS 키 경로·CRC32C·검증 플래그를 검사한다. 잘못된 Bearer 자격은 헤더 생성 전에 원문 없는 오류로 거절하며, KMS 입력 사전 거절은 미전송으로 구분한다. 실제 HTTP/KMS 호출, 업무 의미 스키마·소유권 검증, 비용 예약·DB 저장이 완료됐다는 근거로 사용하지 않는다. [Bearer 형식](https://www.rfc-editor.org/rfc/rfc6750#section-2.1), [OpenAI 구조화 응답의 거절·미완료 처리](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses), [Google KMS 무결성 검증](https://docs.cloud.google.com/kms/docs/data-integrity-guidelines)을 참조한다.
+
+연결정보는 [AI 비공개 설정 기준](../../ai/docs/README.md#비공개-연결-설정)을 따른다. `LlmSettings`는 명시된 비공개 파일을 읽고 기존 공급자 팩토리를 구성하며, 개인 환경·Codex 자격으로 대체하지 않는다. 빈 예시만 Git에 공유하고 실제 파일은 제외한다. 이 구성 경로의 구현은 Spring 분석 HTTP·예산·DB 연결이나 유료 호출 활성화 완료를 뜻하지 않는다.
 
 공개 계약은 기존 데이터 모델·HTTP·응답 모델에서 A 작성/B 영향 확인으로 확정한다. 기존 키·테이블을 분석 큐로 전용하거나 sourceVersion/금융 v4 필드를 임의 추가하지 않는다. 누락 금융 원천의 임의 생성과 사용자 금융 금액 산출은 서버 구현 범위가 아니다. 서버의 원천 조회·공개·Snapshot 조립 책임은 유지한다.
 
 현재 미구현·문서 충돌·fixture 기준 및 **AT01~AT22는 [공통 계약](../../../docs/payse-execution-contract.md#공통-반례인수-조건)에 남아 있다**. API 입력/출력·권한·중복·예약·timeout·세션 무효화 테스트에는 해당 AT와 G0~G7을 필수 대조한다. Dart 계산·화면 검증은 B 담당이며 API 문서나 하네스 PASS로 대체하지 않는다.
+
+공유 실행 코드·공개 프롬프트·기준 배포·검증 경계는 [AI 모듈](../../ai/docs/README.md)을 따른다. API→AI 단방향 Gradle 의존이며 외부 호출은 기본 활성화하지 않는다. 분석 HTTP/DB 실행부 배선은 미완료이고 운영 JAR에 평가 정답을 포함하지 않는다.
+
+공급자 교체 구현은 [AI 모듈의 공급자 경계](../../ai/docs/README.md#공급자-교체-경계)를 필수 참조한다. OpenAI 전용 형식은 `provider/openai`에 격리하고 Java 실행/Python 평가를 유지한다. 계수/생성 실패 단계와 해당 단계의 전송 가능성을 구분하며 캐시 사용량 미확인은 내부 DTO의 null로 보존한다. 공개 분석·금융 HTTP 규격, 예산·재시도·저장 정책은 바꾸지 않는다. 로컬 실행기·모델·토크나이저·운영 연결은 미구현이다.

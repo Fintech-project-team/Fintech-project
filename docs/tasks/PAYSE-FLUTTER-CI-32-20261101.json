@@ -1,0 +1,46 @@
+{
+  "id": "PAYSE-FLUTTER-CI-32-20261101",
+  "role": "integration",
+  "baseCommit": "e7ae222e312d28f31372b8d1b76d7d661e38a85f",
+  "branch": "feat/ai/shared-runtime-32",
+  "allowedPaths": [
+    "scripts/harness/run-flutter.mjs",
+    "scripts/harness/verify-change.mjs",
+    "scripts/harness/tests/flutter-runner.test.mjs",
+    ".github/workflows/flutter.yml",
+    "docs/harness/FLUTTER_TRANSITION.md",
+    "docs/harness/GATE_MATRIX.md",
+    ".gitignore",
+    ".prettierignore",
+    "apps/ai/config/llm.properties.example",
+    "apps/ai/config/llm.properties",
+    "apps/ai/src/main/java/com/payse/ai/provider/config/",
+    "apps/ai/src/main/java/com/payse/ai/provider/openai/OpenAiGateway.java",
+    "apps/ai/src/test/java/com/payse/ai/provider/config/",
+    "apps/ai/docs/README.md",
+    "apps/api/docs/llm-execution.md",
+    "docs/tasks/PAYSE-FLUTTER-CI-32-20261101.json"
+  ],
+  "readBefore": [
+    "AGENTS.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/AGENT_REVIEW.md",
+    "docs/harness/COMMIT_PR_POLICY.md",
+    "docs/harness/FLUTTER_TRANSITION.md",
+    "docs/ownership.md",
+    "docs/development-workflow.md",
+    "docs/toolchain.md",
+    "apps/ai/AGENTS.md",
+    "apps/api/src/AGENTS.md",
+    "docs/payse-execution-contract.md",
+    "apps/api/docs/llm-execution.md"
+  ],
+  "acceptance": [
+    "관련 이슈 #32, PR #170. 실제 CI 로그의 모바일 테스트 90초 시간 초과를 재현 가능한 제한·실패 전파 검사로 보완한다. 코드 오류나 미완료 테스트를 통과로 처리하지 않는다.",
+    "SDK·포맷·분석 제한은 각 90초를 유지하고 테스트는 앱·계산 패키지별 180초로 조정한다. 상위 모바일 검사는 전체 내부 제한 합 810초에 기동 여유 30초를 더한 840초, CI job은 환경 준비를 포함하여 20분으로 정합성을 맞춘다.",
+    "모바일·계산·API 제품 코드·공개 계약·원천·DB는 변경하지 않는다. AI 변경은 추가 승인된 비공개 연결 설정 범위에 한정한다. 기존 테스트·순서·기대값·필수 검사·종료 코드·제목 규칙을 유지한다.",
+    "실제 Flutter 검사와 공통 하네스를 실행하고 기존 변경 보존을 확인한다. 로컬 결과와 push 후 GitHub 재검증을 구분하며 commit·push·PR 병합은 하지 않는다.",
+    "사용자 추가 요청: 명시한 비공개 LLM 설정 파일만 읽는 로더·공급자 구성을 추가한다. 연결정보는 빈 예시만 Git에 보관하고 실제 파일은 제외한다. 환경변수·Codex 자격·다른 계정으로 자동 대체하지 않는다.",
+    "설정 누락·미지원 공급자·키 오류를 전송 전에 차단하며 키를 로그/예외/문자열에 노출하지 않는다. 파일 읽기·구성으로 외부 전송하지 않고 실제 HTTP 분석·예산·DB 실행 배선은 이번에 추가하지 않는다. 기존 API·Flutter 공개 계약과 금융 계산은 유지한다."
+  ]
+}

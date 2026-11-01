@@ -8,7 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTRACTS = ROOT / 'contracts' / 'analysis'
+CONTRACTS = ROOT.parent / 'ai' / 'contracts'
 BASIC_TYPES = ['expense', 'income', 'internal_transfer', 'card_payment', None]
 UUID = {'type': 'string', 'pattern': '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'}
 TEXT = {'type': 'string', 'minLength': 1}

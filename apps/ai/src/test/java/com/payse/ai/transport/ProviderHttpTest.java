@@ -1,7 +1,9 @@
-package com.payse.api.analysis.provider;
+package com.payse.ai.transport;
 
 import static org.junit.jupiter.api.Assertions.*;
-import com.payse.api.analysis.provider.ProviderHttp.ProviderFailure;
+
+import com.payse.ai.testing.ProviderStub;
+import com.payse.ai.transport.ProviderHttp.ProviderFailure;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;

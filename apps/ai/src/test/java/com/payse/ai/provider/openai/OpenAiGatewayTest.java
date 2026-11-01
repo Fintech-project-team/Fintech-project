@@ -1,8 +1,15 @@
-package com.payse.api.analysis.provider;
+package com.payse.ai.provider.openai;
+
+import com.payse.ai.provider.dto.ModelReply;
+import com.payse.ai.provider.dto.TokenUsage;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.payse.api.analysis.provider.ProviderHttp.ProviderFailure;
+import com.payse.ai.testing.ProviderStub;
+
+import com.payse.ai.provider.ModelFailure;
+import com.payse.ai.provider.ModelFailure.Stage;
+import com.payse.ai.provider.ModelGateway;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -18,6 +25,84 @@ class OpenAiGatewayTest {
     private static final String USAGE = "{\"input_tokens\":21,\"output_tokens\":7,"
         + "\"input_tokens_details\":{\"cached_tokens\":5}}";
     private static final String CREDENTIAL = "fixture-openai-secret";
+
+    /**
+     * 실제 서비스에서 실제 HTTP 어댑터를 호출하되 네트워크 대상만 로컬 대역으로 고정한다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void runtimeFlow() throws Exception {
+        try (var provider = new ProviderStub()) {
+            ObjectNode input = (ObjectNode) JSON.readTree(java.nio.file.Files.readString(
+                java.nio.file.Path.of(System.getProperty("payse.testData"), "service-input.json")));
+            String output = "{\"meaningPolicyVersion\":\"PAYSE-MEANING-1\",\"items\":[{\"itemKey\":\"i1\","
+                + "\"meaning\":{\"status\":\"unknown\",\"value\":null,\"reasonCode\":\"insufficient_evidence\"},"
+                + "\"classification\":{\"status\":\"unknown\",\"value\":null,\"reasonCode\":\"insufficient_evidence\"},"
+                + "\"reason\":\"전달 검사용 대역 응답\",\"evidenceTransactionIds\":[\"t1\"]}]}";
+            provider.sequence("{\"object\":\"response.input_tokens\",\"input_tokens\":21}", completed(output, USAGE));
+            var service = new com.payse.ai.analysis.service.AnalysisService((instructions, schema) ->
+                new OpenAiGateway(provider.http(), () -> CREDENTIAL, "approved-test-model",
+                    instructions, "low", schema, 6000, 1200, provider.endpoint()), 6000);
+            var result = service.analyze(input);
+            assertNull(result.failure());
+            assertEquals(input.get("items").get(0).get("evidenceTransactionIds"),
+                result.output().get("items").get(0).get("evidenceTransactionIds"));
+            assertEquals(new TokenUsage(21, 5L, 7), result.usage());
+            assertEquals(2, provider.requests().size());
+
+            // HTTP·OpenAI 응답 봉투가 없는 대역도 동일한 업무 입력/출력 경계를 사용한다.
+            var offline = new com.payse.ai.analysis.service.AnalysisService((instructions, schema) -> {
+                assertEquals(instructions, provider.requests().get(0).body().get("instructions").asString());
+                assertEquals(schema, provider.requests().get(0).body().path("text").path("format").get("schema"));
+                return new ModelGateway() {
+                    /**
+                     * 네트워크 없는 합성 계수를 반환한다. 실제 토크나이저 검증은 아니다.
+                     * @created 2026-11-01
+                     * @usedBy AnalysisService.analyze
+                     */
+                    @Override
+                    public long countInput(JsonNode body) {
+                        assertEquals(JSON.readTree(provider.requests().get(0).body().get("input").asString()), body);
+                        return 21;
+                    }
+
+                    /**
+                     * 정규화된 동일 응답을 직접 반환하며 캐시 사용량 미확인을 유지한다.
+                     * @created 2026-11-01
+                     * @usedBy AnalysisService.analyze
+                     */
+                    @Override
+                    public ModelReply generate(JsonNode body) {
+                        return new ModelReply((ObjectNode) JSON.readTree(output), new TokenUsage(21, null, 7), null);
+                    }
+                };
+            }, 6000);
+            var offlineResult = offline.analyze(input);
+            assertEquals(result.output(), offlineResult.output());
+            assertNull(offlineResult.usage().cachedTokens());
+            assertEquals(2, provider.requests().size());
+        }
+    }
+
+    /**
+     * 최상위 완료와 메시지 미완료가 모순되면 JSON이 정상이어도 채택하지 않는다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void rejectsIncompleteMessage() throws Exception {
+        try (var provider = new ProviderStub()) {
+            ObjectNode response = (ObjectNode) JSON.readTree(completed("{\"kind\":\"fixture\"}", USAGE));
+            ((ObjectNode) response.get("output").get(0)).put("status", "incomplete");
+            provider.reply(200, JSON.writeValueAsString(response));
+            var result = gateway(provider).generate(input());
+            assertEquals("INCOMPLETE_RESPONSE", result.failure());
+            assertNull(result.output());
+            assertEquals(new TokenUsage(21, 5L, 7), result.usage());
+            assertEquals(1, provider.requests().size());
+        }
+    }
 
     /**
      * 계수와 생성의 입력·지침·모델·형식을 비교하고 생성 요청의 보관·도구 실행 제한을 확인한다.
@@ -72,7 +157,7 @@ class OpenAiGatewayTest {
             var reply = gateway(provider).generate(input());
             assertNull(reply.failure());
             assertEquals("fixture", reply.output().path("kind").asString());
-            assertEquals(new OpenAiGateway.Usage(21, 5, 7), reply.usage());
+            assertEquals(new TokenUsage(21, 5L, 7), reply.usage());
             assertEquals(1, provider.requests().size());
         }
     }
@@ -111,7 +196,7 @@ class OpenAiGatewayTest {
             var reply = gateway(provider).generate(input());
             assertEquals("MODEL_REFUSAL", reply.failure());
             assertNull(reply.output());
-            assertEquals(new OpenAiGateway.Usage(21, 5, 7), reply.usage());
+            assertEquals(new TokenUsage(21, 5L, 7), reply.usage());
             assertEquals(1, provider.requests().size());
         }
     }
@@ -130,7 +215,7 @@ class OpenAiGatewayTest {
             var reply = gateway(provider).generate(input());
             assertEquals("INCOMPLETE_RESPONSE", reply.failure());
             assertNull(reply.output());
-            assertEquals(new OpenAiGateway.Usage(21, 5, 7), reply.usage());
+            assertEquals(new TokenUsage(21, 5L, 7), reply.usage());
             assertEquals(1, provider.requests().size());
         }
     }
@@ -151,16 +236,17 @@ class OpenAiGatewayTest {
                 var reply = gateway.generate(input());
                 assertEquals("INVALID_MODEL_OUTPUT", reply.failure());
                 assertNull(reply.output());
-                assertEquals(new OpenAiGateway.Usage(21, 5, 7), reply.usage());
+                assertEquals(new TokenUsage(21, 5L, 7), reply.usage());
             }
             assertEquals(outputs.length, provider.requests().size());
         }
     }
 
     /**
-     * 완료 상태여도 응답 배열·역할·중복 본문이 잘못되면 공급자 구조 오류로 구분한다.
+     * 완료 상태여도 응답 배열·역할·중복 본문 오류를 거절하고 관측 사용량을 유지한다.
      * @created 2026-11-01
      * @usedBy JUnit 5
+     * @modified 2026-11-01 - 구조 오류의 사용량 보존 검증
      */
     @Test
     void rejectsMalformedResponseEnvelope() throws Exception {
@@ -174,10 +260,13 @@ class OpenAiGatewayTest {
                     + "{\"type\":\"output_text\",\"text\":\"{}\"},{\"type\":\"output_text\",\"text\":\"{}\"}]}]}"
             };
             for (String response : responses) {
-                provider.reply(200, response);
-                var failure = assertThrows(ProviderFailure.class, () -> gateway.generate(input()));
-                assertEquals("INVALID_PROVIDER_RESPONSE", failure.getMessage());
-                assertTrue(failure.mayHaveBeenSent());
+                ObjectNode malformed = (ObjectNode) JSON.readTree(response);
+                malformed.set("usage", JSON.readTree(USAGE));
+                provider.reply(200, JSON.writeValueAsString(malformed));
+                var failure = gateway.generate(input());
+                assertEquals("INVALID_PROVIDER_RESPONSE", failure.failure());
+                assertNull(failure.output());
+                assertEquals(new TokenUsage(21, 5L, 7), failure.usage());
             }
             assertEquals(responses.length, provider.requests().size());
         }
@@ -195,10 +284,61 @@ class OpenAiGatewayTest {
             provider.reply(200, "{\"object\":\"response.input_tokens\",\"input_tokens\":100}");
             assertEquals(100L, gateway.countInput(input()));
             provider.reply(200, "{\"object\":\"response.input_tokens\",\"input_tokens\":101}");
-            var failure = assertThrows(ProviderFailure.class, () -> gateway.countInput(input()));
+            var failure = assertThrows(ModelFailure.class, () -> gateway.countInput(input()));
             assertEquals("INPUT_TOKEN_LIMIT", failure.getMessage());
+            assertEquals(Stage.INPUT_COUNT, failure.stage());
+            assertTrue(failure.mayHaveBeenSent());
             assertEquals(2, provider.requests().size());
             assertTrue(provider.requests().stream().allMatch(request -> request.path().endsWith("/input_tokens")));
+        }
+    }
+
+    /**
+     * 키 공급자 예외는 계수/생성 모두 원문 없이 전송 전 실패하며 구성만으로 호출하지 않는다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void sanitizesCredentialFailures() throws Exception {
+        try (var provider = new ProviderStub()) {
+            var gateway = new OpenAiGateway(provider.http(), () -> {
+                throw new IllegalStateException("private-secret-do-not-log");
+            }, "approved-test-model", "Return kind only.", "low", schema(), 100, 40, provider.endpoint());
+            assertEquals(0, provider.requests().size());
+            var count = assertThrows(ModelFailure.class, () -> gateway.countInput(input()));
+            var generation = assertThrows(ModelFailure.class, () -> gateway.generate(input()));
+            assertEquals(Stage.INPUT_COUNT, count.stage());
+            assertEquals(Stage.GENERATION, generation.stage());
+            for (var failure : java.util.List.of(count, generation)) {
+                assertEquals("CREDENTIAL_UNAVAILABLE", failure.getMessage());
+                assertNull(failure.getCause());
+                assertFalse(failure.mayHaveBeenSent());
+                assertFalse(failure.toString().contains("private-secret"));
+            }
+            assertEquals(0, provider.requests().size());
+        }
+    }
+
+    /**
+     * 같은 HTTP 실패도 발생 단계와 전송 가능성을 구분하며 자동 재시도하지 않는다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void separatesTransmissionStages() throws Exception {
+        try (var provider = new ProviderStub()) {
+            provider.reply(503, "{\"message\":\"private-provider-detail\"}");
+            var gateway = gateway(provider);
+            var count = assertThrows(ModelFailure.class, () -> gateway.countInput(input()));
+            var generation = assertThrows(ModelFailure.class, () -> gateway.generate(input()));
+            assertEquals(Stage.INPUT_COUNT, count.stage());
+            assertEquals(Stage.GENERATION, generation.stage());
+            for (var failure : java.util.List.of(count, generation)) {
+                assertEquals("PROVIDER_HTTP_503", failure.getMessage());
+                assertTrue(failure.mayHaveBeenSent());
+                assertNull(failure.getCause());
+            }
+            assertEquals(2, provider.requests().size());
         }
     }
 
@@ -214,12 +354,12 @@ class OpenAiGatewayTest {
             String[] counts = {"-1", "1.5", "\"3\"", "9223372036854775808", "null"};
             for (String count : counts) {
                 provider.reply(200, "{\"object\":\"response.input_tokens\",\"input_tokens\":" + count + "}");
-                var failure = assertThrows(ProviderFailure.class, () -> gateway.countInput(input()));
+                var failure = assertThrows(ModelFailure.class, () -> gateway.countInput(input()));
                 assertEquals("INVALID_PROVIDER_RESPONSE", failure.getMessage());
                 assertTrue(failure.mayHaveBeenSent());
             }
             provider.reply(200, "{\"object\":\"unexpected\",\"input_tokens\":3}");
-            assertThrows(ProviderFailure.class, () -> gateway.countInput(input()));
+            assertThrows(ModelFailure.class, () -> gateway.countInput(input()));
             assertEquals(counts.length + 1, provider.requests().size());
         }
     }
@@ -244,7 +384,7 @@ class OpenAiGatewayTest {
             };
             for (String usage : usages) {
                 provider.reply(200, completed("{\"kind\":\"fixture\"}", usage));
-                var failure = assertThrows(ProviderFailure.class, () -> gateway.generate(input()));
+                var failure = assertThrows(ModelFailure.class, () -> gateway.generate(input()));
                 assertEquals("INVALID_PROVIDER_RESPONSE", failure.getMessage());
                 assertTrue(failure.mayHaveBeenSent());
                 assertNull(failure.getCause());

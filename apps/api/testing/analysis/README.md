@@ -144,3 +144,7 @@ python -B apps/api/testing/analysis/replay_score.py --cases <실행파일> --res
 - `responses`에는 완전 성공한 사례만 들어간다. 부분 실패를 채점할 때는 기존 `evaluate.py`에 이 부분 목록만 넘기지 말고 `replay_score.py`를 사용한다. 그래야 재사용 성공까지 실패로 세지 않으며 누락·실패·불필요 유보·범위 부족을 항목당 한 오류로 집계한다.
 - recordedLlmTransactionError는 요청과 결합된 **기록의** 완료·실패·미완료·거절을 포함한다. 실제 호출 확인이나 모델 정확도 인증이 아니다. 경로별 재사용/실패도 함께 보고하며 wholePipelineMeasured=false, actualModelPerformanceMeasured=false를 유지한다.
 - 기존 파일은 덮어쓰지 않는다. 실행 입력·응답·채점 산출물은 `.harness/` 등 Git 제외 경로에 둔다. 모형 테스트의 정답 응답을 실측 결과로 등록하지 않는다.
+
+## 실제 Java 실행 경로와 대조
+
+운영 의미 실행은 [공유 AI 모듈](../../../ai/docs/README.md)의 `AnalysisService`를 사용한다. 이 폴더는 API 원천·개발 사례·오프라인 채점/재사용 재현 도구이며 운영 요청이 Python을 실행하지 않는다. 기존 기준표와 네 Schema 원본은 `apps/ai/contracts`로 이동했다. Java 테스트는 같은 5,083개 개발 자료의 계약·투영·복원을 대조하지만 정답을 서비스나 모델에 전달하지 않는다. 실행 서비스의 대역 테스트도 실제 정확도·HTTP/저장 완료를 증명하지 않는다.
