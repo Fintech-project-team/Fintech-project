@@ -7,28 +7,89 @@ import '../../shared/design/payse_tokens.dart';
 import '../connection/connection_review.dart' show institutionName;
 import 'composition_bar.dart';
 import 'home_calculation.dart';
-import 'home_screen.dart' show insufficientMessage;
+import 'home_screen.dart' show asOfLabel, insufficientMessage;
+import 'overview_links.dart';
+import 'overview_pages.dart';
 
 /// 2026-10-26: 02-2 계산 내역(영수증 v4). 홈과 같은 계산 결과 [calculation]만 표시한다.
 /// 금액·건수·합계는 계산 결과에서 가져오고, 이름·계좌·날짜는 같은 스냅샷의 원천 값을 그대로 쓴다.
-class CalculationDetailScreen extends StatelessWidget {
+/// 2026-10-31: '계산에 포함한 계좌'(현재 계좌 잔액·남겨둘 돈·예정 지출·참고 내역·쓸 수 있는 돈)와 '계산에 포함하지 않은 계좌'
+/// (기본 접힘)로 나눈다(#163). [section]이 있으면 그 항목을 펼친 채 그 위치로 연다. [links]가 있으면 앱 상태가 바뀔 때 새
+/// 계산 결과로 다시 그리고, 계좌를 누르면 그 계좌의 입출금을, '계산할 계좌 확인'은 계좌 선택을 연다.
+class CalculationDetailScreen extends StatefulWidget {
   /// 2026-10-26: 계산을 마친 홈 결과 [calculation]으로 만든다.
-  const CalculationDetailScreen({super.key, required this.calculation});
+  /// 2026-10-31: 공통 연결 [links]와 펼칠 항목 [section]을 더했다.
+  const CalculationDetailScreen({
+    super.key,
+    required this.calculation,
+    this.links,
+    this.section,
+  });
 
   final HomeCalculationReady calculation;
+  final OverviewLinks? links;
+  final CalcSection? section;
 
   static const String footnote =
       '계획한 지출을 바탕으로 계산한 금액으로, 은행에서 출금할 수 있는 금액과는 다를 수 있어요.';
 
-  /// 2026-10-26: 머리·바·영수증·묶음·안내 문장을 세로로 반환한다.
+  /// 2026-10-31: 상태 객체를 반환한다.
+  @override
+  State<CalculationDetailScreen> createState() =>
+      _CalculationDetailScreenState();
+}
+
+/// 2026-10-31: 펼쳐 열 항목의 위치 키를 가지고, 처음 그린 뒤 그 항목이 보이게 스크롤한다.
+class _CalculationDetailScreenState extends State<CalculationDetailScreen> {
+  final GlobalKey _target = GlobalKey(debugLabel: 'detail-section');
+
+  /// 2026-10-31: 펼칠 항목이 있으면 첫 프레임 뒤 그 위치로 옮긴다.
+  @override
+  void initState() {
+    super.initState();
+    if (widget.section == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = _target.currentContext;
+      if (context != null && context.mounted) {
+        Scrollable.ensureVisible(context, alignment: 0.05);
+      }
+    });
+  }
+
+  /// 2026-10-31: 화면을 반환한다. [CalculationDetailScreen.links]가 있으면 지금 계산 결과를 따른다(계산을 마치지 못한
+  /// 결과가 오면 연 시점의 결과를 유지한다).
   @override
   Widget build(BuildContext context) {
+    final links = widget.links;
+    if (links == null) return _page(widget.calculation);
+    return ValueListenableBuilder<OverviewState>(
+      valueListenable: links.state,
+      builder: (context, state, _) => _page(switch (state.calculation) {
+        final HomeCalculationReady ready => ready,
+        _ => widget.calculation,
+      }),
+    );
+  }
+
+  /// 2026-10-26: 머리·바·영수증·묶음·안내 문장을 세로로 반환한다.
+  Widget _page(HomeCalculationReady calculation) {
     final result = calculation.result;
-    final names = SnapshotNames(calculation.snapshot);
+    final snapshot = calculation.snapshot;
+    final names = SnapshotNames(snapshot);
     final state = compositionBarStateOf(result);
     final chips = showsCompositionBar(state);
     final awaiting =
         result.salaryCycle?.state == calc.SalaryCycleState.awaitingDeposit;
+    final links = widget.links;
+    final excluded = [
+      for (final a in snapshot.accounts ?? const <Account>[])
+        if (!a.included) a,
+    ];
+    final includedCount =
+        result.accountLines?.length ??
+        (snapshot.accounts ?? const <Account>[])
+            .where((a) => a.included)
+            .length;
     return Scaffold(
       backgroundColor: PayseColors.background,
       body: SafeArea(
@@ -43,6 +104,14 @@ class CalculationDetailScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _padded(_PeriodHeader(result: result), top: PayseSpace.x1),
+                    _padded(
+                      _ScopeHeading(
+                        key: const ValueKey('detail-included-heading'),
+                        title: '계산에 포함한 계좌',
+                        count: '$includedCount개',
+                      ),
+                      top: PayseSpace.x6,
+                    ),
                     if (state == CompositionBarState.insufficient)
                       _ReceiptNotice.insufficient(
                         message: insufficientMessage(
@@ -69,12 +138,42 @@ class CalculationDetailScreen extends StatelessWidget {
                         names: names,
                         chips: chips,
                         awaiting: awaiting,
+                        section: widget.section,
+                        target: _target,
+                        onOpenAccount: links == null
+                            ? null
+                            : (id) => openInstrument(
+                                context,
+                                links,
+                                AccountInstrument(id),
+                              ),
+                        onSelectAccounts: links?.writer == null
+                            ? null
+                            : () => changeSelection(context, links!),
                       ),
-                      top: PayseSpace.x6,
+                      top: PayseSpace.x5,
                     ),
-                    _padded(_Groups(result: result, names: names)),
+                    if (excluded.isNotEmpty)
+                      _padded(
+                        _ExcludedSection(
+                          result: result,
+                          names: names,
+                          accounts: excluded,
+                          onOpenAccount: links == null
+                              ? null
+                              : (id) => openInstrument(
+                                  context,
+                                  links,
+                                  AccountInstrument(id),
+                                ),
+                        ),
+                        top: PayseSpace.x8,
+                      ),
                     _padded(
-                      const Text(footnote, style: DetailTypography.secondary),
+                      const Text(
+                        CalculationDetailScreen.footnote,
+                        style: DetailTypography.secondary,
+                      ),
                       top: PayseSpace.x6,
                     ),
                   ],
@@ -99,16 +198,56 @@ class CalculationDetailScreen extends StatelessWidget {
   );
 }
 
+/// 2026-10-31: 대분류 제목('계산에 포함한 계좌 · N개', 17/700).
+class _ScopeHeading extends StatelessWidget {
+  /// 2026-10-31: 제목 [title]과 개수 [count]로 만든다.
+  const _ScopeHeading({super.key, required this.title, required this.count});
+
+  final String title;
+  final String count;
+
+  /// 2026-10-31: 제목을 반환한다.
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      header: true,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: PayseSpace.x2),
+        child: Text.rich(
+          TextSpan(
+            text: title,
+            children: [
+              TextSpan(
+                text: ' · $count',
+                style: DetailTypography.secondary.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          style: const TextStyle(
+            fontSize: 17,
+            height: 25 / 17,
+            fontWeight: FontWeight.w700,
+            color: PayseColors.textPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// 2026-10-26: 뒤로 가기와 화면 제목.
 class _TopBar extends StatelessWidget {
   /// 2026-10-26: 인자 없이 만든다.
   const _TopBar();
 
-  /// 2026-10-26: 높이 56dp 제목 줄을 반환한다.
+  /// 2026-10-26: 높이 56dp 제목 줄을 반환한다. 2026-11-01: 위 12dp를 더해 계좌·카드 탭 제목과 같은 높이에서 시작한다.
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 56,
+    return Container(
+      height: 56 + PayseSpace.x3,
+      padding: const EdgeInsets.only(top: PayseSpace.x3),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: PayseSpace.x3),
         child: Row(
@@ -132,6 +271,9 @@ class _TopBar extends StatelessWidget {
 }
 
 /// 2026-10-26: 계산 기간·기준일·시간축·금융정보 기준 시각.
+/// 2026-11-01: 같은 날짜가 여러 줄에 반복돼 정리했다(혜연 요청). 제목은 기간 'M/D – M/D'(17/700), 그 아래 한 줄에
+/// '다음 월급일 M/D · M월 D일 HH:mm 기준', 그 아래 시간축. 입금 확인 전에는 제목 옆 '지난 계산 기간' 라벨과 둘째 줄
+/// '월급 입금 확인 전'(월급일 당일이면 '오늘 월급일 · 월급 입금 확인 전'), 기간을 모르면 '계산 기간을 정하지 못했어요'다.
 class _PeriodHeader extends StatelessWidget {
   /// 2026-10-26: 계산 결과 [result]로 만든다.
   const _PeriodHeader({required this.result});
@@ -147,44 +289,62 @@ class _PeriodHeader extends StatelessWidget {
     final known =
         state == calc.SalaryCycleState.normal ||
         state == calc.SalaryCycleState.awaitingDeposit;
+    final asOf = asOfLabel(result.context.asOf);
     final String title;
     final String sub;
+    String? label;
     if (!known) {
       title = '계산 기간을 정하지 못했어요';
-      sub = '기준일 ${md(today)}';
+      sub = asOf;
     } else {
       final start = cycle!.periodStart;
       final end = cycle.periodEnd!;
       final last = md(end.addDays(-1));
-      final range = start == null ? '~ $last' : '${md(start)} – $last';
+      title = start == null ? '~ $last' : '${md(start)} – $last';
       if (state == calc.SalaryCycleState.normal) {
-        title = '이번 계산 기간 $range';
-        sub = '기준일 ${md(today)} · 다음 월급일 ${md(end)}';
+        sub = '다음 월급일 ${md(end)} · $asOf';
       } else {
-        title = '이전 계산 기간 $range';
+        label = '지난 계산 기간';
         sub = cycle.previousPayDate!.date == today
-            ? '기준일 ${md(today)} · 오늘 월급일 · 월급 입금 확인 전'
-            : '기준일 ${md(today)} · 월급 입금 확인 전';
+            ? '오늘 월급일 · 월급 입금 확인 전 · $asOf'
+            : '월급 입금 확인 전 · $asOf';
       }
     }
     final start = known ? cycle!.periodStart : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          title,
-          style: DetailTypography.body.copyWith(fontWeight: FontWeight.w600),
-        ),
-        Text(sub, style: DetailTypography.secondary),
-        if (start != null)
-          _Timeline(start: start, end: cycle!.periodEnd!, today: today),
-        Padding(
-          padding: const EdgeInsets.only(top: 10),
-          child: Text(
-            '${financialAsOfLabel(result.context.asOf)} 금융정보 기준',
-            style: DetailTypography.secondary,
+        Text.rich(
+          key: const ValueKey('detail-period-title'),
+          TextSpan(
+            text: title,
+            children: [
+              if (label != null)
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: PayseSpace.x2),
+                    child: StatusLabel(text: label),
+                  ),
+                ),
+            ],
+          ),
+          style: const TextStyle(
+            fontSize: 17,
+            height: 25 / 17,
+            fontWeight: FontWeight.w700,
+            color: PayseColors.textPrimary,
+            fontFeatures: PayseTypography.tabular,
           ),
         ),
+        const SizedBox(height: 2),
+        Text(
+          sub,
+          key: const ValueKey('detail-period-sub'),
+          style: DetailTypography.secondary,
+        ),
+        if (start != null)
+          _Timeline(start: start, end: cycle!.periodEnd!, today: today),
       ],
     );
   }
@@ -373,20 +533,34 @@ class _ReceiptNotice extends StatelessWidget {
   }
 }
 
-/// 2026-10-26: 영수증 본문(계좌 잔액 → 모아둘 돈 → 예정 지출 → 이중선 → 쓸 수 있는 돈).
+/// 2026-10-26: 영수증 본문(계좌 잔액 → 남겨둘 돈 → 예정 지출 → 이중선 → 쓸 수 있는 돈).
+/// 2026-10-31: 예정 지출 다음에 입금 확인 후 반영할 지출과 참고 내역(출금 완료·다음 기간 지출, 기본 접힘)을 두고 그 아래에
+/// 쓸 수 있는 돈을 둔다. [section] 항목은 펼친 채 시작하고 위치 키 [target]을 붙인다.
 class _Receipt extends StatelessWidget {
   /// 2026-10-26: 계산 결과 [result], 이름 조회 [names], 색 칩 표시 여부 [chips], 입금 대기 여부 [awaiting]로 만든다.
+  /// 2026-10-31: 펼칠 항목 [section]·위치 키 [target], 계좌 열기 [onOpenAccount], 계좌 선택 열기 [onSelectAccounts]를 더했다.
   const _Receipt({
     required this.result,
     required this.names,
     required this.chips,
     required this.awaiting,
+    required this.section,
+    required this.target,
+    required this.onOpenAccount,
+    required this.onSelectAccounts,
   });
 
   final calc.CurrentAmountResult result;
   final SnapshotNames names;
   final bool chips;
   final bool awaiting;
+  final CalcSection? section;
+  final GlobalKey target;
+  final ValueChanged<String>? onOpenAccount;
+  final VoidCallback? onSelectAccounts;
+
+  /// 2026-10-31: [s]가 펼칠 항목이면 위치 키를 반환한다.
+  Key? _keyOf(CalcSection s) => section == s ? target : null;
 
   /// 2026-10-26: 영수증 행을 반환한다. 모르는 값은 '계산 불가'로 표시하고 0원으로 바꾸지 않는다.
   @override
@@ -407,16 +581,23 @@ class _Receipt extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Divider(height: 1.5, thickness: 1.5, color: PayseColors.charcoal),
-        _accountRow(),
-        ..._reserveRow(),
+        KeyedSubtree(key: _keyOf(CalcSection.balance), child: _accountRow()),
+        KeyedSubtree(
+          key: _keyOf(CalcSection.reserve),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: _reserveRow(),
+          ),
+        ),
         _ExpandableRow(
           key: const ValueKey('receipt-scheduled'),
+          anchor: _keyOf(CalcSection.scheduled),
+          initiallyOpen: section == CalcSection.scheduled,
           title: '예정 지출',
           chip: chips ? PayseColors.scheduled : null,
           label: awaiting ? '입금 확인 대기' : null,
           count: awaiting || result.e == null ? null : '$scheduledCount건',
           amount: _deduction(result.e),
-          divider: false,
           children: [
             for (final line in scheduled)
               _ScheduledItem(
@@ -427,7 +608,9 @@ class _Receipt extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: PayseSpace.x2),
+        _AwaitingGroup(result: result, names: names),
+        _ReferenceBlock(result: result, names: names),
+        const SizedBox(height: PayseSpace.x5),
         const Divider(height: 1, thickness: 1, color: PayseColors.charcoal),
         const SizedBox(height: 3),
         const Divider(height: 1, thickness: 1, color: PayseColors.charcoal),
@@ -463,7 +646,7 @@ class _Receipt extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Text(
-              '모아둘 돈과 예정 지출을 모두 확보하려면\n${formatKrw(-u)}이 더 필요해요.',
+              '남겨둘 돈과 예정 지출을 모두 확보하려면\n${formatKrw(-u)}이 더 필요해요.',
               textAlign: TextAlign.right,
               style: DetailTypography.secondary,
             ),
@@ -473,27 +656,45 @@ class _Receipt extends StatelessWidget {
   }
 
   /// 2026-10-26: 계좌 잔액 B 행. 펼치면 포함 계좌별 잔액과 월급 계좌 라벨을 보인다.
+  /// 2026-10-31: 이름을 '현재 계좌 잔액'으로 바꾸고, 계좌 줄을 누르면 그 계좌의 입출금을 열며 끝에 '계산할 계좌 확인'을 둔다.
+  /// 계좌 줄은 첫 줄 계좌 이름 … 잔액 ›, 둘째 줄 '기관 ····끝 4자리 · 월급 계좌'다(#163 후속).
   Widget _accountRow() {
     final lines = result.accountLines;
     final b = result.b;
+    final open = onOpenAccount;
     return _ExpandableRow(
       key: const ValueKey('receipt-accounts'),
-      title: '계좌 잔액',
+      initiallyOpen: section == CalcSection.balance,
+      title: '현재 계좌 잔액',
       count: lines == null ? null : '${lines.length}개',
       amount: b == null ? null : formatKrw(b),
       children: [
         for (final line in lines ?? const <calc.AccountLine>[])
-          _ItemRow(
-            name: names.accountName(line.accountId),
-            inlineSecondary: names.maskedTail(line.accountId),
-            label: names.isSalaryAccount(line.accountId) ? '월급 계좌' : null,
-            amount: formatKrw(line.balanceKrw),
+          _Tappable(
+            key: ValueKey('receipt-account-${line.accountId}'),
+            onTap: open == null ? null : () => open(line.accountId),
+            child: _ItemRow(
+              name: names.accountTitle(line.accountId),
+              secondary: [
+                names.accountShort(line.accountId),
+                if (names.isSalaryAccount(line.accountId)) '월급 계좌',
+              ].join(' · '),
+              amount: formatKrw(line.balanceKrw),
+              chevron: open == null ? null : Icons.chevron_right,
+            ),
+          ),
+        if (onSelectAccounts != null)
+          _LinkButton(
+            key: const ValueKey('receipt-select-accounts'),
+            label: '계산할 계좌 고르기',
+            onTap: onSelectAccounts!,
           ),
       ],
     );
   }
 
-  /// 2026-10-26: 모아둘 돈 R−O 행. O가 있으면 배정 설명과 보호액별 내역을, O를 모르면 설정액만 보인다.
+  /// 2026-10-26: 남겨둘 돈 R−O 행. O가 있으면 배정 설명과 보호액별 내역을, O를 모르면 설정액만 보인다.
+  /// 2026-10-31: 펼친 내용 맨 위에 '이체하지 않고 계좌에 남겨둬요'를 한 번만 둔다.
   List<Widget> _reserveRow() {
     final lines = result.reserveLines;
     final known = lines != null && lines.every((l) => l.overlaps != null);
@@ -506,14 +707,17 @@ class _Receipt extends StatelessWidget {
         : '';
     final row = _ExpandableRow(
       key: const ValueKey('receipt-reserves'),
-      title: '모아둘 돈',
+      initiallyOpen: section == CalcSection.reserve,
+      title: '남겨둘 돈',
       chip: chips ? PayseColors.reserve : null,
       amount: _deduction(rEff),
       subtitle: summary.isEmpty ? null : summary,
       divider: lines == null || known,
       children: [
-        if (known)
+        if (known && lines.isNotEmpty) ...[
+          const Text(_reserveMeaning, style: DetailTypography.secondary),
           for (final l in lines) _ReserveDetail(line: l, names: names),
+        ],
       ],
     );
     if (lines == null || known || lines.isEmpty) return [row];
@@ -553,6 +757,74 @@ class _Receipt extends StatelessWidget {
       '${formatKrw(line.usedKrw!)}은 예정 지출에 쓸 예정이에요.';
 }
 
+/// 2026-10-31: 남겨둘 돈의 뜻. 실제 이체나 별도 입금이 아니다.
+const String _reserveMeaning = '이체하지 않고 계좌에 남겨둬요.';
+
+/// 2026-10-31: 누를 수 있는 줄 감싸기. [onTap]이 없으면 그대로 둔다.
+class _Tappable extends StatelessWidget {
+  /// 2026-10-31: 내용 [child]와 누르기 [onTap]으로 만든다.
+  const _Tappable({super.key, required this.child, required this.onTap});
+
+  final Widget child;
+  final VoidCallback? onTap;
+
+  /// 2026-10-31: 줄을 반환한다(터치 최소 48dp).
+  @override
+  Widget build(BuildContext context) {
+    final tap = onTap;
+    if (tap == null) return child;
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: tap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: PayseSize.touchMin),
+          child: Align(alignment: Alignment.centerLeft, child: child),
+        ),
+      ),
+    );
+  }
+}
+
+/// 2026-10-31: 밑줄 글자 버튼('계산할 계좌 확인 ›', 터치 48dp).
+class _LinkButton extends StatelessWidget {
+  /// 2026-10-31: 문구 [label]과 누르기 [onTap]으로 만든다.
+  const _LinkButton({super.key, required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  /// 2026-10-31: 버튼을 반환한다.
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton(
+        onPressed: onTap,
+        style: TextButton.styleFrom(
+          minimumSize: const Size(44, PayseSize.touchMin),
+          padding: EdgeInsets.zero,
+          foregroundColor: PayseColors.textPrimary,
+          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                decoration: TextDecoration.underline,
+                decorationColor: PayseColors.borderStrong,
+              ),
+            ),
+            const Icon(Icons.chevron_right, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// 2026-10-26: 차감 금액 표기. 0원이 아니면 앞에 −를 붙이고, 값이 없으면 null(계산 불가)이다.
 String? _deduction(int? amountKrw) => amountKrw == null
     ? null
@@ -566,8 +838,8 @@ int _byDue(calc.ObligationLine a, calc.ObligationLine b) {
   return byDate != 0 ? byDate : a.obligationId.compareTo(b.obligationId);
 }
 
-/// 2026-10-26: 보호액 한 건의 펼침 내역. 배정이 없으면 이름(원천 그대로)과 '쓰지 않고 남겨둘 금액' 한 줄,
-/// 있으면 설정 금액·예정 지출에 쓸 금액·쓰지 않고 남겨둘 금액이다. 원천 이름을 문장에 끼워 넣지 않는다.
+/// 2026-10-26: 보호액 한 건의 펼침 내역. 배정이 없으면 이름(원천 그대로)·계좌·금액 한 줄,
+/// 있으면 설정 금액·예정 지출에 쓸 금액·계속 남겨둘 금액이다. 원천 이름을 문장에 끼워 넣지 않는다.
 class _ReserveDetail extends StatelessWidget {
   /// 2026-10-26: 계산 결과의 보호액 근거 [line]과 이름 조회 [names]로 만든다.
   const _ReserveDetail({required this.line, required this.names});
@@ -585,7 +857,6 @@ class _ReserveDetail extends StatelessWidget {
       return _ItemRow(
         name: label,
         inlineSecondary: account,
-        secondary: '쓰지 않고 남겨둘 금액',
         amount: formatKrw(line.amountKrw),
       );
     }
@@ -618,7 +889,7 @@ class _ReserveDetail extends StatelessWidget {
               color: PayseColors.dividerSection,
             ),
             _ItemRow(
-              name: '쓰지 않고 남겨둘 금액',
+              name: '계속 남겨둘 금액',
               amount: formatKrw(line.effectiveKrw!),
               strong: true,
             ),
@@ -629,8 +900,10 @@ class _ReserveDetail extends StatelessWidget {
   }
 }
 
-/// 2026-10-26: 현재 구간 예정 지출 한 건. 일부 출금이면 처음 금액·출금 완료·남은 금액을 펼쳐 보인다.
-class _ScheduledItem extends StatefulWidget {
+/// 2026-10-26: 현재 구간 예정 지출 한 건.
+/// 2026-10-31: 남은 금액을 대표 금액으로 두고, 일부 납부한 항목은 그 아래에 처음 금액·납부한 금액을 함께 보인다(남은 금액을
+/// 다시 쓰지 않음). 출금 계좌를 보조 줄에 둔다.
+class _ScheduledItem extends StatelessWidget {
   /// 2026-10-26: 의무 근거 [line], 기준일 [today], 이름 조회 [names], 보호액 근거 [reserveLines]로 만든다.
   const _ScheduledItem({
     required this.line,
@@ -644,79 +917,46 @@ class _ScheduledItem extends StatefulWidget {
   final SnapshotNames names;
   final List<calc.ReserveLine>? reserveLines;
 
-  /// 2026-10-26: 펼침 상태 객체를 반환한다.
-  @override
-  State<_ScheduledItem> createState() => _ScheduledItemState();
-}
-
-/// 2026-10-26: 일부 출금 내역의 펼침 상태(기본 접힘).
-class _ScheduledItemState extends State<_ScheduledItem> {
-  bool _open = false;
-
-  /// 2026-10-26: 항목 한 줄(일부 출금이면 누를 수 있는 줄과 펼침 내역)을 반환한다.
+  /// 2026-10-26: 항목 한 줄(일부 납부면 처음 금액·납부한 금액 포함)을 반환한다.
   @override
   Widget build(BuildContext context) {
-    final line = widget.line;
-    final names = widget.names;
     final due = line.dueDate;
-    final overdue = due.isBefore(widget.today);
+    final overdue = due.isBefore(today);
     final funding = [
-      for (final r in widget.reserveLines ?? const <calc.ReserveLine>[])
+      for (final r in reserveLines ?? const <calc.ReserveLine>[])
         if ((r.overlaps ?? const <calc.ReserveOverlap>[]).any(
           (o) => o.obligationId == line.obligationId,
         ))
           '${names.reserveLabel(r.reserveId)}에서 사용 예정',
     ];
+    final account = names.obligationAccount(line.obligationId);
     final partial = line.settledKrw > 0;
     final name = names.obligationLabel(line.obligationId);
-    if (!partial) {
-      return _ItemRow(
-        name: name,
-        label: dueLabel(due, widget.today),
-        secondary: ['예정일 ${md(due)}', ...funding].join(' · '),
-        amount: formatKrw(line.remainingKrw),
-      );
-    }
-    final header = Semantics(
-      button: true,
-      expanded: _open,
-      child: InkWell(
-        onTap: () => setState(() => _open = !_open),
-        child: _ItemRow(
-          name: name,
-          label: '일부 출금',
-          secondary: [
-            overdue ? '예정일 ${md(due)} 지남' : '예정일 ${md(due)}',
-            ...funding,
-          ].join(' · '),
-          amount: formatKrw(line.remainingKrw),
-          chevron: _open ? Icons.expand_less : Icons.expand_more,
-        ),
-      ),
+    final item = _ItemRow(
+      name: name,
+      label: partial ? '일부 출금' : dueLabel(due, today),
+      secondary: [
+        partial && overdue ? '예정일 ${md(due)} 지남' : '예정일 ${md(due)}',
+        if (account.isNotEmpty) account,
+        ...funding,
+      ].join(' · '),
+      amount: formatKrw(line.remainingKrw),
     );
-    if (!_open) return header;
+    if (!partial) return item;
     return Column(
+      key: ValueKey('scheduled-partial-${line.obligationId}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        header,
-        const SizedBox(height: PayseSpace.x3),
+        item,
+        const SizedBox(height: PayseSpace.x2),
         _Nested(
+          gap: PayseSpace.x2,
           children: [
-            _ItemRow(name: '처음 등록한 예정 금액', amount: formatKrw(line.amountKrw)),
+            _ItemRow(name: '처음 금액', amount: formatKrw(line.amountKrw)),
             _ItemRow(
-              name: '출금 완료',
+              name: '납부한 금액',
               secondary: names.settlementCaption(line.obligationId),
-              amount: formatKrw(-line.settledKrw),
-            ),
-            const Divider(
-              height: 1,
-              thickness: 1,
-              color: PayseColors.dividerSection,
-            ),
-            _ItemRow(
-              name: '남은 예정 지출',
-              amount: formatKrw(line.remainingKrw),
-              strong: true,
+              amount: formatKrw(line.settledKrw),
             ),
           ],
         ),
@@ -725,116 +965,294 @@ class _ScheduledItemState extends State<_ScheduledItem> {
   }
 }
 
-/// 2026-10-26: 영수증 아래 묶음(입금 확인 후 반영할 지출·출금 완료 내역·다음 기간 지출·제외 계좌 지출). 0건이면 그리지 않는다.
-class _Groups extends StatelessWidget {
-  /// 2026-10-26: 계산 결과 [result]와 이름 조회 [names]로 만든다.
-  const _Groups({required this.result, required this.names});
+/// 2026-10-26: 입금 확인 후 반영할 지출. 0건이면 그리지 않는다.
+class _AwaitingGroup extends StatelessWidget {
+  /// 2026-10-31: 계산 결과 [result]와 이름 조회 [names]로 만든다.
+  const _AwaitingGroup({required this.result, required this.names});
 
   final calc.CurrentAmountResult result;
   final SnapshotNames names;
 
-  /// 2026-10-26: 묶음 목록을 반환한다.
+  /// 2026-10-31: 묶음을 반환한다.
   @override
   Widget build(BuildContext context) {
-    final lines = result.obligationLines ?? const <calc.ObligationLine>[];
-    final totals = result.placementTotals ?? const {};
+    final total =
+        result.placementTotals?[calc.ObligationPlacement.awaitingSalary];
+    if (total == null) return const SizedBox.shrink();
     final today = result.context.businessDate;
-    List<calc.ObligationLine> at(calc.ObligationPlacement p) => [
-      for (final l in lines)
-        if (l.placement == p) l,
-    ]..sort(_byDue);
+    return _ExpandableRow(
+      key: const ValueKey('group-awaiting'),
+      title: '입금 확인 후 반영할 지출',
+      count: '${total.count}건',
+      amount: formatKrw(total.totalKrw),
+      weight: FontWeight.w600,
+      children: [
+        for (final l in _at(result, calc.ObligationPlacement.awaitingSalary))
+          _ItemRow(
+            name: names.obligationLabel(l.obligationId),
+            label: l.dueDate == today ? '오늘' : '예정일 지남',
+            secondary: '예정일 ${md(l.dueDate)}',
+            amount: formatKrw(l.remainingKrw),
+          ),
+      ],
+    );
+  }
+}
 
-    final waitingTotal = totals[calc.ObligationPlacement.awaitingSalary];
-    final settled = result.settledTotal;
-    final next = totals[calc.ObligationPlacement.outsidePeriod];
-    final excluded = totals[calc.ObligationPlacement.excludedAccount];
-    final paidLines = [
-      for (final l in lines)
-        if (l.settledKrw > 0 && names.isIncludedObligation(l.obligationId)) l,
-    ]..sort(_byDue);
+/// 2026-10-31: 결과 [result]에서 위치 [p]의 의무를 예정일 순으로 반환한다.
+List<calc.ObligationLine> _at(
+  calc.CurrentAmountResult result,
+  calc.ObligationPlacement p,
+) => [
+  for (final l in result.obligationLines ?? const <calc.ObligationLine>[])
+    if (l.placement == p) l,
+]..sort(_byDue);
 
-    final waiting = waitingTotal == null
-        ? null
-        : _ExpandableRow(
-            key: const ValueKey('group-awaiting'),
-            title: '입금 확인 후 반영할 지출',
-            count: '${waitingTotal.count}건',
-            amount: formatKrw(waitingTotal.totalKrw),
-            children: [
-              for (final l in at(calc.ObligationPlacement.awaitingSalary))
-                _ItemRow(
-                  name: names.obligationLabel(l.obligationId),
-                  label: l.dueDate == today ? '오늘' : '예정일 지남',
-                  secondary: '예정일 ${md(l.dueDate)}',
-                  amount: formatKrw(l.remainingKrw),
-                ),
-            ],
-          );
-    final others = <Widget>[
-      if (settled != null && settled.count > 0)
-        _ExpandableRow(
-          key: const ValueKey('group-settled'),
-          title: '출금 완료 내역',
-          count: '${settled.count}건',
-          amount: formatKrw(settled.totalKrw),
-          subtitle: '아래 지출이 빠져나간 뒤의 잔액으로 계산했어요.',
-          weight: FontWeight.w600,
-          children: [
-            for (final l in paidLines)
-              _ItemRow(
-                name: names.obligationLabel(l.obligationId),
-                secondary: names.settlementCaption(l.obligationId),
-                amount: formatKrw(l.settledKrw),
-              ),
-          ],
-        ),
-      if (next != null)
-        _ExpandableRow(
-          key: const ValueKey('group-next'),
-          title: '다음 기간 지출',
-          count: '${next.count}건',
-          amount: formatKrw(next.totalKrw),
-          subtitle: '다음 계산 기간에 나갈 돈이라, 이번 계산에서는 빼지 않아요.',
-          weight: FontWeight.w600,
-          children: [
-            for (final l in at(calc.ObligationPlacement.outsidePeriod))
-              _ItemRow(
-                name: names.obligationLabel(l.obligationId),
-                secondary: '예정일 ${md(l.dueDate)}',
-                amount: formatKrw(l.remainingKrw),
-              ),
-          ],
-        ),
-      if (excluded != null)
-        _ExpandableRow(
-          key: const ValueKey('group-excluded'),
-          title: '제외 계좌 지출',
-          count: '${excluded.count}건',
-          amount: formatKrw(excluded.totalKrw),
-          subtitle: '쓸 수 있는 돈을 계산할 때 제외한 계좌예요.',
-          weight: FontWeight.w600,
-          children: [
-            for (final l in at(calc.ObligationPlacement.excludedAccount))
-              _ItemRow(
-                name: names.obligationLabel(l.obligationId),
-                label: '계산 제외 계좌',
-                secondary:
-                    '예정일 ${md(l.dueDate)} · ${names.obligationAccount(l.obligationId)}',
-                amount: formatKrw(l.remainingKrw),
-              ),
-          ],
-        ),
+/// 2026-10-31: 참고 내역(#163). '쓸 수 있는 돈' 위, 포함 계좌 묶음 안의 옅은 바탕 접힘 영역이며 따로 빼지 않는 금액이다.
+/// 출금 완료(전액 납부가 확인돼 현재 잔액에 반영된 계산 포함 계좌의 예정 지출)와 다음 기간 지출(다음 월급일부터)을 각자
+/// 묶고, 두 묶음을 합친 금액을 만들지 않는다. 출금 완료는 화면에서 더하지 않도록 건수만 보인다. 둘 다 없으면 그리지 않는다.
+class _ReferenceBlock extends StatefulWidget {
+  /// 2026-10-31: 계산 결과 [result]와 이름 조회 [names]로 만든다.
+  const _ReferenceBlock({required this.result, required this.names});
+
+  final calc.CurrentAmountResult result;
+  final SnapshotNames names;
+
+  /// 2026-10-31: 상태 객체를 반환한다.
+  @override
+  State<_ReferenceBlock> createState() => _ReferenceBlockState();
+}
+
+/// 2026-10-31: 펼침 상태(기본 접힘).
+class _ReferenceBlockState extends State<_ReferenceBlock> {
+  bool _open = false;
+
+  /// 2026-10-31: 참고 내역을 반환한다.
+  @override
+  Widget build(BuildContext context) {
+    final result = widget.result;
+    final names = widget.names;
+    final paid = [
+      for (final l in _at(result, calc.ObligationPlacement.settled))
+        if (names.isIncludedObligation(l.obligationId)) l,
     ];
+    final nextTotal =
+        result.placementTotals?[calc.ObligationPlacement.outsidePeriod];
+    if (paid.isEmpty && nextTotal == null) return const SizedBox.shrink();
+    final end = result.salaryCycle?.periodEnd;
+    return Container(
+      key: const ValueKey('detail-reference'),
+      margin: const EdgeInsets.only(top: PayseSpace.x4),
+      decoration: BoxDecoration(
+        color: PayseColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(PayseRadius.sm),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: PayseSpace.x4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            button: true,
+            expanded: _open,
+            child: InkWell(
+              key: const ValueKey('detail-reference-toggle'),
+              onTap: () => setState(() => _open = !_open),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 56),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      size: 18,
+                      color: PayseColors.textPrimary,
+                    ),
+                    const SizedBox(width: PayseSpace.x2),
+                    const Text(
+                      '참고 내역',
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 22 / 15,
+                        fontWeight: FontWeight.w700,
+                        color: PayseColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(width: PayseSpace.x2),
+                    const Expanded(
+                      child: Text(
+                        '따로 빼지 않아요',
+                        style: DetailTypography.secondary,
+                      ),
+                    ),
+                    Icon(
+                      _open ? Icons.expand_less : Icons.expand_more,
+                      size: 18,
+                      color: PayseColors.textPrimary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (_open) ...[
+            if (paid.isNotEmpty)
+              _ExpandableRow(
+                key: const ValueKey('group-settled'),
+                title: '출금 완료',
+                count: '${paid.length}건',
+                amount: null,
+                hideAmount: true,
+                subtitle: '계좌에서 이미 빠져나갔어요',
+                weight: FontWeight.w600,
+                divider: nextTotal != null,
+                children: [
+                  for (final l in paid)
+                    _ItemRow(
+                      name: names.obligationLabel(l.obligationId),
+                      secondary: names.settlementCaption(l.obligationId),
+                      amount: formatKrw(l.settledKrw),
+                    ),
+                ],
+              ),
+            if (nextTotal != null)
+              _ExpandableRow(
+                key: const ValueKey('group-next'),
+                title: '다음 기간 지출',
+                count: '${nextTotal.count}건',
+                amount: formatKrw(nextTotal.totalKrw),
+                subtitle: end == null ? null : '${md(end)}부터',
+                weight: FontWeight.w600,
+                divider: false,
+                children: [
+                  for (final l in _at(
+                    result,
+                    calc.ObligationPlacement.outsidePeriod,
+                  ))
+                    _ItemRow(
+                      name: names.obligationLabel(l.obligationId),
+                      secondary: [
+                        '예정일 ${md(l.dueDate)}',
+                        if (names.obligationAccount(l.obligationId) case final a
+                            when a.isNotEmpty)
+                          a,
+                      ].join(' · '),
+                      amount: formatKrw(l.remainingKrw),
+                    ),
+                ],
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 2026-10-31: '계산에 포함하지 않은 계좌' 대분류(기본 접힘). 각 계좌의 현재 잔액(원천 값, 화면에서 더하지 않음) → 그 계좌의
+/// 입출금, 제외 계좌 지출. 위 계산에 섞지 않는다.
+class _ExcludedSection extends StatefulWidget {
+  /// 2026-10-31: 계산 결과 [result], 이름 조회 [names], 제외 계좌 [accounts], 계좌 열기 [onOpenAccount]로 만든다.
+  const _ExcludedSection({
+    required this.result,
+    required this.names,
+    required this.accounts,
+    required this.onOpenAccount,
+  });
+
+  final calc.CurrentAmountResult result;
+  final SnapshotNames names;
+  final List<Account> accounts;
+  final ValueChanged<String>? onOpenAccount;
+
+  /// 2026-10-31: 상태 객체를 반환한다.
+  @override
+  State<_ExcludedSection> createState() => _ExcludedSectionState();
+}
+
+/// 2026-10-31: 펼침 상태(기본 접힘).
+class _ExcludedSectionState extends State<_ExcludedSection> {
+  bool _open = false;
+
+  /// 2026-10-31: 대분류를 반환한다.
+  @override
+  Widget build(BuildContext context) {
+    final names = widget.names;
+    final open = widget.onOpenAccount;
+    final excluded = widget
+        .result
+        .placementTotals?[calc.ObligationPlacement.excludedAccount];
     return Column(
+      key: const ValueKey('detail-excluded'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (waiting != null) ...[
-          const SizedBox(height: PayseSpace.x6),
-          waiting,
-        ],
-        if (others.isNotEmpty) ...[
-          const SizedBox(height: PayseSpace.x8),
-          ...others,
+        const Divider(height: 1, thickness: 1, color: PayseColors.borderStrong),
+        Semantics(
+          button: true,
+          expanded: _open,
+          child: InkWell(
+            key: const ValueKey('detail-excluded-toggle'),
+            onTap: () => setState(() => _open = !_open),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 64),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _ScopeHeading(
+                      title: '계산에 포함하지 않은 계좌',
+                      count: '${widget.accounts.length}개',
+                    ),
+                  ),
+                  Icon(
+                    _open ? Icons.expand_less : Icons.expand_more,
+                    size: 18,
+                    color: PayseColors.textPrimary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (_open) ...[
+          for (final a in widget.accounts)
+            Container(
+              decoration: const BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: PayseColors.dividerRow),
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: PayseSpace.x2),
+              child: _Tappable(
+                key: ValueKey('excluded-account-${a.accountId}'),
+                onTap: open == null ? null : () => open(a.accountId),
+                child: _ItemRow(
+                  name: names.accountTitle(a.accountId),
+                  secondary: names.accountShort(a.accountId),
+                  amount: a.balanceKrw == null
+                      ? '잔액 미확인'
+                      : formatKrw(a.balanceKrw!),
+                  chevron: open == null ? null : Icons.chevron_right,
+                ),
+              ),
+            ),
+          if (excluded != null)
+            _ExpandableRow(
+              key: const ValueKey('group-excluded'),
+              title: '제외 계좌 지출',
+              count: '${excluded.count}건',
+              amount: formatKrw(excluded.totalKrw),
+              subtitle: '쓸 수 있는 돈을 계산할 때 빼지 않았어요.',
+              weight: FontWeight.w600,
+              children: [
+                for (final l in _at(
+                  widget.result,
+                  calc.ObligationPlacement.excludedAccount,
+                ))
+                  _ItemRow(
+                    name: names.obligationLabel(l.obligationId),
+                    secondary:
+                        '예정일 ${md(l.dueDate)} · ${names.obligationAccount(l.obligationId)}',
+                    amount: formatKrw(l.remainingKrw),
+                  ),
+              ],
+            ),
         ],
       ],
     );
@@ -846,8 +1264,12 @@ class _ExpandableRow extends StatefulWidget {
   /// 2026-10-26: 제목 [title], 색 칩 [chip], 상태 라벨 [label], 건수 [count], 금액 [amount](null이면 '계산 불가'),
   /// 보조 문장 [subtitle], 제목 굵기 [weight], 펼침 내용 [children],
   /// 아래 구분선 [divider]로 만든다.
+  /// 2026-10-31: 처음 펼침 [initiallyOpen], 머리에 붙일 위치 키 [anchor], 금액 칸 비우기 [hideAmount]를 더했다.
   const _ExpandableRow({
     super.key,
+    this.initiallyOpen = false,
+    this.anchor,
+    this.hideAmount = false,
     required this.title,
     this.chip,
     this.label,
@@ -868,6 +1290,9 @@ class _ExpandableRow extends StatefulWidget {
   final FontWeight weight;
   final List<Widget> children;
   final bool divider;
+  final bool initiallyOpen;
+  final Key? anchor;
+  final bool hideAmount;
 
   /// 2026-10-26: 펼침 상태 객체를 반환한다.
   @override
@@ -876,7 +1301,7 @@ class _ExpandableRow extends StatefulWidget {
 
 /// 2026-10-26: 행의 펼침 상태(처음에는 접힘).
 class _ExpandableRowState extends State<_ExpandableRow> {
-  bool _open = false;
+  late bool _open = widget.initiallyOpen;
 
   /// 2026-10-26: 행과 펼친 내용을 반환한다.
   @override
@@ -887,6 +1312,7 @@ class _ExpandableRowState extends State<_ExpandableRow> {
     final style = DetailTypography.row.copyWith(fontWeight: w.weight);
     final amount = w.amount;
     final head = ConstrainedBox(
+      key: w.anchor,
       constraints: const BoxConstraints(minHeight: 56),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -934,13 +1360,14 @@ class _ExpandableRowState extends State<_ExpandableRow> {
                   ),
                 ),
                 const SizedBox(width: PayseSpace.x2),
-                _AmountText(
-                  text: amount ?? '계산 불가',
-                  semantics: amount ?? '계산 불가',
-                  style: amount == null
-                      ? style.copyWith(color: PayseColors.textSecondary)
-                      : style,
-                ),
+                if (!w.hideAmount)
+                  _AmountText(
+                    text: amount ?? '계산 불가',
+                    semantics: amount ?? '계산 불가',
+                    style: amount == null
+                        ? style.copyWith(color: PayseColors.textSecondary)
+                        : style,
+                  ),
                 const SizedBox(width: PayseSpace.x2),
                 SizedBox(
                   width: 18,
@@ -1032,7 +1459,9 @@ class _ItemRow extends StatelessWidget {
         ? DetailTypography.body.copyWith(fontWeight: FontWeight.w700)
         : DetailTypography.body;
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: chevron == Icons.chevron_right
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
         Expanded(
           child: Column(
@@ -1212,6 +1641,12 @@ class SnapshotNames {
         '${institutionName(snapshot, a.institutionCode)} ${a.productName}';
   }
 
+  /// 2026-10-31: 기관을 둘째 줄에 따로 쓰는 계좌 줄의 이름(별명이 있으면 별명, 없으면 상품명).
+  String accountTitle(String accountId) {
+    final a = _accounts[accountId]!;
+    return a.nickname ?? a.productName;
+  }
+
   /// 2026-10-26: 계좌 번호 끝 4자리 표기('····0001').
   String maskedTail(String accountId) {
     final masked = _accounts[accountId]!.maskedNumber;
@@ -1231,7 +1666,7 @@ class SnapshotNames {
 
   /// 2026-10-26: 보호액 이름.
   String reserveLabel(String reserveId) =>
-      _reserves[reserveId]?.label ?? '모아둘 돈';
+      _reserves[reserveId]?.label ?? '남겨둘 돈';
 
   /// 2026-10-26: 의무 이름.
   String obligationLabel(String obligationId) =>

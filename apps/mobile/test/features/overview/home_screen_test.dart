@@ -7,10 +7,10 @@ import 'package:payse/features/overview/calculation_detail_screen.dart';
 import 'package:payse/features/overview/composition_bar.dart';
 import 'package:payse/features/overview/cycle_moon.dart';
 import 'package:payse/features/overview/home_screen.dart';
+import 'package:payse/features/overview/overview_links.dart';
 import 'package:payse/features/overview/home_skeleton.dart';
 import 'package:payse/shared/design/amount_hero.dart';
 import 'package:payse/shared/design/payse_theme.dart';
-import 'package:payse/shared/design/primary_button.dart';
 
 import '../../data/calculation_input_adapter_test.dart'
     show alphaWithReceipt, salaryOf, septemberSalaryTx;
@@ -67,7 +67,27 @@ void main() {
     final r = calculation.result;
     expect(r.b! - r.rEff! - r.e!, r.u, reason: '장부 금액의 합이 U와 같다');
     await tester.pumpWidget(home(calculation));
-    expect(find.text(HomeScreen.amountLabel), findsOneWidget);
+    expect(find.textContaining(HomeScreen.amountLabel), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('amount-label-chip')),
+      findsOneWidget,
+      reason: '쓸 수 있는 돈 뒤 노란 칩(구성 바가 있을 때)',
+    );
+    final chevron = find.byKey(const ValueKey('home-detail-button'));
+    expect(chevron, findsOneWidget, reason: '계산 내역 진입 ›는 큰 금액 오른쪽');
+    expect(
+      tester.getCenter(chevron).dx,
+      greaterThan(
+        tester
+            .getTopRight(find.textContaining('1,300,000', findRichText: true))
+            .dx,
+      ),
+    );
+    expect(
+      find.text('계산 내역 보기'),
+      findsNothing,
+      reason: '이번 기간 내역 보기와 헷갈려 글자 진입은 두지 않는다',
+    );
     expect(find.text('월급까지 6일'), findsOneWidget);
     expect(find.text('9/25 – 10/24'), findsOneWidget);
     expect(find.text('10월 19일 12:00 기준'), findsOneWidget);
@@ -75,6 +95,7 @@ void main() {
       find.textContaining('1,300,000', findRichText: true),
       findsOneWidget,
     );
+    expectRow('home-row-balance', '계산에 포함한 계좌 잔액');
     expectRow('home-row-balance', '2,000,000원');
     expectRow('home-row-reserve', '−340,000원');
     expectRow('home-row-reserve', '1건');
@@ -88,15 +109,39 @@ void main() {
     expect(find.byKey(const ValueKey('home-negative-notice')), findsNothing);
   });
 
-  testWidgets('정상: 장부의 모아둘 돈·예정 지출 행은 02-2 계산 내역을 연다', (tester) async {
+  testWidgets('정상: 장부의 세 행은 02-2 계산 내역의 같은 항목을 펼쳐 연다', (tester) async {
     final calculation = calculate(alphaWithReceipt()) as HomeCalculationReady;
     await tester.pumpWidget(home(calculation));
-    await tester.tap(find.byKey(const ValueKey('home-row-scheduled')));
-    await tester.pumpAndSettle();
-    final screen = tester.widget<CalculationDetailScreen>(
-      find.byType(CalculationDetailScreen),
-    );
-    expect(identical(screen.calculation, calculation), isTrue);
+    for (final (row, section) in [
+      ('home-row-balance', CalcSection.balance),
+      ('home-row-reserve', CalcSection.reserve),
+      ('home-row-scheduled', CalcSection.scheduled),
+    ]) {
+      await tester.tap(find.byKey(ValueKey(row)));
+      await tester.pumpAndSettle();
+      final screen = tester.widget<CalculationDetailScreen>(
+        find.byType(CalculationDetailScreen),
+      );
+      expect(identical(screen.calculation, calculation), isTrue);
+      expect(screen.section, section, reason: row);
+      await tester.tap(find.byTooltip('뒤로'));
+      await tester.pumpAndSettle();
+    }
+  });
+
+  testWidgets('정상: 금액 영역과 금액 옆 ›는 02-2를 펼침 없이 연다', (tester) async {
+    final calculation = calculate(alphaWithReceipt()) as HomeCalculationReady;
+    await tester.pumpWidget(home(calculation));
+    for (final key in ['home-amount', 'home-detail-button']) {
+      await tester.tap(find.byKey(ValueKey(key)));
+      await tester.pumpAndSettle();
+      final screen = tester.widget<CalculationDetailScreen>(
+        find.byType(CalculationDetailScreen),
+      );
+      expect(screen.section, isNull, reason: key);
+      await tester.tap(find.byTooltip('뒤로'));
+      await tester.pumpAndSettle();
+    }
   });
 
   testWidgets('머리의 다시 불러오기 아이콘은 진입 조회를 다시 실행한다', (tester) async {
@@ -117,7 +162,7 @@ void main() {
     expect(find.byKey(const ValueKey('home-negative-notice')), findsOneWidget);
     expect(find.text('계획한 금액보다 잔액이 부족해요'), findsOneWidget);
     expect(
-      find.text('모아둘 돈과 예정 지출을 모두 확보하려면 500,000원이 더 필요해요.'),
+      find.text('남겨둘 돈과 예정 지출을 모두 확보하려면 500,000원이 더 필요해요.'),
       findsOneWidget,
     );
     expect(find.textContaining('−500,000', findRichText: true), findsOneWidget);
@@ -144,11 +189,20 @@ void main() {
     expectRow('home-row-balance', '2,000,000원');
     expectRow('home-row-reserve', '계산 불가');
     expectRow('home-row-scheduled', '계산 불가');
-    for (final row in [
-      'home-row-balance',
-      'home-row-reserve',
-      'home-row-scheduled',
-    ]) {
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('home-row-balance')),
+        matching: find.byIcon(Icons.chevron_right),
+      ),
+      findsOneWidget,
+      reason: '값을 아는 계좌 잔액 행은 계산 내역을 연다',
+    );
+    expect(
+      find.byKey(const ValueKey('amount-label-chip')),
+      findsNothing,
+      reason: '구성 바가 없으면 칩도 없다',
+    );
+    for (final row in ['home-row-reserve', 'home-row-scheduled']) {
       expect(
         find.descendant(
           of: find.byKey(ValueKey(row)),
@@ -540,10 +594,11 @@ void main() {
       expect(find.byKey(const ValueKey('home-reload')), findsNothing);
       expect(find.byType(MoonSkeleton), findsOneWidget);
       expect(find.byType(LoadingMoon), findsOneWidget);
-      final button = tester.widget<PrimaryButton>(
+      expect(
         find.byKey(const ValueKey('home-detail-button')),
+        findsNothing,
+        reason: '로딩 중에는 계산 내역 진입을 두지 않는다',
       );
-      expect(button.onPressed, isNull);
     });
 
     testWidgets('동작 줄이기 설정이면 로딩 달이 반달로 멈춘다', (tester) async {
@@ -592,8 +647,8 @@ void main() {
         return {
           for (final name in [
             HomeScreen.amountLabel,
-            '계좌 잔액',
-            '모아둘 돈',
+            '계산에 포함한 계좌 잔액',
+            '남겨둘 돈',
             '예정 지출',
           ])
             name: tester.getRect(
@@ -603,9 +658,6 @@ void main() {
             refresh == HomeRefresh.loading
                 ? find.byType(MoonSkeleton)
                 : find.byKey(const ValueKey('home-cycle-moon')),
-          ),
-          'detail': tester.getRect(
-            find.byKey(const ValueKey('home-detail-button')),
           ),
         };
       }
@@ -749,14 +801,7 @@ void main() {
       expect(find.text('다시 시도'), findsOneWidget);
       expect(find.textContaining('원', findRichText: true), findsNothing);
       expect(moonLit(tester), isNull);
-      expect(
-        tester
-            .widget<PrimaryButton>(
-              find.byKey(const ValueKey('home-detail-button')),
-            )
-            .onPressed,
-        isNull,
-      );
+      expect(find.byKey(const ValueKey('home-detail-button')), findsNothing);
     });
 
     for (final (name, refresh, json) in [

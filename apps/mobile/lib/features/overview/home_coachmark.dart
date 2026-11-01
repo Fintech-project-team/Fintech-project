@@ -9,7 +9,7 @@ enum CoachmarkVariant { computed, receiptAbsent, otherInsufficient }
 
 /// 2026-10-28: 02-1a 홈 코치마크(#28 5단계, 캔버스 Coach1~3·Coach1Insuff 확정). 홈 위에 charcoal 50% 덮개를 씌우고
 /// 강조 영역은 실제 홈을 드러낸 채 1.5px moonYellow 테두리만 그린다. 설명은 '계산 내역 보기' 위 8dp에 아래 끝을 고정한
-/// charcoal 안내 면이다. 강조 위치는 [amountRect]·[detailRect]·[planRect]가 돌려주는 실제 위젯 위치(전역 좌표)로 그린다.
+/// charcoal 안내 면이다. 2026-10-31: '계산 내역 보기'가 금액 아래로 옮겨(#163) 안내 면은 하단 탭 위 8dp에 고정한다. 강조 위치는 [amountRect]·[detailRect]·[planRect]가 돌려주는 실제 위젯 위치(전역 좌표)로 그린다.
 class HomeCoachmark extends StatefulWidget {
   /// 2026-10-28: 1단계 문구 [variant], 대상 위치 함수 [amountRect]·[detailRect]·[planRect], 닫을 때 [onDone]으로 만든다.
   const HomeCoachmark({
@@ -41,30 +41,32 @@ class _HomeCoachmarkState extends State<HomeCoachmark> {
   final GlobalKey _panel = GlobalKey();
   int _step = 0;
   Rect? _hole;
-  Rect? _detail;
+  Rect? _nav;
   double? _panelTop;
 
-  /// 2026-10-28: 단계별 강조 반경. 계산 내역 보기 띠는 화면 폭 전체라 0이다.
-  static const List<double> _radius = [12, 0, 12];
+  /// 2026-10-28: 단계별 강조 반경.
+  /// 2026-10-31: '계산 내역 보기'가 금액 아래 글자 버튼으로 옮겨 다른 단계와 같은 12다(#163). 2026-11-01부터 ②는 금액
+  /// 오른쪽 '›'(8dp 넓힘)를 강조한다.
+  static const List<double> _radius = [12, 12, 12];
 
   /// 2026-10-28: 단계별 제목·설명.
   (String, String) _copy() => switch (_step) {
     0 => switch (widget.variant) {
       CoachmarkVariant.computed => (
         '지금 쓸 수 있는 돈이에요',
-        '계좌 잔액에서 모아둘 돈과 예정 지출을 빼고 계산해요.',
+        '계좌 잔액에서 남겨둘 돈과 예정 지출을 빼고 계산해요.',
       ),
       CoachmarkVariant.receiptAbsent => (
         '월급 입금을 확인하면 계산해요',
-        '입금이 확인되면 계좌 잔액에서 모아둘 돈과 예정 지출을 빼고 계산해요.',
+        '입금이 확인되면 계좌 잔액에서 남겨둘 돈과 예정 지출을 빼고 계산해요.',
       ),
       CoachmarkVariant.otherInsufficient => (
         '필요한 정보가 확인되면 계산해요',
-        '정보가 확인되면 계좌 잔액에서 모아둘 돈과 예정 지출을 빼고 계산해요.',
+        '정보가 확인되면 계좌 잔액에서 남겨둘 돈과 예정 지출을 빼고 계산해요.',
       ),
     },
     1 => ('어떻게 계산했는지 확인해 보세요', '계좌별 잔액과 계산에 반영한 지출을 확인할 수 있어요.'),
-    _ => ('계획은 여기서 관리해요', '예정 지출과 모아둘 돈을 확인하고 수정할 수 있어요.'),
+    _ => ('계획은 여기서 관리해요', '예정 지출과 남겨둘 돈을 확인하고 수정할 수 있어요.'),
   };
 
   /// 2026-10-28: 이 단계의 강조 대상 전역 위치를 반환한다. 금액 영역은 좌우·위아래 8dp 넓힌다.
@@ -82,15 +84,15 @@ class _HomeCoachmarkState extends State<HomeCoachmark> {
     final origin = box.localToGlobal(Offset.zero);
     Rect? local(Rect? r) => r?.shift(-origin);
     final hole = local(_target());
-    final detail = local(widget.detailRect());
+    final nav = local(widget.planRect());
     final panel = _panel.currentContext?.findRenderObject() as RenderBox?;
     final panelTop = panel == null || !panel.hasSize
         ? null
         : panel.localToGlobal(Offset.zero).dy - origin.dy;
-    if (hole != _hole || detail != _detail || panelTop != _panelTop) {
+    if (hole != _hole || nav != _nav || panelTop != _panelTop) {
       setState(() {
         _hole = hole;
-        _detail = detail;
+        _nav = nav;
         _panelTop = panelTop;
       });
     }
@@ -130,10 +132,10 @@ class _HomeCoachmarkState extends State<HomeCoachmark> {
         key: _layer,
         builder: (context, constraints) {
           final size = constraints.biggest;
-          final detail = _detail;
-          final panelBottom = detail == null
+          final nav = _nav;
+          final panelBottom = nav == null
               ? PayseSpace.x2
-              : size.height - detail.top + PayseSpace.x2;
+              : size.height - nav.top + PayseSpace.x2;
           return BlockSemantics(
             child: Material(
               type: MaterialType.transparency,

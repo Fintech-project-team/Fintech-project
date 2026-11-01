@@ -3,16 +3,17 @@ import 'package:flutter/material.dart';
 import '../../data/connection/financial_api.dart';
 import '../../data/connection/transaction_history.dart';
 import '../../data/financial_snapshot.dart';
+import '../../shared/design/payse_symbols.dart';
 import '../../shared/design/payse_tokens.dart';
 import '../connection/connection_review.dart';
 import 'home_screen.dart' show asOfLabel;
+import 'period_flow.dart' show transferPairs;
 import 'pull_refresh.dart';
+import 'tab_header.dart';
+import 'transaction_feed.dart';
 import 'transaction_query.dart';
 import 'transaction_rules.dart';
 import 'transaction_sheets.dart';
-
-/// 2026-10-30: 거래 내역 수집 상태.
-enum _Load { loading, ready, failed }
 
 /// 2026-10-30: 02-4 거래 내역(apps/mobile/docs/accounts-transactions.md §4, 29-2 명세). 계좌 내역과 카드 기록을 한 목록에
 /// 날짜 최신순으로 보이고, 기간·거래 수단·거래 종류는 각자의 선택 시트로 바꾼다. [accountId]가 있으면 그 계좌로 고정한
@@ -23,14 +24,25 @@ class TransactionsScreen extends StatefulWidget {
   /// 고정 계좌 [accountId]로 만든다.
   /// 2026-10-30: 아래로 당겨 새로고침 [onRefresh], 그 성공 뒤 처리 [onRefreshed], 새로고침으로 이미 받은 거래 전체
   /// [history](자료 버전이 [snapshot]과 같으면 다시 받지 않고 쓴다)를 더했다.
+  /// 2026-10-31: 고정 카드 [cardId](사용·환불·취소 기록만), 목록 위 머리 [header], 전체 조회의 '계좌·카드별 보기'
+  /// [onPickInstrument](없으면 두지 않음)를 더했다(#163).
+  /// 2026-10-31: 처음 기간 [initialPeriod](없으면 이번 달), 기간 시트에 둘 물려받은 월급 주기 [inheritedPeriod], 기간을 바꿀
+  /// 때 알림 [onPeriodChanged]를 더했다(#163 후속, 들어온 화면의 기간 유지).
   const TransactionsScreen({
     required this.snapshot,
     this.repository,
     this.onSessionInvalid,
     this.accountId,
+    this.cardId,
+    this.header,
+    this.onPickInstrument,
     this.history,
     this.onRefresh,
     this.onRefreshed,
+    this.feed,
+    this.initialPeriod,
+    this.inheritedPeriod,
+    this.onPeriodChanged,
     super.key,
   });
 
@@ -38,9 +50,18 @@ class TransactionsScreen extends StatefulWidget {
   final UserFinancialRepository? repository;
   final VoidCallback? onSessionInvalid;
   final String? accountId;
+  final String? cardId;
+  final Widget? header;
+  final VoidCallback? onPickInstrument;
   final TransactionHistoryReady? history;
   final PullRefresh? onRefresh;
   final ValueChanged<TransactionHistoryReady>? onRefreshed;
+
+  /// 2026-10-31: 함께 쓰는 거래 수집 상태. 있으면 [snapshot]·[repository]·[history] 대신 이 상태를 따른다.
+  final TransactionFeed? feed;
+  final PeriodSelection? initialPeriod;
+  final PeriodSelection? inheritedPeriod;
+  final ValueChanged<PeriodSelection>? onPeriodChanged;
 
   /// 2026-10-30: 상태 객체를 반환한다.
   @override
@@ -48,103 +69,79 @@ class TransactionsScreen extends StatefulWidget {
 }
 
 /// 2026-10-30: 조회 조건·수집 결과를 가진다. 새 Snapshot(자료 버전 변경)이 오면 다시 수집하고 조건은 유지한다.
+/// 2026-10-31: 수집은 [TransactionFeed]가 맡는다. [TransactionsScreen.feed]가 있으면 그것을 함께 쓰고, 없으면 직접 만든다.
 class _TransactionsScreenState extends State<TransactionsScreen> {
-  _Load _load = _Load.loading;
-  bool _stale = false;
-  FinancialSnapshot? _base;
-  List<SourceTransaction> _all = const [];
-  List<Coverage> _coverage = const [];
-  int _request = 0;
-  late TransactionQuery _query = widget.accountId == null
-      ? const TransactionQuery()
-      : TransactionQuery(accountIds: {widget.accountId!}, cardIds: const {});
+  late TransactionQuery _query = TransactionQuery(
+    period: widget.initialPeriod ?? PeriodSelection.thisMonth,
+    accountIds: widget.accountId != null
+        ? {widget.accountId!}
+        : widget.cardId != null
+        ? const {}
+        : null,
+    cardIds: widget.accountId != null
+        ? const {}
+        : widget.cardId != null
+        ? {widget.cardId!}
+        : null,
+  );
   final ScrollController _scroll = ScrollController();
+  TransactionFeed? _own;
 
-  /// 2026-10-30: 처음 수집한다.
+  TransactionFeed get _feed => widget.feed ?? (_own ??= _newFeed());
+
+  /// 2026-10-31: 이 화면만 쓰는 수집 상태를 만든다.
+  TransactionFeed _newFeed() => TransactionFeed(
+    snapshot: widget.snapshot,
+    repository: widget.repository,
+    onSessionInvalid: widget.onSessionInvalid,
+    history: widget.history,
+  );
+
+  /// 2026-10-31: 수집 상태가 바뀌면 다시 그린다.
   @override
   void initState() {
     super.initState();
-    _collect();
+    _feed.addListener(_changed);
   }
+
+  /// 2026-10-31: 수집 상태 변경을 화면에 반영한다.
+  void _changed() => setState(() {});
 
   /// 2026-10-30: 자료 버전이 바뀐 Snapshot이면 다시 수집한다. 새로고침으로 받은 거래가 새로 오면 그것을 쓴다.
   @override
   void didUpdateWidget(covariant TransactionsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.snapshot.dataVersion != widget.snapshot.dataVersion ||
-        (widget.history != oldWidget.history && _matchingHistory != null)) {
-      _collect();
+    if (oldWidget.feed != widget.feed) {
+      (oldWidget.feed ?? _own)?.removeListener(_changed);
+      _feed.addListener(_changed);
     }
+    if (widget.feed == null) _feed.update(widget.snapshot, widget.history);
   }
 
-  /// 2026-10-30: 현재 Snapshot과 자료 버전이 같은 받아 둔 거래 전체. 없으면 null이다.
-  TransactionHistoryReady? get _matchingHistory {
-    final h = widget.history;
-    return h != null && h.snapshot.dataVersion == widget.snapshot.dataVersion
-        ? h
-        : null;
-  }
-
-  /// 2026-10-30: 스크롤 컨트롤러를 폐기한다.
+  /// 2026-10-30: 스크롤 컨트롤러와 직접 만든 수집 상태를 폐기한다.
   @override
   void dispose() {
+    _feed.removeListener(_changed);
+    _own?.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
-  /// 2026-10-30: 모든 페이지를 받는다. 실패하면 이전 완료 결과가 있으면 유지하고 안내 띠를, 없으면 조회 실패를 보인다.
-  Future<void> _collect() async {
-    final request = ++_request;
-    final repo = widget.repository;
-    final first = widget.snapshot;
-    setState(() {
-      if (_base == null) _load = _Load.loading;
-    });
-    final TransactionHistoryResult result;
-    if (_matchingHistory case final ready?) {
-      result = ready;
-    } else if (repo == null || first.nextTransactionCursor == null) {
-      result = TransactionHistoryReady(
-        snapshot: first,
-        transactions: first.transactions ?? const [],
-        coverage: first.coverage,
-      );
-    } else {
-      result = await TransactionHistoryCollector(repo).collect(first);
-    }
-    if (!mounted || request != _request) return;
-    switch (result) {
-      case TransactionHistoryReady(
-        :final snapshot,
-        :final transactions,
-        :final coverage,
-      ):
-        setState(() {
-          _base = snapshot;
-          _all = transactions;
-          _coverage = coverage;
-          _load = _Load.ready;
-          _stale = false;
-        });
-      case TransactionHistorySessionInvalid():
-        widget.onSessionInvalid?.call();
-      case TransactionHistoryFailed():
-        setState(() {
-          if (_base == null) {
-            _load = _Load.failed;
-          } else {
-            _stale = true;
-          }
-        });
-    }
-  }
+  TxLoad get _load => _feed.load;
+  bool get _stale => _feed.stale;
+  List<SourceTransaction> get _all => _feed.all;
+  List<Coverage> get _coverage => _feed.coverage;
+  Future<void> _collect() => _feed.collect();
 
-  FinancialSnapshot get _snap => _base ?? widget.snapshot;
+  FinancialSnapshot get _snap => _feed.snapshot;
   QueryBounds get _bounds => QueryBounds.of(_snap, _coverage);
   bool get _fixed => widget.accountId != null;
+  bool get _fixedCard => widget.cardId != null;
+  bool get _pinned => _fixed || _fixedCard;
 
   /// 2026-10-30: 조건을 [next]로 바꾸고 목록 맨 위로 간다.
   void _apply(TransactionQuery next) {
+    if (next.period != _query.period) widget.onPeriodChanged?.call(next.period);
     setState(() => _query = next);
     if (_scroll.hasClients) _scroll.jumpTo(0);
   }
@@ -153,7 +150,11 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   Future<void> _pickPeriod() async {
     final picked = await showPayseSheet<PeriodSelection>(
       context,
-      PeriodSheet(bounds: _bounds, current: _query.period),
+      PeriodSheet(
+        bounds: _bounds,
+        current: _query.period,
+        inherited: widget.inheritedPeriod,
+      ),
     );
     if (picked != null) _apply(_query.withPeriod(picked));
   }
@@ -180,7 +181,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             (TxType.accountOut, '출금'),
           ]
         : <(TxType?, String)>[
-            (null, '전체'),
+            (null, '모든 내역'),
             for (final t in _query.availableTypes) (t, t.label),
           ];
     final picked = await showPayseSheet<({TxType? value})>(
@@ -195,6 +196,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   /// 2026-10-30: 거래 [t]의 상세 시트를 연다. 원거래는 ID로 실제 확보했을 때만 넘긴다.
+  /// 2026-11-01: 근거 있는 내 계좌 이체면 상대 거래도 넘겨 상세에서 상대 계좌를 보인다.
   void _open(SourceTransaction t) {
     final id = t.originalTransactionId;
     SourceTransaction? original;
@@ -203,12 +205,21 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         if (o.transactionId == id) original = o;
       }
     }
+    SourceTransaction? peer;
+    for (final (from, to) in transferPairs(
+      _all,
+      _snap.transactionRelations ?? const [],
+    )) {
+      if (from.transactionId == t.transactionId) peer = to;
+      if (to.transactionId == t.transactionId) peer = from;
+    }
     showPayseSheet<void>(
       context,
       TransactionDetailSheet(
         snapshot: _snap,
         transaction: t,
         original: original,
+        peer: peer,
       ),
     );
   }
@@ -247,7 +258,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   Widget build(BuildContext context) {
     final bounds = _bounds;
     final month = bounds.monthOf(_query.period);
-    final list = _load == _Load.ready
+    final list = _load == TxLoad.ready
         ? filterAndSort(_all, _query, bounds)
         : const <SourceTransaction>[];
     final missing = _missingNotice();
@@ -266,7 +277,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               onRetry: _collect,
             ),
           ),
-        if (missing != null && _load == _Load.ready)
+        if (missing != null && _load == TxLoad.ready)
           SliverToBoxAdapter(
             child: NoticeBand(
               key: const ValueKey('tx-band-partial'),
@@ -274,43 +285,69 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               body: missing.$2,
             ),
           ),
+        if (widget.header case final header?) SliverToBoxAdapter(child: header),
         SliverPadding(
           padding: const EdgeInsets.symmetric(
             horizontal: PayseSpace.screenHorizontal,
           ),
           sliver: SliverList.list(
             children: [
-              const SizedBox(height: PayseSpace.x3),
-              _periodHeader(bounds, month),
-              const SizedBox(height: PayseSpace.x2),
-              Wrap(
-                spacing: PayseSpace.x2,
-                runSpacing: PayseSpace.x2,
-                children: [
-                  if (!_fixed)
-                    _Chip(
+              if (_pinned)
+                Padding(
+                  padding: const EdgeInsets.only(top: PayseSpace.x2),
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    runSpacing: PayseSpace.x2,
+                    children: [
+                      _periodHeader(bounds, month, compact: true),
+                      TxChip(
+                        key: const ValueKey('chip-type'),
+                        label: _typeChip(),
+                        onTap: _pickType,
+                      ),
+                    ],
+                  ),
+                )
+              else ...[
+                const SizedBox(height: tabTopGap),
+                const TabScope('연결한 모든 계좌·카드', key: ValueKey('tx-scope')),
+                _periodHeader(bounds, month),
+                _basis(),
+                if (widget.onPickInstrument case final pick?) ...[
+                  const SizedBox(height: PayseSpace.x1),
+                  TabLinkRow(
+                    key: const ValueKey('tx-pick-instrument'),
+                    label: '계좌·카드별 보기',
+                    trailing:
+                        '계좌 ${_snap.accounts?.length ?? 0}개 · '
+                        '카드 ${_snap.cards?.length ?? 0}개',
+                    onTap: pick,
+                  ),
+                ],
+                Wrap(
+                  spacing: PayseSpace.x2,
+                  runSpacing: PayseSpace.x2,
+                  children: [
+                    TxChip(
                       key: const ValueKey('chip-means'),
                       label: _meansChip(),
                       onTap: _pickMeans,
                     ),
-                  if (!_fixed || _query.hasAccounts)
-                    _Chip(
+                    TxChip(
                       key: const ValueKey('chip-type'),
                       label: _typeChip(),
                       onTap: _pickType,
                     ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                _load == _Load.loading
-                    ? '거래 내역을 불러오는 중이에요'
-                    : _fixed
-                    ? asOfLabel(_snap.asOf)
-                    : '${asOfLabel(_snap.asOf)} · 연결된 계좌와 카드의 거래 내역이에요',
-                key: const ValueKey('tx-basis'),
-                style: PayseTypography.caption,
-              ),
+                  ],
+                ),
+              ],
+              if (_pinned &&
+                  (_load == TxLoad.loading || !_fixed || widget.header == null))
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: _basis(),
+                ),
               ..._body(list),
               const SizedBox(height: PayseSpace.x6),
             ],
@@ -319,6 +356,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       ],
     );
   }
+
+  /// 2026-11-01: 기준 시각 줄(불러오는 중이면 그 안내).
+  Widget _basis() => Text(
+    _load == TxLoad.loading ? '거래 내역을 불러오는 중이에요' : asOfLabel(_snap.asOf),
+    key: const ValueKey('tx-basis'),
+    style: PayseTypography.caption,
+  );
 
   /// 2026-10-30: 거래 종류 칩 문구(계좌별은 입출금).
   String _typeChip() {
@@ -330,19 +374,31 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         _ => '입출금 전체',
       };
     }
-    return type?.label ?? '거래 종류 전체';
+    return type?.label ?? '모든 내역';
   }
 
   /// 2026-10-30: 기간 머리. 달 단위면 '‹ 2026년 10월 ▾ ›'(가운데), 최근 기간이면 제목과 실제 범위(화살표 없음).
-  Widget _periodHeader(QueryBounds bounds, String? month) {
+  /// 2026-10-31: [compact]면 계좌·카드별 조회용으로 왼쪽 정렬하고 거래 종류 칩과 한 줄에 둔다. 월급 주기는 제목이 곧 범위다.
+  /// 2026-11-01: 전체 거래(20/700)는 '‹ 기간 ▾ ›' 묶음을 화면 가운데에, 계좌·카드별 조회(17/700)는 왼쪽에 두고
+  /// (혜연 요청), 제목이 '‹'·'›' 사이 가운데에 오게 한다. '▾' 아이콘 글자 오른쪽에 약 4dp 빈 공간이 있어
+  /// 오른쪽 여백을 그만큼 줄여 보이는 간격을 맞춘다(실기기 픽셀 측정).
+  Widget _periodHeader(
+    QueryBounds bounds,
+    String? month, {
+    bool compact = false,
+  }) {
     final title = TextButton(
       key: const ValueKey('period-title'),
       onPressed: _pickPeriod,
       style: TextButton.styleFrom(
         minimumSize: const Size(44, PayseSize.touchMin),
-        padding: const EdgeInsets.symmetric(horizontal: PayseSpace.x2),
+        padding: month == null
+            ? const EdgeInsets.only(right: PayseSpace.x2)
+            : const EdgeInsets.only(left: PayseSpace.x2, right: PayseSpace.x1),
         foregroundColor: PayseColors.textPrimary,
-        textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+        textStyle: compact
+            ? const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)
+            : tabKeyStyle,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -361,67 +417,70 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     );
     if (month == null) {
       return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           title,
-          Text(
-            bounds.rangeText(_query.period),
-            key: const ValueKey('period-range'),
-            style: PayseTypography.caption,
-          ),
+          if (_query.period.kind != PeriodKind.cycle)
+            Text(
+              bounds.rangeText(_query.period),
+              key: const ValueKey('period-range'),
+              style: PayseTypography.caption,
+            ),
         ],
       );
     }
     final prev = bounds.shift(month, -1);
     final next = bounds.shift(month, 1);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    final prevButton = IconButton(
+      key: const ValueKey('period-prev'),
+      tooltip: '이전 달 보기',
+      onPressed: prev == null ? null : () => _apply(_query.withPeriod(prev)),
+      icon: const Icon(Icons.chevron_left),
+    );
+    final nextButton = IconButton(
+      key: const ValueKey('period-next'),
+      tooltip: '다음 달 보기',
+      onPressed: next == null ? null : () => _apply(_query.withPeriod(next)),
+      icon: const Icon(Icons.chevron_right),
+    );
+    final group = Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        IconButton(
-          key: const ValueKey('period-prev'),
-          tooltip: '이전 달 보기',
-          onPressed: prev == null
-              ? null
-              : () => _apply(_query.withPeriod(prev)),
-          icon: const Icon(Icons.chevron_left),
-        ),
+        prevButton,
         Flexible(child: title),
-        IconButton(
-          key: const ValueKey('period-next'),
-          tooltip: '다음 달 보기',
-          onPressed: next == null
-              ? null
-              : () => _apply(_query.withPeriod(next)),
-          icon: const Icon(Icons.chevron_right),
-        ),
+        nextButton,
       ],
     );
+    if (compact) return group;
+    return Center(child: group);
   }
 
   /// 2026-10-30: 목록 본문(불러오는 중·조회 실패·없음·날짜별 목록).
   List<Widget> _body(List<SourceTransaction> list) {
     switch (_load) {
-      case _Load.loading:
-        return [const _Skeleton()];
-      case _Load.failed:
+      case TxLoad.loading:
+        return [const TxSkeleton()];
+      case TxLoad.failed:
         return [
-          _Empty(
+          TxEmpty(
             key: const ValueKey('tx-failed'),
             title: '거래 내역을 불러오지 못했어요',
             body: '잠시 후 다시 시도해 주세요.',
             actions: [('다시 시도', _collect)],
           ),
         ];
-      case _Load.ready:
+      case TxLoad.ready:
         break;
     }
     if (list.isEmpty) {
       final isDefaultFixed =
-          _fixed &&
+          _pinned &&
           _query.period == PeriodSelection.thisMonth &&
           _query.type == null;
       if (_query.isDefault || isDefaultFixed) {
         return [
-          _Empty(
+          TxEmpty(
             key: const ValueKey('tx-empty-month'),
             title: '이번 달 거래 내역이 없어요',
             actions: [
@@ -436,14 +495,20 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         ];
       }
       return [
-        _Empty(
+        TxEmpty(
           key: const ValueKey('tx-no-result'),
           title: '선택한 조건의 거래 내역이 없어요',
-          body: _fixed ? '기간이나 입출금 조건을 바꿔보세요.' : '기간이나 거래 수단을 바꿔보세요.',
+          body: _fixed
+              ? '기간이나 입출금 조건을 바꿔보세요.'
+              : _fixedCard
+              ? '기간이나 거래 종류를 바꿔보세요.'
+              : '기간이나 거래 수단을 바꿔보세요.',
           actions: [
             ('기간 변경', _pickPeriod),
             if (_fixed)
               ('입출금 전체 보기', () => _apply(_query.withType(null)))
+            else if (_fixedCard)
+              ('모든 내역 보기', () => _apply(_query.withType(null)))
             else
               ('거래 수단 변경', _pickMeans),
           ],
@@ -455,14 +520,20 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     for (final t in list) {
       final d = recordDate(t)!;
       if (d != day) {
-        out.add(_DayHeader(dayHeader(d)));
+        out.add(
+          TxDayHeader(
+            dayHeader(d),
+            top: day == null ? PayseSpace.x2 : PayseSpace.x4,
+          ),
+        );
         day = d;
       }
       out.add(
-        _TxRow(
+        TxRow(
           key: ValueKey('tx-${t.transactionId}'),
           name: t.merchantName,
-          subtitle: subtitle(_snap, t, withMeans: !_fixed),
+          subtitle: subtitle(_snap, t, withMeans: !_pinned),
+          icon: kindIcon(t),
           amount: amountText(t),
           labels: [?statusLabel(t), ?reflectionLabel(t)],
           onTap: () => _open(t),
@@ -495,10 +566,35 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   }
 }
 
+/// 2026-10-31: 거래 종류 문구 앞 선 아이콘(#163 후속). 내 계좌 이체 양방향, 입금 들어오는 화살표, 출금 나가는 화살표, 카드대금
+/// 납부 납부, 카드 사용 카드, 카드 환불·승인 취소 되돌림. 색은 모두 보조 글자색이며 문구를 대신하지 않는다.
+/// 2026-11-01: 화살표 모양을 맞추려고 Material Symbols Rounded 부분 글꼴([PayseSymbols])을 쓴다.
+IconData kindIcon(SourceTransaction t) {
+  if (isAccountEntry(t)) {
+    return switch (t.payseTransactionType) {
+      'internal_transfer' => transferIcon,
+      'card_payment' => PayseSymbols.payments,
+      _ =>
+        t.direction == 'in' ? PayseSymbols.southWest : PayseSymbols.northEast,
+    };
+  }
+  return t.recordKind == 'card_purchase'
+      ? PayseSymbols.creditCard
+      : PayseSymbols.undo;
+}
+
+/// 2026-11-01: 금액 글자색. '+'로 시작하는 금액(들어온 돈)만 amountIn, 그 밖(−·부호 없음)은 textPrimary다. 부호를 함께
+/// 보여 색만으로 구분하지 않는다.
+Color amountColor(String amount) =>
+    amount.startsWith('+') ? PayseColors.amountIn : PayseColors.textPrimary;
+
+/// 2026-10-31: 내 계좌 이체 아이콘(묶은 이체 행도 같다).
+const IconData transferIcon = PayseSymbols.compareArrows;
+
 /// 2026-10-30: 조건 칩(높이 36·반경 20·테두리 borderStrong, 터치 48).
-class _Chip extends StatelessWidget {
+class TxChip extends StatelessWidget {
   /// 2026-10-30: 문구 [label]과 누르기 [onTap]으로 만든다.
-  const _Chip({required this.label, required this.onTap, super.key});
+  const TxChip({required this.label, required this.onTap, super.key});
 
   final String label;
   final VoidCallback onTap;
@@ -539,17 +635,19 @@ class _Chip extends StatelessWidget {
 }
 
 /// 2026-10-30: 날짜 머리('10월 17일 토요일', 아래 진한 선).
-class _DayHeader extends StatelessWidget {
+class TxDayHeader extends StatelessWidget {
   /// 2026-10-30: 문구 [text]로 만든다.
-  const _DayHeader(this.text);
+  /// 2026-11-01: 위 여백 [top](목록 첫 날짜는 조건 줄에 붙도록 8dp, 그 밖 16dp)을 더했다.
+  const TxDayHeader(this.text, {this.top = PayseSpace.x4, super.key});
 
   final String text;
+  final double top;
 
   /// 2026-10-30: 날짜 머리를 반환한다.
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(top: PayseSpace.x4),
+      margin: EdgeInsets.only(top: top),
       constraints: const BoxConstraints(minHeight: 36),
       alignment: Alignment.centerLeft,
       decoration: const BoxDecoration(
@@ -569,11 +667,12 @@ class _DayHeader extends StatelessWidget {
 
 /// 2026-10-30: 거래 한 줄. 첫 줄 거래명(말줄임)·상태 라벨 … 금액(줄바꿈 없음), 둘째 줄 거래 종류·거래 수단. 위아래 16dp,
 /// 최소 76dp, 아래 연한 선. 누르면 상세 시트.
-class _TxRow extends StatelessWidget {
+class TxRow extends StatelessWidget {
   /// 2026-10-30: 거래명 [name], 둘째 줄 [subtitle], 금액 [amount], 상태 라벨 [labels], 누르기 [onTap]으로 만든다.
-  const _TxRow({
+  const TxRow({
     required this.name,
     required this.subtitle,
+    this.icon,
     required this.amount,
     required this.labels,
     required this.onTap,
@@ -582,6 +681,10 @@ class _TxRow extends StatelessWidget {
 
   final String name;
   final String subtitle;
+
+  /// 2026-10-31: 행 왼쪽 24dp 칸의 20dp 선 아이콘(textSecondary, 배경 없음, 읽기 제외). 거래 종류 문구는 둘째 줄에 그대로
+  /// 둔다. 없으면 아이콘 칸 없이 그린다.
+  final IconData? icon;
   final String amount;
   final List<String> labels;
   final VoidCallback onTap;
@@ -594,7 +697,7 @@ class _TxRow extends StatelessWidget {
     var width = 0.0;
     for (final l in labels) {
       final painter = TextPainter(
-        text: TextSpan(text: l, style: _Label.style),
+        text: TextSpan(text: l, style: TxLabel.style),
         textScaler: MediaQuery.textScalerOf(context),
         textDirection: TextDirection.ltr,
         maxLines: 1,
@@ -618,6 +721,20 @@ class _TxRow extends StatelessWidget {
         ),
         child: Row(
           children: [
+            if (icon case final icon?) ...[
+              ExcludeSemantics(
+                child: SizedBox(
+                  width: 24,
+                  child: Icon(
+                    icon,
+                    key: const ValueKey('tx-kind-icon'),
+                    size: 20,
+                    color: PayseColors.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: PayseSpace.x3),
+            ],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -642,7 +759,7 @@ class _TxRow extends StatelessWidget {
                         for (final (i, l) in labels.indexed) ...[
                           if (i > 0 || inline)
                             const SizedBox(width: PayseSpace.x2),
-                          _Label(l),
+                          TxLabel(l),
                         ],
                       ];
                       if (inline) {
@@ -676,10 +793,10 @@ class _TxRow extends StatelessWidget {
             const SizedBox(width: PayseSpace.x4),
             Text(
               amount,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: PayseColors.textPrimary,
+                color: amountColor(amount),
                 fontFeatures: PayseTypography.tabular,
               ),
             ),
@@ -691,9 +808,9 @@ class _TxRow extends StatelessWidget {
 }
 
 /// 2026-10-30: 상태 라벨(surfaceMuted, 높이 22·좌우 8·반경 8, 13/500 textSecondary, 글자 폭만큼).
-class _Label extends StatelessWidget {
+class TxLabel extends StatelessWidget {
   /// 2026-10-30: 문구 [text]로 만든다.
-  const _Label(this.text);
+  const TxLabel(this.text, {super.key});
 
   final String text;
 
@@ -723,9 +840,9 @@ class _Label extends StatelessWidget {
 }
 
 /// 2026-10-30: 빈 상태(제목·설명·테두리 버튼들).
-class _Empty extends StatelessWidget {
+class TxEmpty extends StatelessWidget {
   /// 2026-10-30: 제목 [title], 설명 [body], 버튼 [actions]로 만든다.
-  const _Empty({
+  const TxEmpty({
     required this.title,
     this.body,
     this.actions = const [],
@@ -798,9 +915,9 @@ class _Empty extends StatelessWidget {
 }
 
 /// 2026-10-30: 불러오는 중 로딩 틀(실제 행 크기).
-class _Skeleton extends StatelessWidget {
+class TxSkeleton extends StatelessWidget {
   /// 2026-10-30: 로딩 틀을 만든다.
-  const _Skeleton();
+  const TxSkeleton({super.key});
 
   /// 2026-10-30: 로딩 틀을 반환한다.
   @override
