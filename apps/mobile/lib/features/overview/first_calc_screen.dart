@@ -207,7 +207,7 @@ class _FirstCalcFlowState extends State<FirstCalcFlow> {
       case 1:
         final rEff = result.rEff!;
         return _Heading(
-          eyebrow: '모아둘 돈을 빼요',
+          eyebrow: '남겨둘 돈을 빼요',
           title: rEff > 0
               ? '${formatKrw(rEff)}은\n쓰지 않고 남겨둘게요'
               : '이번 계산에서 따로 남겨둘\n금액은 0원이에요',
@@ -263,7 +263,7 @@ class _FirstCalcFlowState extends State<FirstCalcFlow> {
           ],
         ),
         _ReceiptRow(
-          title: '모아둘 돈',
+          title: '남겨둘 돈',
           chip: PayseColors.reserve,
           amount: _deduction(result.rEff!),
           items: [
@@ -310,7 +310,7 @@ class _FirstCalcFlowState extends State<FirstCalcFlow> {
         final r = result.r ?? 0;
         if (result.rEff == 0 && r > 0) {
           return _Note(
-            '모아둘 돈 ${formatKrw(r)}은 모두 예정 지출에 쓰기로 해서, '
+            '남겨둘 돈 ${formatKrw(r)}은 모두 예정 지출에 쓰기로 해서, '
             '예정 지출에서 한 번만 빼고 여기서는 따로 빼지 않아요.',
             key: const ValueKey('first-calc-reserve-used'),
           );
@@ -704,7 +704,7 @@ class _Receipt extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
-                      '모아둘 돈과 예정 지출을 모두 확보하려면\n${formatKrw(-u)}이 더 필요해요.',
+                      '남겨둘 돈과 예정 지출을 모두 확보하려면\n${formatKrw(-u)}이 더 필요해요.',
                       textAlign: TextAlign.right,
                       style: DetailTypography.secondary,
                     ),

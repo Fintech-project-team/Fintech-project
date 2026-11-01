@@ -558,6 +558,41 @@ class ReferenceResolution {
   );
 }
 
+/// 2026-10-31: 확인된 두 거래의 관계(docs/data-model.md TransactionRelation). internal_transfer는 [fromId] 출금과 [toId]
+/// 입금이 같은 내 계좌 이체, card_account_pair는 같은 사건의 카드 기록과 계좌 내역이다. 이 관계가 없으면 날짜·금액·이름으로
+/// 두 거래를 묶지 않는다.
+class TransactionRelation {
+  /// 2026-10-31: 종류 [kind], 두 거래 ID [fromId]·[toId], 근거 [evidenceRef]로 만든다.
+  const TransactionRelation({
+    required this.kind,
+    required this.fromId,
+    required this.toId,
+    required this.evidenceRef,
+  });
+
+  static const Set<String> kinds = {'card_account_pair', 'internal_transfer'};
+
+  final String kind;
+  final String fromId;
+  final String toId;
+  final String evidenceRef;
+
+  /// 2026-10-31: 관계 하나를 읽는다. 자기 참조는 계약 위반이다.
+  static TransactionRelation _parse(_Fields f) {
+    final from = f.string('fromId');
+    final to = f.string('toId');
+    if (from == to) {
+      throw SnapshotFormatException('${f.path}.toId', '자기 자신을 참조함');
+    }
+    return TransactionRelation(
+      kind: f.oneOf('kind', kinds),
+      fromId: from,
+      toId: to,
+      evidenceRef: f.string('evidenceRef'),
+    );
+  }
+}
+
 /// 2026-10-23: 모아둘 돈을 예정 지출에 명시 배정한 기록(O의 근거). 배정은 계좌 이체가 아니다.
 class Allocation {
   /// 2026-10-23: [allocationId], [reserveId], [obligationId], 배정 총액 [amountKrw](해제 누계 포함),
@@ -940,7 +975,9 @@ class Statement {
   final String statementId;
   final String cardId;
   final int amountKrw;
-  final String dueDate;
+
+  /// 2026-10-31: 확인된 결제 예정일. null은 미확보이며 다른 날짜로 채우지 않는다(docs/data-model.md).
+  final String? dueDate;
   final List<String> includedTransactionRefs;
   final String detailCompleteness;
   final List<StatementItem>? items;
@@ -978,7 +1015,7 @@ class Statement {
       statementId: f.string('statementId'),
       cardId: f.string('cardId'),
       amountKrw: f.krw('amountKRW', allowNegative: false),
-      dueDate: f.businessDate('dueDate'),
+      dueDate: f.businessDateOrNull('dueDate'),
       includedTransactionRefs: refs,
       detailCompleteness: f.string('detailCompleteness'),
       items: items,
@@ -1052,6 +1089,7 @@ class FinancialSnapshot {
     this.settlements,
     this.relatedTransactions,
     this.referenceResolutions,
+    this.transactionRelations,
     this.hasMoreTransactions = false,
     this.nextTransactionCursor,
     this.accessRestrictions = const [],
@@ -1104,6 +1142,9 @@ class FinancialSnapshot {
 
   /// 2026-10-23: 응답에 없는 거래 참조의 확보 상태. 미확보(unavailable)를 계약 위반과 구분하는 데 쓴다.
   final List<ReferenceResolution>? referenceResolutions;
+
+  /// 2026-10-31: 확인된 거래 관계(내 계좌 이체 짝 등). null이면 원문에 묶음이 없는 것(연결 전)이다.
+  final List<TransactionRelation>? transactionRelations;
 
   /// 2026-10-23: 거래 다음 페이지가 남아 있으면 true다. 받지 못한 거래를 '없음'으로 판단하지 않는다.
   final bool hasMoreTransactions;
@@ -1439,6 +1480,10 @@ class FinancialSnapshot {
       referenceResolutions: f.listOrAbsent(
         'referenceResolutions',
         ReferenceResolution._parse,
+      ),
+      transactionRelations: f.listOrAbsent(
+        'transactionRelations',
+        TransactionRelation._parse,
       ),
       hasMoreTransactions: page is Map && page['nextCursor'] != null,
       nextTransactionCursor: page is Map && page['nextCursor'] is String

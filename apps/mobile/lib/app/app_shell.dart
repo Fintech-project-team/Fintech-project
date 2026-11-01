@@ -12,6 +12,7 @@ import '../features/overview/first_calc_screen.dart';
 import '../features/overview/home_calculation.dart';
 import '../features/overview/home_coachmark.dart';
 import '../features/overview/home_screen.dart';
+import '../features/overview/overview_links.dart';
 import '../features/overview/pull_refresh.dart';
 import '../features/overview/salary_notice.dart';
 import '../features/overview/slide_switch.dart';
@@ -94,13 +95,44 @@ class _AppShellState extends State<AppShell> {
   final GlobalKey _navKey = GlobalKey(debugLabel: 'coach-nav');
   late String? _salaryNoticeFolded = widget.salaryNoticeFolded;
 
+  /// 2026-10-31: 홈·계좌·카드 탭과 그 위에 쌓인 화면이 함께 보는 현재 상태와 고른 안쪽 탭(#163).
+  late final ValueNotifier<OverviewState> _state = ValueNotifier((
+    calculation: _calculation,
+    history: widget.history,
+  ));
+  final ValueNotifier<AccountsCardsTab> _accountsTab = ValueNotifier(
+    AccountsCardsTab.period,
+  );
+
+  /// 2026-10-31: 화면 사이 연결. 저장 연결·새로고침이 바뀔 수 있어 그릴 때마다 만든다.
+  OverviewLinks get _links => OverviewLinks(
+    state: _state,
+    writer: widget.accountsWriter,
+    onRefresh: widget.onPullRefresh,
+    onShowPeriod: _showPeriod,
+  );
+
+  /// 2026-10-31: 계좌·카드 탭의 이번 기간 내역으로 간다.
+  void _showPeriod() {
+    _accountsTab.value = AccountsCardsTab.period;
+    setState(() => _index = 1);
+  }
+
+  /// 2026-10-31: 공통 상태를 폐기한다.
+  @override
+  void dispose() {
+    _state.dispose();
+    _accountsTab.dispose();
+    super.dispose();
+  }
+
   /// 2026-10-29: 월급 입금 확인 안내를 접거나(키) 다시 편다(null). 화면은 바로 바꾸고 기록은 콜백에 맡긴다.
   void _foldSalaryNotice(String? key) {
     setState(() => _salaryNoticeFolded = key);
     widget.onSalaryNoticeFolded?.call(key);
   }
 
-  /// 2026-10-29: 홈 안내에서 월급 정보 편집 화면을 연다. 저장 알림은 '계산 내역 보기' 띠 위에 띄운다.
+  /// 2026-10-29: 홈 안내에서 월급 정보 편집 화면을 연다.
   void _editSalary(BuildContext context, AccountsWriter writer) {
     openSalaryEditor(
       context,
@@ -108,7 +140,6 @@ class _AppShellState extends State<AppShell> {
       repository: writer.repository,
       onSessionInvalid: writer.onSessionInvalid,
       onSnapshot: writer.onSnapshot,
-      bottomGap: PayseSize.primaryBandHeight + PayseSpace.x3,
     );
   }
 
@@ -189,11 +220,20 @@ class _AppShellState extends State<AppShell> {
   }
 
   /// 2026-10-23: 다른 스냅샷이 오면 그 스냅샷으로 다시 계산한다.
+  /// 2026-10-31: 공통 상태도 같은 계산·거래로 바꾼다.
   @override
   void didUpdateWidget(covariant AppShell oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.snapshot, widget.snapshot)) {
       _calculation = computeHomeCalculation(widget.snapshot);
+    }
+    final next = (calculation: _calculation, history: widget.history);
+    if (!identical(_state.value.calculation, next.calculation) ||
+        !identical(_state.value.history, next.history)) {
+      // 위에 쌓인 화면은 이 탭 트리 밖이라 그리는 중에 알리면 안 된다. 이 프레임이 끝난 뒤 한 번에 바꾼다.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _state.value = next;
+      });
     }
   }
 
@@ -219,6 +259,7 @@ class _AppShellState extends State<AppShell> {
         widget.firstCalcRecord == FirstCalcRecord.deferred &&
         explainable != null;
     final coachmark = _coachmark();
+    final links = _links;
     final tabs = Scaffold(
       body: IndexedStack(
         index: _index,
@@ -240,9 +281,11 @@ class _AppShellState extends State<AppShell> {
                 null => null,
               },
             ),
+            links: links,
           ),
           AccountsCardsScreen(
-            onRefresh: widget.onPullRefresh,
+            links: links,
+            tab: _accountsTab,
             history: widget.history,
             snapshot: widget.snapshot,
             calculation: _calculation,
@@ -284,7 +327,8 @@ class _AppShellState extends State<AppShell> {
                 key: const ValueKey('home-coachmark'),
                 variant: coachmark,
                 amountRect: _amountRect,
-                detailRect: () => _rectOf(_coachTargets.detail),
+                detailRect: () =>
+                    _rectOf(_coachTargets.detail)?.inflate(PayseSpace.x2),
                 planRect: _planRect,
                 onDone: _closeCoachmark,
               ),

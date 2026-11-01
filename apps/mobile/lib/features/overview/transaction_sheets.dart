@@ -5,6 +5,7 @@ import '../../shared/design/payse_tokens.dart';
 import '../connection/connection_review.dart';
 import 'transaction_query.dart';
 import 'transaction_rules.dart';
+import 'transactions_screen.dart' show amountColor;
 
 /// 2026-10-30: 흰 면·위 반경 16·덮개 50%·화면 85%까지의 바텀시트를 열고 고른 값을 반환한다(§7 바텀시트).
 Future<T?> showPayseSheet<T>(BuildContext context, Widget child) =>
@@ -201,10 +202,17 @@ class _RadioRow extends StatelessWidget {
 /// 양 끝 부분 월은 '20일부터'·'19일까지'를 붙인다.
 class PeriodSheet extends StatefulWidget {
   /// 2026-10-30: 조회 범위 [bounds]와 현재 선택 [current]로 만든다.
-  const PeriodSheet({required this.bounds, required this.current, super.key});
+  /// 2026-10-31: [inherited]는 들어온 화면에서 물려받은 월급 주기이며, 있으면 맨 위 선택지로 둔다.
+  const PeriodSheet({
+    required this.bounds,
+    required this.current,
+    this.inherited,
+    super.key,
+  });
 
   final QueryBounds bounds;
   final PeriodSelection current;
+  final PeriodSelection? inherited;
 
   @override
   State<PeriodSheet> createState() => _PeriodSheetState();
@@ -228,18 +236,26 @@ class _PeriodSheetState extends State<PeriodSheet> {
       note: '조회 기간 ${widget.bounds.rangeText(effective)}',
       onApply: () => Navigator.of(context).pop(effective),
       children: [
-        for (final kind in PeriodKind.values)
+        if (widget.inherited case final inherited?)
           _RadioRow(
-            key: ValueKey('period-${kind.name}'),
-            label: PeriodSelection(kind).name,
-            selected: _sel.kind == kind,
-            onTap: () => setState(
-              () => _sel = PeriodSelection(
-                kind,
-                month: kind == PeriodKind.month ? _month : null,
+            key: const ValueKey('period-cycle'),
+            label: inherited.name,
+            selected: _sel == inherited,
+            onTap: () => setState(() => _sel = inherited),
+          ),
+        for (final kind in PeriodKind.values)
+          if (kind != PeriodKind.cycle)
+            _RadioRow(
+              key: ValueKey('period-${kind.name}'),
+              label: PeriodSelection(kind).name,
+              selected: _sel.kind == kind,
+              onTap: () => setState(
+                () => _sel = PeriodSelection(
+                  kind,
+                  month: kind == PeriodKind.month ? _month : null,
+                ),
               ),
             ),
-          ),
         if (monthMode) _monthGrid(),
       ],
     );
@@ -595,21 +611,24 @@ class _TypeSheetState extends State<TypeSheet> {
 /// 2026-10-30: 읽기 전용 거래 상세 시트. 위에 거래명·금액, 아래 정보 줄([detailRows]). 편집·저장 없음.
 class TransactionDetailSheet extends StatelessWidget {
   /// 2026-10-30: [snapshot]의 거래 [transaction]과 확보한 원거래 [original]로 만든다.
+  /// 2026-11-01: 근거 있는 내 계좌 이체의 상대 거래 [peer]를 더했다.
   const TransactionDetailSheet({
     required this.snapshot,
     required this.transaction,
     this.original,
+    this.peer,
     super.key,
   });
 
   final FinancialSnapshot snapshot;
   final SourceTransaction transaction;
   final SourceTransaction? original;
+  final SourceTransaction? peer;
 
   @override
   Widget build(BuildContext context) {
     final t = transaction;
-    final rows = detailRows(snapshot, t, original: original);
+    final rows = detailRows(snapshot, t, original: original, peer: peer);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -655,12 +674,12 @@ class TransactionDetailSheet extends StatelessWidget {
                       Text(
                         amountText(t),
                         key: const ValueKey('detail-amount'),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 28,
                           height: 1.25,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -0.84,
-                          color: PayseColors.textPrimary,
+                          color: amountColor(amountText(t)),
                           fontFeatures: PayseTypography.tabular,
                         ),
                       ),
