@@ -27,6 +27,10 @@ abstract final class PayseColors {
   static const Color scheduled = Color(0xFF9EA3AA);
   static const Color available = Color(0xFFF4CF65);
 
+  /// 2026-11-01: 들어온 돈('+' 금액) 글자색. 흰 바탕 대비 6.0:1, surfaceMuted 5.3:1. 혜연 결정으로 정보 안내 색과 같은 파랑을
+  /// 쓰되, 각자 바꿀 수 있게 토큰은 따로 둔다.
+  static const Color amountIn = Color(0xFF175CD3);
+
   static const Color error = Color(0xFFB42318);
   static const Color errorContainer = Color(0xFFFEF3F2);
   static const Color errorBorder = Color(0xFFFECDCA);

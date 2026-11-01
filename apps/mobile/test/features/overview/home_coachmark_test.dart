@@ -99,7 +99,7 @@ void main() {
     await show(tester, _computed());
     expect(coach, findsOneWidget);
     expect(find.text('지금 쓸 수 있는 돈이에요'), findsOneWidget);
-    expect(find.text('계좌 잔액에서 모아둘 돈과 예정 지출을 빼고 계산해요.'), findsOneWidget);
+    expect(find.text('계좌 잔액에서 남겨둘 돈과 예정 지출을 빼고 계산해요.'), findsOneWidget);
     expect(find.text('1 / 3'), findsOneWidget);
     expect(skip, findsOneWidget);
     expect(
@@ -121,18 +121,20 @@ void main() {
     expect(hole.bottom, bar.bottom + 8);
     expect(p.radius, 12);
 
-    final detail = tester.getRect(
-      find.byKey(const ValueKey('home-detail-button')),
-    );
+    final nav = tester.getRect(find.byType(NavigationBar));
     final box = panel(tester);
-    expect(box.bottom, detail.top - 8, reason: '계산 내역 보기 위 8dp');
+    expect(
+      box.bottom,
+      nav.top + nav.height / 2 - 29 - 8,
+      reason: '하단 계획 탭 강조 영역 위 8dp',
+    );
     expect(box.left, 16);
     expect(box.right, 390 - 16);
     expect(box.height, greaterThanOrEqualTo(180));
     expect(p.connectTo, box.top, reason: '연결선은 안내 면 위까지');
   });
 
-  testWidgets('step 2 frames the detail band and step 3 the plan tab', (
+  testWidgets('step 2 frames the amount chevron and step 3 the plan tab', (
     tester,
   ) async {
     await show(tester, _computed());
@@ -144,14 +146,18 @@ void main() {
     final detail = tester.getRect(
       find.byKey(const ValueKey('home-detail-button')),
     );
-    expect(painter(tester).hole, detail);
-    expect(painter(tester).radius, 0);
+    expect(
+      painter(tester).hole,
+      detail.inflate(8),
+      reason: '금액 옆 ›를 8dp 넓혀 강조',
+    );
+    expect(painter(tester).radius, 12);
     expect(painter(tester).connectTo, isNull, reason: '연결선은 1단계만');
     expect(panel(tester).bottom, first.bottom, reason: '같은 기준선');
 
     await tapNext(tester);
     expect(find.text('계획은 여기서 관리해요'), findsOneWidget);
-    expect(find.text('예정 지출과 모아둘 돈을 확인하고 수정할 수 있어요.'), findsOneWidget);
+    expect(find.text('예정 지출과 남겨둘 돈을 확인하고 수정할 수 있어요.'), findsOneWidget);
     expect(find.text('3 / 3'), findsOneWidget);
     expect(skip, findsNothing, reason: '마지막 단계에는 건너뛰기 없음');
     expect(find.text('시작하기'), findsOneWidget);
@@ -210,7 +216,7 @@ void main() {
     await show(tester, _receiptAbsent(), firstCalc: FirstCalcRecord.deferred);
     expect(find.text('월급 입금을 확인하면 계산해요'), findsOneWidget);
     expect(
-      find.text('입금이 확인되면 계좌 잔액에서 모아둘 돈과 예정 지출을 빼고 계산해요.'),
+      find.text('입금이 확인되면 계좌 잔액에서 남겨둘 돈과 예정 지출을 빼고 계산해요.'),
       findsOneWidget,
     );
     final hole = painter(tester).hole!;

@@ -187,7 +187,7 @@ void main() {
 
       // 공통 더미 연결 검증. 알파는 #100 demo-ready(9월 회차 급여 근거 confirmed)라 정보 부족 없이 계산된다.
       // 첫 은행만 연결하므로 계좌 잔액은 그 계좌 1,500,000원이고 U = 1,500,000 − 400,000 − 300,000.
-      expect(find.text('다음 월급일까지\n쓸 수 있는 돈'), findsOneWidget);
+      expect(find.textContaining('다음 월급일까지\n쓸 수 있는 돈'), findsOneWidget);
       expect(
         find.textContaining('800,000', findRichText: true),
         findsOneWidget,

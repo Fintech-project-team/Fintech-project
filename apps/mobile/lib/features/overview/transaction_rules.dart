@@ -83,8 +83,8 @@ String? recordTime(SourceTransaction t) {
 }
 
 /// 2026-10-30: 처리 상태 라벨. posted는 없음. 카드 기록은 approved '승인', cancelled '승인 취소'(거래 종류가 이미 승인 취소면
-/// 다시 붙이지 않음), unknown은 '처리 상태 미확인'. 계좌 내역의 approved·cancelled는 의미가 정해지지 않아 A 답변 전까지
-/// 표시가 미완료이며 카드 문구나 '처리 상태 미확인'으로 바꾸지 않는다(PAYSE-MOBILE-TRANSACTIONS-29-2 명세).
+/// 다시 붙이지 않음), unknown은 '처리 상태 미확인'. 계좌 내역은 posted·unknown만 제공되고 잔액 반영은 reflectionReason으로
+/// 판단한다. 계약상 허용되는 계좌 approved·cancelled가 오면 오류로 보지 않고 라벨을 붙이지 않는다.
 String? statusLabel(SourceTransaction t) {
   if (t.status == 'unknown') return '처리 상태 미확인';
   if (isAccountEntry(t)) return null;
@@ -160,14 +160,24 @@ String dayHeader(String date) {
 /// 2026-10-30: 상세 시트의 정보 줄(라벨·값). 기본 정보(거래 종류·거래처·거래 수단·거래 일시 또는 취소일) 다음에 처리 상태·
 /// 원래 결제·할부·잔액 반영을 잇는다. 거래처가 거래명과 같으면, 거래 내용이 거래 종류와 같은 뜻이면 생략한다.
 /// [original]은 originalTransactionId로 실제 확보한 원거래이며 없으면 원래 결제 줄을 생략한다(추정해 연결하지 않음).
+/// 2026-11-01: [peer]는 transactionRelations(internal_transfer)로 확인된 내 계좌 이체의 상대 거래이며, 있으면 거래 수단 다음에
+/// '받은 계좌'(이 거래가 출금) 또는 '보낸 계좌'(입금)를 보인다. 근거가 없으면 상대 계좌를 추정하지 않는다.
 List<(String, String, String?)> detailRows(
   FinancialSnapshot snapshot,
   SourceTransaction t, {
   SourceTransaction? original,
+  SourceTransaction? peer,
 }) {
   final rows = <(String, String, String?)>[('거래 종류', kindLabel(t), null)];
   final means = meansLabel(snapshot, t);
   if (means != null) rows.add(('거래 수단', means, null));
+  if (peer != null) {
+    rows.add((
+      t.direction == 'out' ? '받은 계좌' : '보낸 계좌',
+      meansLabel(snapshot, peer) ?? '계좌 미확인',
+      null,
+    ));
+  }
   final date = recordDate(t);
   final time = recordTime(t);
   final dateLabel = t.recordKind == 'card_cancellation' ? '취소일' : '거래 일시';

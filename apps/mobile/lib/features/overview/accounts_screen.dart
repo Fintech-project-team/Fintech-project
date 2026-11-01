@@ -14,6 +14,7 @@ import 'home_calculation.dart';
 import 'home_screen.dart' show asOfLabel;
 import 'pull_refresh.dart';
 import 'salary_notice.dart';
+import 'tab_header.dart';
 
 /// 2026-10-29: 계좌 탭에서 저장에 쓰는 세션 연결. 세션 저장소 [repository], 01-1 재사용에 쓰는 표시 정책 [policy],
 /// 세션 무효 처리 [onSessionInvalid], 저장 뒤 최신 Snapshot을 앱에 반영하는 [onSnapshot]이다.
@@ -31,12 +32,15 @@ typedef AccountsWriter = ({
 class AccountsScreen extends StatelessWidget {
   /// 2026-10-29: 현재 Snapshot [snapshot], 홈 계산 [calculation], 저장 연결 [writer](없으면 연필·바꾸기 비활성)로 만든다.
   /// 2026-10-30: 계좌 행 누르기 [onOpenAccount](없으면 행을 누를 수 없음)를 더했다.
+  /// 2026-10-31: 카드 행 누르기 [onOpenCard](없으면 카드 목록을 두지 않음), 계산 내역 열기 [onOpenCalculation]을 더했다(#163).
   const AccountsScreen({
     super.key,
     required this.snapshot,
     required this.calculation,
     this.writer,
     this.onOpenAccount,
+    this.onOpenCard,
+    this.onOpenCalculation,
     this.onRefresh,
   });
 
@@ -44,6 +48,8 @@ class AccountsScreen extends StatelessWidget {
   final HomeCalculation calculation;
   final AccountsWriter? writer;
   final ValueChanged<Account>? onOpenAccount;
+  final ValueChanged<PaymentCard>? onOpenCard;
+  final VoidCallback? onOpenCalculation;
 
   /// 2026-10-30: 아래로 당겨 새로고침(시안 R-5·R-6). 없으면 당겨도 새로고침하지 않는다.
   final PullRefresh? onRefresh;
@@ -149,6 +155,8 @@ class AccountsScreen extends StatelessWidget {
       ...groups.where((g) => g.accounts.first.included),
       ...groups.where((g) => !g.accounts.first.included),
     ];
+    final hasCards =
+        onOpenCard != null && (snapshot.cards ?? const []).isNotEmpty;
     return SafeArea(
       bottom: false,
       child: PullRefreshScrollView(
@@ -158,68 +166,74 @@ class AccountsScreen extends StatelessWidget {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(
               PayseSpace.screenHorizontal,
-              PayseSpace.x5,
+              tabTopGap,
               PayseSpace.screenHorizontal,
               PayseSpace.x6,
             ),
             sliver: SliverList.list(
               children: [
-                const Text(
-                  '계산에 포함한 계좌 잔액',
-                  style: TextStyle(
-                    fontSize: 16,
-                    height: 1.5,
-                    fontWeight: FontWeight.w600,
-                    color: PayseColors.textPrimary,
+                const TabScope('계산에 포함한 계좌 잔액'),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: tabKeyLineHeight,
+                  ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: b == null
+                        ? const Text(
+                            '확인할 수 없어요',
+                            key: ValueKey('accounts-total-unknown'),
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: PayseColors.textSecondary,
+                            ),
+                          )
+                        : FittedBox(
+                            alignment: Alignment.centerLeft,
+                            fit: BoxFit.scaleDown,
+                            child: Text.rich(
+                              key: const ValueKey('accounts-total'),
+                              semanticsLabel: spokenKrw(b),
+                              TextSpan(
+                                text: formatKrwDigits(b),
+                                children: const [
+                                  TextSpan(
+                                    text: '원',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              style: const TextStyle(
+                                fontSize: 24,
+                                height: 32 / 24,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.48,
+                                color: PayseColors.textPrimary,
+                                fontFeatures: PayseTypography.tabular,
+                              ),
+                            ),
+                          ),
                   ),
                 ),
-                const SizedBox(height: PayseSpace.x1),
-                b == null
-                    ? const Text(
-                        '확인할 수 없어요',
-                        key: ValueKey('accounts-total-unknown'),
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: PayseColors.textSecondary,
-                        ),
-                      )
-                    : FittedBox(
-                        alignment: Alignment.centerLeft,
-                        fit: BoxFit.scaleDown,
-                        child: Text.rich(
-                          key: const ValueKey('accounts-total'),
-                          semanticsLabel: spokenKrw(b),
-                          TextSpan(
-                            text: formatKrwDigits(b),
-                            children: const [
-                              TextSpan(
-                                text: '원',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: -0.36,
-                                ),
-                              ),
-                            ],
-                          ),
-                          style: const TextStyle(
-                            fontSize: 32,
-                            height: 1.2,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -1.28,
-                            color: PayseColors.textPrimary,
-                            fontFeatures: PayseTypography.tabular,
-                          ),
-                        ),
-                      ),
-                const SizedBox(height: PayseSpace.x2),
                 Text(
-                  '계산에 포함한 계좌 $included개 · ${asOfLabel(snapshot.asOf)}',
+                  '계좌 $included개 · ${asOfLabel(snapshot.asOf)}',
                   key: const ValueKey('accounts-meta'),
                   style: PayseTypography.caption,
                 ),
-                const SizedBox(height: PayseSpace.x4),
+                const SizedBox(height: PayseSpace.x1),
+                if (onOpenCalculation case final open? when b != null) ...[
+                  TabLinkRow(
+                    key: const ValueKey('accounts-open-calculation'),
+                    label: '쓸 수 있는 돈 계산 내역',
+                    onTap: open,
+                  ),
+                  const SizedBox(height: PayseSpace.x2),
+                ],
                 SizedBox(
                   height: PayseSize.touchMin,
                   child: OutlinedButton(
@@ -238,10 +252,10 @@ class AccountsScreen extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    child: const Text('계산에 포함할 계좌 바꾸기'),
+                    child: const Text('계산할 계좌 바꾸기'),
                   ),
                 ),
-                const SizedBox(height: PayseSpace.x6),
+                const SizedBox(height: PayseSpace.x5),
                 const Divider(height: 1, color: PayseColors.dividerSection),
                 if (snapshot.settings?.salary case final salary?)
                   _SalaryRow(
@@ -249,9 +263,9 @@ class AccountsScreen extends StatelessWidget {
                     onTap: writer == null ? null : () => _editSalary(context),
                   ),
                 for (final (i, g) in ordered.indexed) ...[
-                  const SizedBox(height: PayseSpace.x6),
+                  const SizedBox(height: PayseSpace.x5),
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 2),
+                    padding: EdgeInsets.zero,
                     child: Text(
                       g.name,
                       style: const TextStyle(
@@ -268,7 +282,8 @@ class AccountsScreen extends StatelessWidget {
                       snapshot: snapshot,
                       account: a,
                       divider:
-                          j == g.accounts.length - 1 && i < ordered.length - 1
+                          j == g.accounts.length - 1 &&
+                              (i < ordered.length - 1 || hasCards)
                           ? PayseColors.dividerSection
                           : PayseColors.dividerRow,
                       onRename: writer == null
@@ -278,6 +293,29 @@ class AccountsScreen extends StatelessWidget {
                         final open? => () => open(a),
                         null => null,
                       },
+                    ),
+                ],
+                if (onOpenCard case final open?
+                    when (snapshot.cards ?? const []).isNotEmpty) ...[
+                  const SizedBox(height: PayseSpace.x6),
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 2),
+                    child: Text(
+                      '카드',
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 22 / 15,
+                        fontWeight: FontWeight.w700,
+                        color: PayseColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  for (final c in snapshot.cards!)
+                    _CardRow(
+                      key: ValueKey('card-row-${c.cardId}'),
+                      snapshot: snapshot,
+                      card: c,
+                      onOpen: () => open(c),
                     ),
                 ],
               ],
@@ -322,9 +360,9 @@ class _AccountRow extends StatelessWidget {
     ];
     return [
       '${a.nickname != null ? '${a.productName} ' : ''}····${lastFour(a.maskedNumber)}',
-      if (reserves.length == 1) '모아둘 돈 ${formatKrw(reserves.single.amountKrw)}',
-      if (reserves.length > 1) '모아둘 돈 ${reserves.length}건',
-      if (cards.isNotEmpty) '카드 ${cards.length}장 결제',
+      if (reserves.length == 1) '남겨둘 돈 ${formatKrw(reserves.single.amountKrw)}',
+      if (reserves.length > 1) '남겨둘 돈 ${reserves.length}건',
+      if (cards.isNotEmpty) '연결 카드 ${cards.length}장',
     ];
   }
 
@@ -333,9 +371,8 @@ class _AccountRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final a = account;
     final excluded = !a.included;
-    final color = excluded
-        ? PayseColors.textSecondary
-        : PayseColors.textPrimary;
+    // 2026-11-01: 계산 제외는 '계산에서 제외' 표시로만 구분하고 이름·잔액은 흐리게 하지 않는다(조회 가능한 계좌).
+    const color = PayseColors.textPrimary;
     final name = a.nickname ?? a.productName;
     final balance = a.balanceKrw;
     final salary = snapshot.settings?.salary.salaryAccountId == a.accountId;
@@ -489,6 +526,80 @@ class _Details extends StatelessWidget {
   }
 }
 
+/// 2026-10-31: 카드 한 줄. 카드 이름 → 보조 줄('····끝 4자리 · 출금 계좌 이름' 또는 '출금 계좌 미확인') … '›'. 누르면 카드별
+/// 조회를 연다. 카드 사용액을 잔액으로 보이지 않는다.
+class _CardRow extends StatelessWidget {
+  /// 2026-10-31: [snapshot]의 카드 [card]와 누르기 [onOpen]으로 만든다.
+  const _CardRow({
+    super.key,
+    required this.snapshot,
+    required this.card,
+    required this.onOpen,
+  });
+
+  final FinancialSnapshot snapshot;
+  final PaymentCard card;
+  final VoidCallback onOpen;
+
+  /// 2026-10-31: 카드 줄을 반환한다.
+  @override
+  Widget build(BuildContext context) {
+    final id = card.withdrawalAccountId;
+    final withdrawal = card.withdrawalAccountRestricted || id == null
+        ? null
+        : accountById(snapshot, id);
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: onOpen,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 64),
+          padding: const EdgeInsets.symmetric(vertical: PayseSpace.x3),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: PayseColors.dividerRow)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      card.productName,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 22 / 15,
+                        fontWeight: FontWeight.w600,
+                        color: PayseColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      [
+                        '카드 ····${lastFour(card.maskedNumber)}',
+                        withdrawal == null
+                            ? '출금 계좌 미확인'
+                            : '출금 계좌 ${institutionName(snapshot, withdrawal.institutionCode)} '
+                                  '····${lastFour(withdrawal.maskedNumber)}',
+                      ].join(' · '),
+                      style: PayseTypography.caption,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: PayseSpace.x2),
+              const Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: PayseColors.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// 2026-10-29: 계좌 목록 위 '월급 정보' 줄. 누르면 월급 정보 편집 화면을 연다. 위아래 여백은 24dp로 같고, 아래는 은행 묶음과
 /// 나누는 진한 선이다.
 class _SalaryRow extends StatelessWidget {
@@ -508,7 +619,7 @@ class _SalaryRow extends StatelessWidget {
         onTap: onTap,
         child: Container(
           constraints: const BoxConstraints(minHeight: 64),
-          padding: const EdgeInsets.symmetric(vertical: PayseSpace.x6),
+          padding: const EdgeInsets.symmetric(vertical: PayseSpace.x4),
           decoration: const BoxDecoration(
             border: Border(
               bottom: BorderSide(color: PayseColors.dividerSection),

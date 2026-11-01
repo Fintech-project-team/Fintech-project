@@ -11,6 +11,8 @@ import 'composition_bar.dart';
 import 'cycle_moon.dart';
 import 'home_calculation.dart';
 import 'home_skeleton.dart';
+import 'overview_links.dart';
+import 'overview_pages.dart' show openCalculation;
 import 'salary_notice.dart';
 
 /// 2026-10-23: 02-1 홈. 공유 계산 결과 [calculation]만 표시하며 금액을 직접 계산하지 않는다.
@@ -32,6 +34,7 @@ class HomeScreen extends StatelessWidget {
     this.onShowFirstCalc,
     this.coachTargets,
     this.salaryNotice,
+    this.links,
   });
 
   final HomeCalculation calculation;
@@ -41,6 +44,9 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback? onShowFirstCalc;
   final HomeCoachTargets? coachTargets;
   final SalaryNoticeControl? salaryNotice;
+
+  /// 2026-10-31: 화면 사이 연결(계산 내역의 계좌·계좌 선택, 이번 기간 내역). 없으면 계산 내역만 연다.
+  final OverviewLinks? links;
 
   static const String amountLabel = '다음 월급일까지\n쓸 수 있는 돈';
 
@@ -59,6 +65,7 @@ class HomeScreen extends StatelessWidget {
         onShowFirstCalc: onShowFirstCalc,
         coachTargets: coachTargets,
         salaryNotice: salaryNotice,
+        links: links,
       ),
       HomeCalculationDataError() || HomeCalculationUnexpectedError()
           when failed =>
@@ -131,6 +138,7 @@ class _HomeReady extends StatelessWidget {
     this.onShowFirstCalc,
     this.coachTargets,
     this.salaryNotice,
+    this.links,
   });
 
   final HomeCalculationReady calculation;
@@ -140,8 +148,11 @@ class _HomeReady extends StatelessWidget {
   final VoidCallback? onShowFirstCalc;
   final HomeCoachTargets? coachTargets;
   final SalaryNoticeControl? salaryNotice;
+  final OverviewLinks? links;
 
   /// 2026-10-26: 머리·주기 줄·금액·상태 안내·장부를 스크롤 영역에 두고 '계산 내역 보기' 띠 버튼을 화면 아래에 고정한다.
+  /// 2026-10-31: 금액 영역 전체가 계산 내역을 열고, 아래 고정 띠 대신 장부 아래에 '이번 기간 내역 보기'를 둔다(#163).
+  /// 2026-11-01: 금액 아래 '계산 내역 보기' 글자는 '이번 기간 내역 보기'와 헷갈려 빼고, 진입은 금액 오른쪽 '›'로 알린다.
   @override
   Widget build(BuildContext context) {
     final result = calculation.result;
@@ -177,7 +188,7 @@ class _HomeReady extends StatelessWidget {
           key: const ValueKey('home-negative-notice'),
           kind: StatusNoticeKind.warning,
           title: '계획한 금액보다 잔액이 부족해요',
-          message: '모아둘 돈과 예정 지출을 모두 확보하려면 ${formatKrw(-u)}이 더 필요해요.',
+          message: '남겨둘 돈과 예정 지출을 모두 확보하려면 ${formatKrw(-u)}이 더 필요해요.',
         ),
       );
     } else if (awaiting && salaryNotice == null) {
@@ -224,16 +235,34 @@ class _HomeReady extends StatelessWidget {
                   const SizedBox(height: PayseSpace.section),
                   _target(
                     coachTargets?.amountTop,
-                    AmountHero(
-                      label: HomeScreen.amountLabel,
-                      amountKrw: u,
-                      asOfLabel: asOfLabel(result.context.asOf),
-                      message: u == null && !reported
-                          ? _insufficientText(result, payDay)
-                          : null,
-                      unavailableLabel: absent && !reported
-                          ? '아직 계산할 수 없어요'
-                          : null,
+                    Semantics(
+                      button: true,
+                      label: '계산 내역 보기',
+                      child: InkWell(
+                        key: const ValueKey('home-amount'),
+                        onTap: () => _openDetail(context),
+                        child: AmountHero(
+                          label: HomeScreen.amountLabel,
+                          labelChip: showBar ? PayseColors.available : null,
+                          amountTrailing: KeyedSubtree(
+                            key: coachTargets?.detail,
+                            child: const Icon(
+                              Icons.chevron_right,
+                              key: ValueKey('home-detail-button'),
+                              size: 28,
+                              color: PayseColors.textSecondary,
+                            ),
+                          ),
+                          amountKrw: u,
+                          asOfLabel: asOfLabel(result.context.asOf),
+                          message: u == null && !reported
+                              ? _insufficientText(result, payDay)
+                              : null,
+                          unavailableLabel: absent && !reported
+                              ? '아직 계산할 수 없어요'
+                              : null,
+                        ),
+                      ),
                     ),
                   ),
                   if (reported) ...[
@@ -323,9 +352,14 @@ class _HomeReady extends StatelessWidget {
                       result: result,
                       chips: showBar,
                       awaiting: awaiting,
-                      onOpenDetail: () => _openDetail(context),
+                      onOpenDetail: (section) =>
+                          _openDetail(context, section: section),
                     ),
                   ),
+                  if (links?.onShowPeriod case final show?) ...[
+                    const SizedBox(height: PayseSpace.x4),
+                    _padded(_PeriodLink(onTap: show)),
+                  ],
                   if (resolved) ...[
                     const SizedBox(height: PayseSpace.x6),
                     _padded(
@@ -341,14 +375,6 @@ class _HomeReady extends StatelessWidget {
               ),
             ),
           ),
-          KeyedSubtree(
-            key: coachTargets?.detail,
-            child: PrimaryButton(
-              key: const ValueKey('home-detail-button'),
-              label: '계산 내역 보기',
-              onPressed: () => _openDetail(context),
-            ),
-          ),
         ],
       ),
     );
@@ -359,10 +385,17 @@ class _HomeReady extends StatelessWidget {
       KeyedSubtree(key: key, child: _padded(child));
 
   /// 2026-10-26: 같은 계산 결과로 02-2 계산 내역을 연다.
-  void _openDetail(BuildContext context) {
+  /// 2026-10-31: 펼칠 항목 [section]을 받고, 화면 사이 연결이 있으면 그것으로 연다.
+  void _openDetail(BuildContext context, {CalcSection? section}) {
+    final links = this.links;
+    if (links != null) {
+      openCalculation(context, links, section: section);
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => CalculationDetailScreen(calculation: calculation),
+        builder: (_) =>
+            CalculationDetailScreen(calculation: calculation, section: section),
       ),
     );
   }
@@ -387,6 +420,52 @@ class _HomeReady extends StatelessWidget {
       return '${md(payDay)}에 예정된 월급의 입금 여부를 확인할 정보가 없어요.';
     }
     return insufficientMessage(first);
+  }
+}
+
+/// 2026-10-31: 장부 아래 '이번 기간 내역 보기 →' 이동 행(#163 후속). 테두리·채움 없이 왼쪽 문구 16/600, 오른쪽 화살표,
+/// 행 전체가 터치 영역(최소 56dp)이다. 계좌·카드 탭의 이번 기간 내역으로 간다.
+class _PeriodLink extends StatelessWidget {
+  /// 2026-10-31: 누르기 [onTap]으로 만든다.
+  const _PeriodLink({required this.onTap});
+
+  final VoidCallback onTap;
+
+  /// 2026-10-31: 행을 반환한다.
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      child: InkWell(
+        key: const ValueKey('home-period-button'),
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 56),
+          child: const Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '이번 기간 내역 보기',
+                  style: TextStyle(
+                    fontSize: 16,
+                    height: 24 / 16,
+                    fontWeight: FontWeight.w600,
+                    color: PayseColors.textPrimary,
+                  ),
+                ),
+              ),
+              ExcludeSemantics(
+                child: Icon(
+                  Icons.arrow_forward,
+                  size: 22,
+                  color: PayseColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -461,9 +540,11 @@ class _HomeHeader extends StatelessWidget {
   }
 }
 
-/// 2026-10-26: 홈 전용 장부(design.md §6). 계좌 잔액 B, 모아둘 돈 R−O, 예정 지출 E를 같은 계산 결과로 보인다.
+/// 2026-10-26: 홈 전용 장부(design.md §6). 계좌 잔액 B, 남겨둘 돈 R−O, 예정 지출 E를 같은 계산 결과로 보인다.
+/// 2026-10-31: 각 행을 누르면 02-2의 같은 항목을 펼쳐 연다(#163).
 class _HomeLedger extends StatelessWidget {
   /// 2026-10-26: 계산 결과 [result], 색 칩 표시 [chips], 입금 대기 [awaiting], 02-2 열기 [onOpenDetail]로 만든다.
+  /// 2026-10-31: [onOpenDetail]은 펼칠 항목을 받아 02-2를 연다.
   const _HomeLedger({
     required this.result,
     required this.chips,
@@ -474,7 +555,7 @@ class _HomeLedger extends StatelessWidget {
   final calc.CurrentAmountResult result;
   final bool chips;
   final bool awaiting;
-  final VoidCallback onOpenDetail;
+  final ValueChanged<CalcSection> onOpenDetail;
 
   /// 2026-10-26: 위 구분선과 세 행을 반환한다. 값을 모르면 '계산 불가'이고 화살표를 두지 않는다.
   @override
@@ -498,19 +579,24 @@ class _HomeLedger extends StatelessWidget {
         ),
         _HomeLedgerRow(
           key: const ValueKey('home-row-balance'),
-          name: '계좌 잔액',
+          name: '계산에 포함한 계좌 잔액',
           strong: true,
+          subtitle: switch (result.accountLines) {
+            final lines? when b != null => '${lines.length}개 계좌',
+            _ => null,
+          },
           amount: b == null ? null : formatKrw(b),
+          onTap: b == null ? null : () => onOpenDetail(CalcSection.balance),
         ),
         _HomeLedgerRow(
           key: const ValueKey('home-row-reserve'),
-          name: '모아둘 돈',
+          name: '남겨둘 돈',
           chip: chips ? PayseColors.reserve : null,
           subtitle: rEff == null || reserveCount == null
               ? null
               : '$reserveCount건',
           amount: _minus(rEff),
-          onTap: rEff == null ? null : onOpenDetail,
+          onTap: rEff == null ? null : () => onOpenDetail(CalcSection.reserve),
         ),
         _HomeLedgerRow(
           key: const ValueKey('home-row-scheduled'),
@@ -519,7 +605,7 @@ class _HomeLedger extends StatelessWidget {
           label: awaiting ? '입금 확인 대기' : null,
           subtitle: e == null || awaiting ? null : '월급일 전 $scheduledCount건',
           amount: _minus(e),
-          onTap: e == null ? null : onOpenDetail,
+          onTap: e == null ? null : () => onOpenDetail(CalcSection.scheduled),
         ),
       ],
     );
@@ -755,7 +841,7 @@ String insufficientMessage(calc.InsufficientReason? reason) => switch (reason) {
   calc.InsufficientReason.obligationsMissing ||
   calc.InsufficientReason.settlementsMissing => '예정 지출 정보를 모두 받지 못해 계산하지 않았어요.',
   calc.InsufficientReason.reservesMissing ||
-  calc.InsufficientReason.allocationsMissing => '모아둘 돈 정보를 모두 받지 못해 계산하지 않았어요.',
+  calc.InsufficientReason.allocationsMissing => '남겨둘 돈 정보를 모두 받지 못해 계산하지 않았어요.',
   _ => '필요한 정보를 모두 받지 못해 계산하지 않았어요.',
 };
 
@@ -1126,13 +1212,14 @@ class _HomeLoading extends StatelessWidget {
                             color: PayseColors.dividerSection,
                           ),
                           _HomeLedgerRow(
-                            name: '계좌 잔액',
+                            name: '계산에 포함한 계좌 잔액',
                             strong: true,
+                            subtitle: '0개 계좌',
                             amount: null,
                             skeleton: true,
                           ),
                           _HomeLedgerRow(
-                            name: '모아둘 돈',
+                            name: '남겨둘 돈',
                             subtitle: '0건',
                             amount: null,
                             skeleton: true,
@@ -1151,11 +1238,6 @@ class _HomeLoading extends StatelessWidget {
                 ),
               ),
             ),
-          ),
-          const PrimaryButton(
-            key: ValueKey('home-detail-button'),
-            label: '계산 내역 보기',
-            onPressed: null,
           ),
         ],
       ),
@@ -1250,13 +1332,13 @@ class _HomeLoadFailed extends StatelessWidget {
                           color: PayseColors.dividerSection,
                         ),
                         _HomeLedgerRow(
-                          name: '계좌 잔액',
+                          name: '계산에 포함한 계좌 잔액',
                           strong: true,
                           amount: null,
                           missingText: '불러오지 못함',
                         ),
                         _HomeLedgerRow(
-                          name: '모아둘 돈',
+                          name: '남겨둘 돈',
                           amount: null,
                           missingText: '불러오지 못함',
                         ),
@@ -1272,11 +1354,6 @@ class _HomeLoadFailed extends StatelessWidget {
                 ],
               ),
             ),
-          ),
-          const PrimaryButton(
-            key: ValueKey('home-detail-button'),
-            label: '계산 내역 보기',
-            onPressed: null,
           ),
         ],
       ),

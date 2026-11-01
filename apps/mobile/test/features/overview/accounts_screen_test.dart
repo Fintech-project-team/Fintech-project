@@ -203,7 +203,7 @@ void main() {
       await _pump(tester, repo, snapshot);
 
       expect(find.text('계산에 포함한 계좌 잔액'), findsOneWidget);
-      expect(find.text('계산에 포함한 계좌 4개 · 10월 19일 12:00 기준'), findsOneWidget);
+      expect(find.text('계좌 4개 · 10월 19일 12:00 기준'), findsOneWidget);
       expect(find.byKey(const ValueKey('accounts-total')), findsOneWidget);
       final button = tester.getRect(
         find.byKey(const ValueKey('accounts-change-selection')),
@@ -215,7 +215,7 @@ void main() {
       );
       expect(
         _detail(tester, _kbDemand),
-        '····0001 · 모아둘 돈 400,000원 · 카드 3장 결제',
+        '····0001 · 남겨둘 돈 400,000원 · 연결 카드 3장',
       );
       expect(
         find.byKey(const ValueKey('account-salary-$_kbDemand')),
@@ -226,7 +226,7 @@ void main() {
         find.byKey(const ValueKey('account-salary-$_hanaDemand')),
         findsNothing,
       );
-      expect(_detail(tester, _hanaDemand), '····0003 · 카드 1장 결제');
+      expect(_detail(tester, _hanaDemand), '····0003 · 연결 카드 1장');
       expect(
         tester.getSize(find.byKey(ValueKey('account-salary-$_kbDemand'))).width,
         lessThan(100),
@@ -362,9 +362,9 @@ void main() {
           .toList();
       expect(kb, [
         '····0001',
-        '모아둘 돈 400,000원',
-        '카드 3장 결제',
-      ], reason: '한 줄에 안 들어가면 계좌 번호 / 모아둘 돈 / 카드 결제 의미 단위로 줄바꿈');
+        '남겨둘 돈 400,000원',
+        '연결 카드 3장',
+      ], reason: '한 줄에 안 들어가면 계좌 번호 / 남겨둘 돈 / 카드 결제 의미 단위로 줄바꿈');
     });
 
     testWidgets('월급 정보 opens the salary editor; saving returns with a notice', (
@@ -460,7 +460,7 @@ void main() {
       expect(find.text('계좌 이름을 바꿨어요.'), findsOneWidget);
       expect(_rowOrder(tester), before, reason: '이름만 바꾸면 순서 그대로');
       expect(_inRow(_hanaDemand, '생활비'), findsOneWidget);
-      expect(_detail(tester, _hanaDemand), '생활비 통장 ····0003 · 카드 1장 결제');
+      expect(_detail(tester, _hanaDemand), '생활비 통장 ····0003 · 연결 카드 1장');
     });
 
     testWidgets('clearing a saved name reverts to the original', (
@@ -486,7 +486,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('원래 이름으로 되돌렸어요.'), findsOneWidget);
       expect(_inRow(_hanaDemand, '생활비 통장'), findsOneWidget);
-      expect(_detail(tester, _hanaDemand), '····0003 · 카드 1장 결제');
+      expect(_detail(tester, _hanaDemand), '····0003 · 연결 카드 1장');
     });
 
     testWidgets('input rules: specials only, blocked letters, 12 graphemes', (
@@ -652,7 +652,7 @@ void main() {
       await tester.tap(find.text('이 계좌로 계산하기'));
       await tester.pumpAndSettle();
       expect(find.byType(AccountSelectScreen), findsNothing);
-      expect(find.text('계산에 포함한 계좌 5개 · 10월 19일 12:00 기준'), findsOneWidget);
+      expect(find.text('계좌 5개 · 10월 19일 12:00 기준'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('account-excluded-$_kbDeposit')),
         findsNothing,
@@ -741,7 +741,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('selection-leave')));
       await tester.pumpAndSettle();
       expect(find.byType(AccountSelectScreen), findsNothing);
-      expect(find.text('계산에 포함한 계좌 4개 · 10월 19일 12:00 기준'), findsOneWidget);
+      expect(find.text('계좌 4개 · 10월 19일 12:00 기준'), findsOneWidget);
     });
   });
 }

@@ -49,9 +49,10 @@ public final class ProviderHttp {
      * 승인된 어댑터의 주소에 JSON을 한 번 보낸다. 비정상 응답 본문·자격은 예외에 포함하지 않는다.
      * @created 2026-10-29
      * @usedBy GoogleKms.wrap, GoogleKms.unwrap, OpenAiGateway
+     * @modified 2026-11-01 - Bearer 형식을 헤더 생성 전 검증하여 잘못된 키의 예외 노출 차단
      */
     public JsonNode post(URI endpoint, String bearer, JsonNode body) {
-        if (bearer == null || bearer.isBlank() || bearer.indexOf('\r') >= 0 || bearer.indexOf('\n') >= 0) {
+        if (bearer == null || !bearer.matches("[-A-Za-z0-9._~+/]+=*")) {
             throw new ProviderFailure("CREDENTIAL_UNAVAILABLE", false);
         }
         HttpRequest request = HttpRequest.newBuilder(endpoint).timeout(timeout)
