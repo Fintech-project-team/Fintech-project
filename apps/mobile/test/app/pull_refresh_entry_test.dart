@@ -60,7 +60,7 @@ Future<FakeUserFinancialRepository> _connected({int? pageSize}) async {
 Future<Map<String, Object?>> _json(UserFinancialRepository repo) async =>
     ((await repo.loadSnapshot()) as FinancialOk<Map<String, Object?>>).value;
 
-/// 2026-10-30: [repo]로 앱 진입을 띄우고 하단 '계좌·카드' 탭으로 간다.
+/// 2026-10-30: [repo]로 앱 진입을 띄우고 하단 '계좌·카드' 탭으로 간다. 2026-10-31: 안쪽 '전체 거래' 탭까지 연다.
 Future<void> _openTab(WidgetTester tester, UserFinancialRepository repo) async {
   tester.view.physicalSize = const Size(1170, 2532);
   tester.view.devicePixelRatio = 3;
@@ -87,6 +87,8 @@ Future<void> _openTab(WidgetTester tester, UserFinancialRepository repo) async {
       matching: find.text('계좌·카드'),
     ),
   );
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('inner-tab-all')));
   await tester.pumpAndSettle();
 }
 
@@ -319,7 +321,7 @@ void main() {
     expect(find.byKey(const ValueKey('pull-armed')), findsNothing);
     await _move(tester, gesture, 480);
     expect(find.byKey(const ValueKey('pull-armed')), findsOneWidget);
-    await _move(tester, gesture, -570);
+    await _move(tester, gesture, -620);
     expect(find.byKey(const ValueKey('pull-armed')), findsNothing);
     await _up(tester, gesture);
     await tester.pumpAndSettle();
@@ -422,7 +424,7 @@ void main() {
     expect(repo.pageCalls, hasLength(1));
     expect(find.text('새로고침하지 못했어요'), findsOneWidget);
     expect(
-      find.text('계산에 포함한 계좌 4개 · 10월 19일 12:00 기준'),
+      find.text('계좌 4개 · 10월 19일 12:00 기준'),
       findsOneWidget,
       reason: '계좌 관리도 이전 Snapshot',
     );

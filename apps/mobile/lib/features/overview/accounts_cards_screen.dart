@@ -3,30 +3,38 @@ import 'package:flutter/material.dart';
 import '../../data/connection/transaction_history.dart';
 import '../../data/financial_snapshot.dart';
 import '../../shared/design/payse_tokens.dart';
-import '../connection/connection_review.dart';
 import 'accounts_screen.dart';
 import 'home_calculation.dart';
-import 'pull_refresh.dart';
+import 'overview_links.dart';
+import 'overview_pages.dart';
+import 'period_flow_screen.dart';
+import 'transaction_feed.dart';
+import 'transaction_query.dart';
 import 'transactions_screen.dart';
 
-/// 2026-10-30: 하단 '계좌·카드' 탭(29-2 D10). 제목 아래 안쪽 탭 '거래 내역 / 계좌 관리'를 두고, 고른 안쪽 탭과 각 화면의
-/// 조회 조건·스크롤은 다른 하단 탭에 다녀와도 유지한다. 계좌 관리에서 계좌 행을 누르면 그 계좌로 고정한 거래 내역을 연다.
+/// 2026-10-30: 하단 '계좌·카드' 탭(29-2 D10). 제목 아래 안쪽 탭을 두고, 고른 안쪽 탭과 각 화면의 조회 조건·스크롤은 다른
+/// 하단 탭에 다녀와도 유지한다.
+/// 2026-10-31: 안쪽 탭은 '이번 기간 내역 | 전체 거래 | 계좌 관리'이며 처음에는 이번 기간 내역이다(#163). 두 거래 화면은 같은
+/// 거래 수집 상태를 함께 쓴다. 고른 안쪽 탭은 앱 셸이 가진 [tab]에 두어 홈의 '이번 기간 내역 보기'로도 바꾼다.
 class AccountsCardsScreen extends StatefulWidget {
-  /// 2026-10-30: 현재 Snapshot [snapshot], 홈 계산 [calculation], 저장·조회 연결 [writer], 아래로 당겨 새로고침
-  /// [onRefresh], 새로고침으로 받은 거래 전체 [history]로 만든다.
+  /// 2026-10-30: 현재 Snapshot [snapshot], 홈 계산 [calculation], 저장·조회 연결 [writer], 새로고침으로 받은 거래 전체
+  /// [history]로 만든다.
+  /// 2026-10-31: 화면 사이 연결 [links]와 고른 안쪽 탭 [tab]을 더했다. 새로고침은 [OverviewLinks.onRefresh]를 쓴다.
   const AccountsCardsScreen({
     required this.snapshot,
     required this.calculation,
+    required this.links,
+    required this.tab,
     this.writer,
-    this.onRefresh,
     this.history,
     super.key,
   });
 
   final FinancialSnapshot snapshot;
   final HomeCalculation calculation;
+  final OverviewLinks links;
+  final ValueNotifier<AccountsCardsTab> tab;
   final AccountsWriter? writer;
-  final PullRefresh? onRefresh;
   final TransactionHistoryReady? history;
 
   /// 2026-10-30: 상태 객체를 반환한다.
@@ -34,104 +42,145 @@ class AccountsCardsScreen extends StatefulWidget {
   State<AccountsCardsScreen> createState() => _AccountsCardsScreenState();
 }
 
-/// 2026-10-30: 고른 안쪽 탭을 가진다.
+/// 2026-10-31: 두 거래 화면이 함께 쓰는 거래 수집 상태를 가진다.
 class _AccountsCardsScreenState extends State<AccountsCardsScreen> {
-  int _tab = 0;
+  late final TransactionFeed _feed = TransactionFeed(
+    snapshot: widget.snapshot,
+    repository: widget.writer?.repository,
+    onSessionInvalid: widget.writer?.onSessionInvalid,
+    history: widget.history,
+  );
 
-  /// 2026-10-30: 계좌 [account]로 고정한 거래 내역 화면을 연다.
-  void _openAccount(Account account) {
-    final w = widget.writer;
-    Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => AccountTransactionsPage(
-          snapshot: widget.snapshot,
-          account: account,
-          writer: w,
-          onRefresh: widget.onRefresh,
-          history: widget.history,
-        ),
-      ),
+  /// 2026-10-31: 전체 거래에서 고른 조회 기간. 개별 조회를 열 때 넘긴다.
+  PeriodSelection _allPeriod = PeriodSelection.thisMonth;
+
+  /// 2026-10-31: 새 Snapshot·받은 거래를 수집 상태에 알린다.
+  @override
+  void didUpdateWidget(covariant AccountsCardsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _feed.update(widget.snapshot, widget.history);
+  }
+
+  /// 2026-10-31: 수집 상태를 폐기한다.
+  @override
+  void dispose() {
+    _feed.dispose();
+    super.dispose();
+  }
+
+  /// 2026-10-31: 연결한 전체 계좌·카드에서 고르는 시트를 열고, 전체 거래에서 고른 기간으로 그 조회를 연다.
+  Future<void> _pickInstrument() async {
+    final picked = await pickInstrument(
+      context,
+      widget.snapshot,
+      InstrumentScope.connected,
     );
+    if (picked != null && mounted) {
+      openInstrument(context, widget.links, picked, period: _allPeriod);
+    }
   }
 
   /// 2026-10-30: 제목·안쪽 탭·화면을 반환한다.
   @override
   Widget build(BuildContext context) {
     final w = widget.writer;
+    final links = widget.links;
     return SafeArea(
       bottom: false,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(
-              PayseSpace.screenHorizontal,
-              PayseSpace.x6,
-              PayseSpace.screenHorizontal,
-              0,
-            ),
-            child: Text(
-              '계좌·카드',
-              style: TextStyle(
-                fontSize: 24,
-                height: 1.42,
-                fontWeight: FontWeight.w700,
-                color: PayseColors.textPrimary,
+      child: ValueListenableBuilder<AccountsCardsTab>(
+        valueListenable: widget.tab,
+        builder: (context, tab, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(
+                PayseSpace.screenHorizontal,
+                PayseSpace.x6,
+                PayseSpace.screenHorizontal,
+                0,
+              ),
+              child: Text(
+                '계좌·카드',
+                style: TextStyle(
+                  fontSize: 24,
+                  height: 1.42,
+                  fontWeight: FontWeight.w700,
+                  color: PayseColors.textPrimary,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: PayseSpace.x3),
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: PayseSpace.screenHorizontal,
-            ),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: PayseColors.border)),
-            ),
-            child: Row(
-              children: [
-                _InnerTab(
-                  key: const ValueKey('inner-tab-transactions'),
-                  label: '거래 내역',
-                  selected: _tab == 0,
-                  onTap: () => setState(() => _tab = 0),
+            const SizedBox(height: PayseSpace.x3),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: PayseSpace.screenHorizontal,
+              ),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: PayseColors.border)),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final (i, (t, label)) in const [
+                      (AccountsCardsTab.period, '이번 기간 내역'),
+                      (AccountsCardsTab.all, '전체 거래'),
+                      (AccountsCardsTab.accounts, '계좌 관리'),
+                    ].indexed) ...[
+                      if (i > 0) const SizedBox(width: PayseSpace.x6),
+                      _InnerTab(
+                        key: ValueKey('inner-tab-${t.name}'),
+                        label: label,
+                        selected: tab == t,
+                        onTap: () => widget.tab.value = t,
+                      ),
+                    ],
+                  ],
                 ),
-                const SizedBox(width: PayseSpace.x6),
-                _InnerTab(
-                  key: const ValueKey('inner-tab-accounts'),
-                  label: '계좌 관리',
-                  selected: _tab == 1,
-                  onTap: () => setState(() => _tab = 1),
-                ),
-              ],
+              ),
             ),
-          ),
-          Expanded(
-            child: IndexedStack(
-              index: _tab,
-              children: [
-                TransactionsScreen(
-                  snapshot: widget.snapshot,
-                  repository: w?.repository,
-                  onSessionInvalid: w?.onSessionInvalid,
-                  onRefresh: widget.onRefresh,
-                  history: widget.history,
-                ),
-                MediaQuery.removePadding(
-                  context: context,
-                  removeTop: true,
-                  child: AccountsScreen(
-                    snapshot: widget.snapshot,
+            Expanded(
+              child: IndexedStack(
+                index: tab.index,
+                children: [
+                  PeriodFlowScreen(
                     calculation: widget.calculation,
-                    writer: w,
-                    onOpenAccount: _openAccount,
-                    onRefresh: widget.onRefresh,
+                    feed: _feed,
+                    links: links,
+                    onShowAll: () => widget.tab.value = AccountsCardsTab.all,
                   ),
-                ),
-              ],
+                  TransactionsScreen(
+                    snapshot: widget.snapshot,
+                    feed: _feed,
+                    onRefresh: links.onRefresh,
+                    onPickInstrument: _pickInstrument,
+                    onPeriodChanged: (p) => _allPeriod = p,
+                  ),
+                  MediaQuery.removePadding(
+                    context: context,
+                    removeTop: true,
+                    child: AccountsScreen(
+                      snapshot: widget.snapshot,
+                      calculation: widget.calculation,
+                      writer: w,
+                      onOpenAccount: (a) => openInstrument(
+                        context,
+                        links,
+                        AccountInstrument(a.accountId),
+                      ),
+                      onOpenCard: (c) => openInstrument(
+                        context,
+                        links,
+                        CardInstrument(c.cardId),
+                      ),
+                      onOpenCalculation: () => openCalculation(context, links),
+                      onRefresh: links.onRefresh,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -192,92 +241,6 @@ class _InnerTab extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// 2026-10-30: 계좌 관리에서 연 계좌별 거래 내역. 위 막대에 계좌 이름과 '은행명 ····끝 4자리'를 보이고 거래 수단은
-/// [account]로 고정한다. 연 뒤 당겨서 새로고침하면 받은 Snapshot·거래로 이 화면도 바꾼다.
-class AccountTransactionsPage extends StatefulWidget {
-  /// 2026-10-30: 연 시점의 Snapshot [snapshot], 계좌 [account], 조회 연결 [writer], 새로고침 [onRefresh], 받아 둔 거래
-  /// [history]로 만든다.
-  const AccountTransactionsPage({
-    required this.snapshot,
-    required this.account,
-    this.writer,
-    this.onRefresh,
-    this.history,
-    super.key,
-  });
-
-  final FinancialSnapshot snapshot;
-  final Account account;
-  final AccountsWriter? writer;
-  final PullRefresh? onRefresh;
-  final TransactionHistoryReady? history;
-
-  /// 2026-10-30: 상태 객체를 반환한다.
-  @override
-  State<AccountTransactionsPage> createState() =>
-      _AccountTransactionsPageState();
-}
-
-/// 2026-10-30: 이 화면이 보이는 Snapshot·거래를 가진다.
-class _AccountTransactionsPageState extends State<AccountTransactionsPage> {
-  late FinancialSnapshot _snapshot = widget.snapshot;
-  late TransactionHistoryReady? _history = widget.history;
-
-  /// 2026-10-30: 화면을 반환한다.
-  @override
-  Widget build(BuildContext context) {
-    final w = widget.writer;
-    final account =
-        accountById(_snapshot, widget.account.accountId) ?? widget.account;
-    return Scaffold(
-      backgroundColor: PayseColors.background,
-      appBar: AppBar(
-        backgroundColor: PayseColors.background,
-        surfaceTintColor: PayseColors.background,
-        foregroundColor: PayseColors.textPrimary,
-        centerTitle: false,
-        titleSpacing: 0,
-        toolbarHeight: 56,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              account.nickname ?? account.productName,
-              key: const ValueKey('account-tx-title'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 17,
-                height: 1.45,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            Text(
-              '${institutionName(_snapshot, account.institutionCode)} '
-              '····${lastFour(account.maskedNumber)}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: PayseTypography.caption,
-            ),
-          ],
-        ),
-      ),
-      body: TransactionsScreen(
-        snapshot: _snapshot,
-        repository: w?.repository,
-        onSessionInvalid: w?.onSessionInvalid,
-        accountId: account.accountId,
-        history: _history,
-        onRefresh: widget.onRefresh,
-        onRefreshed: (history) => setState(() {
-          _snapshot = history.snapshot;
-          _history = history;
-        }),
       ),
     );
   }

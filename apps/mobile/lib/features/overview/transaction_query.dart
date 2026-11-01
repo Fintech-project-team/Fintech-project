@@ -13,12 +13,25 @@ String _iso(DateTime d) =>
     '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
 /// 2026-10-30: 조회 기간 종류.
-enum PeriodKind { thisMonth, recent3, recent1y, month }
+/// 2026-10-31: [cycle]은 이번 기간 내역에서 물려받은 계산 결과의 월급 주기다(#163 후속). 선택 시트의 기본 선택지가 아니다.
+enum PeriodKind { thisMonth, recent3, recent1y, month, cycle }
 
 /// 2026-10-30: 조회 기간 선택. [month]는 [PeriodKind.month]일 때의 'YYYY-MM'이다.
+/// 2026-10-31: [PeriodKind.cycle]이면 [start]·[end](양 끝 포함 'YYYY-MM-DD')와 이름 [label]을 가진다.
 class PeriodSelection {
   /// 2026-10-30: 종류 [kind]와 달 [month]로 만든다.
-  const PeriodSelection(this.kind, {this.month});
+  const PeriodSelection(this.kind, {this.month})
+    : start = null,
+      end = null,
+      label = null;
+
+  /// 2026-10-31: 계산 결과의 월급 주기 [start]~[end](양 끝 포함)와 이름 [label]로 만든다. 날짜를 새로 정하지 않는다.
+  const PeriodSelection.cycle({
+    required String this.start,
+    required String this.end,
+    required String this.label,
+  }) : kind = PeriodKind.cycle,
+       month = null;
 
   static const PeriodSelection thisMonth = PeriodSelection(
     PeriodKind.thisMonth,
@@ -26,6 +39,9 @@ class PeriodSelection {
 
   final PeriodKind kind;
   final String? month;
+  final String? start;
+  final String? end;
+  final String? label;
 
   /// 2026-10-30: 선택지 이름.
   String get name => switch (kind) {
@@ -33,14 +49,19 @@ class PeriodSelection {
     PeriodKind.recent3 => '최근 3개월',
     PeriodKind.recent1y => '최근 1년',
     PeriodKind.month => '월 선택',
+    PeriodKind.cycle => label!,
   };
 
   @override
   bool operator ==(Object other) =>
-      other is PeriodSelection && other.kind == kind && other.month == month;
+      other is PeriodSelection &&
+      other.kind == kind &&
+      other.month == month &&
+      other.start == start &&
+      other.end == end;
 
   @override
-  int get hashCode => Object.hash(kind, month);
+  int get hashCode => Object.hash(kind, month, start, end);
 }
 
 /// 2026-10-30: 조회 가능한 범위. [first]는 조회 시작일(coverage requestedStart 중 가장 이른 값), [last]는 기준일(asOf의 날짜)이다.
@@ -92,6 +113,8 @@ class QueryBounds {
         final m = _day('${selection.month}-01');
         final monthEnd = DateTime.utc(m.year, m.month + 1, 0);
         return _clip(_iso(m), _iso(monthEnd));
+      case PeriodKind.cycle:
+        return _clip(selection.start!, selection.end!);
     }
   }
 
@@ -112,11 +135,16 @@ class QueryBounds {
   }
 
   /// 2026-10-30: 화면의 기간 제목. 이번 달·월 선택은 '2026년 10월', 그 밖은 선택지 이름이다.
+  /// 2026-10-31: 물려받은 월급 주기는 'M/D – M/D'(원래 경계 그대로)다.
   String title(PeriodSelection selection) => switch (selection.kind) {
     PeriodKind.thisMonth => _monthTitle(last.substring(0, 7)),
     PeriodKind.month => _monthTitle(selection.month!),
+    PeriodKind.cycle => '${_md(selection.start!)} – ${_md(selection.end!)}',
     _ => selection.name,
   };
+
+  static String _md(String date) =>
+      '${int.parse(date.substring(5, 7))}/${int.parse(date.substring(8, 10))}';
 
   /// 2026-10-30: [selection]의 범위 문구('2026년 7월 20일 ~ 10월 19일', 해가 다르면 둘 다 연도).
   String rangeText(PeriodSelection selection) {
