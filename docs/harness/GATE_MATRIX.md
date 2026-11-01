@@ -75,7 +75,7 @@ mobile 검사는 `apps/mobile/package.json`의 `check`를 통해 실제 SDK 버�
 
 API typecheck는 Java 컴파일+주석 검사, API test는 JUnit+기존 Python 더미 검사에 연결한다. 주석 자동 검사 대상은 apps/api의 src/main/java·src/test/java·tools 아래 직접 작성한 Java 코드다. `node scripts/harness/run-api.mjs check`는 실행 JAR 생성까지 포함한다. JDK 21 또는 테스트용 Python 3.10+ 부재는 BLOCKED, 컴파일/테스트 실패는 FAIL이다. 기존 Node lint는 Java 검증을 대신하지 않는다.
 
-Java 소스도 공통 변경의 실제 소비자로 인식한다. Flutter 전용 변경은 기존 mobile 선택을 유지하므로 API JDK를 요구하지 않는다. 공통 검사기 변경은 mobile과 api를 함께 검사한다. 종합 검사에서 API typecheck와 test는 각각 최대 17분이다(전체 합계 17분이 아님). 내부 Gradle은 명령당 14분, Python 더미 검사는 2분, Java/Python 버전 확인은 각각 10초로 제한하고 나머지는 프로세스 기동·종료 여유다. 단독 API check도 같은 내부 제한을 사용한다. 다른 제품 검사 제한 시간은 유지한다.
+Java 소스도 공통 변경의 실제 소비자로 인식한다. Flutter 전용 변경은 기존 mobile 선택을 유지하므로 API JDK를 요구하지 않는다. 공통 검사기 변경은 mobile과 api를 함께 검사한다. 종합 검사에서 API typecheck와 test는 각각 최대 17분이다(전체 합계 17분이 아님). 내부 Gradle은 명령당 14분, Python 더미 검사는 2분, Java/Python 버전 확인은 각각 10초로 제한하고 나머지는 프로세스 기동·종료 여유다. 단독 API check도 같은 내부 제한을 사용한다. Flutter의 단계별·상위 제한은 [Flutter 전환 기준](FLUTTER_TRANSITION.md)을 따르며 나머지 제품 검사 제한 시간은 유지한다.
 
 API 전용 CI는 API/계약/공통 검사기 변경에서 실행하고 기존 Flutter CI는 수정하지 않는다. 프로세스 생존·초기 차단 테스트와 실제 DB 연결/SQL 동시성/금융 API·Flutter 통합을 구분한다.
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runFlutterCheck } from '../run-flutter.mjs';
+import { FLUTTER_GATE_TIMEOUT_MS, runFlutterCheck } from '../run-flutter.mjs';
 
 const quiet = () => {};
 const prepared = () => true;
@@ -75,6 +75,10 @@ test('full sequence runs each fixed command in the app and calculation package, 
   );
   assert.equal(code, 0);
   assert.equal(calls.length, 7);
+  assert.ok(
+    FLUTTER_GATE_TIMEOUT_MS > calls.reduce((total, call) => total + call.options.timeout, 0),
+    'parent budget must include all child limits and startup overhead',
+  );
   assert.match(calls[0].options.cwd, /apps[\\/]mobile[\\/]?$/u);
   const roots = calls
     .slice(1)
@@ -154,4 +158,72 @@ test('unprepared calculation package is blocked before any check runs', () => {
   assert.ok(
     seen.some((line) => /^BLOCKED: packages\/payse_calculation is not prepared/u.test(line)),
   );
+});
+
+test('a 130-second test fits the test budget without extending format or analysis', () => {
+  const calls = [];
+  const code = runFlutterCheck(
+    'check',
+    (executable, args, options) => {
+      calls.push(options);
+      if (calls.length === 1) return goodSdk;
+      const duration = calls.length >= 6 ? 130000 : 0;
+      return duration < options.timeout
+        ? { status: 0 }
+        : { error: Object.assign(new Error('spawnSync flutter ETIMEDOUT'), { code: 'ETIMEDOUT' }) };
+    },
+    quiet,
+    prepared,
+  );
+  assert.equal(code, 0);
+  assert.deepEqual(
+    calls.slice(0, 5).map((call) => call.timeout),
+    [90000, 90000, 90000, 90000, 90000],
+  );
+  assert.deepEqual(
+    calls.slice(5).map((call) => call.timeout),
+    [180000, 180000],
+  );
+});
+
+test('app and calculation timeouts remain blocked and identify the limit and workspace', () => {
+  for (const [stopAt, workspace] of [
+    [6, 'apps/mobile'],
+    [7, 'packages/payse_calculation'],
+  ]) {
+    let calls = 0;
+    const output = [];
+    const code = runFlutterCheck(
+      'check',
+      () => {
+        calls += 1;
+        if (calls === 1) return goodSdk;
+        if (calls === stopAt) {
+          return {
+            error: Object.assign(new Error('spawnSync flutter ETIMEDOUT'), { code: 'ETIMEDOUT' }),
+          };
+        }
+        return { status: 0 };
+      },
+      (line) => output.push(line),
+      prepared,
+    );
+    assert.equal(code, 2);
+    assert.equal(calls, stopAt);
+    assert.ok(output.some((line) => line.includes(`BLOCKED: test (${workspace}): exceeded 180s`)));
+  }
+});
+
+test('an app test assertion failure stops before calculation tests', () => {
+  let calls = 0;
+  const output = [];
+  const code = runFlutterCheck(
+    'test',
+    () => (++calls === 1 ? goodSdk : { status: 1, stdout: 'Expected: true; Actual: false' }),
+    (line) => output.push(line),
+    prepared,
+  );
+  assert.equal(code, 1);
+  assert.equal(calls, 2);
+  assert.ok(output.includes('FAIL: Flutter test (apps/mobile), exit 1'));
 });

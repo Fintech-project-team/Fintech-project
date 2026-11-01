@@ -15,8 +15,10 @@ import {
 } from './lib.mjs';
 import { inspectCodeSpec } from './code-spec.mjs';
 import { API_GATE_TIMEOUT_MS } from './run-api.mjs';
+import { FLUTTER_GATE_TIMEOUT_MS } from './run-flutter.mjs';
 
 const root = process.cwd();
+const gateTimeouts = { api: API_GATE_TIMEOUT_MS, mobile: FLUTTER_GATE_TIMEOUT_MS };
 const report = {
   runId: crypto.randomUUID(),
   startedAt: new Date().toISOString(),
@@ -33,7 +35,7 @@ let exitCode = 2;
  * @param name - 검사 이름.
  * @param script - Node 실행 파일.
  * @param argv - 인자.
- * @param timeoutMs - 검사 제한 시간. Java 최초 의존성 준비는 더 긴 시간을 허용한다.
+ * @param timeoutMs - 검사 제한 시간. API·Flutter gate는 하위 전체 실행 예산을 사용한다.
  * @returns 검사 성공 여부.
  */
 function run(name, script, argv = [], timeoutMs = 120000) {
@@ -201,7 +203,7 @@ try {
             gate.name + ':' + name,
             npmCli,
             ['run', name, '--workspace', gate.workspace],
-            gate.name === 'api' ? API_GATE_TIMEOUT_MS : 120000,
+            gateTimeouts[gate.name] ?? 120000,
           ),
         );
       }

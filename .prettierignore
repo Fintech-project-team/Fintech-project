@@ -25,3 +25,6 @@ apps/mobile/pubspec.lock
 # Java IDE output is generated from tracked source and contracts.
 /apps/api/bin/
 /apps/ai/bin/
+
+# Never process local provider credentials.
+/apps/ai/config/llm.properties

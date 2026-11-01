@@ -197,6 +197,8 @@ Jev는 **도입 미확정 후보**다. 공식 공급자 TypeSafe의 문서를 �
 
 공급자 어댑터는 loopback 모의 HTTP로 정상·거절·미완료·사용량·JSON 형식·응답 크기·본문 timeout·리디렉션/자동 재시도 금지와 KMS 키 경로·CRC32C·검증 플래그를 검사한다. 잘못된 Bearer 자격은 헤더 생성 전에 원문 없는 오류로 거절하며, KMS 입력 사전 거절은 미전송으로 구분한다. 실제 HTTP/KMS 호출, 업무 의미 스키마·소유권 검증, 비용 예약·DB 저장이 완료됐다는 근거로 사용하지 않는다. [Bearer 형식](https://www.rfc-editor.org/rfc/rfc6750#section-2.1), [OpenAI 구조화 응답의 거절·미완료 처리](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses), [Google KMS 무결성 검증](https://docs.cloud.google.com/kms/docs/data-integrity-guidelines)을 참조한다.
 
+연결정보는 [AI 비공개 설정 기준](../../ai/docs/README.md#비공개-연결-설정)을 따른다. `LlmSettings`는 명시된 비공개 파일을 읽고 기존 공급자 팩토리를 구성하며, 개인 환경·Codex 자격으로 대체하지 않는다. 빈 예시만 Git에 공유하고 실제 파일은 제외한다. 이 구성 경로의 구현은 Spring 분석 HTTP·예산·DB 연결이나 유료 호출 활성화 완료를 뜻하지 않는다.
+
 공개 계약은 기존 데이터 모델·HTTP·응답 모델에서 A 작성/B 영향 확인으로 확정한다. 기존 키·테이블을 분석 큐로 전용하거나 sourceVersion/금융 v4 필드를 임의 추가하지 않는다. 누락 금융 원천의 임의 생성과 사용자 금융 금액 산출은 서버 구현 범위가 아니다. 서버의 원천 조회·공개·Snapshot 조립 책임은 유지한다.
 
 현재 미구현·문서 충돌·fixture 기준 및 **AT01~AT22는 [공통 계약](../../../docs/payse-execution-contract.md#공통-반례인수-조건)에 남아 있다**. API 입력/출력·권한·중복·예약·timeout·세션 무효화 테스트에는 해당 AT와 G0~G7을 필수 대조한다. Dart 계산·화면 검증은 B 담당이며 API 문서나 하네스 PASS로 대체하지 않는다.

@@ -35,7 +35,7 @@ public final class OpenAiGateway implements ModelGateway {
     /**
      * 공식 주소와 승인된 모델·프롬프트·응답 스키마·상한을 받는다. 누락을 기본값으로 보충하지 않는다.
      * @created 2026-10-29
-     * @usedBy 미연결: 예정 사용처 분석 공급자 설정
+     * @usedBy LlmSettings.factory
      */
     public OpenAiGateway(ProviderHttp http, Supplier<String> credentials, String model, String instructions,
             String effort, JsonNode schema, int inputLimit, int outputLimit) {

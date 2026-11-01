@@ -28,6 +28,16 @@ API: 인증·현재 원천 확인·재사용/예산/시도 관리
 
 API의 `GoogleKms`, `EnvelopeCipher`, `MemoryPolicy`, 인증·DB·예산 책임은 이동하지 않는다. Flutter의 금액·기간·반복 계산과 공개 금융 v4 응답도 그대로다. 공급자별 차이는 `ModelFactory`로 주입하며 요청별 지침·스키마를 다른 요청과 공유해서 덮어쓰지 않는다.
 
+## 비공개 연결 설정
+
+Git에 공유하는 [llm.properties.example](../config/llm.properties.example)은 `enabled=false`이며 `provider`·`model`·`apiKey`·`reasoningEffort` 값은 비어 있다. 이 예시를 `apps/ai/config/llm.properties` 또는 서버의 비공개 설정 폴더에 복사한 뒤 사용한다. 저장소의 실제 파일은 Git·포맷 검사에서 제외하며 JAR 리소스로 포함하지 않는다. 서버 파일은 실행 계정만 읽도록 권한을 제한하고 Git에 강제로 추가하지 않는다. 키를 Git에 올렸다가 지우는 방식으로 관리하지 않는다.
+
+`LlmSettings.read(Path)`에 해당 파일 경로를 명시한다. `settings.factory(http, inputLimit, outputLimit)`는 기존 `ModelFactory`를 생성하며 입력/출력 상한은 기존 API 정책에서 받는다. OpenAI 사용 시 공급자 값은 `openai`이고 모델·추론 설정·키는 운영자가 직접 지정한다. 파일이 없거나 활성 구성의 필수 값이 비어 있으면 실패하며 `OPENAI_API_KEY`·Codex 로그인·다른 계정으로 자동 대체하지 않는다. 미구현 로컬 공급자나 임의 전송 주소도 허용하지 않는다.
+
+파일은 최대 16 KiB의 UTF-8 properties이며 중복·알 수 없는 키를 거절한다. 구성은 명시 로드 시 고정되므로 키 교체 후 새 구성을 로드해야 한다. 원문·키는 문자열 출력·예외에 포함하지 않는다. 파일 자체의 저장 암호화를 구현한 것은 아니므로 비공개 파일 권한이 필요하다.
+
+파일 읽기·팩토리 생성에는 통신이 없다. `enabled=true`는 설정 사용 조건이며 실제 유료 호출 승인·예산 검사·운영 활성화를 대신하지 않는다. **현재 Spring 분석 실행/HTTP 경로에는 연결되지 않았으며**, 운영 연결 시 서버 설정에서 비공개 파일의 경로만 전달한다. 테스트의 `test-key`·`test-model`은 합성 값이며 개인 계정 정보가 아니다.
+
 ## 사용과 검증
 
 API 실행부가 인증·소유권·현재 원천·재사용·예약·동시성·설정 승인을 먼저 확인한 뒤 `AnalysisService.analyze`를 호출해야 한다. `ModelFactory`는 승인된 공급자 구현을 요청별 지침·스키마와 조합한다. OpenAI 구성에서는 고정 모델·키 공급자·추론 설정·상한으로 `provider.openai.OpenAiGateway`를 만든다. **서비스 생성만으로 외부 통신은 발생하지 않는다.** OpenAI의 입력 토큰 계수는 외부 전송이다. 다른 구현은 해당 모델의 로컬 계수를 사용할 수 있다.
