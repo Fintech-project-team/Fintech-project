@@ -62,7 +62,7 @@ void main() {
     expect(find.textContaining('금융정보 기준'), findsOneWidget);
 
     await _next(tester, 1);
-    expect(find.text('모아둘 돈을 빼요'), findsOneWidget);
+    expect(find.text('남겨둘 돈을 빼요'), findsOneWidget);
     expect(find.text(formatKrw(-r.rEff!)), findsOneWidget);
 
     await _next(tester, 1);
@@ -111,7 +111,7 @@ void main() {
     await _show(tester, _ready(alphaWithReceipt()));
     Finder row(int i) => find.byKey(ValueKey('first-calc-row-$i'));
     expect(row(0), findsOneWidget);
-    expect(row(1), findsNothing, reason: '모아둘 돈은 2/4부터');
+    expect(row(1), findsNothing, reason: '남겨둘 돈은 2/4부터');
     expect(find.text('금융사에서 받은 잔액 그대로예요.'), findsOneWidget);
     final accountDetail = find.descendant(
       of: row(0),
@@ -214,7 +214,7 @@ void main() {
     expect(result.data, formatKrw(u));
     expect(result.style!.color, PayseColors.error);
     expect(
-      find.text('모아둘 돈과 예정 지출을 모두 확보하려면\n${formatKrw(-u)}이 더 필요해요.'),
+      find.text('남겨둘 돈과 예정 지출을 모두 확보하려면\n${formatKrw(-u)}이 더 필요해요.'),
       findsOneWidget,
     );
   });

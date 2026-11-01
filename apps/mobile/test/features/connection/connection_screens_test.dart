@@ -390,10 +390,10 @@ void main() {
         expect(
           find.byKey(const ValueKey('excluded-reserve-hint')),
           findsOneWidget,
-          reason: '모아둘 돈이 있는 계좌가 미선택',
+          reason: '남겨둘 돈이 있는 계좌가 미선택',
         );
         expect(
-          find.text('모아둘 돈이 있는 계좌예요'),
+          find.text('남겨둘 돈이 있는 계좌예요'),
           findsNothing,
           reason: '처음 미선택은 해제 경고 없음',
         );
@@ -411,12 +411,12 @@ void main() {
         await tester.tap(find.byKey(ValueKey('account-$kb')));
         await tester.pump();
         expect(
-          find.text('모아둘 돈이 있는 계좌예요'),
+          find.text('남겨둘 돈이 있는 계좌예요'),
           findsOneWidget,
           reason: '골랐다가 하나씩 풀면 안내',
         );
         expect(
-          find.textContaining('국민은행 입출금 ····0001을 빼면 이 계좌의 모아둘 돈(현재 비상금)도'),
+          find.textContaining('국민은행 입출금 ····0001을 빼면 이 계좌의 남겨둘 돈(현재 비상금)도'),
           findsOneWidget,
         );
       },
@@ -461,7 +461,7 @@ void main() {
         );
         expect(
           find.text(
-            '이 중 1개 계좌에는 모아둘 돈이 있어요.\n선택을 해제한 계좌의 잔액과 연결된 모아둘 돈은 계산에서 제외돼요.',
+            '이 중 1개 계좌에는 남겨둘 돈이 있어요.\n선택을 해제한 계좌의 잔액과 연결된 남겨둘 돈은 계산에서 제외돼요.',
           ),
           findsOneWidget,
         );
@@ -476,7 +476,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('clear-reserve-confirm')));
         await tester.pumpAndSettle();
         expect(demand.any(c.isAccountSelected), isFalse);
-        expect(find.text('모아둘 돈이 있는 계좌예요'), findsNothing, reason: '경고는 한 번만');
+        expect(find.text('남겨둘 돈이 있는 계좌예요'), findsNothing, reason: '경고는 한 번만');
         expect(_enabled(tester, '이 계좌로 계산하기'), isFalse);
       },
     );
@@ -587,7 +587,7 @@ void main() {
       'section heads use the 01-2 icon header, not the shared token',
       (tester) async {
         await showReview(tester, full());
-        for (final title in ['월급', '카드 결제일', '모아둘 돈', '예정 지출']) {
+        for (final title in ['월급', '카드 결제일', '남겨둘 돈', '예정 지출']) {
           final style = styleOf(tester, title);
           expect(style.fontSize, 16);
           expect(style.fontWeight, FontWeight.w600);
@@ -739,7 +739,7 @@ void main() {
             ..['occurrenceLinks'] = <Object?>[],
         ),
       );
-      expect(find.text('등록된 모아둘 돈이 없어요.'), findsOneWidget);
+      expect(find.text('등록된 남겨둘 돈이 없어요.'), findsOneWidget);
       expect(find.text('등록된 예정 지출이 없어요.'), findsOneWidget);
       expect(find.textContaining('찾지 못했어요'), findsNothing, reason: '분석 전');
       expect(find.textContaining('연결한 계좌'), findsNothing);
@@ -766,9 +766,9 @@ void main() {
       expect(find.text('연결 안 함'), findsOneWidget);
       expect(find.text('매월 25일'), findsOneWidget, reason: '월급일은 그대로');
       expect(find.text('3,000,000원'), findsOneWidget, reason: '금액도 그대로');
-      expect(find.text('연결한 계좌에서 확인되는 모아둘 돈이 없어요.'), findsOneWidget);
+      expect(find.text('연결한 계좌에서 확인되는 남겨둘 돈이 없어요.'), findsOneWidget);
       expect(find.text('연결한 계좌에서 확인되는 예정 지출이 없어요.'), findsOneWidget);
-      expect(find.text('등록된 모아둘 돈이 없어요.'), findsNothing, reason: '숨김은 없음과 다름');
+      expect(find.text('등록된 남겨둘 돈이 없어요.'), findsNothing, reason: '숨김은 없음과 다름');
       expect(_enabled(tester, '쓸 수 있는 돈 계산하기'), isFalse);
       expect(
         find.byKey(const ValueKey('review-reason')),

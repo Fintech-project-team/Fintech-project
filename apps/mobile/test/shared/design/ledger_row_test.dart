@@ -14,7 +14,7 @@ void main() {
     await tester.pumpWidget(
       themed(
         LedgerRow(
-          name: '모아둘 돈',
+          name: '남겨둘 돈',
           amountKrw: 400000,
           isDeduction: true,
           chipColor: PayseColors.reserve,
@@ -32,19 +32,19 @@ void main() {
     final minusCenter = tester.getCenter(
       find.byKey(const ValueKey('ledger-minus')),
     );
-    final nameCenter = tester.getCenter(find.text('모아둘 돈'));
+    final nameCenter = tester.getCenter(find.text('남겨둘 돈'));
     final subtitleCenter = tester.getCenter(find.text('1건'));
     expect((minusCenter.dy - nameCenter.dy).abs(), lessThan(1.5));
     expect(subtitleCenter.dy, greaterThan(minusCenter.dy + 10));
 
-    final nameRight = tester.getTopRight(find.text('모아둘 돈')).dx;
+    final nameRight = tester.getTopRight(find.text('남겨둘 돈')).dx;
     final chipLeft = tester
         .getTopLeft(find.byKey(const ValueKey('ledger-chip')))
         .dx;
     expect(chipLeft - nameRight, closeTo(6, 0.5));
     expect(find.byKey(const ValueKey('ledger-chevron')), findsOneWidget);
 
-    expect(find.bySemanticsLabel('빼기 모아둘 돈 1건 400,000원'), findsOneWidget);
+    expect(find.bySemanticsLabel('빼기 남겨둘 돈 1건 400,000원'), findsOneWidget);
     expect(
       tester.getSize(find.byType(LedgerRow)).height,
       greaterThanOrEqualTo(48),

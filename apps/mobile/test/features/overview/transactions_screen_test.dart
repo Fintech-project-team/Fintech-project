@@ -128,6 +128,39 @@ void main() {
 
   group('02-4 거래 내역 목록', () {
     final s = _source('demo-ready');
+
+    testWidgets('근거 있는 내 계좌 이체 상세에는 상대 계좌가 보인다', (tester) async {
+      await _pump(tester, s);
+      final out = find.byKey(
+        const ValueKey('tx-6f8dad9e-3b56-577b-bf51-c1fbc7d46109'),
+      );
+      await tester.ensureVisible(out);
+      await tester.tap(out);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('detail-row-받은 계좌')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('detail-row-받은 계좌')),
+          matching: find.textContaining('신한은행'),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('detail-close')));
+      await tester.pumpAndSettle();
+      final other = s.transactions!.firstWhere(
+        (t) =>
+            t.recordKind == 'account_entry' &&
+            t.payseTransactionType != 'internal_transfer',
+      );
+      final row = find.byKey(ValueKey('tx-${other.transactionId}'));
+      if (row.evaluate().isNotEmpty) {
+        await tester.ensureVisible(row);
+        await tester.tap(row);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('받은 계좌'), findsNothing);
+        expect(find.textContaining('보낸 계좌'), findsNothing);
+      }
+    });
     final cancel = s.transactions!.firstWhere(
       (t) => t.recordKind == 'card_cancellation',
     );
@@ -140,11 +173,8 @@ void main() {
       expect(_in('period-title', '2026년 10월'), findsOneWidget);
       expect(find.text('(19일까지)'), findsNothing);
       expect(_in('chip-means', '전체 거래 수단'), findsOneWidget);
-      expect(_in('chip-type', '거래 종류 전체'), findsOneWidget);
-      expect(
-        find.text('10월 19일 12:00 기준 · 연결된 계좌와 카드의 거래 내역이에요'),
-        findsOneWidget,
-      );
+      expect(_in('chip-type', '모든 내역'), findsOneWidget);
+      expect(find.text('10월 19일 12:00 기준'), findsOneWidget);
       final next = tester.widget<IconButton>(
         find.byKey(const ValueKey('period-next')),
       );
@@ -303,7 +333,7 @@ void main() {
       await _sheet(tester, 'chip-type', ['type-accountOut']);
       await _sheet(tester, 'chip-means', ['means-accounts']);
       expect(_in('chip-means', '카드 전체'), findsOneWidget);
-      expect(_in('chip-type', '거래 종류 전체'), findsOneWidget);
+      expect(_in('chip-type', '모든 내역'), findsOneWidget);
     });
 
     testWidgets('조건 결과 없음: 기간 변경·거래 수단 변경', (tester) async {
