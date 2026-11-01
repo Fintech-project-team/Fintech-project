@@ -1,0 +1,1807 @@
+{
+  "C001": {
+    "split": "calibration",
+    "groupId": "policy-salary",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-salary",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "salary",
+        "basicType": "income",
+        "counterexample": "월급일에 같은 금액으로 받은 지인 송금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "9ed37e0d-c67e-5b2d-807d-9edaff6b0a30"
+      }
+    ]
+  },
+  "C002": {
+    "split": "calibration",
+    "groupId": "policy-salary",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-salary",
+        "inputSufficient": false,
+        "coverageGap": false,
+        "meaning": null,
+        "basicType": null,
+        "counterexample": "월급일에 같은 금액으로 받은 지인 송금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "98a3fdf9-2c0a-5dff-977d-7df0900a70d8"
+      }
+    ]
+  },
+  "C003": {
+    "split": "calibration",
+    "groupId": "policy-bonus",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-bonus",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "bonus",
+        "basicType": "income",
+        "counterexample": "대출 실행금이 평소 월급보다 큼",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "b5fb3afe-dcc2-5c7b-8da0-d2f8400b3286"
+      }
+    ]
+  },
+  "C004": {
+    "split": "calibration",
+    "groupId": "policy-bonus",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-bonus",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "loan_proceeds",
+        "basicType": null,
+        "counterexample": "대출 실행금이 평소 월급보다 큼",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "c48fc878-ec91-55df-a1de-7ced253b3955"
+      }
+    ]
+  },
+  "C005": {
+    "split": "calibration",
+    "groupId": "policy-business_receipt",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-business_receipt",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "business_receipt",
+        "basicType": "income",
+        "counterexample": "거래처가 보증금을 반환함",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "b5bd869f-b8c4-5b8c-9842-029bbf12a186"
+      }
+    ]
+  },
+  "C006": {
+    "split": "calibration",
+    "groupId": "policy-business_receipt",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-business_receipt",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "deposit_return",
+        "basicType": null,
+        "counterexample": "거래처가 보증금을 반환함",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "f86dd128-6023-58ae-bf9f-3ddac9988098"
+      }
+    ]
+  },
+  "C007": {
+    "split": "calibration",
+    "groupId": "policy-pension",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-pension",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "pension",
+        "basicType": "income",
+        "counterexample": "매월 같은 금액의 가족 송금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "ba446c03-6469-5c3c-8df4-7497e1b80d82"
+      }
+    ]
+  },
+  "C008": {
+    "split": "calibration",
+    "groupId": "policy-pension",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-pension",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "personal_transfer",
+        "basicType": null,
+        "counterexample": "매월 같은 금액의 가족 송금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "57e63605-e55c-5bd2-a5fa-56e70bfa2b52"
+      }
+    ]
+  },
+  "C009": {
+    "split": "calibration",
+    "groupId": "policy-public_benefit",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-public_benefit",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "public_benefit",
+        "basicType": "income",
+        "counterexample": "공공기관이 사용료를 환불함",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "96ab402b-2ea8-5f9f-a625-6eac3c80acec"
+      }
+    ]
+  },
+  "C010": {
+    "split": "calibration",
+    "groupId": "policy-public_benefit",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-public_benefit",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "account_refund",
+        "basicType": null,
+        "counterexample": "공공기관이 사용료를 환불함",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "32ffa766-d6a0-552f-8c09-af5cbf4a1daa"
+      }
+    ]
+  },
+  "C011": {
+    "split": "calibration",
+    "groupId": "policy-interest",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-interest",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "interest",
+        "basicType": "income",
+        "counterexample": "소액 현금 입금이나 환급금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "6e42a62b-f759-531f-bb2d-f55c65db1978"
+      }
+    ]
+  },
+  "C012": {
+    "split": "calibration",
+    "groupId": "policy-interest",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-interest",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "cash_deposit",
+        "basicType": null,
+        "counterexample": "소액 현금 입금이나 환급금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "b6bffe0f-f61b-5b57-8ab4-e4be257dbb82"
+      }
+    ],
+    "alsoCoversGroups": ["policy-cash_deposit"]
+  },
+  "C013": {
+    "split": "calibration",
+    "groupId": "policy-dividend",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-dividend",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "dividend",
+        "basicType": "income",
+        "counterexample": "투자상품 매도 원금이 돌아옴",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "ef4f2500-5ad3-50c4-9a9b-506e363fa9e1"
+      }
+    ]
+  },
+  "C014": {
+    "split": "calibration",
+    "groupId": "policy-dividend",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-dividend",
+        "inputSufficient": false,
+        "coverageGap": false,
+        "meaning": null,
+        "basicType": null,
+        "counterexample": "투자상품 매도 원금이 돌아옴",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "09cfff61-d961-57cc-a3a2-adac2d8ea2f9"
+      }
+    ]
+  },
+  "C015": {
+    "split": "calibration",
+    "groupId": "policy-loan_proceeds",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-loan_proceeds",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "loan_proceeds",
+        "basicType": null,
+        "counterexample": "은행의 예금 만기 원금 반환",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "7a83639e-f61f-576e-ac9a-9955078d2b68"
+      }
+    ]
+  },
+  "C016": {
+    "split": "calibration",
+    "groupId": "policy-loan_proceeds",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-loan_proceeds",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "deposit_maturity",
+        "basicType": null,
+        "counterexample": "은행의 예금 만기 원금 반환",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "33d1379c-b0d1-57fa-9eec-166dbcc7ac0a"
+      }
+    ]
+  },
+  "C017": {
+    "split": "calibration",
+    "groupId": "policy-personal_transfer",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-personal_transfer",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "personal_transfer",
+        "basicType": null,
+        "counterexample": "같은 인명이 임대료·물품대금·대여금 반환을 보냄",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "76dd497c-e8e2-5f4d-a2b9-d78adf9dbc54"
+      }
+    ]
+  },
+  "C018": {
+    "split": "calibration",
+    "groupId": "policy-personal_transfer",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-personal_transfer",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "asset_sale",
+        "basicType": null,
+        "counterexample": "같은 인명이 임대료·물품대금·대여금 반환을 보냄",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "0f8896a2-1e4d-568f-ae74-fa86e77a00c2"
+      }
+    ]
+  },
+  "C019": {
+    "split": "calibration",
+    "groupId": "policy-reimbursement",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-reimbursement",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "reimbursement",
+        "basicType": null,
+        "counterexample": "친구가 보낸 선물금 또는 물품대금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "ded7bbf8-333a-58c5-aba5-bf8c90cc36bc"
+      }
+    ]
+  },
+  "C020": {
+    "split": "calibration",
+    "groupId": "policy-reimbursement",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-reimbursement",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "asset_sale",
+        "basicType": null,
+        "counterexample": "친구가 보낸 선물금 또는 물품대금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "b5b98df2-c5b7-5c96-8595-bbc180fb6646"
+      }
+    ]
+  },
+  "C021": {
+    "split": "calibration",
+    "groupId": "policy-deposit_return",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-deposit_return",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "deposit_return",
+        "basicType": null,
+        "counterexample": "임대인이 수리비를 정산함",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "e704631d-655e-55fa-ba95-e9a8c0589f18"
+      }
+    ]
+  },
+  "C022": {
+    "split": "calibration",
+    "groupId": "policy-deposit_return",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-deposit_return",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "reimbursement",
+        "basicType": null,
+        "counterexample": "임대인이 수리비를 정산함",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "665abafe-6fef-5f96-b7d9-b125abdb61c6"
+      }
+    ]
+  },
+  "C023": {
+    "split": "calibration",
+    "groupId": "policy-investment_redemption",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-investment_redemption",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "investment_redemption",
+        "basicType": null,
+        "counterexample": "배당·수익금 또는 원금과 수익이 구분되지 않는 혼합 입금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "da135b91-ec44-5133-9483-fad45e407707"
+      }
+    ]
+  },
+  "C024": {
+    "split": "calibration",
+    "groupId": "policy-investment_redemption",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-investment_redemption",
+        "inputSufficient": false,
+        "coverageGap": false,
+        "meaning": null,
+        "basicType": null,
+        "counterexample": "배당·수익금 또는 원금과 수익이 구분되지 않는 혼합 입금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "dc07db8c-3fb0-5a6c-a5ab-1c9265226644"
+      }
+    ]
+  },
+  "C025": {
+    "split": "calibration",
+    "groupId": "policy-asset_sale",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-asset_sale",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "asset_sale",
+        "basicType": null,
+        "counterexample": "대금 환불·보증금·사업 매출 구분이 안 되는 입금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "58deeb02-79de-5834-99ab-ed09d9da855d"
+      }
+    ]
+  },
+  "C026": {
+    "split": "calibration",
+    "groupId": "policy-asset_sale",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-asset_sale",
+        "inputSufficient": false,
+        "coverageGap": false,
+        "meaning": null,
+        "basicType": null,
+        "counterexample": "대금 환불·보증금·사업 매출 구분이 안 되는 입금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "1561ae14-606f-5176-8670-1b1c77ae30fb"
+      }
+    ]
+  },
+  "C027": {
+    "split": "calibration",
+    "groupId": "policy-rent",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-rent",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "rent",
+        "basicType": "expense",
+        "counterexample": "매월 부모에게 보내는 생활비",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "1cac9a5c-f092-5e44-9984-acdca8a55b67"
+      }
+    ]
+  },
+  "C028": {
+    "split": "calibration",
+    "groupId": "policy-rent",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-rent",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "personal_transfer",
+        "basicType": null,
+        "counterexample": "매월 부모에게 보내는 생활비",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "6661075b-ba83-546a-97d1-8e6b08d1e374"
+      }
+    ]
+  },
+  "C029": {
+    "split": "calibration",
+    "groupId": "policy-housing_management",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-housing_management",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "housing_management",
+        "basicType": "expense",
+        "counterexample": "관리사무소에 납부한 주차 등록비나 보증금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "d4dfadfb-6970-591e-8336-f90e821b3e43"
+      }
+    ]
+  },
+  "C030": {
+    "split": "calibration",
+    "groupId": "policy-housing_management",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-housing_management",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "vehicle_cost",
+        "basicType": "expense",
+        "counterexample": "관리사무소에 납부한 주차 등록비나 보증금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "316029b3-825f-5b03-949b-5dad29396761"
+      }
+    ]
+  },
+  "C031": {
+    "split": "calibration",
+    "groupId": "policy-utility",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-utility",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "utility",
+        "basicType": "expense",
+        "counterexample": "설비 설치비·보증금·환급 거래",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "e1cb8658-2945-5f69-be6a-0388dc3d5837"
+      }
+    ]
+  },
+  "C032": {
+    "split": "calibration",
+    "groupId": "policy-utility",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-utility",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "deposit_payment",
+        "basicType": null,
+        "counterexample": "설비 설치비·보증금·환급 거래",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "324aada5-08b4-5d15-b4dc-dc28109e7777"
+      }
+    ]
+  },
+  "C033": {
+    "split": "calibration",
+    "groupId": "policy-telecom",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-telecom",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "telecom",
+        "basicType": "expense",
+        "counterexample": "휴대전화 기기 구매대금·콘텐츠 결제",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "c3a6d902-abad-5388-96f7-eb1214fe36e9"
+      }
+    ]
+  },
+  "C034": {
+    "split": "calibration",
+    "groupId": "policy-telecom",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-telecom",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "retail",
+        "basicType": "expense",
+        "counterexample": "휴대전화 기기 구매대금·콘텐츠 결제",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "2d918132-7c32-5a10-9fee-a15312c53674"
+      }
+    ]
+  },
+  "C035": {
+    "split": "calibration",
+    "groupId": "policy-insurance",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-insurance",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "insurance",
+        "basicType": "expense",
+        "counterexample": "보험사 대출 상환·보험금 입금·환급",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "f3ad0f5a-6264-531d-a597-1526c16c26df"
+      }
+    ]
+  },
+  "C036": {
+    "split": "calibration",
+    "groupId": "policy-insurance",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-insurance",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "loan_repayment",
+        "basicType": null,
+        "counterexample": "보험사 대출 상환·보험금 입금·환급",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "eaa66e0a-e58a-532e-aaf8-63bc176db117"
+      }
+    ]
+  },
+  "C037": {
+    "split": "calibration",
+    "groupId": "policy-loan_repayment",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-loan_repayment",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "loan_repayment",
+        "basicType": null,
+        "counterexample": "정기적금 납입이나 카드대금 출금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "0265af62-bc0e-5a19-9e23-26235e810aaa"
+      }
+    ]
+  },
+  "C038": {
+    "split": "calibration",
+    "groupId": "policy-loan_repayment",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-loan_repayment",
+        "inputSufficient": false,
+        "coverageGap": false,
+        "meaning": null,
+        "basicType": null,
+        "counterexample": "정기적금 납입이나 카드대금 출금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "7a6671b6-aa13-5980-87d7-eea6264105d1"
+      }
+    ]
+  },
+  "C039": {
+    "split": "calibration",
+    "groupId": "policy-tax_public_charge",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-tax_public_charge",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "tax_public_charge",
+        "basicType": "expense",
+        "counterexample": "공영주차비·공공시설 이용료",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "c65b14eb-f560-52ac-bd9b-197be941b5b3"
+      }
+    ]
+  },
+  "C040": {
+    "split": "calibration",
+    "groupId": "policy-tax_public_charge",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-tax_public_charge",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "vehicle_cost",
+        "basicType": "expense",
+        "counterexample": "공영주차비·공공시설 이용료",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "d92e05b7-6b3b-53a6-ab56-bc5b24af129d"
+      }
+    ]
+  },
+  "C041": {
+    "split": "calibration",
+    "groupId": "policy-education",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-education",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "education",
+        "basicType": "expense",
+        "counterexample": "학교에서 구매한 물품·기부금·보증금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "570d1f8e-da2d-55d9-bf2b-5b5e2b89c25f"
+      }
+    ]
+  },
+  "C042": {
+    "split": "calibration",
+    "groupId": "policy-education",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-education",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "retail",
+        "basicType": "expense",
+        "counterexample": "학교에서 구매한 물품·기부금·보증금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "04f9045c-db5d-5d99-a6c0-aeb75dc24767"
+      }
+    ]
+  },
+  "C043": {
+    "split": "calibration",
+    "groupId": "policy-medical",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-medical",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "medical",
+        "basicType": "expense",
+        "counterexample": "의료기관 주차비·건강식품 소매 구매",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "d1b20098-bd56-50d0-91f0-8684921725d7"
+      }
+    ]
+  },
+  "C044": {
+    "split": "calibration",
+    "groupId": "policy-medical",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-medical",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "vehicle_cost",
+        "basicType": "expense",
+        "counterexample": "의료기관 주차비·건강식품 소매 구매",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "75f9fa50-f97b-5c34-96f9-e49ec19439c6"
+      }
+    ]
+  },
+  "C045": {
+    "split": "calibration",
+    "groupId": "policy-groceries",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-groceries",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "groceries",
+        "basicType": "expense",
+        "counterexample": "대형마트에서 가전·생활용품을 구매함",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "66548b87-594f-539f-be24-c5abf40dffa2"
+      }
+    ]
+  },
+  "C046": {
+    "split": "calibration",
+    "groupId": "policy-groceries",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-groceries",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "retail",
+        "basicType": "expense",
+        "counterexample": "대형마트에서 가전·생활용품을 구매함",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "73127c16-8184-50f6-9a20-7bdd533cca87"
+      }
+    ]
+  },
+  "C047": {
+    "split": "calibration",
+    "groupId": "policy-dining",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-dining",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "dining",
+        "basicType": "expense",
+        "counterexample": "배달앱으로 생필품·식재료를 주문함",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "21fc372b-1329-5294-a5d7-f68aa1280bad"
+      }
+    ]
+  },
+  "C048": {
+    "split": "calibration",
+    "groupId": "policy-dining",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-dining",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "retail",
+        "basicType": "expense",
+        "counterexample": "배달앱으로 생필품·식재료를 주문함",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "2f952b0d-6089-5688-9eca-2bb1b60bbe0b"
+      }
+    ]
+  },
+  "C049": {
+    "split": "calibration",
+    "groupId": "policy-retail",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-retail",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "retail",
+        "basicType": "expense",
+        "counterexample": "플랫폼에서 예약한 진료·숙박·교통 서비스",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "eddbb224-2b51-57ad-9462-1eac8645c722"
+      }
+    ]
+  },
+  "C050": {
+    "split": "calibration",
+    "groupId": "policy-retail",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-retail",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "lodging",
+        "basicType": "expense",
+        "counterexample": "플랫폼에서 예약한 진료·숙박·교통 서비스",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "3731e005-e07c-585c-8ac9-db6e03443c73"
+      }
+    ]
+  },
+  "C051": {
+    "split": "calibration",
+    "groupId": "policy-transport",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-transport",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "transport",
+        "basicType": "expense",
+        "counterexample": "차량 구입비·주유·보증금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "bd4746e5-9eee-5ad3-a826-5ee376f94b47"
+      }
+    ]
+  },
+  "C052": {
+    "split": "calibration",
+    "groupId": "policy-transport",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-transport",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "vehicle_cost",
+        "basicType": "expense",
+        "counterexample": "차량 구입비·주유·보증금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "800c991d-cf21-5549-b34b-ecd0d9844535"
+      }
+    ]
+  },
+  "C053": {
+    "split": "calibration",
+    "groupId": "policy-vehicle_cost",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-vehicle_cost",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "vehicle_cost",
+        "basicType": "expense",
+        "counterexample": "자동차 매각대금·대출·보험료",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "f1a56aef-3914-5364-b503-bebc71b33675"
+      }
+    ]
+  },
+  "C054": {
+    "split": "calibration",
+    "groupId": "policy-vehicle_cost",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-vehicle_cost",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "asset_sale",
+        "basicType": null,
+        "counterexample": "자동차 매각대금·대출·보험료",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "87bb0fe1-048f-5af4-8767-b06f1b8f2f4f"
+      }
+    ]
+  },
+  "C055": {
+    "split": "calibration",
+    "groupId": "policy-subscription",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-subscription",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "subscription",
+        "basicType": "expense",
+        "counterexample": "매월 약값·통신비·보험료 납부",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "62d4fe67-e39f-5c53-81a6-c621a8b2200d"
+      }
+    ]
+  },
+  "C056": {
+    "split": "calibration",
+    "groupId": "policy-subscription",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-subscription",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "telecom",
+        "basicType": "expense",
+        "counterexample": "매월 약값·통신비·보험료 납부",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "d665066a-245d-5470-9543-275fe3a4e0e6"
+      }
+    ]
+  },
+  "C057": {
+    "split": "calibration",
+    "groupId": "policy-donation",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-donation",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "donation",
+        "basicType": "expense",
+        "counterexample": "단체의 상품 구매대금 또는 회비",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "5a20cee7-4b3c-55e4-8f93-4a7d0f9ce66f"
+      }
+    ]
+  },
+  "C058": {
+    "split": "calibration",
+    "groupId": "policy-donation",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-donation",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "retail",
+        "basicType": "expense",
+        "counterexample": "단체의 상품 구매대금 또는 회비",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "7a53f6e2-f1b7-56e4-b8c6-66b17a55f0dd"
+      }
+    ]
+  },
+  "C059": {
+    "split": "calibration",
+    "groupId": "policy-bank_fee",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-bank_fee",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "bank_fee",
+        "basicType": "expense",
+        "counterexample": "대출 원금·이자·기타 정산액",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "feb66155-aa01-5e6e-addf-0a817ee3019f"
+      }
+    ]
+  },
+  "C060": {
+    "split": "calibration",
+    "groupId": "policy-bank_fee",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-bank_fee",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "loan_repayment",
+        "basicType": null,
+        "counterexample": "대출 원금·이자·기타 정산액",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "0e5a0a3b-b0d2-5f5a-9620-12a927f3f146"
+      }
+    ]
+  },
+  "C061": {
+    "split": "calibration",
+    "groupId": "policy-self_transfer",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-self_transfer",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "self_transfer",
+        "basicType": "internal_transfer",
+        "counterexample": "타인에게 송금한 뒤 우연히 같은 금액이 들어옴",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "692ed178-2f65-5556-b221-564b8882595c"
+      }
+    ]
+  },
+  "C062": {
+    "split": "calibration",
+    "groupId": "policy-self_transfer",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-self_transfer",
+        "inputSufficient": false,
+        "coverageGap": false,
+        "meaning": null,
+        "basicType": null,
+        "counterexample": "타인에게 송금한 뒤 우연히 같은 금액이 들어옴",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "b73dca36-1e87-52f2-a07d-f9901cc20ef2"
+      }
+    ]
+  },
+  "C063": {
+    "split": "calibration",
+    "groupId": "policy-savings_transfer",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-savings_transfer",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "savings_transfer",
+        "basicType": "internal_transfer",
+        "counterexample": "타인 적금을 대신 납입하거나 보험 저축상품 대금을 지급함",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "c81a4fab-ecb0-5845-8c8b-cab364b1c1a8"
+      }
+    ]
+  },
+  "C064": {
+    "split": "calibration",
+    "groupId": "policy-savings_transfer",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-savings_transfer",
+        "inputSufficient": false,
+        "coverageGap": false,
+        "meaning": null,
+        "basicType": null,
+        "counterexample": "타인 적금을 대신 납입하거나 보험 저축상품 대금을 지급함",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "67ac7f9e-d6db-5a6f-9e53-da37e051a205"
+      }
+    ]
+  },
+  "C065": {
+    "split": "calibration",
+    "groupId": "policy-card_bill_payment",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-card_bill_payment",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "card_bill_payment",
+        "basicType": null,
+        "counterexample": "카드사 대출 상환이나 별도 수수료 출금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "31de7ede-d85a-5b28-bdfa-bd8ac1160c0b"
+      }
+    ]
+  },
+  "C066": {
+    "split": "calibration",
+    "groupId": "policy-card_bill_payment",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-card_bill_payment",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "loan_repayment",
+        "basicType": null,
+        "counterexample": "카드사 대출 상환이나 별도 수수료 출금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "3d30eb13-db97-5cb0-8bff-944d15fc5f82"
+      }
+    ]
+  },
+  "C067": {
+    "split": "calibration",
+    "groupId": "policy-cash_withdrawal",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-cash_withdrawal",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "cash_withdrawal",
+        "basicType": null,
+        "counterexample": "ATM으로 타인 계좌에 송금한 거래",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "75f172b8-21b1-5b1a-bb68-74366cf6ee77"
+      }
+    ]
+  },
+  "C068": {
+    "split": "calibration",
+    "groupId": "policy-cash_withdrawal",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-cash_withdrawal",
+        "inputSufficient": false,
+        "coverageGap": false,
+        "meaning": null,
+        "basicType": null,
+        "counterexample": "ATM으로 타인 계좌에 송금한 거래",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "34d5776f-2fc9-5813-b6a1-6f6517a24b1a"
+      }
+    ]
+  },
+  "C070": {
+    "split": "calibration",
+    "groupId": "policy-cash_deposit",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-cash_deposit",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "loan_proceeds",
+        "basicType": null,
+        "counterexample": "계좌이체 입금이나 현금서비스 대출금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "879bc05d-c63d-5b5f-8818-25c0ccd1a1aa"
+      }
+    ]
+  },
+  "C071": {
+    "split": "calibration",
+    "groupId": "policy-cancellation",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-cancellation",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "cancellation",
+        "basicType": null,
+        "counterexample": "별도 계좌 입금이나 실제 카드 환불 기록",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "53481223-9660-507c-a7f1-b7538288087b"
+      }
+    ]
+  },
+  "C072": {
+    "split": "calibration",
+    "groupId": "policy-cancellation",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-cancellation",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "refund",
+        "basicType": null,
+        "counterexample": "별도 계좌 입금이나 실제 카드 환불 기록",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "d8d84f08-f220-593c-a558-3fea9355b193"
+      }
+    ]
+  },
+  "C073": {
+    "split": "calibration",
+    "groupId": "policy-refund",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-refund",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "refund",
+        "basicType": null,
+        "counterexample": "카드 승인 취소 또는 개인 대납 정산금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "fcd8269e-b956-5a5a-9383-fbb403050e24"
+      }
+    ]
+  },
+  "C074": {
+    "split": "calibration",
+    "groupId": "policy-refund",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-refund",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "cancellation",
+        "basicType": null,
+        "counterexample": "카드 승인 취소 또는 개인 대납 정산금",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "3f7022bb-0d68-5475-a79c-47bef20313bf"
+      }
+    ]
+  },
+  "C075": {
+    "split": "calibration",
+    "groupId": "policy-account_refund",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-account_refund",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "account_refund",
+        "basicType": null,
+        "counterexample": "대출금 입금을 환불로 오인",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "e2474b20-d888-548e-9ae8-5be1311d3a28"
+      }
+    ]
+  },
+  "C076": {
+    "split": "calibration",
+    "groupId": "policy-account_refund",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-account_refund",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "loan_proceeds",
+        "basicType": null,
+        "counterexample": "대출금 입금을 환불로 오인",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "0c190cd0-ac2b-5a11-a5e4-5344bf108bbf"
+      }
+    ]
+  },
+  "C077": {
+    "split": "calibration",
+    "groupId": "policy-deposit_maturity",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-deposit_maturity",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "deposit_maturity",
+        "basicType": null,
+        "counterexample": "투자 수익을 예금 원금으로 오인",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "b01f6d3c-135c-53cd-95ea-01e5a5446d73"
+      }
+    ]
+  },
+  "C078": {
+    "split": "calibration",
+    "groupId": "policy-deposit_maturity",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-deposit_maturity",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "interest",
+        "basicType": "income",
+        "counterexample": "투자 수익을 예금 원금으로 오인",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "3911962e-25f2-5794-803c-297e0de3a42f"
+      }
+    ]
+  },
+  "C079": {
+    "split": "calibration",
+    "groupId": "policy-deposit_payment",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-deposit_payment",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "deposit_payment",
+        "basicType": null,
+        "counterexample": "월세를 보증금으로 오인",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "a1b4cf96-d49c-5f17-9a2d-fd1904ecde5c"
+      }
+    ]
+  },
+  "C080": {
+    "split": "calibration",
+    "groupId": "policy-deposit_payment",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-deposit_payment",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "rent",
+        "basicType": "expense",
+        "counterexample": "월세를 보증금으로 오인",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "24a343c6-5014-573f-b353-5e5deb7b0617"
+      }
+    ]
+  },
+  "C081": {
+    "split": "calibration",
+    "groupId": "policy-lodging",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-lodging",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "lodging",
+        "basicType": "expense",
+        "counterexample": "호텔 식당 식사비를 숙박비로 오인",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "5dd4f47b-6c29-57b8-ae24-b706f8abd97b"
+      }
+    ]
+  },
+  "C082": {
+    "split": "calibration",
+    "groupId": "policy-lodging",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "groupId": "policy-lodging",
+        "inputSufficient": true,
+        "coverageGap": false,
+        "meaning": "dining",
+        "basicType": "expense",
+        "counterexample": "호텔 식당 식사비를 숙박비로 오인",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "430abedf-c68e-55d9-8262-f86eb9e8211c"
+      }
+    ]
+  },
+  "C083": {
+    "split": "calibration",
+    "groupId": "authored-rent",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "inputSufficient": true,
+        "meaning": "rent",
+        "basicType": null,
+        "mustPreserve": ["candidateAmount", "candidateDay", "planApproval"],
+        "itemKey": "a3e1743a-1b3e-5c4e-9891-dd25d2bf215f"
+      }
+    ]
+  },
+  "C084": {
+    "split": "calibration",
+    "groupId": "authored-telecom",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "inputSufficient": true,
+        "meaning": "telecom",
+        "basicType": null,
+        "mustPreserve": ["candidateAmount", "candidateDay", "planApproval"],
+        "itemKey": "e4452233-0716-579d-ada7-d5672cd84a24"
+      }
+    ]
+  },
+  "C085": {
+    "split": "calibration",
+    "groupId": "authored-insurance",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "inputSufficient": true,
+        "meaning": "insurance",
+        "basicType": null,
+        "mustPreserve": ["candidateAmount", "candidateDay", "planApproval"],
+        "itemKey": "d5a442dd-e644-5e51-9e4a-2e777bb75e5e"
+      }
+    ]
+  },
+  "C086": {
+    "split": "calibration",
+    "groupId": "authored-subscription",
+    "items": [
+      {
+        "labelOrigin": "authored_synthetic",
+        "split": "calibration",
+        "inputSufficient": true,
+        "meaning": "subscription",
+        "basicType": null,
+        "mustPreserve": ["candidateAmount", "candidateDay", "planApproval"],
+        "itemKey": "069d1cfe-213d-5822-92b4-43bb32a09939"
+      }
+    ]
+  },
+  "C087": {
+    "split": "calibration",
+    "groupId": "authored-ambiguous",
+    "items": [
+      {
+        "labelOrigin": "existing_gamma_private_label",
+        "split": "calibration",
+        "inputSufficient": false,
+        "meaning": null,
+        "basicType": null,
+        "authorKnownMeaning": "loan_proceeds",
+        "mustPreserve": ["transactionId", "source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "24ccc634-1aaf-500c-950e-06725b2631bc"
+      }
+    ]
+  },
+  "C088": {
+    "split": "calibration",
+    "groupId": "authored-ambiguous",
+    "items": [
+      {
+        "labelOrigin": "adversarial_synthetic",
+        "split": "calibration",
+        "inputSufficient": false,
+        "meaning": null,
+        "basicType": null,
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "24ccc634-1aaf-500c-950e-06725b2631bc"
+      }
+    ]
+  },
+  "C089": {
+    "split": "calibration",
+    "groupId": "authored-retail",
+    "items": [
+      {
+        "labelOrigin": "authored_confounder",
+        "split": "calibration",
+        "inputSufficient": true,
+        "meaning": "retail",
+        "basicType": "expense",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "bae3fb49-3479-5ea4-9c02-d09ab3058652"
+      }
+    ]
+  },
+  "C090": {
+    "split": "calibration",
+    "groupId": "authored-retail",
+    "items": [
+      {
+        "labelOrigin": "authored_confounder",
+        "split": "calibration",
+        "inputSufficient": true,
+        "meaning": "retail",
+        "basicType": "expense",
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "83cb5df7-8f27-5dd4-9824-3970b8b3616c"
+      }
+    ]
+  },
+  "C091": {
+    "split": "calibration",
+    "groupId": "authored-loan_proceeds",
+    "items": [
+      {
+        "labelOrigin": "authored_confounder",
+        "split": "calibration",
+        "inputSufficient": true,
+        "meaning": "loan_proceeds",
+        "basicType": null,
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "d9fce99b-de46-5ed9-afcb-656e21fa4771"
+      }
+    ]
+  },
+  "C092": {
+    "split": "calibration",
+    "groupId": "authored-loan_proceeds",
+    "items": [
+      {
+        "labelOrigin": "authored_confounder",
+        "split": "calibration",
+        "inputSufficient": true,
+        "meaning": "loan_proceeds",
+        "basicType": null,
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "57a4a566-02ee-59b9-848f-c6d81876bf2f"
+      }
+    ]
+  },
+  "C093": {
+    "split": "calibration",
+    "groupId": "authored-investment_redemption",
+    "items": [
+      {
+        "labelOrigin": "authored_confounder",
+        "split": "calibration",
+        "inputSufficient": true,
+        "meaning": "investment_redemption",
+        "basicType": null,
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "9d3af436-fb07-551d-a3b4-57c762955c11"
+      }
+    ]
+  },
+  "C094": {
+    "split": "calibration",
+    "groupId": "authored-ambiguous",
+    "items": [
+      {
+        "labelOrigin": "authored_confounder",
+        "split": "calibration",
+        "inputSufficient": false,
+        "meaning": null,
+        "basicType": null,
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "73e13d75-d46e-5dfc-bbe3-c6a8d50cb7de"
+      }
+    ]
+  },
+  "C095": {
+    "split": "calibration",
+    "groupId": "authored-ambiguous",
+    "items": [
+      {
+        "labelOrigin": "authored_confounder",
+        "split": "calibration",
+        "inputSufficient": false,
+        "meaning": null,
+        "basicType": null,
+        "mustPreserve": ["source", "salaryEvidence", "settings", "balance"],
+        "itemKey": "de0b00e0-826e-5797-8bed-47a8dc517844"
+      }
+    ]
+  },
+  "C096": {
+    "split": "calibration",
+    "groupId": "missing-name",
+    "items": [
+      {
+        "labelOrigin": "authored_edge",
+        "split": "calibration",
+        "groupId": "missing-name",
+        "inputSufficient": true,
+        "meaning": "rent",
+        "basicType": "expense",
+        "itemKey": "d8c4d1f6-f20f-50f2-b560-64742e987a43"
+      }
+    ]
+  },
+  "C097": {
+    "split": "calibration",
+    "groupId": "missing-name",
+    "items": [
+      {
+        "labelOrigin": "authored_edge",
+        "split": "calibration",
+        "groupId": "missing-name",
+        "inputSufficient": false,
+        "meaning": null,
+        "basicType": null,
+        "itemKey": "115aa282-237d-5f50-a8e1-832a30b2a989"
+      }
+    ]
+  },
+  "C098": {
+    "split": "calibration",
+    "groupId": "same-platform",
+    "items": [
+      {
+        "labelOrigin": "authored_edge",
+        "split": "calibration",
+        "groupId": "same-platform",
+        "inputSufficient": true,
+        "meaning": "groceries",
+        "basicType": "expense",
+        "itemKey": "182bb5a1-8cae-5416-ae4e-287475765a50"
+      }
+    ]
+  },
+  "C099": {
+    "split": "calibration",
+    "groupId": "same-platform",
+    "items": [
+      {
+        "labelOrigin": "authored_edge",
+        "split": "calibration",
+        "groupId": "same-platform",
+        "inputSufficient": true,
+        "meaning": "medical",
+        "basicType": "expense",
+        "itemKey": "69047257-4777-511a-869e-4fec049244bc"
+      }
+    ]
+  },
+  "C100": {
+    "split": "calibration",
+    "groupId": "same-platform",
+    "items": [
+      {
+        "labelOrigin": "authored_edge",
+        "split": "calibration",
+        "groupId": "same-platform",
+        "inputSufficient": false,
+        "meaning": null,
+        "basicType": "expense",
+        "itemKey": "3abf726a-57ad-5961-ac1d-2120c8a469be"
+      }
+    ]
+  },
+  "C101": {
+    "split": "calibration",
+    "groupId": "conflicting-purpose",
+    "items": [
+      {
+        "labelOrigin": "authored_edge",
+        "split": "calibration",
+        "groupId": "conflicting-purpose",
+        "inputSufficient": false,
+        "meaning": null,
+        "basicType": null,
+        "itemKey": "741cb09b-7464-54bf-b5e9-170034cc401e"
+      }
+    ]
+  },
+  "C102": {
+    "split": "calibration",
+    "groupId": "instruction-in-text",
+    "items": [
+      {
+        "labelOrigin": "authored_edge",
+        "split": "calibration",
+        "groupId": "instruction-in-text",
+        "inputSufficient": true,
+        "meaning": "rent",
+        "basicType": "expense",
+        "itemKey": "d86d9a62-9d5a-5c28-9a02-c88c1a027919"
+      }
+    ]
+  },
+  "C103": {
+    "split": "calibration",
+    "groupId": "missing-relation",
+    "items": [
+      {
+        "labelOrigin": "authored_edge",
+        "split": "calibration",
+        "groupId": "missing-relation",
+        "inputSufficient": false,
+        "meaning": null,
+        "basicType": null,
+        "itemKey": "023156db-6ce1-513e-a9b1-c595a68fd398"
+      }
+    ]
+  },
+  "C104": {
+    "split": "calibration",
+    "groupId": "unavailable-original",
+    "items": [
+      {
+        "labelOrigin": "authored_edge",
+        "split": "calibration",
+        "groupId": "unavailable-original",
+        "inputSufficient": true,
+        "meaning": "refund",
+        "basicType": "expense",
+        "itemKey": "048bb2c0-d773-5b68-bb48-8366992f096f"
+      }
+    ]
+  },
+  "C105": {
+    "split": "calibration",
+    "groupId": "recurring-unknown",
+    "items": [
+      {
+        "labelOrigin": "authored_edge",
+        "split": "calibration",
+        "groupId": "recurring-unknown",
+        "inputSufficient": false,
+        "meaning": null,
+        "basicType": null,
+        "itemKey": "1e3ca9c0-4118-54e5-ae99-ce2da2e4b1e0"
+      }
+    ]
+  }
+}

@@ -40,4 +40,10 @@ tasks.register('apiDocsCheck', Exec) {
         'tools/VerifyApiDocs.java', 'src/main/java', 'src/test/java', 'tools'
 }
 tasks.named('check') { dependsOn 'apiDocsCheck' }
+// Offline analysis contracts and private evaluation labels; no provider or DB access.
+tasks.register('analysisContracts', Exec) {
+    commandLine 'python', '-B', '-m', 'unittest', 'discover',
+        '-s', 'testing/analysis', '-p', 'test_*.py'
+}
+tasks.named('test') { dependsOn 'analysisContracts' }
 tasks.named('jar') { enabled = false }
