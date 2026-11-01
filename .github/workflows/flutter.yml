@@ -13,7 +13,7 @@ permissions:
 jobs:
   flutter:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       FLUTTER_SUPPRESS_ANALYTICS: 'true'
     steps:

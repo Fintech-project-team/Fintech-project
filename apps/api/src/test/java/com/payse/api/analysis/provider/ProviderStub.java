@@ -1,5 +1,7 @@
 package com.payse.api.analysis.provider;
 
+import com.payse.ai.transport.ProviderHttp;
+
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;

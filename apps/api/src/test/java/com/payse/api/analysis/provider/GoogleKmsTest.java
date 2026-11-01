@@ -1,9 +1,11 @@
 package com.payse.api.analysis.provider;
 
+import com.payse.ai.transport.ProviderHttp;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.payse.api.analysis.crypto.WrappedKey;
-import com.payse.api.analysis.provider.ProviderHttp.ProviderFailure;
+import com.payse.ai.transport.ProviderHttp.ProviderFailure;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;

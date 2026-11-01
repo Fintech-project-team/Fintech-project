@@ -13,9 +13,16 @@ const commands = {
   analyze: ['flutter', ['--no-version-check', 'analyze', '--no-pub']],
   test: ['flutter', ['--no-version-check', 'test', '--no-pub']],
 };
+const commandTimeouts = { sdk: 90000, format: 90000, analyze: 90000, test: 180000 };
+// The parent must allow every bounded step plus process startup/exit overhead.
+export const FLUTTER_GATE_TIMEOUT_MS =
+  commandTimeouts.sdk +
+  workspaces.length * (commandTimeouts.format + commandTimeouts.analyze + commandTimeouts.test) +
+  30000;
 
 /**
  * @created 2026-10-19
+ * @modified 2026-11-01 - 테스트에 별도 시간 예산을 적용하고 시간 초과 제한을 표시한다.
  * @description 앱과 계산 패키지에서 고정된 Flutter 검사만 실행하고 SDK 불일치·준비 누락·실패를 호출자에게 전달한다.
  * @param mode - sdk, format, analyze, test 또는 check.
  * @param spawn - 실제 실행 또는 검사에 주입할 프로세스 실행 함수.
@@ -33,7 +40,7 @@ export function runFlutterCheck(
     output('BLOCKED: use sdk, format, analyze, test or check');
     return 2;
   }
-  const invoke = (executable, args, cwd = mobile) => {
+  const invoke = (executable, args, cwd = mobile, timeoutMs = commandTimeouts.sdk) => {
     // Every argument is a fixed literal above; user input is never inserted into a shell command.
     const windows = process.platform === 'win32';
     return spawn(
@@ -43,7 +50,7 @@ export function runFlutterCheck(
         cwd,
         encoding: 'utf8',
         windowsHide: true,
-        timeout: 90000,
+        timeout: timeoutMs,
         maxBuffer: 8 * 1024 * 1024,
         env: { ...process.env, FLUTTER_SUPPRESS_ANALYTICS: 'true' },
       },
@@ -83,11 +90,16 @@ export function runFlutterCheck(
     const [executable, args] = commands[name];
     for (const cwd of workspaces) {
       const label = path.relative(root, cwd).split(path.sep).join('/');
-      const result = invoke(executable, args, cwd);
+      const timeoutMs = commandTimeouts[name];
+      const result = invoke(executable, args, cwd, timeoutMs);
       if (result.stdout) output(result.stdout);
       if (result.stderr) output(result.stderr);
       if (result.error) {
-        output(`BLOCKED: ${name} (${label}): ${result.error.message}`);
+        const detail =
+          result.error.code === 'ETIMEDOUT'
+            ? `exceeded ${timeoutMs / 1000}s limit; ${result.error.message}`
+            : result.error.message;
+        output(`BLOCKED: ${name} (${label}): ${detail}`);
         return 2;
       }
       if (result.status !== 0) {

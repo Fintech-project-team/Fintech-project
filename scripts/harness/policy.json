@@ -1,7 +1,7 @@
 {
   "version": 1,
   "roles": {
-    "data": ["apps/api/", "apps/mock-bank/"],
+    "data": ["apps/api/", "apps/mock-bank/", "apps/ai/"],
     "cashflow": [
       "apps/mobile/src/features/connection/",
       "apps/mobile/src/features/recurring/",
@@ -75,7 +75,7 @@
       "scripts": ["check"]
     },
     "api": {
-      "prefixes": ["apps/api/"],
+      "prefixes": ["apps/api/", "apps/ai/"],
       "workspace": "apps/api",
       "scripts": ["typecheck", "test"]
     },

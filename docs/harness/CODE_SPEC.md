@@ -59,3 +59,7 @@ API 개발은 [API 필수 규칙](../../apps/api/src/AGENTS.md)을 따른다. �
 - 생성일이 확인되지 않는 기존 코드만 `@created unknown - 이력 확인 불가: 구체적 사유`를 허용한다. 새 코드의 실제 날짜, unknown 허용 사유, 목적·사용처·수정 이력 누락은 diff 리뷰로 확인한다.
 - 자동 생성 코드·record 자동 접근자·람다 본문에는 주석을 복제하지 않는다. 익명 클래스에 직접 선언한 메서드는 포함한다. 기재된 모든 `@modified`에는 유효한 날짜와 목적이 있어야 한다.
 - 자동 검사는 API Gradle `apiDocsCheck`로 연결한다. 이 예외는 Flutter/Dart·JS/TS에 적용하지 않는다.
+
+## 공유 AI Java
+
+`apps/ai`의 직접 작성한 Java에도 위 API Java 주석 규칙을 적용한다. [AI 필수 규칙](../../apps/ai/AGENTS.md)을 함께 읽으며 API의 `apiDocsCheck`가 두 모듈의 main/test 코드를 검사한다. AI는 별도 HTTP/DB 계층을 요구하지 않는다.

@@ -2,7 +2,8 @@ package com.payse.api.analysis.provider;
 
 import com.payse.api.analysis.crypto.KeyProtector;
 import com.payse.api.analysis.crypto.WrappedKey;
-import com.payse.api.analysis.provider.ProviderHttp.ProviderFailure;
+import com.payse.ai.transport.ProviderHttp;
+import com.payse.ai.transport.ProviderHttp.ProviderFailure;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Base64;

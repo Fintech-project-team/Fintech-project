@@ -108,3 +108,7 @@ VO는 기존 값·검증·민감 정보의 문자열 숨김을 유지한다. JPA
 - [Spring 요청 검증](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/requestbody.html): 기본 400과 PAYSE 업무 검증 422의 명시적 매핑 필요.
 
 작성·변경·검증 이력은 [API 문서 이력](history/2026-10-22-api-doc-history.md)에 보존한다.
+
+## 공유 AI 빌드
+
+`apps/ai`는 Java 21 라이브러리이며 API의 Gradle `:ai` 모듈로 함께 빌드·배포한다. 별도 실행 서버나 npm workspace는 없다. `node scripts/harness/run-api.mjs check`가 AI Java 테스트·주석과 Boot JAR의 운영 코드 포함/비공개 평가 자료 제외도 검사한다. [AI 지침](../../ai/AGENTS.md)과 [구조](../../ai/docs/README.md)를 해당 작업 전에 읽는다. 금융 HTTP·DB·KMS는 API 책임을 유지한다.
