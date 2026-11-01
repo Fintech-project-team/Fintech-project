@@ -13,6 +13,7 @@ java {
 repositories { mavenCentral() }
 
 dependencies {
+    implementation project(':ai')
     implementation platform(org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES)
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -37,13 +38,39 @@ tasks.register('apiDocsCheck', Exec) {
         languageVersion = JavaLanguageVersion.of(21)
     }
     commandLine launcher.get().executablePath.asFile.absolutePath,
-        'tools/VerifyApiDocs.java', 'src/main/java', 'src/test/java', 'tools'
+        'tools/VerifyApiDocs.java', 'src/main/java', 'src/test/java', 'tools',
+        '../ai/src/main/java', '../ai/src/test/java'
 }
-tasks.named('check') { dependsOn 'apiDocsCheck' }
+tasks.named('check') { dependsOn 'apiDocsCheck', ':ai:check' }
 // Offline analysis contracts and private evaluation labels; no provider or DB access.
 tasks.register('analysisContracts', Exec) {
     commandLine 'python', '-B', '-m', 'unittest', 'discover',
         '-s', 'testing/analysis', '-p', 'test_*.py'
 }
-tasks.named('test') { dependsOn 'analysisContracts' }
+tasks.named('test') { dependsOn 'analysisContracts', ':ai:test' }
 tasks.named('jar') { enabled = false }
+
+// Verify the deployable artifact contains AI runtime code but no private evaluation material.
+tasks.register('aiArchiveCheck') {
+    dependsOn 'bootJar'
+    doLast {
+        def archive = tasks.named('bootJar').get().archiveFile.get().asFile
+        new java.util.zip.ZipFile(archive).withCloseable { boot ->
+            def aiEntries = boot.entries().toList().findAll { it.name.startsWith('BOOT-INF/lib/ai-') && it.name.endsWith('.jar') }
+            if (aiEntries.size() != 1) throw new GradleException('Expected one shared AI module in Boot JAR')
+            def names = []
+            new java.util.zip.ZipInputStream(boot.getInputStream(aiEntries.first())).withCloseable { nested ->
+                for (def entry = nested.nextEntry; entry != null; entry = nested.nextEntry) names.add(entry.name)
+            }
+            if (!names.contains('com/payse/ai/analysis/service/AnalysisService.class')) {
+                throw new GradleException('AI runtime missing from deployment')
+            }
+            if (names.any { it.contains('expected.private') || it.contains('meaning-policy.json') || it.contains('/testing/') || it.contains('/cases/') || it.endsWith('Test.class') }) {
+                throw new GradleException('Private evaluation material entered AI deployment')
+            }
+            def publicFiles = names.findAll { it.startsWith('com/payse/ai/rules/') && !it.endsWith('/') }
+            if (publicFiles.size() != 6) throw new GradleException('Unexpected AI public resource set')
+        }
+    }
+}
+tasks.named('check') { dependsOn 'aiArchiveCheck' }

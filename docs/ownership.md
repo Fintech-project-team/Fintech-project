@@ -13,7 +13,7 @@ integration·data·cashflow·allocation은 사람 수가 아니라 기존 하네
 | 역할        | 담당 경로                                                                 | 확인할 다른 영역                                           |
 | ----------- | ------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | integration | packages/, scripts/, 공통 설정, apps/mobile/app/, apps/mobile/src/shared/ | 각 기능 영역의 코드와 통합 결과                            |
-| data        | apps/api/, apps/mock-bank/                                                | contracts, finance-core 입력, 앱의 API 사용 방식           |
+| data        | apps/api/, apps/ai/, apps/mock-bank/                                      | contracts, finance-core 입력, 앱의 API 사용 방식           |
 | cashflow    | apps/mobile/src/features/connection/, recurring/, spending/               | contracts, finance-core 출력, shared, allocation 공개 함수 |
 | allocation  | apps/mobile/src/features/allocation/, docs/demo/                          | contracts, finance-core, spending 결과, 계획 저장 API      |
 
@@ -42,6 +42,6 @@ cashflow 표의 recurring/와 spending/은 apps/mobile/src/features/ 아래 경�
 | integration | `apps/mobile/lib/main.dart`, `lib/app/`, `lib/data/`, `lib/shared/`, 대응 공통 테스트, 모바일 공통 docs, pubspec·SDK·플랫폼·검사 설정 |
 | cashflow    | `apps/mobile/lib/features/{auth,connection,overview,recurring,simulation}/`, `apps/mobile/test/features/` 아래 같은 기능명            |
 | allocation  | `apps/mobile/lib/features/{planning,adjustment}/`, `apps/mobile/test/features/` 아래 같은 기능명, 기존 `docs/demo/`                   |
-| data        | 기존 `apps/api/`, `apps/mock-bank/`; Flutter 공유 Repository를 단독 변경하는 권한은 추가하지 않음                                     |
+| data        | `apps/api/`, `apps/ai/`, `apps/mock-bank/`; Flutter 공유 Repository를 단독 변경하는 권한은 추가하지 않음                              |
 
 기능 폴더는 실제 작업 시 필요한 것만 만든다. 테스트도 담당 기능과 같은 경계로 제한한다. 공통 계약·pubspec·SDK 버전은 integration 변경으로 검토하고 기능 작업의 역할만 바꿔 검사를 통과시키지 않는다. 초기화 완료와 금융 기능 완료는 [전환 기준](harness/FLUTTER_TRANSITION.md)에서 구분한다.

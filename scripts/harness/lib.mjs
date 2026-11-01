@@ -165,6 +165,7 @@ export function references(task, files, policy) {
   }
   if (paths.some((p) => p.startsWith('packages/'))) refs.add('docs/calculation-rules.md');
   if (paths.some((p) => p.startsWith('apps/api/'))) refs.add('apps/api/src/AGENTS.md');
+  if (paths.some((p) => p.startsWith('apps/ai/'))) refs.add('apps/ai/AGENTS.md');
   if (task.role === 'integration') {
     refs.add('docs/development-workflow.md');
     refs.add('docs/toolchain.md');

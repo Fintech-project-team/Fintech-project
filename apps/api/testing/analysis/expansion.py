@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import itertools
 import json
+import os
 from collections import Counter
 from pathlib import Path
 
@@ -208,7 +209,7 @@ def materialize(folder, inputs, expected, report):
     directory = Path(__file__).resolve().parent
     for path in (directory / 'expansion.py', directory / 'bank_cases.py', directory / 'build_cases.py',
                  CONTRACTS / 'meaning-policy.json'):
-        manifest['recipeHashes'][str(path.relative_to(ROOT)).replace('\\', '/')] = hashlib.sha256(path.read_bytes()).hexdigest()
+        manifest['recipeHashes'][os.path.relpath(path, ROOT).replace('\\', '/')] = hashlib.sha256(path.read_bytes()).hexdigest()
     for name, rows, field in [('inputs.jsonl', inputs, 'input'), ('expected.private.jsonl', expected, 'expected')]:
         content = ''.join(json.dumps({'caseId': key, field: value}, ensure_ascii=False, separators=(',', ':')) + '\n'
                           for key, value in rows.items())

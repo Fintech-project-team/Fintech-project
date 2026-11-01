@@ -1,10 +1,10 @@
 # PAYSE 거래·반복 의미 해석 계약
 
-상태: **분석 전용 계약·오프라인 평가 기준. 실제 분석 HTTP/DB·Flutter 연동은 미완료**. 금융 Snapshot v4와 원천·설정은 변경하지 않는다. 의미 입력/출력, 평가 또는 Flutter 분석 연동을 개발할 때 이 문서와 [분석 API](analysis-api.md), [실행 상세](llm-execution.md)를 필수 참조한다.
+상태: **분석 전용 계약과 공유 Java 실행 모듈. 실제 분석 HTTP/DB·Flutter 연동은 미완료**. [AI 구조·검사](../../ai/docs/README.md)를 함께 따른다. 금융 Snapshot v4와 원천·설정은 변경하지 않는다. 의미 입력/출력, 평가 또는 Flutter 분석 연동을 개발할 때 이 문서와 [분석 API](analysis-api.md), [실행 상세](llm-execution.md)를 필수 참조한다.
 
 ## 기준의 범위
 
-[의미 기준표](../contracts/analysis/meaning-policy.json)가 `PAYSE-MEANING-1`의 단일 기준이다. **41개 의미** 각각에 코드·표시명·범주·필수 근거·불충분 근거·혼동 사례·기본 분류 정책·긍정/구체 혼동 예시가 있다. 사용자 요청에 따라 세부 의미의 범위를 넓힌 PAYSE 설계이며 금융기관 공식 분류표나 실측 정확도를 뜻하지 않는다.
+[의미 기준표](../../ai/contracts/meaning-policy.json)가 `PAYSE-MEANING-1`의 단일 기준이다. **41개 의미** 각각에 코드·표시명·범주·필수 근거·불충분 근거·혼동 사례·기본 분류 정책·긍정/구체 혼동 예시가 있다. 사용자 요청에 따라 세부 의미의 범위를 넓힌 PAYSE 설계이며 금융기관 공식 분류표나 실측 정확도를 뜻하지 않는다.
 
 | 범주           | 개수 | 세부 의미                                                                                                                                                            |
 | -------------- | ---: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -23,7 +23,7 @@
 
 ## 업무별 입출력
 
-실행 가능한 자료 규격은 [거래 입력](../contracts/analysis/transactionMeaning.input.schema.json)·[거래 출력](../contracts/analysis/transactionMeaning.output.schema.json)·[반복 입력](../contracts/analysis/recurringMeaning.input.schema.json)·[반복 출력](../contracts/analysis/recurringMeaning.output.schema.json)이다. JSON Schema 생성 원본은 [build_schemas.py](../testing/analysis/build_schemas.py)이며 게시 파일과 자동 대조한다. 금융 응답에 필드를 추가하는 규격이 아니다.
+실행 가능한 자료 규격은 [거래 입력](../../ai/contracts/transactionMeaning.input.schema.json)·[거래 출력](../../ai/contracts/transactionMeaning.output.schema.json)·[반복 입력](../../ai/contracts/recurringMeaning.input.schema.json)·[반복 출력](../../ai/contracts/recurringMeaning.output.schema.json)이다. JSON Schema 생성 원본은 [build_schemas.py](../testing/analysis/build_schemas.py)이며 게시 파일과 자동 대조한다. 금융 응답에 필드를 추가하는 규격이 아니다.
 
 | 구분      | Flutter → 서버                                | 모델 → 서버 → Flutter                                              |
 | --------- | --------------------------------------------- | ------------------------------------------------------------------ |

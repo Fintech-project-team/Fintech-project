@@ -78,3 +78,7 @@ API typecheck는 Java 컴파일+주석 검사, API test는 JUnit+기존 Python �
 Java 소스도 공통 변경의 실제 소비자로 인식한다. Flutter 전용 변경은 기존 mobile 선택을 유지하므로 API JDK를 요구하지 않는다. 공통 검사기 변경은 mobile과 api를 함께 검사한다. 종합 검사에서 API typecheck와 test는 각각 최대 17분이다(전체 합계 17분이 아님). 내부 Gradle은 명령당 14분, Python 더미 검사는 2분, Java/Python 버전 확인은 각각 10초로 제한하고 나머지는 프로세스 기동·종료 여유다. 단독 API check도 같은 내부 제한을 사용한다. 다른 제품 검사 제한 시간은 유지한다.
 
 API 전용 CI는 API/계약/공통 검사기 변경에서 실행하고 기존 Flutter CI는 수정하지 않는다. 프로세스 생존·초기 차단 테스트와 실제 DB 연결/SQL 동시성/금융 API·Flutter 통합을 구분한다.
+
+## 공유 AI 모듈 검사
+
+`apps/ai/` 변경도 기존 API gate가 검사한다. API Gradle은 AI 컴파일·JUnit·Java 주석·공개 리소스·배포 JAR 경계를 포함한다. AI 수정 시 [AI 규칙](../../apps/ai/AGENTS.md)을 필수로 읽는다. 별도 npm workspace나 Flutter 파일 수정 권한을 추가하지 않는다. 공통 하네스·CI 변경이면 기존 규칙대로 Flutter 검사도 수행한다.
