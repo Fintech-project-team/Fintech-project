@@ -1,0 +1,36 @@
+{
+  "id": "PAYSE-AI-GUIDANCE-32-20261101",
+  "role": "integration",
+  "baseCommit": "897c6ff10c2767d59cc4e7bb65fef0ab07ff54f5",
+  "branch": "feat/api/analysis-memory-query-32",
+  "allowedPaths": [
+    "apps/ai/AGENT.md",
+    "apps/ai/AGENTS.md",
+    "apps/ai/docs/README.md",
+    "docs/tasks/PAYSE-ANALYSIS-API-32-20261101.json",
+    "docs/tasks/PAYSE-AI-GUIDANCE-32-20261101.json"
+  ],
+  "readBefore": [
+    "AGENTS.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/ownership.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/development-workflow.md",
+    "docs/toolchain.md",
+    "apps/ai/AGENTS.md",
+    "apps/ai/docs/README.md",
+    "apps/api/AGENT.md",
+    "apps/api/src/AGENTS.md",
+    "docs/payse-execution-contract.md",
+    "apps/api/docs/analysis-meaning.md",
+    "apps/api/docs/llm-execution.md"
+  ],
+  "acceptance": [
+    "관련 이슈 #32. 사용자의 명시적 요청대로 AI 개발 규칙과 입력 자료 사용 규칙을 apps/ai/AGENTS.md 하나로 통합하고 중복 AGENT.md를 제거한다.",
+    "API가 권한 검증한 DB 자료, 사용자별 유효 기억·캐시, 최소 입력, 원천 불변, Flutter 계산, 공급자 교체 경계, 검증·비밀 보호의 기존 요구를 빠뜨리거나 완화하지 않는다.",
+    "삭제되는 문서의 실행 참조와 링크를 정리한다. 기존 작업 명세의 readBefore만 현행 통합 경로로 연결하고 과거 기준 커밋·작업 범위·완료 조건 기록은 보존한다. 이 교차 문서 수정은 사용자 요청에 포함된 영향 경로 정리다.",
+    "통합 지침이 직접 참조하는 AI 구조 안내에서 이미 구현된 API·DB 연결을 미구현으로 적은 설명을 정정한다. 실제 운영 공급자·KMS·비용 장부·모바일 연결의 남은 상태와 구분하며 구현 범위를 확대하지 않는다.",
+    "문서·링크·필수 참조·내용 호환성과 공통 검사를 확인한다. Java/Python/Dart·API 스키마·DB·fixture·검사기 동작·모바일은 변경하지 않는다. 실제 LLM/KMS 호출과 운영 서비스 변경은 하지 않는다."
+  ]
+}
