@@ -44,7 +44,7 @@ void main() {
         const AmountHero(
           label: label,
           amountKrw: -120000,
-          message: '모아둘 돈과 예정 지출을 유지하려면 120,000원이 부족해요.',
+          message: '남겨둘 돈과 예정 지출을 유지하려면 120,000원이 부족해요.',
         ),
       ),
     );

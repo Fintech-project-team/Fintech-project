@@ -10,6 +10,8 @@ class AmountHero extends StatelessWidget {
   /// [amountKrw]가 null이면 정보 부족으로 보고 0원 대신 '계산할 수 없어요'를 보인다.
   /// [message]는 호출자가 만든 부족·정보 부족 안내 문장이며 없으면 생략한다.
   /// 2026-10-26: [unavailableLabel]은 정보 부족 금액 자리 문구다. 없으면 [unavailableText]를 쓴다.
+  /// 2026-10-31: [labelChip]은 라벨 끝의 8×8 색 칩(null이면 없음), [link]는 금액 바로 아래 둘 진입 버튼이다.
+  /// 2026-11-01: [amountTrailing]은 금액 줄 오른쪽 끝에 세로 가운데로 두는 표시(예: 진입 '›', 읽기 제외)다.
   const AmountHero({
     super.key,
     required this.label,
@@ -17,6 +19,9 @@ class AmountHero extends StatelessWidget {
     this.asOfLabel,
     this.message,
     this.unavailableLabel,
+    this.labelChip,
+    this.link,
+    this.amountTrailing,
   });
 
   final String label;
@@ -24,6 +29,9 @@ class AmountHero extends StatelessWidget {
   final String? asOfLabel;
   final String? message;
   final String? unavailableLabel;
+  final Color? labelChip;
+  final Widget? link;
+  final Widget? amountTrailing;
 
   static const String unavailableText = '계산할 수 없어요';
 
@@ -71,9 +79,39 @@ class AmountHero extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, style: PayseTypography.amountLabel),
+        Text.rich(
+          TextSpan(
+            text: label,
+            children: [
+              if (labelChip case final chip?)
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: SizedBox(
+                      key: const ValueKey('amount-label-chip'),
+                      width: 8,
+                      height: 8,
+                      child: ColoredBox(color: chip),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          style: PayseTypography.amountLabel,
+        ),
         const SizedBox(height: PayseSpace.x2),
-        amountLine,
+        if (amountTrailing case final trailing?)
+          Row(
+            children: [
+              Expanded(child: amountLine),
+              const SizedBox(width: PayseSpace.x2),
+              ExcludeSemantics(child: trailing),
+            ],
+          )
+        else
+          amountLine,
+        ?link,
         if (asOfLabel != null) ...[
           const SizedBox(height: 10),
           Text(asOfLabel!, style: PayseTypography.caption),
