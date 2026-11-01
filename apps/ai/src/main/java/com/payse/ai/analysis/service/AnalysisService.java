@@ -1,16 +1,19 @@
 package com.payse.ai.analysis.service;
 
 import com.payse.ai.provider.dto.ModelReply;
+import com.payse.ai.analysis.dto.AnalysisResult;
 
 import com.payse.ai.analysis.mapper.InputMapper;
 import com.payse.ai.analysis.validation.AnalysisContract;
 import com.payse.ai.analysis.validation.ContractFailure;
+import com.payse.ai.analysis.validation.StorageContract;
 import com.payse.ai.provider.ModelFactory;
 import com.payse.ai.provider.ModelGateway;
 
 import com.payse.ai.provider.ModelFailure;
 import com.payse.ai.provider.ModelFailure.Stage;
 import java.util.Objects;
+import java.util.List;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -39,20 +42,48 @@ public final class AnalysisService {
      * API 권한·원천·재사용·예산 확인 후에만 호출한다. 이 메서드 성공은 DB 채택 완료가 아니다.
      * @created 2026-11-01
      * @usedBy AnalysisServiceTest, 미연결: 예정 사용처 API 작업 실행
+     * @modified 2026-11-01 - 저장용 호출과 계수·생성 정책을 공유하고 기존 의미 반환 계약 유지
      */
     public ModelReply analyze(ObjectNode payload) {
         InputMapper mapper = new InputMapper(payload, contract);
-        ModelGateway model = Objects.requireNonNull(models.create(contract.instructions(), mapper.schema()), "model");
-        long tokens = model.countInput(mapper.input());
-        if (tokens < 0) throw new ModelFailure("INVALID_TOKEN_COUNT", Stage.GENERATION, false);
-        if (tokens > inputLimit) throw new ModelFailure("INPUT_TOKEN_LIMIT", Stage.GENERATION, false);
-        ModelReply reply = model.generate(mapper.input());
-        if (reply == null) throw new ModelFailure("INVALID_PROVIDER_RESPONSE", Stage.GENERATION, true);
+        ModelReply reply = generate(mapper, contract.instructions(), mapper.schema());
         if (reply.failure() != null) return new ModelReply(null, reply.usage(), reply.failure());
         try {
             return new ModelReply(mapper.restore(reply.output()), reply.usage(), null);
         } catch (ContractFailure failure) {
             return new ModelReply(null, reply.usage(), "INVALID_MODEL_OUTPUT");
         }
+    }
+
+    /**
+     * 한 공급자 응답에서 기존 의미 출력과 보존 제안을 받는다. DB 저장·채택은 수행하지 않는다.
+     * @created 2026-11-01
+     * @usedBy AnalysisStorageTest, 미연결: 예정 사용처 API 분석 worker
+     */
+    public AnalysisResult analyzeForStorage(ObjectNode payload) {
+        InputMapper mapper = new InputMapper(payload, contract);
+        ModelReply reply = generate(mapper, contract.instructions() + "\n" + StorageContract.instructions(),
+            mapper.storageSchema());
+        if (reply.failure() != null) return new AnalysisResult(null, List.of(), reply.usage(), reply.failure());
+        try {
+            return mapper.restoreStorage(reply.output(), reply.usage());
+        } catch (ContractFailure failure) {
+            return new AnalysisResult(null, List.of(), reply.usage(), "INVALID_MODEL_OUTPUT");
+        }
+    }
+
+    /**
+     * 의미 전용과 저장용이 같은 계수·단일 생성·전송 실패 정책을 사용한다.
+     * @created 2026-11-01
+     * @usedBy analyze, analyzeForStorage
+     */
+    private ModelReply generate(InputMapper mapper, String instructions, ObjectNode schema) {
+        ModelGateway model = Objects.requireNonNull(models.create(instructions, schema), "model");
+        long tokens = model.countInput(mapper.input());
+        if (tokens < 0) throw new ModelFailure("INVALID_TOKEN_COUNT", Stage.GENERATION, false);
+        if (tokens > inputLimit) throw new ModelFailure("INPUT_TOKEN_LIMIT", Stage.GENERATION, false);
+        ModelReply reply = model.generate(mapper.input());
+        if (reply == null) throw new ModelFailure("INVALID_PROVIDER_RESPONSE", Stage.GENERATION, true);
+        return reply;
     }
 }
