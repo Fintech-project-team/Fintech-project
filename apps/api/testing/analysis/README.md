@@ -125,3 +125,22 @@
 검증된 원천 확인 → 해당 거래 사용자 확인 → 유효 LLM 결과 순으로 선택하며 같은 권위의 상충 답은 미해결로 남긴다. 과거 unknown이 확인된 원천 답을 가로막지 않는다. 원천/사용자 확인은 현재 근거·정책·응답 형식의 검증을 요구하고, LLM 결과 재사용은 모델·프롬프트 버전도 대조한다. 모델 교체만으로 확인된 원천 사실을 다시 해석하지 않는다.
 
 실제 DB 권한/보관 검증, 진행 작업 합류, 부분 기억의 운영 DTO, 최종 판단 합성은 연결하지 않았다. 이 도구의 verified 플래그나 임시 지문을 공개 인증·영구 DB 규격으로 사용하지 않는다. 유효 결과가 남아도 관계를 분리할 수 없는 배치는 그대로 보존한다. 자동 재호출·새 모델 전환·예산 증액 기능은 추가하지 않는다.
+
+## 저장 응답으로 경로 재현하기
+
+`replay.py`는 원천/유효 결과 재사용 → 미해결 입력 준비 → 기록된 공급자 응답 검증을 연결한다. 외부 호출 함수·DB 저장·금융 계산은 없다. 기존 `currentClassifications`와 새 후보를 분리해 기록하며, 기존 분류가 없다는 이유로 후보를 자동 확정하지 않는다. 최종 적용 어댑터·실제 3개월 정확도는 여전히 미검증이다.
+
+내부 실행 파일은 `{caseId: {payload, ownerScope, versions, records, now, requestId, attemptId}}`다. `payload`는 분석 입력, `versions`는 policy/model/prompt/schema, `records`는 `routing.py`가 검사하는 합성 검증 자료다. `now`는 이 재현 실행의 고정 검사 시각이다. 비공개 정답은 별도 파일이며 실행 파일에 추가할 수 없다. 이 문맥은 실제 서버 인증·DB 조회를 대신하지 않는다.
+
+```text
+python -B apps/api/testing/analysis/replay.py --cases <실행파일> --export-requests <새 요청파일>
+python -B apps/api/testing/analysis/replay.py --cases <실행파일> --responses <저장응답> --output <새 재현결과>
+python -B apps/api/testing/analysis/replay_score.py --cases <실행파일> --responses <저장응답> --expected <비공개정답> --output <새 채점결과>
+```
+
+- 요청 파일에는 미해결 항목의 최소 입력·공급자 출력 Schema·버전·실행 식별자·지문만 있다. 소유자 문맥, 재사용 기록, 정답, 원래 ID 대응표는 포함하지 않는다. 실제 공급자에는 이 파일 전체가 아닌 승인된 입력/Schema만 전달해야 하며 현재 전송 기능은 없다.
+- 저장 응답은 `{caseId, requestId, attemptId, requestFingerprint, status, output}` 객체의 배열이다. status는 completed/failed/incomplete/refused이며 completed 외에는 output이 null이다. completed의 output은 해당 요청의 짧은 ID를 사용한 응답이다. 요청·사용자 문맥·현재 입력/버전/별칭 대응을 결합한 지문을 먼저 대조한다. 이 지문은 오프라인 자료 혼입 방지이며 전송·권한·기록 진위의 인증 수단이 아니다.
+- 같은 i1/t1이라도 다른 요청의 응답은 채택하지 않는다. 중복 사례/시도·미발급 ID·항목 누락을 거절한다. 공급자 배치는 전부 성공하거나 전부 실패하며, 독립 재사용 성공은 보존한다. 정상 unknown은 결과, 실패는 별도 error와 result:null로 기록한다.
+- `responses`에는 완전 성공한 사례만 들어간다. 부분 실패를 채점할 때는 기존 `evaluate.py`에 이 부분 목록만 넘기지 말고 `replay_score.py`를 사용한다. 그래야 재사용 성공까지 실패로 세지 않으며 누락·실패·불필요 유보·범위 부족을 항목당 한 오류로 집계한다.
+- recordedLlmTransactionError는 요청과 결합된 **기록의** 완료·실패·미완료·거절을 포함한다. 실제 호출 확인이나 모델 정확도 인증이 아니다. 경로별 재사용/실패도 함께 보고하며 wholePipelineMeasured=false, actualModelPerformanceMeasured=false를 유지한다.
+- 기존 파일은 덮어쓰지 않는다. 실행 입력·응답·채점 산출물은 `.harness/` 등 Git 제외 경로에 둔다. 모형 테스트의 정답 응답을 실측 결과로 등록하지 않는다.
