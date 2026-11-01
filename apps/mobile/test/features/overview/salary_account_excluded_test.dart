@@ -125,7 +125,7 @@ void main() {
     expect(now.salaryCycle!.state, calc.SalaryCycleState.normal);
     expect(was.b, 2000000);
     expect(now.b, 500000, reason: '월급 계좌 잔액 1,500,000원만 B에서 빠짐');
-    expect(now.r, 0, reason: '월급 계좌의 모아둘 돈 400,000원은 R에서 빠짐');
+    expect(now.r, 0, reason: '월급 계좌의 남겨둘 돈 400,000원은 R에서 빠짐');
     expect(now.u, 500000);
   });
 

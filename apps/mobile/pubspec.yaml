@@ -23,6 +23,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/fonts/OFL.txt
+    - assets/fonts/MaterialSymbols-LICENSE.txt
     - assets/fixtures/demo-ready.json
     - assets/fixtures/demo-life.json
     - assets/fixtures/alpha-ready.json
@@ -42,3 +43,6 @@ flutter:
           weight: 600
         - asset: assets/fonts/Pretendard-Bold.otf
           weight: 700
+    - family: PayseSymbols
+      fonts:
+        - asset: assets/fonts/MaterialSymbolsRounded-subset.ttf

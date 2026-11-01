@@ -62,7 +62,7 @@ class CompositionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = compositionBarStateOf(result);
     final segments = <(String, Color, int)>[
-      ('모아둘 돈', PayseColors.reserve, result.rEff!),
+      ('남겨둘 돈', PayseColors.reserve, result.rEff!),
       ('예정 지출', PayseColors.scheduled, result.e!),
       if (state == CompositionBarState.positive)
         ('쓸 수 있는 돈', PayseColors.available, result.u!),
@@ -250,7 +250,7 @@ class _ShortfallBar extends StatelessWidget {
     );
     return Semantics(
       label:
-          '막대 전체는 모아둘 돈과 예정 지출의 합 ${spokenKrw(deduction)}이고, '
+          '막대 전체는 남겨둘 돈과 예정 지출의 합 ${spokenKrw(deduction)}이고, '
           '계좌 잔액 ${spokenKrw(b)} 위치 뒤로 ${spokenKrw(shortfall)}이 부족해요',
       child: ExcludeSemantics(
         child: Padding(
@@ -258,7 +258,7 @@ class _ShortfallBar extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('모아둘 돈 + 예정 지출 ${formatKrw(deduction)}', style: strong),
+              Text('남겨둘 돈 + 예정 지출 ${formatKrw(deduction)}', style: strong),
               const SizedBox(height: PayseSpace.x1),
               AnchoredLabel(
                 fraction: fraction,

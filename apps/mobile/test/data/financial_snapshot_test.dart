@@ -207,4 +207,39 @@ void main() {
       });
     });
   });
+
+  group('거래 관계와 청구 예정일(#163)', () {
+    test('transactionRelations를 읽고 내 계좌 이체 짝을 그대로 둔다', () {
+      final s = FinancialSnapshot.fromJson(readSource('demo-life'));
+      final relations = s.transactionRelations!;
+      expect(relations, hasLength(192));
+      expect(
+        relations.where((r) => r.kind == 'internal_transfer'),
+        hasLength(25),
+      );
+      expect(relations.first.evidenceRef, isNotEmpty);
+    });
+
+    test('자기 참조·허용하지 않는 종류는 형식 오류다', () {
+      for (final (name, patch) in [
+        ('self', (Map r) => r['toId'] = r['fromId']),
+        ('kind', (Map r) => r['kind'] = 'same_amount'),
+      ]) {
+        final json = readSource('demo-life');
+        patch(rows(json, 'transactionRelations').first);
+        expect(
+          () => FinancialSnapshot.fromJson(json),
+          throwsA(isA<SnapshotFormatException>()),
+          reason: name,
+        );
+      }
+    });
+
+    test('청구 결제 예정일이 null이면 미확보로 두고 다른 날짜로 채우지 않는다', () {
+      final json = readSource('demo-life');
+      rows(json, 'statements').first['dueDate'] = null;
+      final s = FinancialSnapshot.fromJson(json);
+      expect(s.statements!.first.dueDate, isNull);
+    });
+  });
 }

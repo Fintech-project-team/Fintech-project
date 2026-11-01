@@ -64,7 +64,15 @@ Map<String, Object?> withExcludedInsurance() {
 }
 
 /// 2026-10-26: 영수증·묶음의 모든 펼침 행과 일부 출금 항목을 펼친다.
+/// 2026-10-31: 참고 내역·계산에 포함하지 않은 계좌를 먼저 펼친다(일부 납부 내역은 늘 보인다).
 Future<void> expandAll(WidgetTester tester) async {
+  for (final key in ['detail-reference-toggle', 'detail-excluded-toggle']) {
+    final toggle = find.byKey(ValueKey(key));
+    if (toggle.evaluate().isEmpty) continue;
+    await tester.ensureVisible(toggle);
+    await tester.tap(toggle);
+    await tester.pump();
+  }
   for (final key in [
     'receipt-accounts',
     'receipt-reserves',
@@ -80,12 +88,6 @@ Future<void> expandAll(WidgetTester tester) async {
     if (head.evaluate().isEmpty) continue;
     await tester.ensureVisible(head.first);
     await tester.tap(head.first);
-    await tester.pump();
-  }
-  final partial = find.text('일부 출금');
-  if (partial.evaluate().isNotEmpty) {
-    await tester.ensureVisible(partial.first);
-    await tester.tap(partial.first);
     await tester.pump();
   }
 }
@@ -108,8 +110,10 @@ void main() {
   testWidgets('① 정상: 기간·시간축·3구간 바·영수증 합계를 계산 결과 그대로 보인다', (tester) async {
     await tester.pumpWidget(detail(ready(withExcludedInsurance())));
     expect(find.text('계산 내역'), findsOneWidget);
-    expect(find.text('이번 계산 기간 9/25 – 10/24'), findsOneWidget);
-    expect(find.text('기준일 10/19 · 다음 월급일 10/25'), findsOneWidget);
+    expect(find.text('9/25 – 10/24'), findsOneWidget);
+    expect(find.text('다음 월급일 10/25 · 10월 19일 12:00 기준'), findsOneWidget);
+    expect(find.textContaining('기준일'), findsNothing, reason: '같은 날짜를 반복하지 않는다');
+    expect(find.textContaining('금융정보 기준'), findsNothing);
     expect(find.text('10/19 기준'), findsOneWidget);
     expect(find.text('10/25 월급일'), findsOneWidget);
     expect(
@@ -120,7 +124,6 @@ void main() {
       ),
       reason: '월급일 날짜는 오른쪽 여백 끝에 맞춘다',
     );
-    expect(find.text('10/19 12:00 금융정보 기준'), findsOneWidget);
     expect(find.byKey(const ValueKey('composition-bar')), findsOneWidget);
     final segments = find.descendant(
       of: find.byKey(const ValueKey('composition-bar')),
@@ -131,7 +134,8 @@ void main() {
       expect(tester.getSize(find.byWidget(e.widget)).height, 6);
       expect(tester.getSize(find.byWidget(e.widget)).width, greaterThan(0));
     }
-    expect(find.textContaining('쓸 수 있는 돈'), findsNWidgets(3));
+    expect(find.textContaining('쓸 수 있는 돈'), findsNWidgets(2));
+    expect(find.textContaining('계산에 포함한 계좌'), findsOneWidget);
 
     expect(find.text('2,000,000원'), findsOneWidget);
     expect(find.text('−340,000원'), findsOneWidget);
@@ -142,7 +146,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('월세'), findsNothing, reason: '처음에는 모두 접혀 있다');
-    expect(find.text('처음 등록한 예정 금액'), findsNothing);
+    expect(find.text('처음 금액'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('receipt-scheduled')));
     await tester.pump();
     final receiptLines = find.descendant(
@@ -170,15 +174,53 @@ void main() {
       );
     }
     expect(find.textContaining('월세'), findsOneWidget);
-    expect(find.text('예정일 10/22'), findsOneWidget);
+    expect(find.text('예정일 10/22 · 국민은행 ····0001'), findsOneWidget);
     expect(find.text('D-3'), findsOneWidget);
-    expect(find.text('예정일 10/18 지남 · 현재 비상금에서 사용 예정'), findsOneWidget);
+    expect(
+      find.text('예정일 10/18 지남 · 국민은행 ····0001 · 현재 비상금에서 사용 예정'),
+      findsOneWidget,
+    );
+    expect(find.text('처음 금액'), findsOneWidget, reason: '일부 납부 내역은 항목 안에 바로');
 
-    expect(find.textContaining('출금 완료 내역'), findsOneWidget);
-    expect(find.text('150,000원'), findsOneWidget);
-    expect(find.text('아래 지출이 빠져나간 뒤의 잔액으로 계산했어요.'), findsOneWidget);
+    expect(find.text('참고 내역'), findsOneWidget);
+    expect(find.text('따로 빼지 않아요'), findsOneWidget);
+    expect(find.textContaining('출금 완료'), findsNothing, reason: '참고 내역은 접혀 있다');
+    final reference = tester.getRect(
+      find.byKey(const ValueKey('detail-reference')),
+    );
+    final total = tester.getRect(find.byKey(const ValueKey('receipt-result')));
+    expect(reference.bottom, lessThan(total.top), reason: '쓸 수 있는 돈 위');
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('detail-reference-toggle')),
+    );
+    await tester.tap(find.byKey(const ValueKey('detail-reference-toggle')));
+    await tester.pump();
+    expect(find.textContaining('출금 완료'), findsOneWidget);
+    expect(find.text('계좌에서 이미 빠져나갔어요'), findsOneWidget);
+    expect(
+      find.text('150,000원'),
+      findsNothing,
+      reason: '부분 납부를 섞은 합계를 만들지 않는다',
+    );
     expect(find.textContaining('다음 기간 지출'), findsOneWidget);
-    expect(find.text('다음 계산 기간에 나갈 돈이라, 이번 계산에서는 빼지 않아요.'), findsOneWidget);
+    expect(find.text('10/25부터'), findsOneWidget);
+
+    expect(
+      find.textContaining('제외 계좌 지출'),
+      findsNothing,
+      reason: '제외 계좌는 접혀 있다',
+    );
+    final excluded = find.byKey(const ValueKey('detail-excluded-toggle'));
+    expect(
+      tester.getRect(excluded).top,
+      greaterThan(
+        tester.getRect(find.byKey(const ValueKey('receipt-result'))).bottom,
+      ),
+      reason: '제외 계좌는 쓸 수 있는 돈 아래 별도 대분류',
+    );
+    await tester.ensureVisible(excluded);
+    await tester.tap(excluded);
+    await tester.pump();
     expect(find.textContaining('제외 계좌 지출'), findsOneWidget);
     expect(find.text('30,000원'), findsOneWidget);
     expect(find.textContaining('입금 확인 후 반영할 지출'), findsNothing);
@@ -186,19 +228,20 @@ void main() {
     expect(find.text(CalculationDetailScreen.footnote), findsOneWidget);
   });
 
-  testWidgets('펼침: 계좌·모아둘 돈·일부 출금·묶음 내역을 원천 이름과 계산값으로 보인다', (tester) async {
+  testWidgets('펼침: 계좌·남겨둘 돈·일부 출금·묶음 내역을 원천 이름과 계산값으로 보인다', (tester) async {
     await tester.pumpWidget(detail(ready(withExcludedInsurance())));
     await tester.tap(find.textContaining('계좌 잔액'));
-    await tester.tap(find.textContaining('모아둘 돈').last);
+    await tester.tap(find.textContaining('남겨둘 돈').last);
     await tester.pump();
-    expect(find.text('월급 계좌'), findsOneWidget);
+    expect(find.text('국민은행 ····0001 · 월급 계좌'), findsOneWidget);
     expect(find.text('1,500,000원'), findsOneWidget);
     expect(find.text('500,000원'), findsOneWidget);
     expect(find.textContaining('현재 비상금'), findsWidgets);
     expect(find.text('설정한 금액'), findsOneWidget);
     expect(find.text('예정 지출에 쓸 금액 · 예정일 10/18'), findsOneWidget);
     expect(find.text('−60,000원'), findsOneWidget);
-    expect(find.text('쓰지 않고 남겨둘 금액'), findsOneWidget);
+    expect(find.text('계속 남겨둘 금액'), findsOneWidget);
+    expect(find.text('이체하지 않고 계좌에 남겨둬요.'), findsOneWidget);
     expect(find.textContaining('으로 설정한'), findsNothing);
     expect(find.textContaining('로 쓰기로'), findsNothing);
     expect(find.text('340,000원'), findsOneWidget);
@@ -206,26 +249,41 @@ void main() {
     await tester.ensureVisible(find.byKey(const ValueKey('receipt-scheduled')));
     await tester.tap(find.byKey(const ValueKey('receipt-scheduled')));
     await tester.pump();
-    await tester.ensureVisible(find.text('일부 출금'));
-    await tester.tap(find.text('일부 출금'));
-    await tester.pump();
-    expect(find.text('처음 등록한 예정 금액'), findsOneWidget);
+    expect(find.text('처음 금액'), findsOneWidget);
     expect(find.text('100,000원'), findsOneWidget);
-    expect(find.text('−40,000원'), findsOneWidget);
-    expect(find.text('남은 예정 지출'), findsOneWidget);
+    expect(find.text('납부한 금액'), findsOneWidget);
+    expect(find.text('40,000원'), findsOneWidget);
+    expect(find.text('남은 예정 지출'), findsNothing, reason: '남은 금액을 다시 쓰지 않는다');
     expect(find.text('10/16 출금 · 국민은행 ····0001'), findsOneWidget);
 
-    await tester.ensureVisible(find.textContaining('출금 완료 내역'));
-    await tester.tap(find.textContaining('출금 완료 내역'));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('detail-reference-toggle')),
+    );
+    await tester.tap(find.byKey(const ValueKey('detail-reference-toggle')));
+    await tester.pump();
+    await tester.ensureVisible(find.textContaining('출금 완료'));
+    await tester.tap(find.textContaining('출금 완료'));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('detail-excluded-toggle')),
+    );
+    await tester.tap(find.byKey(const ValueKey('detail-excluded-toggle')));
+    await tester.pump();
     await tester.ensureVisible(find.textContaining('제외 계좌 지출'));
     await tester.tap(find.textContaining('제외 계좌 지출'));
     await tester.pump();
     expect(find.text('카드 청구'), findsOneWidget);
     expect(find.text('10/10 출금 · 국민은행 ····0001'), findsOneWidget);
     expect(find.text('110,000원'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('group-settled')),
+        matching: find.textContaining('월세'),
+      ),
+      findsNothing,
+      reason: '일부 납부 항목은 출금 완료에 다시 넣지 않는다',
+    );
     expect(find.textContaining('보험료'), findsOneWidget);
-    expect(find.text('계산 제외 계좌'), findsOneWidget);
-    expect(find.textContaining('하나은행 ····0003'), findsOneWidget);
+    expect(find.textContaining('하나은행 ····0003'), findsWidgets);
   });
 
   testWidgets('② 0원: 노란 구간 없이 2구간, 결과 0원', (tester) async {
@@ -253,12 +311,12 @@ void main() {
     for (final e in shortfallSegments.evaluate()) {
       expect(tester.getSize(find.byWidget(e.widget)).height, 6);
     }
-    expect(find.text('모아둘 돈 + 예정 지출 700,000원'), findsOneWidget);
+    expect(find.text('남겨둘 돈 + 예정 지출 700,000원'), findsOneWidget);
     expect(find.text('계좌 잔액 500,000원'), findsOneWidget);
     expect(find.text('200,000원 부족'), findsOneWidget);
     expect(find.text('−200,000원'), findsOneWidget);
     expect(
-      find.text('모아둘 돈과 예정 지출을 모두 확보하려면\n200,000원이 더 필요해요.'),
+      find.text('남겨둘 돈과 예정 지출을 모두 확보하려면\n200,000원이 더 필요해요.'),
       findsOneWidget,
     );
     final result = tester.widget<Text>(
@@ -282,7 +340,7 @@ void main() {
     expect(find.text('0원'), findsOneWidget);
     expect(find.text('−700,000원'), findsOneWidget);
     expect(
-      find.text('모아둘 돈과 예정 지출을 모두 확보하려면\n700,000원이 더 필요해요.'),
+      find.text('남겨둘 돈과 예정 지출을 모두 확보하려면\n700,000원이 더 필요해요.'),
       findsOneWidget,
     );
   });
@@ -301,7 +359,7 @@ void main() {
     final calculation = ready(readSource('alpha-ready'));
     await tester.pumpWidget(detail(calculation));
     expect(find.text('계산 기간을 정하지 못했어요'), findsOneWidget);
-    expect(find.text('기준일 10/19'), findsOneWidget);
+    expect(find.text('10월 19일 12:00 기준'), findsOneWidget);
     expect(find.text('10/19 기준'), findsNothing);
     expect(find.byKey(const ValueKey('composition-bar')), findsNothing);
     expect(
@@ -318,7 +376,7 @@ void main() {
     expect(find.text('계산할 수 없어요'), findsOneWidget);
     expect(find.text('확인 필요'), findsNothing);
     expect(find.text('0원'), findsNothing);
-    expect(find.textContaining('출금 완료 내역'), findsOneWidget);
+    expect(find.text('참고 내역'), findsOneWidget);
   });
 
   testWidgets('⑥ 정보 부족(예정 지출 숨김): 기간을 알면 기간·시간축을 유지한다', (tester) async {
@@ -340,7 +398,7 @@ void main() {
     }
     expect(calculation.result.u, isNull);
     await tester.pumpWidget(detail(calculation));
-    expect(find.text('이번 계산 기간 9/25 – 10/24'), findsOneWidget);
+    expect(find.text('9/25 – 10/24'), findsOneWidget);
     expect(find.text('10/19 기준'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('detail-insufficient-notice')),
@@ -351,8 +409,12 @@ void main() {
 
   testWidgets('⑦ 입금 확인 전: 바 아래 한 곳에 빠진 지출 합계, 예정 지출은 입금 확인 대기', (tester) async {
     await tester.pumpWidget(detail(ready(readSource('salary-wait'))));
-    expect(find.text('이전 계산 기간 9/25 – 10/24'), findsOneWidget);
-    expect(find.text('기준일 10/25 · 오늘 월급일 · 월급 입금 확인 전'), findsOneWidget);
+    expect(
+      find.textContaining('9/25 – 10/24', findRichText: true),
+      findsWidgets,
+    );
+    expect(find.text('지난 계산 기간'), findsOneWidget);
+    expect(find.text('오늘 월급일 · 월급 입금 확인 전 · 10월 25일 08:00 기준'), findsOneWidget);
     expect(find.byKey(const ValueKey('composition-bar')), findsOneWidget);
     expect(find.text('아직 월급 입금이 확인되지 않았어요'), findsOneWidget);
     expect(
@@ -503,7 +565,7 @@ void main() {
         expectIn('receipt-scheduled', formatKrw(l.remainingKrw));
         if (l.settledKrw > 0) {
           expectIn('receipt-scheduled', formatKrw(l.amountKrw));
-          expectIn('receipt-scheduled', formatKrw(-l.settledKrw));
+          expectIn('receipt-scheduled', formatKrw(l.settledKrw));
         }
       }
       expectIn('receipt-result', formatKrw(r.u!));
@@ -520,11 +582,13 @@ void main() {
           expectIn(value, formatKrw(l.remainingKrw));
         }
       }
-      if (r.settledTotal!.count > 0) {
-        expectIn('group-settled', formatKrw(r.settledTotal!.totalKrw));
-        for (final l in lines.where((l) => l.settledKrw > 0)) {
-          expectIn('group-settled', formatKrw(l.settledKrw));
-        }
+      final names = SnapshotNames(c.snapshot);
+      for (final l in lines.where(
+        (l) =>
+            l.placement == calc.ObligationPlacement.settled &&
+            names.isIncludedObligation(l.obligationId),
+      )) {
+        expectIn('group-settled', formatKrw(l.settledKrw));
       }
     });
   }
