@@ -1,0 +1,51 @@
+{
+  "id": "PAYSE-MEMORY-PERIOD-32-20261101",
+  "role": "integration",
+  "baseCommit": "282ad2a40899b72342b0b8f9dfeabadf460ae38d",
+  "branch": "feat/api/analysis-memory-query-32",
+  "allowedPaths": [
+    "apps/api/src/",
+    "apps/api/database/011_analysis_memory_refs.sql",
+    "apps/api/database/analysis/",
+    "apps/api/database/test_analysis_service.py",
+    "apps/api/database/test_analysis_memory.py",
+    "apps/api/docs/analysis-api.md",
+    "apps/api/docs/analysis-storage.md",
+    "apps/api/docs/llm-execution.md",
+    "apps/api/docs/history/2026-11-01-memory-period-handoff.md",
+    "apps/ai/docs/README.md",
+    "docs/api-contract.md",
+    "docs/api-response-models.md",
+    "docs/tasks/PAYSE-MEMORY-PERIOD-32-20261101.json"
+  ],
+  "readBefore": [
+    "AGENTS.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/ownership.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/development-workflow.md",
+    "docs/toolchain.md",
+    "docs/data-contracts.md",
+    "docs/database-schema.md",
+    "docs/api-contract.md",
+    "docs/api-response-models.md",
+    "docs/payse-execution-contract.md",
+    "apps/ai/AGENTS.md",
+    "apps/api/AGENT.md",
+    "apps/api/src/AGENTS.md",
+    "apps/api/docs/sql-style.md",
+    "apps/api/docs/analysis-api.md",
+    "apps/api/docs/analysis-storage.md",
+    "apps/api/docs/analysis-meaning.md",
+    "apps/api/docs/llm-execution.md"
+  ],
+  "acceptance": [
+    "관련 이슈 #32 및 기존 금융 조회 #22. 사용자 확정대로 AI 기억 목록은 확인·삭제용이며 현재 입력 검증 없이 실제 재사용 가능으로 확정하지 않는다. 적용 여부는 기존 결과 조회에서 최신 입력으로 재검증한다.",
+    "금융 원천과 AI 기억 모두 사용자 요청 기간을 필터링해 페이지로 조회한다. AI 보존·참조 플래그로 금융 조회 기간을 제한하지 않는다. 기존 AI 만료·삭제·현재 소유권 및 공개 권한 차단은 유지한다.",
+    "기존 금융 v4 응답·무필터 cursor 경로·원천 날짜 판정·금융 데이터와 Flutter 계산을 보존한다. 현재 DB 확보 범위와 사용자가 요청한 기간을 구분하며 2년 요청을 2년 완전 확보로 표시하지 않는다.",
+    "관리 목록의 전체 관련 거래 권한을 확인할 최소 불변 원천 메타를 별도 이행에 추가한다. 기존 행의 근거를 추측해 채우지 않으며 미확보 메타는 본문을 반환하지 않는다. 임시 DB에서 권한·롤백·기간·페이지·삭제/만료·타 사용자·늦은 권한 변경을 검증한다.",
+    "모바일·계산 패키지·기존 fixture·운영 DB/서버/키는 변경하지 않는다. 실제 LLM/KMS·유료 호출은 하지 않는다. 자동 정리·비용 장부·보존기간 정책 변경으로 범위를 확대하지 않는다.",
+    "기존 지침 통합 커밋을 보존하고 기능별 현재 문서와 실제 코드를 일치시킨다. 팀원에게 기간 조회와 관리 목록의 신규 연결 사항·미검증을 구분해 전달하며 검증 완료 후 기능 브랜치에 commit·push한다. PR 생성·병합 및 develop 직접 push는 하지 않는다."
+  ]
+}

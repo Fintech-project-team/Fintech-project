@@ -1,6 +1,7 @@
 package com.payse.api.finance.service;
 
 import com.payse.api.finance.dto.PageSlice;
+import com.payse.api.finance.dto.TransactionQuery;
 import com.payse.api.finance.error.FinancialException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -46,9 +47,23 @@ public final class FinancialProjection {
      * @param afterId 첫 조회는 null, 후속 조회는 검증한 cursor의 마지막 UUID
      * @param pageOnly 후속 거래 페이지 여부
      * @return cursor 서명 전 응답과 마지막 거래 ID·다음 페이지 여부
+     * @modified 2026-11-01 - 기존 조회는 기간 없는 공통 투영으로 위임
      */
     public PageSlice project(ObjectNode source, Set<String> connectedCodes, String dataVersion,
             UUID afterId, boolean pageOnly) {
+        return project(source, connectedCodes, dataVersion, afterId, pageOnly, null, null);
+    }
+
+    /**
+     * 현재 공개 권한을 유지하며 명시 날짜 범위의 거래를 같은 페이지 계약으로 제공한다.
+     * @created 2026-11-01
+     * @usedBy FinancialService.snapshot, FinancialPeriodTest
+     * @param startDate 명시 범위 시작일. endDate와 함께 생략하면 원천 coverage 범위를 사용한다.
+     * @param endDate 명시 범위 종료일. 양 끝 날짜를 포함하며 보유하지 않은 원천은 생성하지 않는다.
+     */
+    public PageSlice project(ObjectNode source, Set<String> connectedCodes, String dataVersion,
+            UUID afterId, boolean pageOnly, LocalDate startDate, LocalDate endDate) {
+        new TransactionQuery(null, startDate, endDate);
         try {
             Context context = new Context(source, connectedCodes, dataVersion);
             ObjectNode visible = context.build();
@@ -56,7 +71,7 @@ public final class FinancialProjection {
                 if (pageOnly || afterId != null) throw unavailable();
                 return new PageSlice(visible, null, false);
             }
-            return FinancialPages.slice(visible, afterId, pageOnly);
+            return FinancialPages.slice(visible, afterId, pageOnly, startDate, endDate);
         } catch (FinancialException failure) {
             throw failure;
         } catch (RuntimeException failure) {

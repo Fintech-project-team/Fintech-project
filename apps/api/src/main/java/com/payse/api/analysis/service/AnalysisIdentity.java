@@ -6,6 +6,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -15,6 +16,65 @@ import tools.jackson.databind.node.ObjectNode;
  * @usedBy AnalysisJobs, AnalysisResults
  */
 public final class AnalysisIdentity {
+    /**
+     * 모델이 선택한 일부 증거가 아닌 검증 입력의 전체 관계 연결을 항목별로 보존한다.
+     * @created 2026-11-01
+     * @usedBy AnalysisResults.save
+     */
+    public List<UUID> sourceRefs(ObjectNode input, String itemKey) {
+        JsonNode item = null;
+        for (JsonNode candidate : input.path("items")) {
+            if (candidate.path("itemKey").asString().equals(itemKey)) item = candidate;
+        }
+        if (item == null) throw new IllegalStateException("Missing analysis item");
+        Set<String> ids = new HashSet<>();
+        item.path("evidenceTransactionIds").forEach(id -> ids.add(id.asString()));
+        if (item.path("targetTransactionId").isString()) ids.add(item.path("targetTransactionId").asString());
+        boolean expanded;
+        do {
+            expanded = false;
+            for (JsonNode transaction : input.path("transactions")) {
+                if (ids.contains(transaction.path("transactionId").asString())
+                        && transaction.path("originalTransactionId").isString()) {
+                    expanded |= ids.add(transaction.path("originalTransactionId").asString());
+                }
+            }
+            for (JsonNode relation : input.path("relations")) {
+                String from = relation.path("fromId").asString();
+                String to = relation.path("toId").asString();
+                if (ids.contains(from) || ids.contains(to)) {
+                    expanded |= ids.add(from);
+                    expanded |= ids.add(to);
+                }
+            }
+        } while (expanded);
+        return ids.stream().sorted().map(UUID::fromString).toList();
+    }
+
+    /**
+     * 관리 목록에 원천 변경 사실만 표시할 지문이며 실제 재사용 적격 판정을 대신하지 않는다.
+     * @created 2026-11-01
+     * @usedBy AnalysisResults.save, MemoryCatalog.entry
+     */
+    public String referenceHash(ObjectNode source, List<UUID> refs) {
+        Set<String> ids = new HashSet<>();
+        refs.forEach(id -> ids.add(id.toString()));
+        ObjectNode facts = rawFacts(source, ids);
+        facts.set("ruleVersion", source.get("ruleVersion"));
+        List<JsonNode> relations = new ArrayList<>();
+        for (JsonNode relation : source.path("transactionRelations")) {
+            if (ids.contains(relation.path("fromId").asString()) || ids.contains(relation.path("toId").asString())) {
+                ObjectNode value = (ObjectNode) relation.deepCopy();
+                value.remove(List.of("userId", "sourceVersion", "sourceRef"));
+                relations.add(value);
+            }
+        }
+        relations.sort(Comparator.comparing(row -> AnalysisJson.canonical(row).toString()));
+        var links = facts.putArray("relations");
+        relations.forEach(links::add);
+        return AnalysisJson.digest(facts);
+    }
+
     /**
      * 같은 의미 대상의 중복 항목을 거절하고 현재 요청의 항목 식별을 만든다.
      * @created 2026-11-01

@@ -33,6 +33,7 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -40,6 +41,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -197,13 +199,18 @@ class AnalysisHttpTest {
      * 연간 자료 적재만 같은 JDBC 연결에서 별도 제한을 설정한다. 제품 요청의 12초 제한은 유지한다.
      * @created 2026-11-01
      * @usedBy start
+     * @modified 2026-11-01 - 준비용 통계를 최종 제약 검사 전에 갱신해 반복 재적재 지연 완화
      */
     private void prepareSeed() throws Exception {
         String seed = Files.readString(Path.of(setting("SEED_FILE")));
+        var boundary = java.util.regex.Pattern.compile("(?m)^SET CONSTRAINTS ALL IMMEDIATE;\\r?$");
+        assertEquals(1L, boundary.matcher(seed).results().count(), "Expected one final seed validation boundary");
+        // 폐기 DB의 통계만 갱신한다. 원천 값·제약·RLS·커밋 경계는 동일하게 유지한다.
+        String prepared = boundary.matcher(seed).replaceFirst("ANALYZE;\n$0");
         admin.execute((org.springframework.jdbc.core.ConnectionCallback<Void>) connection -> {
             try (var statement = connection.createStatement()) {
                 statement.execute("SET statement_timeout = '120s'");
-                try { statement.execute(seed); }
+                try { statement.execute(prepared); }
                 finally {
                     statement.execute("ROLLBACK");
                     statement.execute("SET statement_timeout = '12s'");
@@ -217,11 +224,13 @@ class AnalysisHttpTest {
      * 비동기 작업을 해제·종료한 뒤 금융 불변을 확인하고 이 검사 소유 연결만 닫는다.
      * @created 2026-11-01
      * @usedBy JUnit AfterEach
+     * @modified 2026-11-01 - 기억 목록의 복호화 경합 대기도 종료 전에 해제
      */
     @AfterEach
     void stop() throws Exception {
         try {
             if (model != null) model.release.countDown();
+            if (testKeys != null) testKeys.unwrapRelease.countDown();
             if (context != null) context.close();
             if (financialBefore != null) assertEquals(financialBefore, fingerprint(), "Financial data changed");
         } finally {
@@ -833,6 +842,479 @@ class AnalysisHttpTest {
         assertEquals(2, model.calls.get());
     }
 
+
+    /**
+     * 비활성·원천 변경 기억도 검토용 본문은 읽되 현재 적용 가능하다고 표시하지 않는다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void listsInactiveAndChangedMemoriesForReview() throws Exception {
+        storeMemories(input);
+        String inactive = memoryId(input.path("items").get(0).path("itemKey").asString());
+        String changed = memoryId(input.path("items").get(1).path("itemKey").asString());
+        String transaction = input.path("items").get(1).path("targetTransactionId").asString();
+        assertEquals(1, admin.update("UPDATE payse.analysis_items SET active=false,metadata_version=metadata_version+1 WHERE user_id=? AND id=?", owner, UUID.fromString(inactive)));
+        assertEquals(1, admin.update("UPDATE payse.financial_transactions SET amount_krw=amount_krw+1 WHERE user_id=? AND id=?", owner, UUID.fromString(transaction)));
+        assertEquals(1, admin.update("UPDATE payse.users SET data_version=data_version+1 WHERE id=?", owner));
+        financialBefore = fingerprint();
+        Map<String, String> dates = allMemoryDates();
+        testKeys.unwrapCalls.set(0);
+        ObjectNode listed = listMemories("", token);
+        assertEquals("PAYSE-ANALYSIS-1", listed.path("contractVersion").asString());
+        assertEquals(10, listed.path("items").size());
+        for (JsonNode item : listed.path("items")) {
+            assertEquals("unchecked", item.path("resultAvailability").asString());
+            assertEquals("available", item.path("contentAvailability").asString());
+            assertTrue(item.has("interpretation"));
+            assertEquals(RESULT_TEXT, item.path("retentionReason").asString());
+            assertFalse(item.has("sourceRefs"));
+            assertFalse(item.has("sourceHash"));
+            assertFalse(item.has("id"));
+        }
+        assertFalse(memory(listed, inactive).path("active").asBoolean());
+        assertEquals(2, memory(listed, inactive).path("metadataVersion").asInt());
+        assertTrue(memory(listed, changed).path("sourceChanged").asBoolean());
+        assertFalse(memory(listed, inactive).path("sourceChanged").asBoolean());
+        assertEquals(10, testKeys.unwrapCalls.get());
+        assertEquals(1, model.calls.get());
+        assertEquals(dates, allMemoryDates());
+    }
+
+    /**
+     * 과거 기간 조회도 삭제·일반 만료 본문을 되살리지 않고 중요보존 예외만 복호화한다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void memoryPeriodsDoNotRestoreExpiredOrDeletedBodies() throws Exception {
+        storeMemories(input);
+        LocalDate day = clock.instant().atZone(ZoneId.of("Asia/Seoul")).toLocalDate();
+        String removed = memoryId(input.path("items").get(0).path("itemKey").asString());
+        String retained = memoryId(input.path("items").get(1).path("itemKey").asString());
+        assertEquals(204, send("DELETE", "/analysis-memories/" + removed, null, token, key()).statusCode());
+        assertEquals(1, admin.update("UPDATE payse.analysis_items SET important=true,is_reference=true,metadata_version=metadata_version+1 WHERE user_id=? AND id=?", owner, UUID.fromString(retained)));
+        Map<String, String> dates = allMemoryDates();
+        clock.advance(Duration.ofDays(100));
+        testKeys.unwrapCalls.set(0);
+        ObjectNode listed = listMemories(period(day, day), token);
+        assertEquals(10, listed.path("items").size());
+        for (JsonNode item : listed.path("items")) {
+            String id = item.path("itemId").asString();
+            if (id.equals(retained)) {
+                assertEquals("available", item.path("contentAvailability").asString());
+                assertEquals("unchecked", item.path("resultAvailability").asString());
+                assertTrue(item.has("interpretation"));
+            } else assertHiddenMemory(item, id.equals(removed) ? "deleted" : "expired");
+        }
+        assertEquals(1, testKeys.unwrapCalls.get());
+        testKeys.unwrapCalls.set(0);
+        assertTrue(listMemories(period(day.plusDays(1), day.plusDays(1)), token).path("items").isEmpty());
+        assertEquals(0, testKeys.unwrapCalls.get());
+        assertEquals(dates, allMemoryDates());
+        assertEquals(1, model.calls.get());
+        for (String invalid : List.of("?startDate=" + day, "?endDate=" + day,
+                "?startDate=2026-02-30&endDate=2026-03-01", period(day.plusDays(1), day))) {
+            body(send("GET", "/analysis-memories" + invalid, null, token, null), 422);
+        }
+    }
+
+    /**
+     * 저장일의 서울 자정 양쪽을 구분하며 종료일 하루 전체를 포함한다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void memoryPeriodUsesSeoulDayBoundaries() throws Exception {
+        model.unknownClassification = true;
+        ObjectNode twenty = independentInput(20);
+        ZoneId seoul = ZoneId.of("Asia/Seoul");
+        LocalDate first = clock.instant().atZone(seoul).toLocalDate();
+        Instant midnight = first.plusDays(1).atStartOfDay(seoul).toInstant();
+        clock.advance(Duration.between(clock.instant(), midnight.minusMillis(1)));
+        storeMemories(subset(twenty, 0, 10));
+        clock.advance(Duration.ofMillis(2));
+        storeMemories(subset(twenty, 10, 10));
+        ObjectNode before = listMemories(period(first, first), token);
+        ObjectNode after = listMemories(period(first.plusDays(1), first.plusDays(1)), token);
+        assertEquals(10, before.path("items").size());
+        assertEquals(10, after.path("items").size());
+        Set<String> ids = new HashSet<>();
+        for (JsonNode item : before.path("items")) {
+            assertEquals(first, Instant.parse(item.path("storedAt").asString()).atZone(seoul).toLocalDate());
+            assertTrue(ids.add(item.path("itemId").asString()));
+        }
+        for (JsonNode item : after.path("items")) {
+            assertEquals(first.plusDays(1), Instant.parse(item.path("storedAt").asString()).atZone(seoul).toLocalDate());
+            assertTrue(ids.add(item.path("itemId").asString()));
+        }
+        assertEquals(20, listMemories(period(first, first.plusDays(1)), token).path("items").size());
+        assertEquals(2, model.calls.get());
+    }
+
+    /**
+     * 20건 페이지는 다른 사용자·세션·기간에 재사용되지 않으며 해당 페이지 본문만 복호화한다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void memoryPagesBindOwnerSessionAndPeriod() throws Exception {
+        model.unknownClassification = true;
+        storeMemories(independentInput(25));
+        LocalDate day = clock.instant().atZone(ZoneId.of("Asia/Seoul")).toLocalDate();
+        String range = period(day, day);
+        testKeys.unwrapCalls.set(0);
+        ObjectNode first = listMemories(range, token);
+        assertEquals(20, first.path("items").size());
+        assertTrue(first.path("pageInfo").path("hasMore").asBoolean());
+        String cursor = first.path("pageInfo").path("nextCursor").asString();
+        assertFalse(cursor.isBlank());
+        assertEquals(20, testKeys.unwrapCalls.get());
+        testKeys.unwrapCalls.set(0);
+        ObjectNode second = listMemories(range + "&cursor=" + cursor, token);
+        assertEquals(5, second.path("items").size());
+        assertFalse(second.path("pageInfo").path("hasMore").asBoolean());
+        assertTrue(second.path("pageInfo").path("nextCursor").isNull());
+        assertEquals(5, testKeys.unwrapCalls.get());
+        List<String> actual = new ArrayList<>();
+        for (JsonNode page : List.of(first, second)) for (JsonNode item : page.path("items")) {
+            assertEquals("unchecked", item.path("resultAvailability").asString());
+            actual.add(item.path("itemId").asString());
+        }
+        assertEquals(25, new HashSet<>(actual).size());
+        assertEquals(actual.stream().sorted().toList(), actual);
+        assertEquals(admin.queryForList("SELECT id::text FROM payse.analysis_items WHERE user_id=? ORDER BY id", String.class, owner), actual);
+        body(send("GET", "/analysis-memories" + period(day, day.plusDays(1)) + "&cursor=" + cursor, null, token, null), 409);
+        JsonNode beta = json.readTree(Files.readString(Path.of("fixtures/generated-v4/snapshots/beta-ready.json")));
+        UUID other = UUID.fromString(beta.path("userId").asString());
+        setCode(other, code);
+        String otherToken = login(credentials(other), code);
+        assertTrue(listMemories("", otherToken).path("items").isEmpty());
+        body(send("GET", "/analysis-memories" + range + "&cursor=" + cursor, null, otherToken, null), 403);
+        assertEquals(204, send("DELETE", "/demo-sessions/current", null, token, null).statusCode());
+        token = login(credentials, code);
+        body(send("GET", "/analysis-memories" + range + "&cursor=" + cursor, null, token, null), 403);
+        body(send("GET", "/analysis-memories?cursor=invalid", null, token, null), 400);
+        assertEquals(1, model.calls.get());
+    }
+
+    /**
+     * 모델이 답변 근거를 줄여도 원래 입력의 연결 거래 권한까지 기억 조회에서 확인한다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void memoryListUsesFullStoredSourcePermissions() throws Exception {
+        JsonNode relation = unique(source.path("transactionRelations"), row -> "fixture-owned-transfer-1".equals(row.path("evidenceRef").asString()));
+        JsonNode from = unique(source.path("transactions"), row -> relation.path("fromId").equals(row.path("transactionId")));
+        JsonNode to = unique(source.path("transactions"), row -> relation.path("toId").equals(row.path("transactionId")));
+        ObjectNode extended = meaningInput(source, 9);
+        appendMeaning(extended, from);
+        appendMeaning(extended, to);
+        ObjectNode link = ((ArrayNode) extended.path("relations")).addObject();
+        for (String field : List.of("kind", "fromId", "toId")) link.set(field, relation.get(field));
+        ObjectNode fromItem = (ObjectNode) unique(extended.path("items"), row -> from.path("transactionId").equals(row.path("targetTransactionId")));
+        ((ArrayNode) fromItem.path("evidenceTransactionIds")).add(to.path("transactionId").asString());
+        model.unknownClassification = true;
+        model.minimalEvidence = true;
+        storeMemories(extended);
+        String fromMemory = memoryId(fromItem.path("itemKey").asString());
+        String toMemory = memoryId("meaning:" + to.path("transactionId").asString());
+        ObjectNode original = listMemories("", token);
+        assertEquals(1, memory(original, fromMemory).path("interpretation").path("evidenceTransactionIds").size());
+        String targetInstitution = institutionFor(to);
+        assertNotEquals(institutionFor(from), targetInstitution);
+        disconnectInstitution(targetInstitution);
+        testKeys.unwrapCalls.set(0);
+        ObjectNode listed = listMemories("", token);
+        assertEquals(11, listed.path("items").size());
+        assertHiddenMemory(memory(listed, fromMemory), "restricted");
+        assertHiddenMemory(memory(listed, toMemory), "restricted");
+        assertEquals(9, testKeys.unwrapCalls.get());
+        assertFalse(listed.toString().contains(to.path("transactionId").asString()));
+        assertEquals(1, model.calls.get());
+    }
+
+    /**
+     * 원천 권한 메타가 없는 기존 행은 검토 목록에 남기되 본문·암호화 키를 읽지 않는다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void legacyMemoryIsListedWithoutDecrypting() throws Exception {
+        storeMemories(input);
+        String original = memoryId(input.path("items").get(0).path("itemKey").asString());
+        String legacy = cloneMemory(original, true);
+        testKeys.unwrapCalls.set(0);
+        ObjectNode listed = listMemories("", token);
+        assertEquals(11, listed.path("items").size());
+        assertHiddenMemory(memory(listed, legacy), "unverified");
+        assertEquals(10, testKeys.unwrapCalls.get());
+    }
+
+    /**
+     * 다른 기억 ID에 복사한 암호문은 같은 사용자라도 AAD가 달라 목록 본문으로 노출되지 않는다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void memoryCiphertextCannotMoveToOtherItem() throws Exception {
+        storeMemories(input);
+        cloneMemory(memoryId(input.path("items").get(0).path("itemKey").asString()), false);
+        HttpResponse<String> response = send("GET", "/analysis-memories", null, token, null);
+        body(response, 503);
+        assertFalse(response.body().contains(RESULT_TEXT));
+        assertFalse(response.body().contains("interpretation"));
+    }
+
+    /**
+     * 외부 키 복호화 중 삭제된 기억은 뒤늦게 응답되지 않고 변경 충돌로 재조회를 요구한다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void memoryListRechecksDeletionAfterDecrypt() throws Exception {
+        storeMemories(input);
+        String removed = memoryId(input.path("items").get(0).path("itemKey").asString());
+        testKeys.blockUnwrap();
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var pending = executor.submit(() -> send("GET", "/analysis-memories", null, token, null));
+            assertTrue(testKeys.unwrapEntered.await(10, TimeUnit.SECONDS));
+            try {
+                assertEquals(204, send("DELETE", "/analysis-memories/" + removed, null, token, key()).statusCode());
+            } finally { testKeys.unwrapRelease.countDown(); }
+            HttpResponse<String> response = pending.get(15, TimeUnit.SECONDS);
+            body(response, 409);
+            assertFalse(response.body().contains(RESULT_TEXT));
+        }
+        assertHiddenMemory(memory(listMemories("", token), removed), "deleted");
+        assertEquals(1, admin.queryForObject("SELECT count(*) FROM payse.analysis_suppressions WHERE user_id=?", Integer.class, owner));
+    }
+
+    /**
+     * 복호화 동안 금융사 연결이 해제되면 읽었던 평문을 버리고 새 권한으로 재조회하게 한다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void memoryListRechecksDisconnectAfterDecrypt() throws Exception {
+        storeMemories(input);
+        JsonNode transaction = unique(source.path("transactions"), row -> input.path("items").get(0).path("targetTransactionId").equals(row.path("transactionId")));
+        testKeys.blockUnwrap();
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var pending = executor.submit(() -> send("GET", "/analysis-memories", null, token, null));
+            assertTrue(testKeys.unwrapEntered.await(10, TimeUnit.SECONDS));
+            try { disconnectInstitution(institutionFor(transaction)); }
+            finally { testKeys.unwrapRelease.countDown(); }
+            HttpResponse<String> response = pending.get(15, TimeUnit.SECONDS);
+            body(response, 409);
+            assertFalse(response.body().contains(RESULT_TEXT));
+        }
+        testKeys.unwrapCalls.set(0);
+        for (JsonNode item : listMemories("", token).path("items")) assertHiddenMemory(item, "restricted");
+        assertEquals(0, testKeys.unwrapCalls.get());
+    }
+
+    /**
+     * 복호화 동안 종료한 세션은 결과 목록을 받지 못하며 새 로그인으로만 다시 조회한다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void memoryListRechecksLogoutAfterDecrypt() throws Exception {
+        storeMemories(input);
+        testKeys.blockUnwrap();
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var pending = executor.submit(() -> send("GET", "/analysis-memories", null, token, null));
+            assertTrue(testKeys.unwrapEntered.await(10, TimeUnit.SECONDS));
+            try { assertEquals(204, send("DELETE", "/demo-sessions/current", null, token, null).statusCode()); }
+            finally { testKeys.unwrapRelease.countDown(); }
+            HttpResponse<String> response = pending.get(15, TimeUnit.SECONDS);
+            body(response, 401);
+            assertFalse(response.body().contains(RESULT_TEXT));
+            assertFalse(response.body().contains("interpretation"));
+        }
+    }
+
+    /**
+     * 목록도 인증을 필터보다 먼저 검사하며 GET 본문·허용하지 않은 필터를 무시하지 않는다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void memoryListAuthenticatesBeforeFilters() throws Exception {
+        body(send("GET", "/analysis-memories?startDate=bad", null, "invalid", null), 401);
+        body(send("GET", "/analysis-memories?startDate=bad", null, token, null), 422);
+        body(send("GET", "/analysis-memories?limit=1", null, token, null), 400);
+        body(send("GET", "/analysis-memories", "{}", token, null), 422);
+        assertTrue(listMemories("?startDate=0001-01-01&endDate=9999-12-31", token).path("items").isEmpty());
+        assertEquals(0, model.calls.get());
+    }
+
+
+    /**
+     * 실제 접수·입력·비동기 채택 경로로 기억을 준비하며 목록 검사 전 불필요한 복호화는 하지 않는다.
+     * @created 2026-11-01
+     * @usedBy 기억 목록 HTTP 검사
+     */
+    private void storeMemories(ObjectNode meaning) throws Exception {
+        String job = accept(meaning, key()).path("jobId").asString();
+        submit(job, meaning, key(), false, false);
+        await(job, "succeeded");
+    }
+
+    /**
+     * 검토 목록은 적용용 현재 입력을 제출하지 않는 독립 조회 경로로 읽는다.
+     * @created 2026-11-01
+     * @usedBy 기억 목록 HTTP 검사
+     */
+    private ObjectNode listMemories(String query, String bearer) throws Exception {
+        return body(send("GET", "/analysis-memories" + query, null, bearer, null), 200);
+    }
+
+    /**
+     * 준비 입력의 키와 현재 소유자로 기억 한 건을 식별하고 중복·누락은 테스트 실패로 처리한다.
+     * @created 2026-11-01
+     * @usedBy 기억 목록 HTTP 검사
+     */
+    private String memoryId(String itemKey) {
+        List<UUID> ids = admin.queryForList("SELECT id FROM payse.analysis_items WHERE user_id=? AND item_key=?", UUID.class, owner, itemKey);
+        assertEquals(1, ids.size());
+        return ids.getFirst().toString();
+    }
+
+    /**
+     * 목록의 공개 기억 ID를 기준으로 한 항목만 선택한다.
+     * @created 2026-11-01
+     * @usedBy 기억 목록 HTTP 검사
+     */
+    private JsonNode memory(JsonNode response, String id) {
+        return unique(response.path("items"), item -> id.equals(item.path("itemId").asString()));
+    }
+
+    /**
+     * 숨긴 본문·보존 설명·원천 변경 추정이 응답에서 제외되며 적용 상태는 미검증인지 검사한다.
+     * @created 2026-11-01
+     * @usedBy 만료·삭제·권한·기존 행 검사
+     */
+    private void assertHiddenMemory(JsonNode item, String state) {
+        assertEquals(state, item.path("contentAvailability").asString());
+        assertEquals("unchecked", item.path("resultAvailability").asString());
+        for (String field : List.of("interpretation", "retentionReason", "sourceChanged", "sourceRefs", "sourceHash")) assertFalse(item.has(field), field);
+        for (String field : List.of("itemId", "resultId", "semanticTaskKind", "active", "isReference", "important", "referencePolicy", "storedAt", "normalExpiresAt", "metadataVersion")) assertTrue(item.has(field), field);
+    }
+
+    /**
+     * 양끝 저장일을 포함하는 명시 조회 문자열을 만들며 날짜 정책은 서버가 검증한다.
+     * @created 2026-11-01
+     * @usedBy 날짜 필터·페이지 검사
+     */
+    private String period(LocalDate start, LocalDate end) { return "?startDate=" + start + "&endDate=" + end; }
+
+    /**
+     * 최초 저장·정상 만료 시각은 전체 기억 ID별로 보존되는지 확인할 비교 자료다.
+     * @created 2026-11-01
+     * @usedBy 읽기·보존 기산 검사
+     */
+    private Map<String, String> allMemoryDates() {
+        Map<String, String> dates = new HashMap<>();
+        for (Map<String, Object> row : admin.queryForList("SELECT id,stored_at,normal_expires_at FROM payse.analysis_items WHERE user_id=?", owner)) {
+            dates.put(row.get("id").toString(), row.get("stored_at") + "/" + row.get("normal_expires_at"));
+        }
+        assertFalse(dates.isEmpty());
+        return dates;
+    }
+
+    /**
+     * 페이지 크기 검사는 기존 금융 거래를 사용하며 관계를 생략한 가짜 근거를 만들지 않는다.
+     * @created 2026-11-01
+     * @usedBy 페이지·서울 날짜 경계 검사
+     */
+    private ObjectNode independentInput(int count) {
+        Set<String> linked = new HashSet<>();
+        for (JsonNode relation : source.path("transactionRelations")) {
+            linked.add(relation.path("fromId").asString());
+            linked.add(relation.path("toId").asString());
+        }
+        List<JsonNode> rows = new ArrayList<>();
+        for (JsonNode row : source.path("transactions")) {
+            if ("account_entry".equals(row.path("recordKind").asString()) && row.path("originalTransactionId").isNull()
+                    && !linked.contains(row.path("transactionId").asString())) rows.add(row);
+        }
+        rows.sort(Comparator.comparing(row -> row.path("transactionId").asString()));
+        assertTrue(rows.size() >= count, "Prepared source must contain enough independent account records");
+        ObjectNode result = meaningInput(source, 0);
+        for (JsonNode row : rows.subList(0, count)) appendMeaning(result, row);
+        return result;
+    }
+
+    /**
+     * 실제 원천 한 건과 현재 분류를 입력 스키마의 허용 필드로만 투영한다.
+     * @created 2026-11-01
+     * @usedBy independentInput, 관계 권한 검사
+     */
+    private void appendMeaning(ObjectNode meaning, JsonNode transaction) {
+        assertEquals(owner.toString(), transaction.path("userId").asString());
+        assertTrue(transaction.path("originalTransactionId").isNull());
+        String id = transaction.path("transactionId").asString();
+        ObjectNode item = ((ArrayNode) meaning.path("items")).addObject().put("itemKey", "meaning:" + id).put("targetTransactionId", id).putNull("candidateKey");
+        item.putArray("evidenceTransactionIds").add(id);
+        ObjectNode projected = ((ArrayNode) meaning.path("transactions")).addObject();
+        for (String field : List.of("transactionId", "recordKind", "direction", "status", "reflectionReason", "merchantName", "description", "originalTransactionId")) projected.set(field, transaction.get(field).deepCopy());
+        ((ArrayNode) meaning.path("currentClassifications")).addObject().put("transactionId", id).set("value", transaction.path("payseTransactionType").deepCopy());
+    }
+
+    /**
+     * 거래의 실제 계좌 관계를 따라 연결 해제할 기관을 찾고 표시명은 사용하지 않는다.
+     * @created 2026-11-01
+     * @usedBy 연결 권한 검사
+     */
+    private String institutionFor(JsonNode transaction) {
+        JsonNode account = unique(source.path("accounts"), row -> transaction.path("accountId").equals(row.path("accountId")));
+        return account.path("institutionCode").asString();
+    }
+
+    /**
+     * 폐기 DB의 지정 기관 연결만 해제하고 이후 API가 다른 금융 상태를 바꾸지 않는지 비교한다.
+     * @created 2026-11-01
+     * @usedBy 연결 해제 경합·관계 권한 검사
+     */
+    private void disconnectInstitution(String institution) {
+        assertFalse(institution.isBlank());
+        assertEquals(1, admin.update("UPDATE payse.institution_links SET disconnected_at=clock_timestamp() WHERE user_id=? AND institution_code=? AND disconnected_at IS NULL", owner, institution));
+        assertEquals(1, admin.update("UPDATE payse.users SET data_version=data_version+1 WHERE id=?", owner));
+        financialBefore = fingerprint();
+    }
+
+    /**
+     * 과거 권한 메타 누락 또는 AAD 이동 공격을 폐기 DB의 새 행으로 재현한다. 기존 행은 변경하지 않는다.
+     * @created 2026-11-01
+     * @usedBy legacyMemoryIsListedWithoutDecrypting, memoryCiphertextCannotMoveToOtherItem
+     */
+    private String cloneMemory(String original, boolean legacy) {
+        UUID result = UUID.randomUUID(), item = UUID.randomUUID();
+        UUID previous = UUID.fromString(original);
+        assertEquals(1, admin.update("""
+            INSERT INTO payse.analysis_results
+              (id,user_id,semantic_kind,input_hash,provenance,accepted_manifest,committed_at)
+            SELECT ?,r.user_id,r.semantic_kind,r.input_hash,r.provenance,r.accepted_manifest,r.committed_at
+            FROM payse.analysis_results r JOIN payse.analysis_items i
+              ON i.user_id=r.user_id AND i.result_id=r.id
+            WHERE i.user_id=? AND i.id=?
+            """, result, owner, previous));
+        String sourceColumns = legacy ? "NULL,NULL" : "source_refs,source_hash";
+        assertEquals(1, admin.update("""
+            INSERT INTO payse.analysis_items
+              (id,user_id,result_id,item_key,semantic_kind,memory_key,evidence_hash,stored_at,normal_expires_at,
+               ciphertext,crypto_meta,active,is_reference,important,reference_policy,metadata_version,
+               policy_version,policy_actor,deleted_at,purge_requested_at,source_refs,source_hash)
+            SELECT ?,user_id,?,item_key,semantic_kind,memory_key,evidence_hash,stored_at,normal_expires_at,
+               ciphertext,crypto_meta,active,is_reference,important,reference_policy,metadata_version,
+               policy_version,policy_actor,deleted_at,purge_requested_at,
+            """ + sourceColumns + " FROM payse.analysis_items WHERE user_id=? AND id=?", item, result, owner, previous));
+        return item.toString();
+    }
+
     /**
      * 요청 경로와 본문을 실제 HTTP로 보내고 세션 쿠키를 만들지 않는지 확인한다.
      * @created 2026-11-01
@@ -1251,11 +1733,14 @@ class AnalysisHttpTest {
      * 실제 지침·별칭 입력을 받는 네트워크 없는 공급자다. 호출 수·실패·늦은 응답을 제어한다.
      * @created 2026-11-01
      * @usedBy RuntimeConfig
+     * @modified 2026-11-01 - 다양한 원천·축소 응답 근거를 사용하는 목록 권한 검사 지원
      */
     static final class ControlledModel implements ModelFactory {
         private final AtomicInteger calls = new AtomicInteger();
         private volatile String failure = "none";
         private volatile boolean important;
+        private volatile boolean unknownClassification;
+        private volatile boolean minimalEvidence;
         private volatile CountDownLatch returned = new CountDownLatch(1);
         private volatile CountDownLatch entered = new CountDownLatch(0);
         private volatile CountDownLatch release = new CountDownLatch(0);
@@ -1288,6 +1773,7 @@ class AnalysisHttpTest {
                  * 실제 공유 검증기로 검사할 완결 응답 또는 명시 실패를 한 번 생성한다.
                  * @created 2026-11-01
                  * @usedBy AnalysisService
+                 * @modified 2026-11-01 - 목록 검사에만 판단 유보·직접 거래 근거 축소를 명시 적용
                  */
                 @Override
                 public ModelReply generate(JsonNode input) {
@@ -1308,9 +1794,11 @@ class AnalysisHttpTest {
                     for (JsonNode requested : input.path("items")) {
                         String item = requested.path("itemKey").asString();
                         ObjectNode row = rows.addObject().put("itemKey", item).put("reason", RESULT_TEXT);
-                        row.set("evidenceTransactionIds", requested.path("evidenceTransactionIds").deepCopy());
+                        if (minimalEvidence) row.putArray("evidenceTransactionIds").add(requested.path("targetTransactionId").asString());
+                        else row.set("evidenceTransactionIds", requested.path("evidenceTransactionIds").deepCopy());
                         row.putObject("meaning").put("status", "unknown").putNull("value").put("reasonCode", "insufficient_evidence");
-                        row.putObject("classification").put("status", "candidate").put("value", "income").put("reasonCode", "supported");
+                        if (unknownClassification) row.putObject("classification").put("status", "unknown").putNull("value").put("reasonCode", "insufficient_evidence");
+                        else row.putObject("classification").put("status", "candidate").put("value", "income").put("reasonCode", "supported");
                         memories.addObject().put("itemKey", item).put("active", true).put("isReference", true)
                             .put("important", important).put("referencePolicy", "optional").put("reason", RESULT_TEXT);
                     }
@@ -1368,11 +1856,22 @@ class AnalysisHttpTest {
      * 키만 테스트 메모리에 보관하며 사용자·기억 문맥을 확인하는 KMS 대역이다.
      * @created 2026-11-01
      * @usedBy RuntimeConfig
+     * @modified 2026-11-01 - 목록별 복호화 호출 수와 권한 변경 경합을 관찰
      */
     static final class TestKeys implements KeyProtector {
         private volatile boolean failWrap;
+        private final AtomicInteger unwrapCalls = new AtomicInteger();
+        private volatile CountDownLatch unwrapEntered = new CountDownLatch(0);
+        private volatile CountDownLatch unwrapRelease = new CountDownLatch(0);
         private final Map<String, byte[]> keys = new ConcurrentHashMap<>();
         private final Map<String, byte[]> contexts = new ConcurrentHashMap<>();
+
+        /**
+         * DB 잠금 밖 키 복호화 동안 삭제·로그아웃을 실행하도록 테스트 대기 지점을 설정한다.
+         * @created 2026-11-01
+         * @usedBy 기억 목록 경합 검사
+         */
+        void blockUnwrap() { unwrapEntered = new CountDownLatch(1); unwrapRelease = new CountDownLatch(1); }
 
         /**
          * 독립 데이터 키를 불투명 핸들로 감싸고 입력 배열은 보관하지 않는다.
@@ -1392,9 +1891,18 @@ class AnalysisHttpTest {
          * 현재 사용자·기억 문맥이 같은 키만 독립 배열로 반환한다.
          * @created 2026-11-01
          * @usedBy EnvelopeCipher
+         * @modified 2026-11-01 - 호출 수와 테스트 제어 대기를 추가하되 AAD 검증 유지
          */
         @Override
         public byte[] unwrap(WrappedKey wrapped, byte[] context) {
+            unwrapCalls.incrementAndGet();
+            unwrapEntered.countDown();
+            try {
+                if (!unwrapRelease.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("Test unwrap was not released");
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Test unwrap interrupted");
+            }
             String id = new String(wrapped.ciphertext(), StandardCharsets.US_ASCII);
             if (!"test-only".equals(wrapped.keyRef()) || !Arrays.equals(contexts.get(id), context) || !keys.containsKey(id)) {
                 throw new IllegalStateException("Unknown test key context");

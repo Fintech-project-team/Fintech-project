@@ -26,6 +26,7 @@ public class BootstrapSecurityConfiguration {
      * @modified 2026-10-29 - 금융 경로는 database+auth+finance에서 서비스 권한 검사를 거쳐 제공
      * @modified 2026-10-30 - salary-notices 활성 시에만 회차별 안내 조회·닫기 경로 제공
      * @modified 2026-11-01 - analysis 활성 시 사용자 인증을 거치는 분석 HTTP 경로 추가
+     * @modified 2026-11-01 - 같은 인증 경계에서 AI 기억 관리 목록 GET 허용
      * @param http Spring이 제공하는 보안 구성기
      * @param environment DB/인증 프로필 활성 여부
      * @return 인증의 자격 검사는 서비스에 위임하고 다른 경로는 차단하는 필터 체인
@@ -51,7 +52,7 @@ public class BootstrapSecurityConfiguration {
                     if (environment.matchesProfiles("analysis")) {
                         authorize.requestMatchers(HttpMethod.POST, "/analysis-jobs", "/analysis-jobs/{id}/input",
                             "/analysis-jobs/{id}/retry", "/analysis-results/query").permitAll();
-                        authorize.requestMatchers(HttpMethod.GET, "/analysis-jobs/{id}").permitAll();
+                        authorize.requestMatchers(HttpMethod.GET, "/analysis-jobs/{id}", "/analysis-memories").permitAll();
                         authorize.requestMatchers(HttpMethod.DELETE, "/analysis-memories/{id}").permitAll();
                     }
                     authorize.requestMatchers(HttpMethod.GET, "/snapshot", "/transactions").permitAll();

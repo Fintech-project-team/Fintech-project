@@ -90,13 +90,15 @@ public final class AnalysisResults {
      * 짧은 채택 트랜잭션에서 항목을 원자 저장하되 삭제된 근거는 본문 없이 제외한다.
      * @created 2026-11-01
      * @usedBy AnalysisJobs.execute
+     * @modified 2026-11-01 - 관리 조회의 전체 근거 접근 검증용 불변 참조·지문 저장
      */
     public UUID save(UUID owner, ObjectNode input, String inputHash, List<Prepared> prepared, boolean recovery) {
         UUID resultId = UUID.randomUUID();
         Instant now = clock.instant();
         String kind = input.path("semanticTaskKind").asString();
         Map<String, AnalysisIdentity.Item> bound = new HashMap<>();
-        identity.boundItems(finances.load(owner), input).forEach(item -> bound.put(item.itemKey(), item));
+        ObjectNode source = finances.load(owner);
+        identity.boundItems(source, input).forEach(item -> bound.put(item.itemKey(), item));
         ObjectNode header = row(owner, resultId).put("semantic_kind", kind).put("input_hash", inputHash)
             .put("committed_at", now.toString());
         ObjectNode provenance = (ObjectNode) input.path("context").deepCopy();
@@ -125,6 +127,10 @@ public final class AnalysisResults {
                 .put("active", decision.active()).put("is_reference", decision.isReference())
                 .put("important", decision.important()).put("reference_policy", decision.referencePolicy())
                 .put("metadata_version", 1).put("policy_version", "PAYSE-MEMORY-1").put("policy_actor", "ai");
+            List<UUID> refs = identity.sourceRefs(input, value.identity().itemKey());
+            var referenceIds = stored.putArray("source_refs");
+            refs.forEach(id -> referenceIds.add(id.toString()));
+            stored.put("source_hash", identity.referenceHash(source, refs));
             stored.putObject("crypto_meta").put("keyRef", encrypted.key().keyRef())
                 .put("wrappedKey", Base64.getEncoder().encodeToString(encrypted.key().ciphertext()))
                 .put("nonce", Base64.getEncoder().encodeToString(encrypted.nonce()));
@@ -204,23 +210,33 @@ public final class AnalysisResults {
      * DB 잠금 밖에서 허용된 기억만 복호화하며 반환 직전 호출자가 자격을 다시 확인한다.
      * @created 2026-11-01
      * @usedBy AnalysisJobs.query
+     * @modified 2026-11-01 - 관리 목록과 단일 기억 복호화 구현 공유
      */
     public Map<UUID, ObjectNode> decrypt(UUID owner, Selection selection) {
         Map<UUID, ObjectNode> bodies = new HashMap<>();
         for (Entry entry : selection.entries()) {
             if (!entry.state().equals("available")) continue;
             ObjectNode memory = entry.memory();
-            JsonNode meta = memory.path("crypto_meta");
-            EncryptedMemory encrypted = new EncryptedMemory(
-                HexFormat.of().parseHex(memory.path("ciphertext").asString().substring(2)),
-                Base64.getDecoder().decode(meta.path("nonce").asString()),
-                new WrappedKey(meta.path("keyRef").asString(), Base64.getDecoder().decode(meta.path("wrappedKey").asString())));
             UUID id = uuid(memory, "id");
-            byte[] plaintext = runtime.decrypt(owner, id, encrypted);
-            try { bodies.put(id, (ObjectNode) AnalysisJson.JSON.readTree(plaintext)); }
-            finally { Arrays.fill(plaintext, (byte) 0); }
+            bodies.put(id, decryptMemory(owner, memory));
         }
         return bodies;
+    }
+
+    /**
+     * 호출자가 현재 열람 자격을 확인한 기억 하나만 사용자·항목 AAD로 복호화한다.
+     * @created 2026-11-01
+     * @usedBy decrypt, MemoryCatalog.read
+     */
+    public ObjectNode decryptMemory(UUID owner, ObjectNode memory) {
+        JsonNode meta = memory.path("crypto_meta");
+        EncryptedMemory encrypted = new EncryptedMemory(
+            HexFormat.of().parseHex(memory.path("ciphertext").asString().substring(2)),
+            Base64.getDecoder().decode(meta.path("nonce").asString()),
+            new WrappedKey(meta.path("keyRef").asString(), Base64.getDecoder().decode(meta.path("wrappedKey").asString())));
+        byte[] plaintext = runtime.decrypt(owner, uuid(memory, "id"), encrypted);
+        try { return (ObjectNode) AnalysisJson.JSON.readTree(plaintext); }
+        finally { Arrays.fill(plaintext, (byte) 0); }
     }
 
     /**

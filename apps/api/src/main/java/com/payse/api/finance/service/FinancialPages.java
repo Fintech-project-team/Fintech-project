@@ -51,8 +51,9 @@ final class FinancialPages {
      * @param after 첫 페이지 null 또는 검증한 cursor의 마지막 거래 ID
      * @param pageOnly Snapshot 전체가 아닌 후속 페이지 여부
      * @return 마지막 ID·후속 여부와 계약에 맞는 응답
+     * @modified 2026-11-01 - 선택적 요청 기간을 원천 확보 범위와 별도로 적용
      */
-    static PageSlice slice(ObjectNode snapshot, UUID after, boolean pageOnly) {
+    static PageSlice slice(ObjectNode snapshot, UUID after, boolean pageOnly, LocalDate startDate, LocalDate endDate) {
         Map<String, ObjectNode> transactions = new LinkedHashMap<>();
         Map<String, ObjectNode> coverage = new HashMap<>();
         for (ObjectNode row : rows(snapshot, "coverage")) {
@@ -64,7 +65,11 @@ final class FinancialPages {
         for (ObjectNode transaction : rows(snapshot, "transactions")) {
             String transactionId = id(transaction, "transactionId");
             transactions.put(transactionId, transaction);
-            if (inPeriod(transaction, coverage, asOf)) withinPeriod.add(transactionId);
+            LocalDate day = eventDate(transaction, asOf);
+            boolean sourcePeriod = inPeriod(transaction, coverage, day);
+            boolean requestedPeriod = startDate == null ? sourcePeriod
+                : !day.isBefore(startDate) && !day.isAfter(endDate);
+            if (requestedPeriod) withinPeriod.add(transactionId);
         }
         List<String> ordered = withinPeriod.stream().sorted().toList();
         String afterId = after == null ? null : after.toString();
@@ -113,14 +118,13 @@ final class FinancialPages {
     }
 
     /**
-     * 원천 종류에 맞는 업무일을 coverage의 명시 구간과 비교한다. 급여 예상일을 만들지 않는다.
+     * 원천 종류에 맞는 업무일만 선택한다. 다른 종류의 날짜나 임의 자정으로 대체하지 않는다.
      * 날짜·시각이 모두 미확인이라 소속 기간을 판정할 수 없으면 임의 생략 대신 503을 반환한다.
-     * @created 2026-10-29
+     * @created 2026-11-01
      * @usedBy FinancialPages.slice
      */
-    private static boolean inPeriod(ObjectNode transaction, Map<String, ObjectNode> coverage, OffsetDateTime asOf) {
+    private static LocalDate eventDate(ObjectNode transaction, OffsetDateTime asOf) {
         String kind = text(transaction, "recordKind");
-        boolean account = kind.equals("account_entry");
         String basis = switch (kind) {
             case "account_entry" -> "booking";
             case "card_purchase" -> "purchase";
@@ -141,6 +145,17 @@ final class FinancialPages {
         if (date == null) throw unavailable();
         LocalDate day = LocalDate.parse(date);
         if (day.isAfter(asOf.atZoneSameInstant(SEOUL).toLocalDate())) throw unavailable();
+        return day;
+    }
+
+    /**
+     * 기존 확보 범위의 모순을 검증한다. 범위 밖에 보유한 관계 거래의 날짜를 바꾸지 않는다.
+     * @created 2026-10-29
+     * @usedBy FinancialPages.slice
+     * @modified 2026-11-01 - 날짜 선택과 기존 coverage 검증을 분리해 명시 조회 범위를 보존
+     */
+    private static boolean inPeriod(ObjectNode transaction, Map<String, ObjectNode> coverage, LocalDate day) {
+        boolean account = text(transaction, "recordKind").equals("account_entry");
         String target = (account ? "account:" : "card:") + text(transaction, account ? "accountId" : "cardId");
         ObjectNode range = coverage.get(target);
         if (range == null) throw unavailable();

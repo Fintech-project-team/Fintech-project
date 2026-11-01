@@ -1,11 +1,14 @@
 package com.payse.api.finance.controller;
 
 import com.payse.api.finance.error.FinancialException;
+import com.payse.api.finance.dto.TransactionQuery;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.Collections;
 import java.util.Set;
 import org.springframework.context.annotation.Profile;
@@ -82,6 +85,38 @@ public final class FinancialHttpInput {
             throw new FinancialException(400, "INVALID_CURSOR");
         }
         return query.get("cursor")[0];
+    }
+
+    /**
+     * 기존 cursor 단독 경로 또는 날짜 쌍을 가진 첫/후속 거래 페이지를 해석한다.
+     * @created 2026-11-01
+     * @usedBy FinancialController.page의 인증 후 지연 입력
+     */
+    public TransactionQuery transactions(HttpServletRequest request) {
+        var query = request.getParameterMap();
+        if (!query.containsKey("startDate") && !query.containsKey("endDate")) {
+            return new TransactionQuery(cursor(request, true), null, null);
+        }
+        if (body(request).length != 0 || !query.keySet().containsAll(Set.of("startDate", "endDate"))
+                || !Set.of("startDate", "endDate", "cursor").containsAll(query.keySet())
+                || query.values().stream().anyMatch(values -> values.length != 1)) {
+            throw new FinancialException(422, "VALIDATION_FAILED");
+        }
+        String cursor = query.containsKey("cursor") ? query.get("cursor")[0] : null;
+        return new TransactionQuery(cursor, date(query.get("startDate")[0]), date(query.get("endDate")[0]));
+    }
+
+    /**
+     * YYYY-MM-DD의 존재하는 날짜만 읽고 시각·공백·말일 자동 보정을 허용하지 않는다.
+     * @created 2026-11-01
+     * @usedBy transactions
+     */
+    private LocalDate date(String value) {
+        if (value == null || !value.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}") || value.startsWith("0000")) {
+            throw new FinancialException(422, "VALIDATION_FAILED");
+        }
+        try { return LocalDate.parse(value); }
+        catch (DateTimeParseException failure) { throw new FinancialException(422, "VALIDATION_FAILED"); }
     }
 
     /**

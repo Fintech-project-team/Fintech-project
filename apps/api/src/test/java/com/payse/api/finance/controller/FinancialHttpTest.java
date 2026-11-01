@@ -22,6 +22,7 @@ import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -396,6 +397,89 @@ class FinancialHttpTest {
         assertEquals(expected, received);
         assertTrue(pages >= 2);
         for (JsonNode statement : snapshot.path("statements")) assertFalse(statement.has("items"));
+    }
+
+    /**
+     * 기간 첫 조회와 후속 페이지는 같은 조건에 묶이며 기존 Snapshot cursor와 교차 사용하지 않는다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void periodPagesBindDatesAndPurpose() throws Exception {
+        JsonNode snapshot = ok("GET", "/snapshot", null);
+        LocalDate end = LocalDate.parse(snapshot.path("coverage").get(0).path("requestedEnd").asString());
+        LocalDate start = end.minusYears(2);
+        String period = "startDate=" + start + "&endDate=" + end;
+        JsonNode page = ok("GET", "/transactions?" + period, null);
+        assertEquals(snapshot.path("schemaVersion"), page.path("schemaVersion"));
+        assertEquals(snapshot.path("coverage"), page.path("coverage"));
+        assertFalse(page.has("accounts"));
+        String cursor = page.path("page").path("nextCursor").asString();
+        assertFalse(cursor.isBlank());
+        error(send("GET", "/transactions?" + period + "&cursor="
+            + snapshot.path("page").path("nextCursor").asString(), null), 409, "STALE_DATA");
+        error(send("GET", "/transactions?cursor=" + cursor, null), 409, "STALE_DATA");
+        error(send("GET", "/transactions?startDate=" + start.plusDays(1) + "&endDate=" + end
+            + "&cursor=" + cursor, null), 409, "STALE_DATA");
+        error(send("GET", "/transactions?" + period + "&cursor=broken", null), 400, "INVALID_CURSOR");
+        Set<String> received = new HashSet<>();
+        int pages = 0;
+        while (true) {
+            pages++;
+            assertTrue(page.path("transactions").size() <= 100);
+            for (JsonNode row : page.path("transactions")) assertTrue(received.add(row.path("transactionId").asString()));
+            JsonNode next = page.path("page").path("nextCursor");
+            if (next.isNull()) break;
+            assertTrue(pages < 10);
+            page = ok("GET", "/transactions?" + period + "&cursor=" + next.asString(), null);
+        }
+        Set<String> expected = new HashSet<>();
+        for (String group : List.of("transactions", "relatedTransactions")) {
+            source.path(group).forEach(row -> expected.add(row.path("transactionId").asString()));
+        }
+        assertEquals(expected, received);
+        assertTrue(pages >= 2);
+        assertEquals(204, send("DELETE", "/demo-sessions/current", null).statusCode());
+        token = login();
+        error(send("GET", "/transactions?" + period + "&cursor=" + cursor, null), 403, "RESOURCE_FORBIDDEN");
+    }
+
+    /**
+     * 단일 날짜 경계를 포함하며 없는 기간은 빈 페이지, 잘못된 입력은 오류로 구분한다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void periodDatesRemainExplicitAndReadOnly() throws Exception {
+        JsonNode snapshot = ok("GET", "/snapshot", null);
+        LocalDate firstDay = LocalDate.parse(snapshot.path("coverage").get(0).path("requestedStart").asString());
+        LocalDate emptyDay = firstDay.minusYears(2);
+        JsonNode empty = ok("GET", "/transactions?startDate=" + emptyDay + "&endDate=" + emptyDay, null);
+        assertTrue(empty.path("transactions").isEmpty());
+        assertTrue(empty.path("page").path("nextCursor").isNull());
+        assertEquals(snapshot.path("coverage"), empty.path("coverage"));
+        for (String query : List.of("startDate=2026-01-01", "endDate=2026-10-19",
+                "startDate=2025-02-29&endDate=2026-10-19", "startDate=2026-10-20&endDate=2026-10-19",
+                "startDate=2026-01-01&startDate=2026-01-02&endDate=2026-10-19")) {
+            error(send("GET", "/transactions?" + query, null), 422, "VALIDATION_FAILED");
+        }
+        error(send("GET", "/transactions?startDate=invalid", null, "invalid", Map.of()), 401, "SESSION_INVALID");
+        assertEquals(snapshot.path("dataVersion"), ok("GET", "/snapshot", null).path("dataVersion"));
+    }
+
+    /**
+     * 금융 저장 후에는 기간이 같아도 이전 페이지 문맥을 사용하지 않는다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void periodCursorRejectsChangedFinancialVersion() throws Exception {
+        LocalDate end = LocalDate.parse(source.path("coverage").get(0).path("requestedEnd").asString());
+        String period = "startDate=" + end.minusYears(2) + "&endDate=" + end;
+        String cursor = ok("GET", "/transactions?" + period, null).path("page").path("nextCursor").asString();
+        assertFalse(cursor.isBlank());
+        ok("PATCH", "/accounts/" + account().path("accountId").asString(), command().put("nickname", "기간 조회"));
+        error(send("GET", "/transactions?" + period + "&cursor=" + cursor, null), 409, "STALE_DATA");
     }
 
     /**

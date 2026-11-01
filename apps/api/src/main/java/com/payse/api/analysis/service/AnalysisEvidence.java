@@ -23,6 +23,18 @@ public final class AnalysisEvidence {
     private final AnalysisContract contract = new AnalysisContract();
 
     /**
+     * 저장 당시 전체 근거의 현재 소유권·금융사 공개 권한을 확인한다. 입력 재사용 검사는 별도다.
+     * @created 2026-11-01
+     * @usedBy MemoryCatalog.entry
+     */
+    public void references(UUID owner, ObjectNode source, List<UUID> refs) {
+        if (owner == null || !owner.toString().equals(source.path("userId").asString())) throw forbidden();
+        if (refs.isEmpty()) throw unavailable();
+        SourceView view = new SourceView(owner, source);
+        for (UUID id : refs) view.transaction(id.toString());
+    }
+
+    /**
      * 본문 없는 접수도 현재 문맥·선택 계좌·근거 거래의 공개 권한을 확인한다.
      * @created 2026-11-01
      * @usedBy AnalysisJobs.validateDescriptor

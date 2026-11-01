@@ -57,10 +57,21 @@ public final class FinancialCursor {
      * 고정 조회 문맥·마지막 UUID를 새 nonce로 암호화한다. 원천 일정은 계산하지 않는다.
      * @created 2026-10-29
      * @usedBy FinancialService.snapshot
+     * @modified 2026-11-01 - 기존 금융 페이지 크기를 유지하며 목적별 크기 경로에 위임
      */
     public String encode(UUID user, UUID session, String context, UUID lastId) {
+        return encode(user, session, context, lastId, 100);
+    }
+
+    /**
+     * 목적별 문맥과 페이지 크기를 암호화 봉투에 함께 고정한다.
+     * @created 2026-11-01
+     * @usedBy encode, MemoryCatalog.select
+     */
+    public String encode(UUID user, UUID session, String context, UUID lastId, int size) {
+        if (size < 1 || size > 100) throw new IllegalArgumentException("Invalid page size");
         ObjectNode payload = json.createObjectNode().put("user", user.toString()).put("session", session.toString())
-            .put("context", context).put("last", lastId.toString()).put("size", 100);
+            .put("context", context).put("last", lastId.toString()).put("size", size);
         byte[] nonce = new byte[12];
         random.nextBytes(nonce);
         try {
@@ -79,8 +90,19 @@ public final class FinancialCursor {
      * 변조 400·다른 사용자/세션 403·변경된 조회 문맥 409를 구분한다.
      * @created 2026-10-29
      * @usedBy FinancialService.snapshot
+     * @modified 2026-11-01 - 기존 금융 페이지 크기를 유지하며 목적별 크기를 검증
      */
     public UUID decode(String encoded, UUID user, UUID session, String context) {
+        return decode(encoded, user, session, context, 100);
+    }
+
+    /**
+     * 다른 크기·목적의 페이지를 섞지 않고 소유자·세션·조회 문맥을 재검증한다.
+     * @created 2026-11-01
+     * @usedBy decode, MemoryCatalog.select
+     */
+    public UUID decode(String encoded, UUID user, UUID session, String context, int size) {
+        if (size < 1 || size > 100) throw new IllegalArgumentException("Invalid page size");
         JsonNode payload;
         UUID last;
         try {
@@ -95,7 +117,7 @@ public final class FinancialCursor {
             byte[] plain = cipher(Cipher.DECRYPT_MODE, nonce).doFinal(bytes, 12, bytes.length - 12);
             payload = json.readTree(plain);
             if (!payload.isObject() || !Set.copyOf(payload.propertyNames()).equals(Set.of("user", "session", "context", "last", "size"))
-                    || !payload.path("size").isIntegralNumber() || payload.path("size").intValue() != 100) {
+                    || !payload.path("size").isIntegralNumber() || payload.path("size").intValue() != size) {
                 throw new IllegalArgumentException();
             }
             for (String field : Set.of("user", "session", "context", "last")) {
