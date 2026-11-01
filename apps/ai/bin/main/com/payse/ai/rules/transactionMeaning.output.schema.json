@@ -1,0 +1,132 @@
+{
+  "type": "object",
+  "properties": {
+    "meaningPolicyVersion": {
+      "type": "string",
+      "enum": ["PAYSE-MEANING-1"]
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "itemKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "meaning": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["candidate", "unknown"]
+              },
+              "value": {
+                "type": ["string", "null"],
+                "enum": [
+                  "salary",
+                  "bonus",
+                  "business_receipt",
+                  "pension",
+                  "public_benefit",
+                  "interest",
+                  "dividend",
+                  "loan_proceeds",
+                  "personal_transfer",
+                  "reimbursement",
+                  "deposit_return",
+                  "investment_redemption",
+                  "asset_sale",
+                  "rent",
+                  "housing_management",
+                  "utility",
+                  "telecom",
+                  "insurance",
+                  "loan_repayment",
+                  "tax_public_charge",
+                  "education",
+                  "medical",
+                  "groceries",
+                  "dining",
+                  "retail",
+                  "transport",
+                  "vehicle_cost",
+                  "subscription",
+                  "donation",
+                  "bank_fee",
+                  "self_transfer",
+                  "savings_transfer",
+                  "card_bill_payment",
+                  "cash_withdrawal",
+                  "cash_deposit",
+                  "cancellation",
+                  "refund",
+                  "account_refund",
+                  "deposit_maturity",
+                  "deposit_payment",
+                  "lodging",
+                  null
+                ]
+              },
+              "reasonCode": {
+                "type": "string",
+                "enum": [
+                  "supported",
+                  "insufficient_evidence",
+                  "conflicting_evidence",
+                  "outside_taxonomy"
+                ]
+              }
+            },
+            "required": ["status", "value", "reasonCode"],
+            "additionalProperties": false
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "evidenceTransactionIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "minItems": 1,
+            "maxItems": 60
+          },
+          "classification": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["candidate", "unknown"]
+              },
+              "value": {
+                "type": ["string", "null"],
+                "enum": ["expense", "income", "internal_transfer", "card_payment", null]
+              },
+              "reasonCode": {
+                "type": "string",
+                "enum": [
+                  "supported",
+                  "insufficient_evidence",
+                  "conflicting_evidence",
+                  "outside_taxonomy"
+                ]
+              }
+            },
+            "required": ["status", "value", "reasonCode"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["itemKey", "meaning", "reason", "evidenceTransactionIds", "classification"],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "maxItems": 60
+    }
+  },
+  "required": ["meaningPolicyVersion", "items"],
+  "additionalProperties": false
+}
