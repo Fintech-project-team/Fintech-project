@@ -4,9 +4,14 @@ import static com.payse.ai.analysis.validation.SchemaRules.require;
 
 import com.payse.ai.analysis.validation.AnalysisContract;
 import com.payse.ai.analysis.validation.SchemaRules;
+import com.payse.ai.analysis.validation.StorageContract;
+import com.payse.ai.analysis.dto.AnalysisResult;
+import com.payse.ai.provider.dto.TokenUsage;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiFunction;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -77,6 +82,29 @@ public final class InputMapper {
         ObjectNode restored = (ObjectNode) transform(response, null, this::restoreId);
         contract.output(original, restored);
         return restored;
+    }
+
+    /**
+     * 같은 요청의 의미 출력과 개별 보존 메타데이터를 감싼 공급자 전용 규격을 만든다.
+     * @created 2026-11-01
+     * @usedBy AnalysisService.analyzeForStorage
+     */
+    public ObjectNode storageSchema() {
+        return StorageContract.schema(schema, original.get("items").size());
+    }
+
+    /**
+     * 의미와 보존 목록을 모두 검증하고 동일한 요청별 ID 대응으로 복원한다.
+     * @created 2026-11-01
+     * @usedBy AnalysisService.analyzeForStorage
+     */
+    public AnalysisResult restoreStorage(ObjectNode response, TokenUsage usage) {
+        SchemaRules.check(storageSchema(), response);
+        ObjectNode output = restore((ObjectNode) response.get("output"));
+        JsonNode memories = transform(response.get("memories"), null, this::restoreId);
+        Set<String> expected = new HashSet<>();
+        for (JsonNode item : original.get("items")) expected.add(item.get("itemKey").asString());
+        return new AnalysisResult(output, StorageContract.decisions(memories, expected), usage, null);
     }
 
     /**

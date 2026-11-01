@@ -13,7 +13,7 @@ import javax.crypto.spec.SecretKeySpec;
 /**
  * 매 기억의 독립 데이터 키와 인증된 사용자·기억 문맥으로 분석 본문을 보호한다.
  * @created 2026-10-29
- * @usedBy 미연결: 예정 사용처 분석 기억 저장·조회 서비스, EnvelopeCipherTest
+ * @usedBy AnalysisRuntime, EnvelopeCipherTest
  */
 public final class EnvelopeCipher {
     private final KeyProtector protector;
@@ -31,7 +31,7 @@ public final class EnvelopeCipher {
     /**
      * 본문을 새 키로 암호화한다. 호출자는 전달한 원본 평문 배열을 사용 후 정리한다.
      * @created 2026-10-29
-     * @usedBy 미연결: 예정 사용처 분석 결과 저장 서비스, EnvelopeCipherTest
+     * @usedBy AnalysisRuntime.encrypt, EnvelopeCipherTest
      */
     public EncryptedMemory encrypt(UUID userId, UUID itemId, byte[] plaintext) {
         Objects.requireNonNull(plaintext, "plaintext");
@@ -55,7 +55,7 @@ public final class EnvelopeCipher {
     /**
      * 소유권·유효성 검증 후에만 호출한다. 반환 평문은 호출자가 사용 후 정리한다.
      * @created 2026-10-29
-     * @usedBy 미연결: 예정 사용처 분석 기억 조회 서비스, EnvelopeCipherTest
+     * @usedBy AnalysisRuntime.decrypt, EnvelopeCipherTest
      */
     public byte[] decrypt(UUID userId, UUID itemId, EncryptedMemory encrypted) {
         Objects.requireNonNull(encrypted, "encrypted");

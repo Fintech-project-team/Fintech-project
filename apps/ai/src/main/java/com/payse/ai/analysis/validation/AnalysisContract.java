@@ -204,14 +204,35 @@ public final class AnalysisContract {
      * 완결 출력만 허용하고 기존 분류·허용 근거·관계 경계를 보존한다.
      * @created 2026-11-01
      * @usedBy InputMapper.restore
+     * @modified 2026-11-01 - 부분 조회와 항목 검증을 공유하되 생성 출력의 완결성 유지
      */
     public void output(JsonNode payload, JsonNode result) {
         input(payload);
+        validateOutput(payload, result, true);
+    }
+
+    /**
+     * 유효한 전체 입력에서 조회 가능한 출력 부분집합만 검증한다. 누락 항목을 생성하지 않는다.
+     * @created 2026-11-01
+     * @usedBy 미연결: 예정 사용처 AnalysisResults.response
+     */
+    public void outputSubset(JsonNode payload, JsonNode result) {
+        input(payload);
+        validateOutput(payload, result, false);
+    }
+
+    /**
+     * 전체·부분 출력에 같은 구조·항목·근거 검증을 적용하고 부분 조회의 외부 ID도 거절한다.
+     * @created 2026-11-01
+     * @usedBy output, outputSubset
+     */
+    private void validateOutput(JsonNode payload, JsonNode result, boolean requireComplete) {
         String task = payload.get("semanticTaskKind").asString();
         SchemaRules.check(schema(task, "output"), result);
         Map<String, JsonNode> requested = keyed(payload.get("items"), "itemKey");
         Map<String, JsonNode> received = keyed(result.get("items"), "itemKey");
-        require(requested.keySet().equals(received.keySet()), "INCOMPLETE_ITEMS");
+        if (requireComplete) require(requested.keySet().equals(received.keySet()), "INCOMPLETE_ITEMS");
+        else require(requested.keySet().containsAll(received.keySet()), "OUTPUT_OUTSIDE_ITEMS");
         Map<String, JsonNode> current = keyed(payload.get("currentClassifications"), "transactionId");
         for (var entry : received.entrySet()) {
             JsonNode row = entry.getValue();

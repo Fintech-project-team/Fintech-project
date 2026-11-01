@@ -7,7 +7,7 @@ import java.util.Objects;
 /**
  * 개별 분석 기억의 보관 기한과 현재 참조 자격을 구분한다. 금융 날짜는 계산하지 않는다.
  * @created 2026-10-29
- * @usedBy 미연결: 예정 사용처 분석 결과 저장·조회·폐기 서비스, MemoryPolicyTest
+ * @usedBy AnalysisJobs, AnalysisResults, MemoryPolicyTest; 폐기 실행기는 미연결
  */
 public final class MemoryPolicy {
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
@@ -15,7 +15,7 @@ public final class MemoryPolicy {
     /**
      * 최초 저장 시각에서 달력 3개월 뒤 같은 한국 시각을 반환한다. 없는 날짜는 말일이다.
      * @created 2026-10-29
-     * @usedBy retention, MemoryPolicyTest
+     * @usedBy retention, AnalysisJobs, AnalysisResults, MemoryPolicyTest
      */
     public Instant normalExpiry(Instant storedAt) {
         return Objects.requireNonNull(storedAt, "storedAt").atZone(SEOUL).plusMonths(3).toInstant();

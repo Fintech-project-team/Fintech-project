@@ -1,6 +1,6 @@
 # PAYSE AI 개발 규칙
 
-이 폴더는 API와 함께 배포하는 Java 21 라이브러리다. 작업 전에 이 문서, [공통 코드 규칙](../../docs/harness/CODE_SPEC.md), [API 명명·가독성](../api/AGENT.md), [Java 주석 규칙](../api/src/AGENTS.md)의 3~8·19항을 필수로 읽는다. 이름·생성일·수정일·실제 호출자 규칙을 AI 코드에도 동일하게 적용한다.
+이 폴더는 API와 함께 배포하는 Java 21 라이브러리다. 작업 전에 이 문서, [입력 자료 사용 규칙](AGENT.md), [공통 코드 규칙](../../docs/harness/CODE_SPEC.md), [API 명명·가독성](../api/AGENT.md), [Java 주석 규칙](../api/src/AGENTS.md)의 3~8·19항을 필수로 읽는다. 이름·생성일·수정일·실제 호출자 규칙을 AI 코드에도 동일하게 적용한다.
 
 1. 업무 안에서 `service`·`mapper`·`validation`·필요한 `dto`를 구분한다. 공급자 통신은 `provider`, 재사용 HTTP는 `transport`에 둔다. 빈 계층·거대한 공통 Manager·사용자 상태를 가진 singleton을 만들지 않는다.
 2. [실행 계약](../../docs/payse-execution-contract.md), [의미 규격](../api/docs/analysis-meaning.md), [API 실행 상세](../api/docs/llm-execution.md)의 관련 절을 필수 참조한다. AI→API 의존은 금지하며 API가 AI를 호출한다. 별도 포트·DB·서버를 만들지 않는다.
