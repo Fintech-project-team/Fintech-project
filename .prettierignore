@@ -21,3 +21,7 @@ docs/references/*.source.md
 **/.flutter-plugins-dependencies
 apps/mobile/.metadata
 apps/mobile/pubspec.lock
+
+# Java IDE output is generated from tracked source and contracts.
+/apps/api/bin/
+/apps/ai/bin/
