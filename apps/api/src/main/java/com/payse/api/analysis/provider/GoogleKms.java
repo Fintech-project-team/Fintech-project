@@ -53,6 +53,7 @@ public final class GoogleKms implements KeyProtector {
      * 데이터 키·AAD의 CRC 검증과 반환 키 버전 확인 후 감싼 키만 반환한다.
      * @created 2026-10-29
      * @usedBy EnvelopeCipher.encrypt
+     * @modified 2026-11-01 - KMS 무결성 검증값은 실제 boolean true만 허용
      */
     @Override
     public WrappedKey wrap(byte[] plaintext, byte[] context) {
@@ -64,8 +65,8 @@ public final class GoogleKms implements KeyProtector {
         binary(request, "additionalAuthenticatedData", context);
         JsonNode response = http.post(endpoint.resolve(key + ":encrypt"), tokens.get(), request);
         String version = response.path("name").asString("");
-        if (!validVersion(version) || !response.path("verifiedPlaintextCrc32c").asBoolean(false)
-                || !response.path("verifiedAdditionalAuthenticatedDataCrc32c").asBoolean(false)) {
+        if (!validVersion(version) || !verified(response, "verifiedPlaintextCrc32c")
+                || !verified(response, "verifiedAdditionalAuthenticatedDataCrc32c")) {
             throw invalid();
         }
         return new WrappedKey(version, checkedBytes(response, "ciphertext"));
@@ -75,10 +76,13 @@ public final class GoogleKms implements KeyProtector {
      * 허용된 키의 부모 CryptoKey 주소로 복호화한다. 회전 전 버전도 같은 키면 사용할 수 있다.
      * @created 2026-10-29
      * @usedBy EnvelopeCipher.decrypt
+     * @modified 2026-11-01 - 사전 입력 거절은 KMS 전송 전 실패로 구분
      */
     @Override
     public byte[] unwrap(WrappedKey wrapped, byte[] context) {
-        if (wrapped == null || !validVersion(wrapped.keyRef()) || context == null) throw invalid();
+        if (wrapped == null || !validVersion(wrapped.keyRef()) || context == null) {
+            throw new ProviderFailure("INVALID_KMS_INPUT", false);
+        }
         ObjectNode request = json.createObjectNode();
         binary(request, "ciphertext", wrapped.ciphertext());
         binary(request, "additionalAuthenticatedData", context);
@@ -89,6 +93,16 @@ public final class GoogleKms implements KeyProtector {
             throw invalid();
         }
         return plaintext;
+    }
+
+    /**
+     * 검증 플래그의 문자열·숫자 강제 변환을 허용하지 않는다.
+     * @created 2026-11-01
+     * @usedBy wrap
+     */
+    private boolean verified(JsonNode response, String field) {
+        JsonNode value = response.path(field);
+        return value.isBoolean() && value.booleanValue();
     }
 
     /**
