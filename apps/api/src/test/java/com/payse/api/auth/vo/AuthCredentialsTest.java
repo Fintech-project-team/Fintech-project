@@ -22,10 +22,15 @@ class AuthCredentialsTest {
         assertEquals("데모알파", credentials.name());
         assertEquals("01000000001", credentials.phone());
         assertEquals("000001", credentials.code());
-        assertNotEquals(new AuthCredentials("Kim", "01000000001", "000001"),
-            new AuthCredentials("kim", "01000000001", "000001"));
+        assertNotEquals(
+            new AuthCredentials("Kim", "01000000001", "000001"),
+            new AuthCredentials("kim", "01000000001", "000001")
+        );
         assertEquals("Ab", new AuthCredentials("Ab", "01000000001", "000001").name());
-        assertEquals("가".repeat(20), new AuthCredentials("가".repeat(20), "01000000001", "000001").name());
+        assertEquals(
+            "가".repeat(20),
+            new AuthCredentials("가".repeat(20), "01000000001", "000001").name()
+        );
     }
 
     /**
@@ -33,12 +38,32 @@ class AuthCredentialsTest {
      * @created 2026-10-22
      * @usedBy JUnit test
      * @modified 2026-10-25 - 이름을 역할에 맞게 정리
+     * @modified 2026-11-02 - 긴 식 지역변수 분리
      */
     @Test
     void rejectsInvalidNames() {
-        for (String name : Arrays.asList(null, "", " ", "가", "가".repeat(21), "김 데모", "김1",
-                "\t김데모", "김데모\n", "\u00a0김데모", "김데모\u3000", "ㄱㄴ", "가", "김😀", "Ｋｉｍ")) {
-            assertThrows(IllegalArgumentException.class, () -> new AuthCredentials(name, "01000000001", "000001"));
+        var invalidNames = Arrays.asList(
+            null,
+            "",
+            " ",
+            "가",
+            "가".repeat(21),
+            "김 데모",
+            "김1",
+            "\t김데모",
+            "김데모\n",
+            "\u00a0김데모",
+            "김데모\u3000",
+            "ㄱㄴ",
+            "가",
+            "김😀",
+            "Ｋｉｍ"
+        );
+        for (String name : invalidNames) {
+            assertThrows(
+                IllegalArgumentException.class,
+                () -> new AuthCredentials(name, "01000000001", "000001")
+            );
         }
     }
 
@@ -46,27 +71,62 @@ class AuthCredentialsTest {
      * 전화의 숫자 집합·접두사·길이와 허용 구분자 경계를 검사한다.
      * @created 2026-10-22
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 긴 식 지역변수 분리
      */
     @Test
     void rejectsInvalidPhones() {
-        for (String phone : Arrays.asList(null, "", "0100000000", "010000000011", "01100000001",
-                "+821000000001", "010\t00000001", "010\n00000001", "010\u00a000000001",
-                "０１００００００００１", "010–0000–0001", "0100000000a")) {
-            assertThrows(IllegalArgumentException.class, () -> new AuthCredentials("데모알파", phone, "000001"));
+        var invalidPhones = Arrays.asList(
+            null,
+            "",
+            "0100000000",
+            "010000000011",
+            "01100000001",
+            "+821000000001",
+            "010\t00000001",
+            "010\n00000001",
+            "010\u00a000000001",
+            "０１００００００００１",
+            "010–0000–0001",
+            "0100000000a"
+        );
+        for (String phone : invalidPhones) {
+            assertThrows(
+                IllegalArgumentException.class,
+                () -> new AuthCredentials("데모알파", phone, "000001")
+            );
         }
-        assertEquals("01000000001", new AuthCredentials("데모알파", "0-1 0 0-0000 001", "000001").phone());
+        assertEquals(
+            "01000000001",
+            new AuthCredentials("데모알파", "0-1 0 0-0000 001", "000001").phone()
+        );
     }
 
     /**
      * 코드를 trim하거나 유니코드 숫자·다른 길이로 허용하지 않는다.
      * @created 2026-10-22
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 긴 식 지역변수 분리
      */
     @Test
     void rejectsInvalidCodes() {
-        for (String code : Arrays.asList(null, "", "00001", "0000001", "000001 ", " 000001", "00000\n",
-                "０００００１", "٠٠٠٠٠١", "0000a1", "000-01")) {
-            assertThrows(IllegalArgumentException.class, () -> new AuthCredentials("데모알파", "01000000001", code));
+        var invalidCodes = Arrays.asList(
+            null,
+            "",
+            "00001",
+            "0000001",
+            "000001 ",
+            " 000001",
+            "00000\n",
+            "０００００１",
+            "٠٠٠٠٠١",
+            "0000a1",
+            "000-01"
+        );
+        for (String code : invalidCodes) {
+            assertThrows(
+                IllegalArgumentException.class,
+                () -> new AuthCredentials("데모알파", "01000000001", code)
+            );
         }
     }
 
@@ -81,8 +141,10 @@ class AuthCredentialsTest {
         var credentials = new AuthCredentials("데모알파", "01000000001", "000001");
         assertEquals("AuthCredentials[REDACTED]", credentials.toString());
         String invalid = "private-name-must-not-be-repeated";
-        var error = assertThrows(IllegalArgumentException.class,
-            () -> new AuthCredentials(invalid, "01000000001", "000001"));
+        var error = assertThrows(
+            IllegalArgumentException.class,
+            () -> new AuthCredentials(invalid, "01000000001", "000001")
+        );
         assertFalse(error.toString().contains(invalid));
     }
 }

@@ -1,0 +1,48 @@
+{
+  "id": "PAYSE-ANALYSIS-API-32-20261101",
+  "role": "data",
+  "baseCommit": "b0658ca70eca4545395382b46acadf01a6819cee",
+  "branch": "feat/api/analysis-jobs-32",
+  "allowedPaths": [
+    "apps/api/src/",
+    "apps/api/database/008_analysis_storage.sql",
+    "apps/api/database/analysis/",
+    "apps/api/database/test_analysis_storage.py",
+    "apps/api/database/test_analysis_service.py",
+    "apps/api/tests/",
+    "apps/api/docs/analysis-api.md",
+    "apps/api/docs/analysis-storage.md",
+    "apps/api/docs/analysis-meaning.md",
+    "apps/api/docs/llm-execution.md",
+    "apps/api/docs/history/2026-11-01-analysis-api-handoff.md",
+    "apps/ai/AGENT.md",
+    "apps/ai/AGENTS.md",
+    "apps/ai/src/",
+    "docs/tasks/PAYSE-ANALYSIS-API-32-20261101.json"
+  ],
+  "readBefore": [
+    "AGENTS.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/ownership.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/data-contracts.md",
+    "docs/database-schema.md",
+    "docs/payse-execution-contract.md",
+    "apps/api/AGENTS.md",
+    "apps/ai/AGENTS.md",
+    "apps/api/docs/sql-style.md",
+    "apps/api/docs/analysis-api.md",
+    "apps/api/docs/analysis-storage.md",
+    "apps/api/docs/analysis-meaning.md",
+    "apps/api/docs/llm-execution.md"
+  ],
+  "acceptance": [
+    "관련 이슈 #32. 현재 인증·JPA·SQL 권한·암호화 도구를 재사용하여 분석 접수·상태 조회·결과 저장/조회·사용자 재시도를 실제 API와 PostgreSQL에 연결한다.",
+    "같은 사용자와 현재 유효한 근거의 기억·캐시만 사용한다. 타 사용자 조회·변경·멱등 키·기억 삭제 차단·늦은 응답·동시 채택·롤백을 별도 임시 PostgreSQL과 테스트 공급자에서 검증한다.",
+    "명시적으로 미결정인 API 세부 규칙은 사용자 답변 후 구현한다. 원천 검증과 계산의 책임을 구분하며 금융 원천·기존 ID/금액/날짜·금융 응답 버전은 유지한다.",
+    "apps/ai/AGENT.md에 API가 권한 검증한 DB 자료와 사용자별 유효 기억만 AI 입력으로 제공한다는 규칙을 추가한다. AI의 직접 DB 접근·금융 계산·원천 변경은 금지한다.",
+    "모바일·계산 패키지·기존 실행 DB/서버/키는 변경하지 않는다. 실제 LLM/KMS 연결·유료 호출은 실행하지 않으며 테스트 대역은 테스트 코드에만 둔다.",
+    "필수 검사 및 문서·API·Flutter 연결 호환성을 확인하고 미구현·미검증을 구분한다. 검증 통과 후 사용자 승인대로 이 새 작업 브랜치에 commit·push하되 PR 생성·병합·develop 직접 push는 하지 않는다."
+  ]
+}

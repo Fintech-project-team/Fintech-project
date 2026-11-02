@@ -4,6 +4,8 @@ import com.payse.api.auth.controller.AuthHttpInput;
 import com.payse.api.auth.controller.AuthHttpResponse;
 import com.payse.api.auth.dto.AuthResponse;
 import com.payse.api.auth.error.AuthStoreException;
+import com.payse.api.constants.ApiCodeConstants;
+import com.payse.api.constants.ApiConfigConstants;
 import com.payse.api.finance.error.FinancialException;
 import com.payse.api.finance.error.TransactionStoreException;
 import com.payse.api.finance.service.FinancialService;
@@ -26,6 +28,7 @@ import tools.jackson.databind.node.ObjectNode;
 @RestController
 @Profile("database & auth & finance")
 public final class FinancialController {
+
     private final FinancialService service;
     private final FinancialHttpInput input;
     private final AuthHttpInput auth;
@@ -35,7 +38,11 @@ public final class FinancialController {
      * @created 2026-10-29
      * @usedBy Spring 생성자 주입
      */
-    public FinancialController(FinancialService service, FinancialHttpInput input, AuthHttpInput auth) {
+    public FinancialController(
+        FinancialService service,
+        FinancialHttpInput input,
+        AuthHttpInput auth
+    ) {
         this.service = service;
         this.input = input;
         this.auth = auth;
@@ -52,13 +59,14 @@ public final class FinancialController {
     }
 
     /**
-     * 검증된 불투명 cursor로 같은 자료 버전의 후속 페이지를 반환한다.
+     * 기존 cursor 후속 조회 또는 명시 기간의 첫/후속 거래 페이지를 반환한다.
      * @created 2026-10-29
      * @usedBy GET /transactions
+     * @modified 2026-11-01 - 선택적 날짜 쌍을 인증 후 해석하는 거래 조회 경로 연결
      */
     @GetMapping("/transactions")
     public ResponseEntity<ObjectNode> page(HttpServletRequest request) {
-        return ok(service.read(auth.bearer(request), () -> input.cursor(request, true), true));
+        return ok(service.transactions(auth.bearer(request), () -> input.transactions(request)));
     }
 
     /**
@@ -66,13 +74,31 @@ public final class FinancialController {
      * @created 2026-10-29
      * @usedBy 공통 HTTP 계약 §3·§4 금융 쓰기 경로
      */
-    @RequestMapping(path = {"/institution-links", "/account-selection", "/accounts/{id}", "/settings",
-        "/obligations", "/obligations/{id}", "/obligations/{id}/cancel",
-        "/reserves", "/reserves/{id}", "/reserves/{id}/cancel"},
-        method = {RequestMethod.POST, RequestMethod.PATCH, RequestMethod.DELETE})
+    @RequestMapping(
+        path = {
+            ApiConfigConstants.Finance.LINKS_PATH,
+            ApiConfigConstants.Finance.SELECTION_PATH,
+            ApiConfigConstants.Finance.ACCOUNT_PATH,
+            ApiConfigConstants.Finance.SETTINGS_PATH,
+            ApiConfigConstants.Finance.OBLIGATIONS_PATH,
+            ApiConfigConstants.Finance.OBLIGATION_PATH,
+            ApiConfigConstants.Finance.CANCEL_OBLIGATION_PATH,
+            ApiConfigConstants.Finance.RESERVES_PATH,
+            ApiConfigConstants.Finance.RESERVE_PATH,
+            ApiConfigConstants.Finance.CANCEL_RESERVE_PATH
+        },
+        method = {
+            RequestMethod.POST,
+            RequestMethod.PATCH,
+            RequestMethod.DELETE
+        }
+    )
     public ResponseEntity<ObjectNode> write(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
-        return ok(service.write(auth.bearer(request), request.getMethod(), path, () -> input.read(request)));
+        return ok(
+            service
+                .write(auth.bearer(request), request.getMethod(), path, () -> input.read(request))
+        );
     }
 
     /**
@@ -89,18 +115,30 @@ public final class FinancialController {
      * DB·커밋 장애는 SQL·입력값 없이 재시도 가능한 실패로 전달한다.
      * @created 2026-10-29
      * @usedBy Spring MVC 저장 예외 처리
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조
      */
-    @ExceptionHandler({AuthStoreException.class, TransactionStoreException.class, RuntimeException.class})
+    @ExceptionHandler(
+        {
+            AuthStoreException.class,
+            TransactionStoreException.class,
+            RuntimeException.class
+        }
+    )
     public ResponseEntity<AuthResponse.Error> unavailable() {
-        return AuthHttpResponse.error(503, "TEMPORARILY_UNAVAILABLE", null);
+        return AuthHttpResponse.error(503, ApiCodeConstants.Finance.TEMPORARILY_UNAVAILABLE, null);
     }
 
     /**
      * 금융 성공 응답도 중간 캐시에 저장하지 않는다.
      * @created 2026-10-29
      * @usedBy snapshot, page, write
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조
      */
     private ResponseEntity<ObjectNode> ok(ObjectNode body) {
-        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store").body(body);
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CACHE_CONTROL, ApiConfigConstants.Finance.NO_STORE)
+            .body(body);
     }
 }

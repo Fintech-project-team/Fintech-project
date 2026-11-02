@@ -150,6 +150,7 @@ export function selectGates(files, policy, productPresent, presentGates) {
 
 /**
  * @created 2026-09-28
+ * @modified 2026-11-02 - 통합 API 지침을 필수 참조하고 과거 읽기 경로를 호환한다.
  * @description 작업별 핵심 참조를 선택한다.
  * @param task - 작업 명세.
  * @param files - 변경 파일.
@@ -164,12 +165,15 @@ export function references(task, files, policy) {
     refs.add('docs/contracts.md');
   }
   if (paths.some((p) => p.startsWith('packages/'))) refs.add('docs/calculation-rules.md');
-  if (paths.some((p) => p.startsWith('apps/api/'))) refs.add('apps/api/src/AGENTS.md');
+  if (paths.some((p) => p.startsWith('apps/api/'))) refs.add('apps/api/AGENTS.md');
+  if (paths.some((p) => p.startsWith('apps/ai/'))) refs.add('apps/ai/AGENTS.md');
   if (task.role === 'integration') {
     refs.add('docs/development-workflow.md');
     refs.add('docs/toolchain.md');
   }
-  return [...refs];
+  // 과거 작업 명세의 읽기 경로만 연결한다. 쓰기 허용 경로는 변경하지 않는다.
+  const apiRulePaths = new Set(['apps/api/AGENT.md', 'apps/api/src/AGENTS.md']);
+  return [...new Set([...refs].map((ref) => (apiRulePaths.has(ref) ? 'apps/api/AGENTS.md' : ref)))];
 }
 
 /**

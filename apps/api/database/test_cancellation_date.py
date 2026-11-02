@@ -52,9 +52,12 @@ class CancellationDateTests(unittest.TestCase):
         cls.row = targets[0]
         originals = [row for row in snapshot['transactions']
                      if row['transactionId'] == cls.row['originalTransactionId']]
-        if (len(originals) != 1 or cls.row['userId'] != snapshot['userId']
-                or originals[0]['userId'] != snapshot['userId']
-                or originals[0]['cardId'] != cls.row['cardId']):
+        relation_invalid = (
+            len(originals) != 1 or cls.row['userId'] != snapshot['userId']
+            or originals[0]['userId'] != snapshot['userId']
+            or originals[0]['cardId'] != cls.row['cardId']
+        )
+        if relation_invalid:
             raise ValueError('Invalid cancellation owner or original relation')
         cls.original = originals[0]
         cls.create_database(cls.database, legacy=False)

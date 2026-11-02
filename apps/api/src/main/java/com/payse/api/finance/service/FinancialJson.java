@@ -1,5 +1,8 @@
 package com.payse.api.finance.service;
 
+import com.payse.api.constants.ApiConfigConstants;
+import com.payse.api.constants.ApiFieldConstants;
+import com.payse.api.constants.ApiMessageConstants;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -14,6 +17,7 @@ import tools.jackson.databind.node.ObjectNode;
  * @usedBy FinancialService, FinancialCursor
  */
 final class FinancialJson {
+
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     /**
@@ -21,18 +25,23 @@ final class FinancialJson {
      * @created 2026-10-29
      * @usedBy 클래스 초기화
      */
-    private FinancialJson() {}
+    private FinancialJson() {
+    }
 
     /**
      * 메서드·정규 경로·원래 허용 본문으로 요청 지문을 만든다. 키 자체는 제외한다.
      * @created 2026-10-29
      * @usedBy FinancialService.write
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조
      */
     static String requestDigest(String method, String path, ObjectNode body) {
         ObjectNode copy = body.deepCopy();
-        copy.remove("idempotencyKey");
-        ObjectNode request = JSON.createObjectNode().put("method", method).put("path", path);
-        request.set("body", copy);
+        copy.remove(ApiFieldConstants.Finance.IDEMPOTENCY_KEY);
+        ObjectNode request = JSON.createObjectNode()
+            .put(ApiFieldConstants.Finance.METHOD, method)
+            .put(ApiFieldConstants.Finance.PATH, path);
+        request.set(ApiFieldConstants.Finance.BODY, copy);
         return digest(request);
     }
 
@@ -40,13 +49,20 @@ final class FinancialJson {
      * 직렬화가 결정적인 JSON의 SHA-256을 계산한다. 비밀 자격을 입력받지 않는다.
      * @created 2026-10-29
      * @usedBy requestDigest, FinancialCursor.context
+     * @modified 2026-11-02 - 긴 식 지역변수 분리
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조
      */
     static String digest(JsonNode node) {
         try {
-            byte[] bytes = canonical(node).toString().getBytes(StandardCharsets.UTF_8);
-            return "sha256:" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+            byte[] bytes = canonical(node)
+                .toString()
+                .getBytes(StandardCharsets.UTF_8);
+            byte[] digest = MessageDigest.getInstance(ApiConfigConstants.Finance.DIGEST_ALGORITHM)
+                .digest(bytes);
+            return ApiConfigConstants.Finance.SHA256_PREFIX + HexFormat.of().formatHex(digest);
         } catch (GeneralSecurityException failure) {
-            throw new IllegalStateException("Required financial digest unavailable");
+            throw new IllegalStateException(ApiMessageConstants.Finance.DIGEST_UNAVAILABLE);
         }
     }
 
@@ -58,7 +74,10 @@ final class FinancialJson {
     private static JsonNode canonical(JsonNode node) {
         if (node.isObject()) {
             ObjectNode result = JSON.createObjectNode();
-            node.propertyNames().stream().sorted().forEach(key -> result.set(key, canonical(node.get(key))));
+            node.propertyNames()
+                .stream()
+                .sorted()
+                .forEach(key -> result.set(key, canonical(node.get(key))));
             return result;
         }
         if (node.isArray()) {

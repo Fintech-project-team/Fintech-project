@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'apps/api/**'
+      - 'apps/ai/**'
       - 'packages/contracts/**'
       - 'scripts/harness/**'
       - 'package.json'

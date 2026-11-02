@@ -1,0 +1,1256 @@
+{
+  "version": "PAYSE-MEANING-1",
+  "meanings": [
+    {
+      "code": "salary",
+      "label": "급여",
+      "group": "receipt",
+      "requiredEvidence": [
+        "고용주의 정기 근로 대가라는 지급 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "급여일·설정 금액 일치 또는 회사명만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "월급일에 같은 금액으로 받은 지인 송금",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. income는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "고용주 A",
+        "description": "급여 입금",
+        "expectedBasicType": "income"
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "박*민",
+        "description": "타행이체 정산",
+        "expectedMeaning": null,
+        "expectedBasicType": null,
+        "rationale": "개인명과 정산이라는 적요만으로 급여·대여금 반환·비용 정산을 구분할 수 없다. 월급일이나 설정 금액을 근거로 덧붙이지 않는다."
+      }
+    },
+    {
+      "code": "bonus",
+      "label": "상여·성과급",
+      "group": "receipt",
+      "requiredEvidence": [
+        "고용주의 상여·성과 보상이라는 지급 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "평소 월급보다 큰 입금 또는 연말 입금",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "대출 실행금이 평소 월급보다 큼",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. income는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "고용주 A",
+        "description": "성과급 지급",
+        "expectedBasicType": "income"
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "금융기관 한도대출센터",
+        "description": "한도대출 실행금 입금",
+        "expectedMeaning": "loan_proceeds",
+        "expectedBasicType": null,
+        "rationale": "큰 입금인지 여부와 무관하게 대출 실행 목적이 명시되어 있다. 상여금이나 소득으로 자동 분류하지 않는다."
+      }
+    },
+    {
+      "code": "business_receipt",
+      "label": "사업·용역 대금",
+      "group": "receipt",
+      "requiredEvidence": [
+        "사업 활동의 매출 또는 용역 제공 대가라는 명시 목적. 개인 자산 처분은 별도 의미이며 구분 근거가 없으면 유보",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "법인명에서 입금되었음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "거래처가 보증금을 반환함",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. income는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "거래처 A",
+        "description": "용역대금 입금",
+        "expectedBasicType": "income"
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "거래처 임대관리팀",
+        "description": "사무실 임대보증금 반환",
+        "expectedMeaning": "deposit_return",
+        "expectedBasicType": null,
+        "rationale": "거래처가 보낸 돈이어도 명시 목적은 보증금 반환이며 판매·용역 매출이 아니다."
+      }
+    },
+    {
+      "code": "pension",
+      "label": "연금 수령",
+      "group": "receipt",
+      "requiredEvidence": [
+        "연금 지급이라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "매월 일정한 입금만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "매월 같은 금액의 가족 송금",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. income는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "연금 지급기관 A",
+        "description": "연금 지급",
+        "expectedBasicType": "income"
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "김*정",
+        "description": "가족 생활비 송금",
+        "expectedMeaning": "personal_transfer",
+        "expectedBasicType": null,
+        "rationale": "가족 생활비 전달이 명시되어 있다. 반복 입금처럼 보이더라도 연금 지급 근거가 아니다."
+      }
+    },
+    {
+      "code": "public_benefit",
+      "label": "공적 지원금·급여",
+      "group": "receipt",
+      "requiredEvidence": [
+        "지원금·공적 급여 지급이라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "기관명 또는 국가 관련 문자열만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "공공기관이 사용료를 환불함",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. income는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "지원금 지급기관 A",
+        "description": "생활지원금 지급",
+        "expectedBasicType": "income"
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "공공 체육시설 수납처",
+        "description": "시설사용료 반환",
+        "expectedMeaning": "account_refund",
+        "expectedBasicType": null,
+        "rationale": "공공기관 입금이지만 지원금이 아닌 사용료 반환이다. card_refund가 아닌 계좌 입금에 카드 환불 코드를 강제로 적용하지 않는다."
+      }
+    },
+    {
+      "code": "interest",
+      "label": "예금 등 이자 수령",
+      "group": "receipt",
+      "requiredEvidence": [
+        "이자 지급이라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "작고 정기적인 입금만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "소액 현금 입금이나 환급금",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. income는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "금융기관 A",
+        "description": "예금이자 입금",
+        "expectedBasicType": "income"
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "현금자동입출금기",
+        "description": "ATM 현금 입금",
+        "expectedMeaning": "cash_deposit",
+        "expectedBasicType": null,
+        "rationale": "현금 입금 방식이 명시되어 있고 이자 지급 근거가 없다. 현금의 발생 원인이나 소득 여부는 알 수 없다."
+      }
+    },
+    {
+      "code": "dividend",
+      "label": "배당금 수령",
+      "group": "receipt",
+      "requiredEvidence": [
+        "배당 지급이라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "투자 관련 기관명만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "투자상품 매도 원금이 돌아옴",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. income는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "배당 지급기관 A",
+        "description": "배당금 입금",
+        "expectedBasicType": "income"
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "투자상품 취급기관",
+        "description": "투자상품 매도대금",
+        "expectedMeaning": null,
+        "expectedBasicType": null,
+        "rationale": "매도대금만으로 배당인지 또는 원금과 수익 중 무엇인지 구분할 수 없다. 투자 원금 회수라고도 단정하지 않는다."
+      }
+    },
+    {
+      "code": "loan_proceeds",
+      "label": "대출 실행금",
+      "group": "receipt",
+      "requiredEvidence": [
+        "대출 실행 또는 차입금 수령이라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "큰 입금 또는 은행명만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "은행의 예금 만기 원금 반환",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. 기본 분류 후보는 null로 둔다. 입출금 방향을 소득·소비로 자동 환원하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "금융기관 A",
+        "description": "대출실행 입금",
+        "expectedBasicType": null
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "예금 취급 금융기관",
+        "description": "정기예금 만기해지 원금 입금",
+        "expectedMeaning": "deposit_maturity",
+        "expectedBasicType": null,
+        "rationale": "예금 원금의 반환이 명시되어 대출 실행금이 아니다. 현재 투자 원금 회수 코드를 예금 만기 반환까지 임의 확대하지 않는다."
+      }
+    },
+    {
+      "code": "personal_transfer",
+      "label": "개인 간 송금",
+      "group": "receipt",
+      "requiredEvidence": [
+        "개인 간 자금 전달이며 다른 지급 목적이 확인되지 않는다는 근거",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "가린 인명과 타행이체 표시만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "같은 인명이 임대료·물품대금·대여금 반환을 보냄",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. 기본 분류 후보는 null로 둔다. 입출금 방향을 소득·소비로 자동 환원하지 않는다. 개인송금 후보는 in/out 모두 가능하며 상대방 이름만으로 목적을 확정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "소*연",
+        "description": "개인송금 생활비 전달",
+        "expectedBasicType": null
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "소*연",
+        "description": "개인 소유 중고 자전거 매각대금",
+        "expectedMeaning": "asset_sale",
+        "expectedBasicType": null,
+        "rationale": "상대가 개인이어도 구체적인 개인 자산 매각 대가가 명시되어 있으므로 막연한 개인 송금보다 그 의미를 사용한다."
+      }
+    },
+    {
+      "code": "reimbursement",
+      "label": "대납·경비 정산금",
+      "group": "receipt",
+      "requiredEvidence": [
+        "앞서 지출한 비용의 대납·경비 정산 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "개인 입금 또는 월말 입금",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "친구가 보낸 선물금 또는 물품대금",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. 기본 분류 후보는 null로 둔다. 입출금 방향을 소득·소비로 자동 환원하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "정산 지급처 A",
+        "description": "출장경비 정산금 입금",
+        "expectedBasicType": null
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "최*우",
+        "description": "개인 소유 중고 책 판매대금",
+        "expectedMeaning": "asset_sale",
+        "expectedBasicType": null,
+        "rationale": "친구 같은 인명에서 왔다는 이유로 대납 정산금으로 볼 수 없다. 적요에는 개인 물품 매각 목적이 명시되어 있다."
+      }
+    },
+    {
+      "code": "deposit_return",
+      "label": "보증금 반환",
+      "group": "receipt",
+      "requiredEvidence": [
+        "보증금 반환이라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "큰 일회성 입금이나 임대인 이름",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "임대인이 수리비를 정산함",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. 기본 분류 후보는 null로 둔다. 입출금 방향을 소득·소비로 자동 환원하지 않는다. 일반 계좌 입금의 해석 범위이며 투자계좌·자산 관리 기능 지원을 새로 선언하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "임대 상대방 A",
+        "description": "임대차 보증금 반환",
+        "expectedBasicType": null
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "임대 상대방",
+        "description": "임차인이 대납한 보일러 수리비 정산금",
+        "expectedMeaning": "reimbursement",
+        "expectedBasicType": null,
+        "rationale": "임대인이 보내도 보증금 반환이 아니라 앞서 대납한 수리 비용의 정산 목적이다."
+      }
+    },
+    {
+      "code": "investment_redemption",
+      "label": "투자 원금 회수",
+      "group": "receipt",
+      "requiredEvidence": [
+        "투자 원금 회수라는 목적이 명시됨",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "증권사 입금 또는 매도대금만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "배당·수익금 또는 원금과 수익이 구분되지 않는 혼합 입금",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. 기본 분류 후보는 null로 둔다. 입출금 방향을 소득·소비로 자동 환원하지 않는다. 일반 계좌 입금의 해석 범위이며 투자계좌·자산 관리 기능 지원을 새로 선언하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "투자 취급기관 A",
+        "description": "투자 원금 반환",
+        "expectedBasicType": null
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "운용기관 정산팀",
+        "description": "원금 및 운용수익 일괄 지급",
+        "expectedMeaning": null,
+        "expectedBasicType": null,
+        "rationale": "원금과 수익이 합쳐져 있어 입금 전체를 원금 회수나 배당으로 단정할 수 없다. 구성액도 생성하지 않는다."
+      }
+    },
+    {
+      "code": "asset_sale",
+      "label": "물품·자산 매각 대금",
+      "group": "receipt",
+      "requiredEvidence": [
+        "사업 매출이 아닌 개인 소유 물품·자산 처분 대가라는 명시 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "개인 입금 또는 중고거래 플랫폼 이름",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "대금 환불·보증금·사업 매출 구분이 안 되는 입금",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. 기본 분류 후보는 null로 둔다. 입출금 방향을 소득·소비로 자동 환원하지 않는다. 일반 계좌 입금의 해석 범위이며 투자계좌·자산 관리 기능 지원을 새로 선언하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "매수 상대방 A",
+        "description": "개인 소유 중고 물품 매각대금",
+        "expectedBasicType": null
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "거래대행 정산처",
+        "description": "거래대금 정산",
+        "expectedMeaning": null,
+        "expectedBasicType": null,
+        "rationale": "개인 자산 처분·사업 매출·환급 중 어떤 정산인지 제공 입력만으로 구분할 수 없다."
+      }
+    },
+    {
+      "code": "rent",
+      "label": "주거 임차료",
+      "group": "living_expense",
+      "requiredEvidence": [
+        "주거 임차료 지급이라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "개인명·매월 같은 금액·날짜만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "매월 부모에게 보내는 생활비",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. expense는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "임대 상대방 A",
+        "description": "주거 월세 납부",
+        "expectedBasicType": "expense"
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "부*모",
+        "description": "부모님 생활비 송금",
+        "expectedMeaning": "personal_transfer",
+        "expectedBasicType": null,
+        "rationale": "월간 정기이체일 수 있어도 지급 목적은 가족 생활비 전달이며 주거 임차료라는 근거가 없다."
+      }
+    },
+    {
+      "code": "housing_management",
+      "label": "주거 관리비",
+      "group": "living_expense",
+      "requiredEvidence": [
+        "주거 관리비 지급이라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "아파트명 또는 관리사무소명만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "관리사무소에 납부한 주차 등록비나 보증금",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. expense는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "공동주택 관리사무소 A",
+        "description": "주택 관리비 자동이체",
+        "expectedBasicType": "expense"
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "공동주택 주차관리실",
+        "description": "주차 월정기 이용료",
+        "expectedMeaning": "vehicle_cost",
+        "expectedBasicType": "expense",
+        "rationale": "공동주택에 납부한 돈이지만 명시된 목적은 주차 이용이다. 관리비나 일반 구독으로 자동 묶지 않는다."
+      }
+    },
+    {
+      "code": "utility",
+      "label": "전기·가스·수도 요금",
+      "group": "living_expense",
+      "requiredEvidence": [
+        "전기·가스·수도 사용 요금이라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "공급기관명만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "설비 설치비·보증금·환급 거래",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. expense는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "공급기관 A",
+        "description": "전기요금 자동이체",
+        "expectedBasicType": "expense"
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "가스 공급시설 관리처",
+        "description": "공급설비 이용보증금 납부",
+        "expectedMeaning": "deposit_payment",
+        "expectedBasicType": null,
+        "rationale": "공급기관 출금이어도 사용요금이 아니라 보증금 납부다. 현재 세부 의미에 없는 목적을 공과금이나 소비로 강제 분류하지 않는다."
+      }
+    },
+    {
+      "code": "telecom",
+      "label": "통신 요금",
+      "group": "living_expense",
+      "requiredEvidence": [
+        "전화·인터넷 등 통신 사용료라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "통신사명 또는 CMS만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "휴대전화 기기 구매대금·콘텐츠 결제",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. expense는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "통신 제공기관 A",
+        "description": "이동통신 요금 자동이체",
+        "expectedBasicType": "expense"
+      },
+      "contrast": {
+        "recordKind": "card_purchase",
+        "direction": "out",
+        "merchantName": "통신사 단말 판매점",
+        "description": "휴대전화 단말기 구매대금",
+        "expectedMeaning": "retail",
+        "expectedBasicType": "expense",
+        "rationale": "통신사에서 결제했더라도 서비스 요금이 아닌 물품 구매가 명시되어 있다."
+      }
+    },
+    {
+      "code": "insurance",
+      "label": "보험료",
+      "group": "living_expense",
+      "requiredEvidence": [
+        "보험료 납부라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "보험사명만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "보험사 대출 상환·보험금 입금·환급",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. expense는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "보험 제공기관 A",
+        "description": "보험료 자동납부",
+        "expectedBasicType": "expense"
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "보험사 금융지원팀",
+        "description": "보험계약대출 원금 상환",
+        "expectedMeaning": "loan_repayment",
+        "expectedBasicType": null,
+        "rationale": "보험사 출금이지만 원천 적요는 대출 원금 상환이다. 보험료나 순소비 금액으로 바꾸지 않는다."
+      }
+    },
+    {
+      "code": "loan_repayment",
+      "label": "대출 상환",
+      "group": "living_expense",
+      "requiredEvidence": [
+        "대출 상환이라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "은행명·정기 출금·큰 금액",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "정기적금 납입이나 카드대금 출금",
+      "basicTypePolicy": "대출 상환의 표시 후보만 제공한다. 원금·이자·수수료 구분이 없으면 기본 expense 분류나 순소비 금액을 자동 확정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "금융기관 A",
+        "description": "대출 상환 출금",
+        "expectedBasicType": null
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "저축 상품 수납처",
+        "description": "적금 자동이체",
+        "expectedMeaning": null,
+        "expectedBasicType": null,
+        "rationale": "적금이라는 목적은 대출 상환을 뒷받침하지 않는다. 계좌 소유권과 명시 이체 관계가 없어 본인 저축 이동도 확정할 수 없다."
+      }
+    },
+    {
+      "code": "tax_public_charge",
+      "label": "세금·공적 부담금",
+      "group": "living_expense",
+      "requiredEvidence": [
+        "세금·공적 부담금 납부라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "공공기관명만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "공영주차비·공공시설 이용료",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. expense는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "공공 수납기관 A",
+        "description": "지방세 납부",
+        "expectedBasicType": "expense"
+      },
+      "contrast": {
+        "recordKind": "card_purchase",
+        "direction": "out",
+        "merchantName": "구청 공영주차장",
+        "description": "주차장 이용료",
+        "expectedMeaning": "vehicle_cost",
+        "expectedBasicType": "expense",
+        "rationale": "공공기관이 수납했다는 이유만으로 세금이 아니다. 차량 주차 이용 대가가 명시되어 있다."
+      }
+    },
+    {
+      "code": "education",
+      "label": "교육비",
+      "group": "living_expense",
+      "requiredEvidence": [
+        "수강·학비 등 교육 대가라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "학교·학원처럼 보이는 이름만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "학교에서 구매한 물품·기부금·보증금",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. expense는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "교육 제공처 A",
+        "description": "수강료 납부",
+        "expectedBasicType": "expense"
+      },
+      "contrast": {
+        "recordKind": "card_purchase",
+        "direction": "out",
+        "merchantName": "학교 협동매점",
+        "description": "우산 구매대금",
+        "expectedMeaning": "retail",
+        "expectedBasicType": "expense",
+        "rationale": "학교 관련 상호에서 결제했어도 교육 대가가 아니라 일반 물품 구입이다."
+      }
+    },
+    {
+      "code": "medical",
+      "label": "의료·의약 비용",
+      "group": "living_expense",
+      "requiredEvidence": [
+        "진료·처방 의약품 등 의료 대가라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "병원 건물·약국처럼 보이는 이름만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "의료기관 주차비·건강식품 소매 구매",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. expense는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "의료 제공처 A",
+        "description": "진료비 결제",
+        "expectedBasicType": "expense"
+      },
+      "contrast": {
+        "recordKind": "card_purchase",
+        "direction": "out",
+        "merchantName": "의료기관 주차관리처",
+        "description": "병원 주차장 이용료",
+        "expectedMeaning": "vehicle_cost",
+        "expectedBasicType": "expense",
+        "rationale": "병원 명칭이 있어도 진료나 의약품이 아니라 주차 이용료다."
+      }
+    },
+    {
+      "code": "groceries",
+      "label": "식재료·장보기",
+      "group": "living_expense",
+      "requiredEvidence": [
+        "식재료·식료품 구매라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "마트·편의점 상호 또는 카드 승인만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "대형마트에서 가전·생활용품을 구매함",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. expense는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "식료품 판매처 A",
+        "description": "식료품 구매 결제",
+        "expectedBasicType": "expense"
+      },
+      "contrast": {
+        "recordKind": "card_purchase",
+        "direction": "out",
+        "merchantName": "생활마트 가전코너",
+        "description": "전자레인지 구매",
+        "expectedMeaning": "retail",
+        "expectedBasicType": "expense",
+        "rationale": "마트에서 결제했지만 식재료가 아닌 가전 물품 구매가 명시되어 있다."
+      }
+    },
+    {
+      "code": "dining",
+      "label": "외식·음료",
+      "group": "living_expense",
+      "requiredEvidence": [
+        "식사·음료 제공 대가라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "배달앱·상호명 또는 점심 시간",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "배달앱으로 생필품·식재료를 주문함",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. expense는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "식음료 제공처 A",
+        "description": "음식 식사대금 결제",
+        "expectedBasicType": "expense"
+      },
+      "contrast": {
+        "recordKind": "card_purchase",
+        "direction": "out",
+        "merchantName": "배달 중개서비스",
+        "description": "세제 및 휴지 배달 주문",
+        "expectedMeaning": "retail",
+        "expectedBasicType": "expense",
+        "rationale": "배달 채널을 사용했다고 식사로 단정할 수 없다. 제공된 적요는 생활용품 구매를 가리킨다."
+      }
+    },
+    {
+      "code": "retail",
+      "label": "일반 물품 구매",
+      "group": "living_expense",
+      "requiredEvidence": [
+        "구체 하위 목적이 확인되지 않는 일반 물품 구매",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "온라인 플랫폼명 또는 결제대행사명만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "플랫폼에서 예약한 진료·숙박·교통 서비스",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. expense는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "물품 판매처 A",
+        "description": "생활용품 구매 결제",
+        "expectedBasicType": "expense"
+      },
+      "contrast": {
+        "recordKind": "card_purchase",
+        "direction": "out",
+        "merchantName": "온라인 예약 중개처",
+        "description": "숙박 예약대금",
+        "expectedMeaning": "lodging",
+        "expectedBasicType": "expense",
+        "rationale": "대금 지급이 있는 서비스 구매지만 물품 구매가 아니며 현 세부 의미 목록에 숙박 항목은 없다. 세부 unknown과 기본 expense 후보를 구분한다."
+      }
+    },
+    {
+      "code": "transport",
+      "label": "대중교통·택시",
+      "group": "living_expense",
+      "requiredEvidence": [
+        "대중교통·택시 이용 대가라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "교통 관련 기관명 또는 반복 소액",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "차량 구입비·주유·보증금",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. expense는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "운송 제공처 A",
+        "description": "택시 이용요금 결제",
+        "expectedBasicType": "expense"
+      },
+      "contrast": {
+        "recordKind": "card_purchase",
+        "direction": "out",
+        "merchantName": "차량 연료 판매처",
+        "description": "차량 주유 결제",
+        "expectedMeaning": "vehicle_cost",
+        "expectedBasicType": "expense",
+        "rationale": "대중교통·택시 이용이 아닌 차량 연료 구매가 명시되어 있다."
+      }
+    },
+    {
+      "code": "vehicle_cost",
+      "label": "차량 유지·이용 비용",
+      "group": "living_expense",
+      "requiredEvidence": [
+        "주유·주차·정비 등 차량 이용·유지 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "차량 관련 상호만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "자동차 매각대금·대출·보험료",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. expense는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "차량 서비스 제공처 A",
+        "description": "차량 정비대금 결제",
+        "expectedBasicType": "expense"
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "자동차 매입업체",
+        "description": "개인 소유 중고차 매각대금",
+        "expectedMeaning": "asset_sale",
+        "expectedBasicType": null,
+        "rationale": "자동차 관련 거래여도 출금 비용이 아닌 개인 자산 처분 입금이다. 소득이나 유지비로 자동 환원하지 않는다."
+      }
+    },
+    {
+      "code": "subscription",
+      "label": "서비스 정기 구독",
+      "group": "living_expense",
+      "requiredEvidence": [
+        "영상·콘텐츠·소프트웨어 등 서비스 구독 대가라는 명시 목적. 통신·보험 등 구체 서비스가 있으면 해당 의미 우선; 반복성만으로 선택하지 않음",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "매월 비슷한 출금 또는 자동이체",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "매월 약값·통신비·보험료 납부",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. expense는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "서비스 제공처 A",
+        "description": "영상서비스 구독료 결제",
+        "expectedBasicType": "expense"
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "인터넷 통신서비스",
+        "description": "인터넷 사용요금 자동납부",
+        "expectedMeaning": "telecom",
+        "expectedBasicType": "expense",
+        "rationale": "반복 납부 방식보다 구체적인 통신 서비스 목적을 우선한다. 자동납부만으로 일반 구독으로 바꾸지 않는다."
+      }
+    },
+    {
+      "code": "donation",
+      "label": "기부금",
+      "group": "living_expense",
+      "requiredEvidence": [
+        "기부라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "단체 이름·개인 송금만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "단체의 상품 구매대금 또는 회비",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. expense는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "수령 단체 A",
+        "description": "기부금 이체",
+        "expectedBasicType": "expense"
+      },
+      "contrast": {
+        "recordKind": "card_purchase",
+        "direction": "out",
+        "merchantName": "후원단체 판매부",
+        "description": "기념품 구매대금",
+        "expectedMeaning": "retail",
+        "expectedBasicType": "expense",
+        "rationale": "후원단체가 수령해도 물품 대가가 명시되어 있으므로 기부로 단정하지 않는다."
+      }
+    },
+    {
+      "code": "bank_fee",
+      "label": "금융 수수료",
+      "group": "living_expense",
+      "requiredEvidence": [
+        "금융 거래 수수료라는 목적",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "은행명과 소액 출금",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "대출 원금·이자·기타 정산액",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. expense는 이 합성 긍정 예시의 제안값이며 원천 direction만으로 자동 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "금융기관 A",
+        "description": "이체 수수료 출금",
+        "expectedBasicType": "expense"
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "은행 여신관리부",
+        "description": "대출 원금 및 이자 합산 상환",
+        "expectedMeaning": "loan_repayment",
+        "expectedBasicType": null,
+        "rationale": "은행 출금이지만 수수료라는 근거가 없고 대출 상환 목적이 명시되어 있다. 원금·이자의 구성액은 추정하지 않는다."
+      }
+    },
+    {
+      "code": "self_transfer",
+      "label": "본인 계좌 간 이체",
+      "group": "fund_movement",
+      "requiredEvidence": [
+        "공개 가능한 동일 사용자 거래의 명시적 internal_transfer 관계",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "같은 금액·가까운 날짜 또는 본인 이름만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "타인에게 송금한 뒤 우연히 같은 금액이 들어옴",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. 기본 분류 후보는 null로 둔다. 입출금 방향을 소득·소비로 자동 환원하지 않는다. 이 텍스트 예시만으로는 확정 관계가 충족되지 않는다. 별도 평가에서 실제 관계를 제공·누락하여 구분한다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "본인 계좌",
+        "description": "본인 계좌 이체",
+        "expectedBasicType": null
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "본인 이름으로 표시된 수취인",
+        "description": "모바일이체",
+        "expectedMeaning": null,
+        "expectedBasicType": null,
+        "rationale": "본인처럼 보이는 표시명은 동일 사용자 계좌 소유권이나 internal_transfer 관계를 입증하지 않는다. 관계 없이 본인 이체를 확정하지 않는다."
+      }
+    },
+    {
+      "code": "savings_transfer",
+      "label": "저축 계좌로 자금 이동",
+      "group": "fund_movement",
+      "requiredEvidence": [
+        "동일 사용자 계좌 관계와 저축 목적의 연결 근거",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "상품명·적금 납입 문구 또는 정기 출금만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "타인 적금을 대신 납입하거나 보험 저축상품 대금을 지급함",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. 기본 분류 후보는 null로 둔다. 입출금 방향을 소득·소비로 자동 환원하지 않는다. 이 텍스트 예시만으로는 확정 관계가 충족되지 않는다. 별도 평가에서 실제 관계를 제공·누락하여 구분한다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "본인 저축계좌",
+        "description": "본인 적금계좌 납입",
+        "expectedBasicType": null
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "적금 수납계좌",
+        "description": "지인 적금 대신 납입",
+        "expectedMeaning": null,
+        "expectedBasicType": null,
+        "rationale": "저축 납입 문구가 있어도 본인 계좌라는 근거가 없으며 적요는 타인을 위한 납입이다. 본인 자산 이동으로 묶지 않는다."
+      }
+    },
+    {
+      "code": "card_bill_payment",
+      "label": "카드 청구대금 납부",
+      "group": "fund_movement",
+      "requiredEvidence": [
+        "해당 거래의 적요에 카드 청구·결제대금 출금 목적이 명시되면 표시용 의미 후보를 제안할 수 있음. 기본 card_payment 판정에는 공개 청구·계좌 출금·명시 결제 매핑 또는 검증된 기존 분류가 별도로 필요함",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "카드사명·금액·결제일 일치만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "카드사 대출 상환이나 별도 수수료 출금",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. 기본 분류 후보는 null로 둔다. 입출금 방향을 소득·소비로 자동 환원하지 않는다. 이 텍스트 예시만으로는 확정 관계가 충족되지 않는다. 별도 평가에서 실제 관계를 제공·누락하여 구분한다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "카드 제공기관 A",
+        "description": "카드 결제대금 출금",
+        "expectedBasicType": null
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "카드사 대출센터",
+        "description": "장기카드대출 상환",
+        "expectedMeaning": "loan_repayment",
+        "expectedBasicType": null,
+        "rationale": "카드사 출금이어도 청구 대금 납부가 아니라 대출 상환 목적이 명시되어 있다."
+      }
+    },
+    {
+      "code": "cash_withdrawal",
+      "label": "현금 인출",
+      "group": "fund_movement",
+      "requiredEvidence": [
+        "현금 인출 사실이 명시된 원천 거래",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "ATM 또는 출금이라는 단어만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "ATM으로 타인 계좌에 송금한 거래",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. 기본 분류 후보는 null로 둔다. 입출금 방향을 소득·소비로 자동 환원하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "현금자동입출금기",
+        "description": "ATM 현금 출금",
+        "expectedBasicType": null
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "소*연",
+        "description": "ATM 계좌이체",
+        "expectedMeaning": null,
+        "expectedBasicType": null,
+        "rationale": "ATM 경유 거래가 물리적인 현금 인출을 뜻하지 않는다. 송금 목적과 수취 계좌 관계도 알 수 없다."
+      }
+    },
+    {
+      "code": "cash_deposit",
+      "label": "현금 입금",
+      "group": "fund_movement",
+      "requiredEvidence": [
+        "현금 입금 사실이 명시된 원천 거래",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "입금 또는 현금 관련 상대방 이름만 있음",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "계좌이체 입금이나 현금서비스 대출금",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. 기본 분류 후보는 null로 둔다. 입출금 방향을 소득·소비로 자동 환원하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "현금자동입출금기",
+        "description": "ATM 현금 입금",
+        "expectedBasicType": null
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "카드사 금융서비스",
+        "description": "단기카드대출 입금",
+        "expectedMeaning": "loan_proceeds",
+        "expectedBasicType": null,
+        "rationale": "현금서비스 성격의 입금이어도 원천이 명시한 것은 차입금이며 ATM 현금 입금이나 소득으로 간주하지 않는다."
+      }
+    },
+    {
+      "code": "cancellation",
+      "label": "카드 승인 취소",
+      "group": "reversal",
+      "requiredEvidence": [
+        "원천 recordKind=card_cancellation",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "취소처럼 보이는 이름만 있고 원천 종류가 불명확함",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "별도 계좌 입금이나 실제 카드 환불 기록",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. 기본 분류 후보는 null로 둔다. 입출금 방향을 소득·소비로 자동 환원하지 않는다. 원천 recordKind가 있으면 상호·적요가 모호해도 사건 종류는 유지한다. 원거래 연결·잔액 반영·소득 여부는 별도다.",
+      "positive": {
+        "recordKind": "card_cancellation",
+        "direction": "in",
+        "merchantName": "가맹점 A",
+        "description": "승인취소",
+        "expectedBasicType": null
+      },
+      "contrast": {
+        "recordKind": "card_refund",
+        "direction": "in",
+        "merchantName": "가맹점 반품접수처",
+        "description": "승인취소 정산",
+        "expectedMeaning": "refund",
+        "expectedBasicType": null,
+        "rationale": "적요의 취소 표현보다 원천 recordKind=card_refund를 유지한다. 원거래 연결이나 계좌 잔액 반영을 추가로 확정하지 않는다."
+      }
+    },
+    {
+      "code": "refund",
+      "label": "카드 환불",
+      "group": "reversal",
+      "requiredEvidence": [
+        "원천 recordKind=card_refund",
+        "현재 사용자에게 공개된 해당 거래의 근거만 사용하고 표시명·금액·날짜 유사성을 관계 확인으로 대체하지 않음"
+      ],
+      "insufficientEvidence": [
+        "환불이라는 상대방 이름만 있고 원천 종류가 불명확함",
+        "서로 충돌하는 목적·접근 제한으로 가려진 필수 근거는 unknown 또는 해석 보류 대상"
+      ],
+      "counterexample": "카드 승인 취소 또는 개인 대납 정산금",
+      "basicTypePolicy": "기존 거래 분류는 변경하지 않는다. 명시 근거를 가진 표시 후보이며, 필요한 확정 저장은 별도 사용자 흐름을 따른다. 기본 분류 후보는 null로 둔다. 입출금 방향을 소득·소비로 자동 환원하지 않는다. 원천 recordKind가 있으면 상호·적요가 모호해도 사건 종류는 유지한다. 원거래 연결·잔액 반영·소득 여부는 별도다.",
+      "positive": {
+        "recordKind": "card_refund",
+        "direction": "in",
+        "merchantName": "가맹점 A",
+        "description": "카드환불",
+        "expectedBasicType": null
+      },
+      "contrast": {
+        "recordKind": "card_cancellation",
+        "direction": "in",
+        "merchantName": "가맹점 환급접수처",
+        "description": "환급 처리",
+        "expectedMeaning": "cancellation",
+        "expectedBasicType": null,
+        "rationale": "적요의 환급 표현보다 원천 recordKind=card_cancellation을 유지한다. 실제 계좌 입금이나 소득으로 바꾸지 않는다."
+      }
+    },
+    {
+      "code": "account_refund",
+      "label": "계좌로 받은 이용대금 반환",
+      "group": "reversal",
+      "requiredEvidence": [
+        "이용·구매 대금의 반환이라는 명시 목적. 새 수입 또는 실제 계좌 반영을 자동 확정하지 않음"
+      ],
+      "insufficientEvidence": ["입금이라는 방향만 있고 원거래 목적이나 반환 사유가 없음"],
+      "counterexample": "대출금 입금을 환불로 오인",
+      "basicTypePolicy": "표시 후보만 제안하며 기존 분류·원천·잔액·정산을 수정하지 않는다. 방향만으로 수입/소비를 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "거래처 C",
+        "description": "시설사용료 반환",
+        "expectedBasicType": null
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "거래처 C",
+        "description": "대출실행 입금",
+        "expectedMeaning": "loan_proceeds",
+        "expectedBasicType": null,
+        "rationale": "대출금 입금을 환불로 오인"
+      }
+    },
+    {
+      "code": "deposit_maturity",
+      "label": "예금 원금 회수",
+      "group": "receipt",
+      "requiredEvidence": [
+        "예금의 만기·해지에 따른 원금 회수라는 명시 목적. 이자와 원금을 금액으로 임의 분리하지 않음"
+      ],
+      "insufficientEvidence": ["원금과 이자가 섞인 금액인데 구성이 미확인"],
+      "counterexample": "투자 수익을 예금 원금으로 오인",
+      "basicTypePolicy": "표시 후보만 제안하며 기존 분류·원천·잔액·정산을 수정하지 않는다. 방향만으로 수입/소비를 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "거래처 C",
+        "description": "정기예금 만기해지 원금 입금",
+        "expectedBasicType": null
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "in",
+        "merchantName": "거래처 C",
+        "description": "예금이자 지급",
+        "expectedMeaning": "interest",
+        "expectedBasicType": "income",
+        "rationale": "투자 수익을 예금 원금으로 오인"
+      }
+    },
+    {
+      "code": "deposit_payment",
+      "label": "반환 조건부 보증금 납부",
+      "group": "movement",
+      "requiredEvidence": ["반환 조건부 보증금 납부라는 명시 목적. 임차료·물품 소비와 구분"],
+      "insufficientEvidence": ["입회비·계약금 등 반환 조건이 불명확한 납부"],
+      "counterexample": "월세를 보증금으로 오인",
+      "basicTypePolicy": "표시 후보만 제안하며 기존 분류·원천·잔액·정산을 수정하지 않는다. 방향만으로 수입/소비를 결정하지 않는다.",
+      "positive": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "거래처 C",
+        "description": "공급설비 이용보증금 납부",
+        "expectedBasicType": null
+      },
+      "contrast": {
+        "recordKind": "account_entry",
+        "direction": "out",
+        "merchantName": "거래처 C",
+        "description": "주거 월세 납부",
+        "expectedMeaning": "rent",
+        "expectedBasicType": "expense",
+        "rationale": "월세를 보증금으로 오인"
+      }
+    },
+    {
+      "code": "lodging",
+      "label": "숙박비",
+      "group": "spending",
+      "requiredEvidence": ["숙박 시설 이용 또는 숙박 예약의 대가라는 명시 목적"],
+      "insufficientEvidence": ["여행 플랫폼 상호만 있고 숙박·교통·물품 중 목적이 미확인"],
+      "counterexample": "호텔 식당 식사비를 숙박비로 오인",
+      "basicTypePolicy": "표시 후보만 제안하며 기존 분류·원천·잔액·정산을 수정하지 않는다. 방향만으로 수입/소비를 결정하지 않는다.",
+      "positive": {
+        "recordKind": "card_purchase",
+        "direction": "out",
+        "merchantName": "거래처 C",
+        "description": "숙박 예약대금 결제",
+        "expectedBasicType": "expense"
+      },
+      "contrast": {
+        "recordKind": "card_purchase",
+        "direction": "out",
+        "merchantName": "거래처 C",
+        "description": "호텔 식당 식사대금 결제",
+        "expectedMeaning": "dining",
+        "expectedBasicType": "expense",
+        "rationale": "호텔 식당 식사비를 숙박비로 오인"
+      }
+    }
+  ]
+}

@@ -83,7 +83,9 @@ def run_check(caddy, openssl):
         root = Path(temporary).resolve()
         if os.name == 'nt':
             import csv
-            sid = next(csv.reader(command(['whoami', '/user', '/fo', 'csv', '/nh'], root).decode().splitlines()))[1]
+            account_output = command(['whoami', '/user', '/fo', 'csv', '/nh'], root).decode()
+            account_rows = csv.reader(account_output.splitlines())
+            sid = next(account_rows)[1]
             command(['icacls', root, '/inheritance:r', '/grant:r', f'*{sid}:(OI)(CI)F'], root)
         command([openssl, 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', 'ca.key',
             '-out', 'ca.pem', '-days', '1', '-subj', '/CN=PAYSE Local Verification CA'], root)

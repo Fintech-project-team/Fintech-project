@@ -432,9 +432,12 @@ def _notice_months(user: _User) -> tuple[str, str]:
     for transaction_id in transaction_ids:
         transaction = _one(source["transactions"], lambda row: row["transactionId"] == transaction_id,
                            "안내 검사 입금 관계")
-        _require(transaction["userId"] == owner and transaction["accountId"] == salary["salaryAccountId"]
-                 and transaction["recordKind"] == "account_entry" and transaction["direction"] == "in"
-                 and transaction["balanceReflected"] is True, "안내 검사 급여 계좌 입금 소유권")
+        salary_deposit_matches = (
+            transaction["userId"] == owner and transaction["accountId"] == salary["salaryAccountId"]
+            and transaction["recordKind"] == "account_entry" and transaction["direction"] == "in"
+            and transaction["balanceReflected"] is True
+        )
+        _require(salary_deposit_matches, "안내 검사 급여 계좌 입금 소유권")
     # 기준 시각의 월은 독립 조회의 입력값일 뿐 급여 회차로 추정하거나 원천에 저장하지 않는다.
     reference = datetime.fromisoformat(source["asOf"].replace("Z", "+00:00"))
     _require(reference.tzinfo is not None, "안내 검사 기준 시각 오프셋")
@@ -447,10 +450,13 @@ def _notice(client: _Client, user: _User, month: str, *, dismiss: bool = False) 
     """2026-10-30: 안내 API의 소유자·회차·표식·시각 계약을 확인한다. 사용처: 안내 저장·보존 검사."""
     path = "/salary-notices/" + month + ("/dismissal" if dismiss else "")
     result = _expect(client.request("PUT" if dismiss else "GET", path, token=user.token), 200, "급여 안내 요청")
-    _require(set(result) == {"contractVersion", "userId", "payMonth", "dismissed", "dismissedAt"}
-             and result["contractVersion"] == "PAYSE-SALARY-NOTICE-1"
-             and result["userId"] == user.seed["userId"] and result["payMonth"] == month
-             and type(result["dismissed"]) is bool, "급여 안내 응답 계약")
+    notice_matches = (
+        set(result) == {"contractVersion", "userId", "payMonth", "dismissed", "dismissedAt"}
+        and result["contractVersion"] == "PAYSE-SALARY-NOTICE-1"
+        and result["userId"] == user.seed["userId"] and result["payMonth"] == month
+        and type(result["dismissed"]) is bool
+    )
+    _require(notice_matches, "급여 안내 응답 계약")
     if result["dismissed"]:
         value = result["dismissedAt"]
         _require(isinstance(value, str), "급여 안내 최초 시각 형식")

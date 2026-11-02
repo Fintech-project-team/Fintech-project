@@ -5,4 +5,6 @@ package com.payse.api.finance.vo;
  * @created 2026-10-29
  * @usedBy TransactionLink, TransactionRepository.mapLink
  */
-public enum OriginalState { ABSENT, AVAILABLE, UNAVAILABLE, RESTRICTED }
+public enum OriginalState {
+    ABSENT, AVAILABLE, UNAVAILABLE, RESTRICTED
+}

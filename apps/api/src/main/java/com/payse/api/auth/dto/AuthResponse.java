@@ -15,21 +15,31 @@ public final class AuthResponse {
      * @created 2026-10-29
      * @usedBy AuthResponse 클래스 초기화
      */
-    private AuthResponse() {}
+    private AuthResponse() {
+    }
 
     /**
      * 최초 성공 때만 토큰을 포함하는 공개 로그인 응답이다.
      * @created 2026-10-28
      * @usedBy AuthHttpResponse.reply, Spring JSON 직렬화
      */
-    public record Login(UUID userId, String name, UUID sessionId, String accessToken,
-            String tokenType, Instant issuedAt) {
+    public record Login(
+        UUID userId,
+        String name,
+        UUID sessionId,
+        String accessToken,
+        String tokenType,
+        Instant issuedAt
+    ) {
         /**
          * DTO 문자열 표현에서 토큰·사용자 정보를 제외한다.
          * @created 2026-10-28
          * @usedBy Java 문자열 변환
          */
-        @Override public String toString() { return "Login[REDACTED]"; }
+        @Override
+        public String toString() {
+            return "Login[REDACTED]";
+        }
     }
 
     /**
@@ -37,19 +47,22 @@ public final class AuthResponse {
      * @created 2026-10-28
      * @usedBy AuthHttpResponse.reply, Spring JSON 직렬화
      */
-    public record Verified(UUID userId, UUID sessionId, boolean verified) {}
+    public record Verified(UUID userId, UUID sessionId, boolean verified) {
+    }
 
     /**
      * 입력·내부 SQL 없이 공개 오류 식별자와 빈 상세 목록을 제공한다.
      * @created 2026-10-28
      * @usedBy AuthHttpResponse.error, Spring JSON 직렬화
      */
-    public record Problem(String code, String message, UUID requestId, List<Object> details) {}
+    public record Problem(String code, String message, UUID requestId, List<Object> details) {
+    }
 
     /**
      * 공통 error 최상위 키를 유지한다.
      * @created 2026-10-28
      * @usedBy AuthHttpResponse.error, Spring JSON 직렬화
      */
-    public record Error(Problem error) {}
+    public record Error(Problem error) {
+    }
 }

@@ -18,6 +18,7 @@ import java.sql.PreparedStatement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -64,24 +65,36 @@ class SessionJdbcTest {
          * @usedBy Java 문자열 표현
          * @return 원문이 없는 설명
          */
-        @Override public String toString() { return "Fixture[REDACTED]"; }
+        @Override
+        public String toString() {
+            return "Fixture[REDACTED]";
+        }
     }
 
     /**
      * 명시한 폐기용 주소·역할 형식만 허용하고 일부 환경 누락은 실패시킨다.
      * @created 2026-10-26
      * @usedBy JUnit BeforeAll
+     * @modified 2026-11-02 - 긴 식 지역변수 분리
      */
     @BeforeAll
     static void readEnvironment() {
-        assumeFalse(System.getenv().keySet().stream().noneMatch(key -> key.startsWith("PAYSE_SESSION_TEST_")),
-            "Run test_session_service.py with PostgreSQL binaries and a new work directory");
+        boolean missingEnvironment = System.getenv()
+            .keySet()
+            .stream()
+            .noneMatch(key -> key.startsWith("PAYSE_SESSION_TEST_"));
+        assumeFalse(
+            missingEnvironment,
+            "Run test_session_service.py with PostgreSQL binaries and a new work directory"
+        );
         url = required("JDBC_URL");
         login = required("DB_USER");
         password = required("DB_PASSWORD");
         adminLogin = required("ADMIN_USER");
         adminPassword = required("ADMIN_PASSWORD");
-        assertTrue(url.matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/payse_auth_test_sessions"));
+        assertTrue(
+            url.matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/payse_auth_test_sessions")
+        );
         assertTrue(login.matches("payse_session_[0-9a-f]{32}"));
         assertTrue(adminLogin.matches("payse_session_setup_[0-9a-f]{32}"));
     }
@@ -107,14 +120,20 @@ class SessionJdbcTest {
      */
     @BeforeEach
     void open() {
-        application = "session_test_" + UUID.randomUUID().toString().replace("-", "");
+        application = "session_test_" + UUID.randomUUID()
+            .toString()
+            .replace("-", "");
         pool = newPool(login, password, 8, application);
         adminPool = newPool(adminLogin, adminPassword, 3, application + "_setup");
         jdbc = new JdbcTemplate(pool);
         admin = new JdbcTemplate(adminPool);
-        assertEquals(Boolean.TRUE, jdbc.queryForObject(
-            "SELECT NOT rolsuper AND NOT rolbypassrls AND NOT rolinherit FROM pg_roles WHERE rolname=session_user",
-            Boolean.class));
+        assertEquals(
+            Boolean.TRUE,
+            jdbc.queryForObject(
+                "SELECT NOT rolsuper AND NOT rolbypassrls AND NOT rolinherit FROM pg_roles WHERE rolname=session_user",
+                Boolean.class
+            )
+        );
         jpa = new JpaTestContext(pool);
         repository = new AuthRepository(jpa.entityManager());
         transactions = new AuthTransactions(jpa.entityManager(), jpa.manager());
@@ -133,12 +152,19 @@ class SessionJdbcTest {
      * @created 2026-10-26
      * @usedBy JUnit AfterEach
      * @modified 2026-10-29 - JPA 저장소·트랜잭션으로 기존 PostgreSQL 세션 검증 유지
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     @AfterEach
     void close() {
-        if (jpa != null) jpa.close();
-        if (pool != null) pool.close();
-        if (adminPool != null) adminPool.close();
+        if (jpa != null) {
+            jpa.close();
+        }
+        if (pool != null) {
+            pool.close();
+        }
+        if (adminPool != null) {
+            adminPool.close();
+        }
     }
 
     /**
@@ -169,23 +195,49 @@ class SessionJdbcTest {
      * @created 2026-10-26
      * @usedBy SessionJdbcTest.open, 타 사용자 검증
      * @return 실제 준비된 사용자 입력
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     private Fixture prepareUser() {
         UUID id = UUID.randomUUID();
-        String suffix = id.toString().replace("-", "").substring(0, 12);
-        for (int digit = 0; digit < 10; digit++) suffix = suffix.replace((char) ('0' + digit), (char) ('k' + digit));
+        String suffix = id.toString()
+            .replace("-", "")
+            .substring(0, 12);
+        for (int digit = 0; digit < 10; digit++) {
+            suffix = suffix.replace((char) ('0' + digit), (char) ('k' + digit));
+        }
         SecureRandom random = new SecureRandom();
-        Fixture fixture = new Fixture(id, "고객" + suffix,
+        Fixture fixture = new Fixture(
+            id,
+            "고객" + suffix,
             "010" + String.format(Locale.ROOT, "%08d", random.nextInt(100_000_000)),
-            String.format(Locale.ROOT, "%06d", random.nextInt(1_000_000)));
-        assertEquals(1, admin.update("""
+            String.format(Locale.ROOT, "%06d", random.nextInt(1_000_000))
+        );
+        assertEquals(
+            1,
+            admin.update(
+                """
             INSERT INTO payse.users(id, name, phone, code_verifier, data_version, created_at)
             VALUES (?, ?, ?, ?, 1, clock_timestamp())
-            """, fixture.id(), fixture.name(), fixture.phone(), crypto.codeVerifier(fixture.id(), fixture.code())));
-        assertEquals(1, admin.queryForObject("""
+            """,
+                fixture.id(),
+                fixture.name(),
+                fixture.phone(),
+                crypto.codeVerifier(fixture.id(), fixture.code())
+            )
+        );
+        assertEquals(
+            1,
+            admin.queryForObject(
+                """
             SELECT count(*) FROM payse.users
             WHERE id=? AND name=? AND phone=? AND deactivated_at IS NULL AND data_version=1
-            """, Integer.class, fixture.id(), fixture.name(), fixture.phone()));
+            """,
+                Integer.class,
+                fixture.id(),
+                fixture.name(),
+                fixture.phone()
+            )
+        );
         return fixture;
     }
 
@@ -210,8 +262,10 @@ class SessionJdbcTest {
      * @return 커밋 후 반환된 세션 정보
      */
     private AuthResult.Login signIn(Fixture fixture) throws Exception {
-        return assertInstanceOf(AuthResult.Login.class,
-            service.login(peer(), fixture.name(), fixture.phone(), fixture.code()));
+        return assertInstanceOf(
+            AuthResult.Login.class,
+            service.login(peer(), fixture.name(), fixture.phone(), fixture.code())
+        );
     }
 
     /**
@@ -221,10 +275,13 @@ class SessionJdbcTest {
      * @param fixture 준비한 사용자
      * @param active 활성 행만 셀지 여부
      * @return 해당 상태의 정확한 행 수
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     private int sessions(Fixture fixture, boolean active) {
         String sql = "SELECT count(*) FROM payse.demo_sessions WHERE user_id=?";
-        if (active) sql += " AND ended_at IS NULL";
+        if (active) {
+            sql += " AND ended_at IS NULL";
+        }
         return admin.queryForObject(sql, Integer.class, fixture.id());
     }
 
@@ -252,10 +309,15 @@ class SessionJdbcTest {
      * @return 해당 키에 저장된 사건 수
      */
     private int events(String kind, String key) {
-        return admin.queryForObject("""
+        return admin.queryForObject(
+            """
             SELECT coalesce((SELECT cardinality(event_times) FROM payse.auth_rate_limits
                 WHERE kind=? AND key_digest=?), 0)
-            """, Integer.class, kind, key);
+            """,
+            Integer.class,
+            kind,
+            key
+        );
     }
 
     /**
@@ -265,22 +327,45 @@ class SessionJdbcTest {
      */
     @Test
     void createsSessionAfterCommit() throws Exception {
-        AuthResult.Login result = assertInstanceOf(AuthResult.Login.class,
-            service.login(peer(), " " + user.name() + " ", user.phone(), user.code()));
+        AuthResult.Login result = assertInstanceOf(
+            AuthResult.Login.class,
+            service.login(peer(), " " + user.name() + " ", user.phone(), user.code())
+        );
         assertEquals(user.id(), result.userId());
         assertEquals(user.name(), result.name());
         assertNotNull(result.sessionId());
         assertNotNull(result.issuedAt());
         assertEquals(1, sessions(user, true));
-        assertEquals(1, admin.queryForObject("""
+        assertEquals(
+            1,
+            admin.queryForObject(
+                """
             SELECT count(*) FROM payse.demo_sessions
             WHERE id=? AND user_id=? AND token_digest=? AND issued_at=? AND ended_at IS NULL
-            """, Integer.class, result.sessionId(), user.id(), crypto.tokenDigest(result.accessToken()),
-            java.sql.Timestamp.from(result.issuedAt())));
-        assertEquals(1L, admin.queryForObject("SELECT data_version FROM payse.users WHERE id=?", Long.class, user.id()));
+            """,
+                Integer.class,
+                result.sessionId(),
+                user.id(),
+                crypto.tokenDigest(result.accessToken()),
+                java.sql.Timestamp.from(result.issuedAt())
+            )
+        );
+        assertEquals(
+            1L,
+            admin.queryForObject(
+                "SELECT data_version FROM payse.users WHERE id=?",
+                Long.class,
+                user.id()
+            )
+        );
         assertFalse(result.toString().contains(result.accessToken()));
         assertFalse(result.toString().contains(user.name()));
-        assertNull(jdbc.queryForObject("SELECT NULLIF(current_setting('payse.user_id',true),'')", String.class));
+        assertNull(
+            jdbc.queryForObject(
+                "SELECT NULLIF(current_setting('payse.user_id',true),'')",
+                String.class
+            )
+        );
         assertEquals(login, jdbc.queryForObject("SELECT current_user", String.class));
     }
 
@@ -292,12 +377,17 @@ class SessionJdbcTest {
     @Test
     void preservesExistingSession() throws Exception {
         AuthResult.Login first = signIn(user);
-        failure(service.login(peer(), user.name(), user.phone(), user.code()), AuthResult.Reason.AUTH_REJECTED);
+        failure(
+            service.login(peer(), user.name(), user.phone(), user.code()),
+            AuthResult.Reason.AUTH_REJECTED
+        );
         assertEquals(1, sessions(user, true));
         assertEquals(1, sessions(user, false));
         assertEquals(0, events("combo", crypto.combinationLimitKey(user.name(), user.phone())));
-        AuthResult.Verified verified = assertInstanceOf(AuthResult.Verified.class,
-            service.reverify(peer(), first.accessToken(), user.name(), user.phone(), user.code()));
+        AuthResult.Verified verified = assertInstanceOf(
+            AuthResult.Verified.class,
+            service.reverify(peer(), first.accessToken(), user.name(), user.phone(), user.code())
+        );
         assertEquals(first.sessionId(), verified.sessionId());
     }
 
@@ -305,6 +395,7 @@ class SessionJdbcTest {
      * 같은 계정의 동시 최초 로그인은 성공 한 개와 기존 세션 보존으로 끝난다.
      * @created 2026-10-26
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     @Test
     void allowsOnlyOneConcurrentLogin() throws Exception {
@@ -313,17 +404,24 @@ class SessionJdbcTest {
             List<Future<AuthResult>> pending = new ArrayList<>();
             for (int index = 0; index < 8; index++) {
                 InetAddress address = peer();
-                pending.add(executor.submit(() -> {
-                    assertTrue(start.await(5, TimeUnit.SECONDS));
-                    return service.login(address, user.name(), user.phone(), user.code());
-                }));
+                pending.add(
+                    executor.submit(
+                        () -> {
+                            assertTrue(start.await(5, TimeUnit.SECONDS));
+                            return service.login(address, user.name(), user.phone(), user.code());
+                        }
+                    )
+                );
             }
             start.countDown();
             int successful = 0;
             for (Future<AuthResult> future : pending) {
                 AuthResult result = future.get(10, TimeUnit.SECONDS);
-                if (result instanceof AuthResult.Login) successful++;
-                else failure(result, AuthResult.Reason.AUTH_REJECTED);
+                if (result instanceof AuthResult.Login) {
+                    successful++;
+                } else {
+                    failure(result, AuthResult.Reason.AUTH_REJECTED);
+                }
             }
             assertEquals(1, successful);
         }
@@ -340,14 +438,25 @@ class SessionJdbcTest {
     void reverifiesWithoutNewSession() throws Exception {
         AuthResult.Login first = signIn(user);
         for (int index = 0; index < 2; index++) {
-            AuthResult.Verified verified = assertInstanceOf(AuthResult.Verified.class,
-                service.reverify(peer(), first.accessToken(), user.name(), user.phone(), user.code()));
+            AuthResult.Verified verified = assertInstanceOf(
+                AuthResult.Verified.class,
+                service
+                    .reverify(peer(), first.accessToken(), user.name(), user.phone(), user.code())
+            );
             assertEquals(first.userId(), verified.userId());
             assertEquals(first.sessionId(), verified.sessionId());
         }
         assertEquals(1, sessions(user, false));
-        assertTrue(crypto.verifyToken(first.accessToken(), admin.queryForObject(
-            "SELECT token_digest FROM payse.demo_sessions WHERE id=?", String.class, first.sessionId())));
+        assertTrue(
+            crypto.verifyToken(
+                first.accessToken(),
+                admin.queryForObject(
+                    "SELECT token_digest FROM payse.demo_sessions WHERE id=?",
+                    String.class,
+                    first.sessionId()
+                )
+            )
+        );
     }
 
     /**
@@ -359,13 +468,18 @@ class SessionJdbcTest {
     void rejectsOtherOwnerWithoutEndingSession() throws Exception {
         Fixture other = prepareUser();
         AuthResult.Login first = signIn(user);
-        failure(service.reverify(peer(), first.accessToken(), other.name(), other.phone(), other.code()),
-            AuthResult.Reason.AUTH_REJECTED);
+        failure(
+            service
+                .reverify(peer(), first.accessToken(), other.name(), other.phone(), other.code()),
+            AuthResult.Reason.AUTH_REJECTED
+        );
         assertEquals(1, events("combo", crypto.combinationLimitKey(other.name(), other.phone())));
         assertEquals(1, sessions(user, true));
         assertEquals(0, sessions(other, false));
-        assertInstanceOf(AuthResult.Verified.class,
-            service.reverify(peer(), first.accessToken(), user.name(), user.phone(), user.code()));
+        assertInstanceOf(
+            AuthResult.Verified.class,
+            service.reverify(peer(), first.accessToken(), user.name(), user.phone(), user.code())
+        );
     }
 
     /**
@@ -382,14 +496,30 @@ class SessionJdbcTest {
         InetAddress secondPeer = peer();
         CountDownLatch start = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(2)) {
-            Future<AuthResult> left = executor.submit(() -> {
-                assertTrue(start.await(5, TimeUnit.SECONDS));
-                return service.reverify(firstPeer, first.accessToken(), other.name(), other.phone(), other.code());
-            });
-            Future<AuthResult> right = executor.submit(() -> {
-                assertTrue(start.await(5, TimeUnit.SECONDS));
-                return service.reverify(secondPeer, second.accessToken(), user.name(), user.phone(), user.code());
-            });
+            Future<AuthResult> left = executor.submit(
+                () -> {
+                    assertTrue(start.await(5, TimeUnit.SECONDS));
+                    return service.reverify(
+                        firstPeer,
+                        first.accessToken(),
+                        other.name(),
+                        other.phone(),
+                        other.code()
+                    );
+                }
+            );
+            Future<AuthResult> right = executor.submit(
+                () -> {
+                    assertTrue(start.await(5, TimeUnit.SECONDS));
+                    return service.reverify(
+                        secondPeer,
+                        second.accessToken(),
+                        user.name(),
+                        user.phone(),
+                        user.code()
+                    );
+                }
+            );
             start.countDown();
             failure(left.get(8, TimeUnit.SECONDS), AuthResult.Reason.AUTH_REJECTED);
             failure(right.get(8, TimeUnit.SECONDS), AuthResult.Reason.AUTH_REJECTED);
@@ -408,8 +538,10 @@ class SessionJdbcTest {
         AuthResult.Login first = signIn(user);
         assertEquals(AuthResult.LoggedOut.INSTANCE, service.logout(first.accessToken()));
         failure(service.logout(first.accessToken()), AuthResult.Reason.SESSION_INVALID);
-        failure(service.reverify(peer(), first.accessToken(), user.name(), user.phone(), user.code()),
-            AuthResult.Reason.SESSION_INVALID);
+        failure(
+            service.reverify(peer(), first.accessToken(), user.name(), user.phone(), user.code()),
+            AuthResult.Reason.SESSION_INVALID
+        );
         assertEquals(0, sessions(user, true));
         AuthResult.Login next = signIn(user);
         assertNotEquals(first.sessionId(), next.sessionId());
@@ -423,20 +555,28 @@ class SessionJdbcTest {
      * 코드 대조 실패 네 번과 이후 성공이 실패 창을 지우지 않음을 확인한다.
      * @created 2026-10-26
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 차단 결과 존재 전제를 해당 검증 지점에 명시
      */
     @Test
     void keepsFailuresAcrossSuccessAndBlocksFifth() throws Exception {
         String wrong = user.code().equals("000000") ? "000001" : "000000";
         for (int index = 0; index < 4; index++) {
-            failure(service.login(peer(), user.name(), user.phone(), wrong), AuthResult.Reason.AUTH_REJECTED);
+            failure(
+                service.login(peer(), user.name(), user.phone(), wrong),
+                AuthResult.Reason.AUTH_REJECTED
+            );
         }
         AuthResult.Login result = signIn(user);
         assertEquals(4, events("combo", crypto.combinationLimitKey(user.name(), user.phone())));
-        AuthResult.Failure blocked = failure(service.reverify(peer(), result.accessToken(), user.name(), user.phone(), wrong),
-            AuthResult.Reason.RATE_LIMITED);
-        AuthResult.Failure repeated = failure(service.reverify(peer(), result.accessToken(), user.name(), user.phone(), user.code()),
-            AuthResult.Reason.RATE_LIMITED);
-        assertEquals(blocked.retryAt(), repeated.retryAt());
+        AuthResult.Failure blocked = failure(
+            service.reverify(peer(), result.accessToken(), user.name(), user.phone(), wrong),
+            AuthResult.Reason.RATE_LIMITED
+        );
+        AuthResult.Failure repeated = failure(
+            service.reverify(peer(), result.accessToken(), user.name(), user.phone(), user.code()),
+            AuthResult.Reason.RATE_LIMITED
+        );
+        assertEquals(Objects.requireNonNull(blocked).retryAt(), repeated.retryAt());
         assertEquals(5, events("combo", crypto.combinationLimitKey(user.name(), user.phone())));
         assertEquals(1, sessions(user, true));
     }
@@ -450,8 +590,12 @@ class SessionJdbcTest {
     void limitsMissingAccount() throws Exception {
         String absentName = "없는" + user.name();
         for (int index = 1; index <= 5; index++) {
-            failure(service.login(peer(), absentName, user.phone(), user.code()), index < 5
-                ? AuthResult.Reason.AUTH_REJECTED : AuthResult.Reason.RATE_LIMITED);
+            failure(
+                service.login(peer(), absentName, user.phone(), user.code()),
+                index < 5
+                    ? AuthResult.Reason.AUTH_REJECTED
+                    : AuthResult.Reason.RATE_LIMITED
+            );
         }
         assertEquals(0, sessions(user, false));
     }
@@ -463,18 +607,39 @@ class SessionJdbcTest {
      */
     @Test
     void distinguishesInactiveFromWrongCodeInternally() throws Exception {
-        assertEquals(1, admin.update("""
+        assertEquals(
+            1,
+            admin.update(
+                """
             UPDATE payse.users
             SET deactivated_at=clock_timestamp(), purge_after=clock_timestamp()+interval '1 year'
             WHERE id=?
-            """, user.id()));
-        failure(service.login(peer(), user.name(), user.phone(), user.code()), AuthResult.Reason.AUTH_REJECTED);
+            """,
+                user.id()
+            )
+        );
+        failure(
+            service.login(peer(), user.name(), user.phone(), user.code()),
+            AuthResult.Reason.AUTH_REJECTED
+        );
         assertEquals(0, events("combo", crypto.combinationLimitKey(user.name(), user.phone())));
         Fixture disabled = prepareUser();
-        assertEquals(1, admin.update("UPDATE payse.users SET code_verifier=? WHERE id=?",
-            "DISABLED:isolated-session-check", disabled.id()));
-        failure(service.login(peer(), disabled.name(), disabled.phone(), disabled.code()), AuthResult.Reason.AUTH_REJECTED);
-        assertEquals(1, events("combo", crypto.combinationLimitKey(disabled.name(), disabled.phone())));
+        assertEquals(
+            1,
+            admin.update(
+                "UPDATE payse.users SET code_verifier=? WHERE id=?",
+                "DISABLED:isolated-session-check",
+                disabled.id()
+            )
+        );
+        failure(
+            service.login(peer(), disabled.name(), disabled.phone(), disabled.code()),
+            AuthResult.Reason.AUTH_REJECTED
+        );
+        assertEquals(
+            1,
+            events("combo", crypto.combinationLimitKey(disabled.name(), disabled.phone()))
+        );
         assertEquals(0, sessions(user, false));
         assertEquals(0, sessions(disabled, false));
     }
@@ -491,7 +656,10 @@ class SessionJdbcTest {
         for (int index = 1; index < 60; index++) {
             failure(service.rejectMalformed(address), AuthResult.Reason.INVALID_INPUT);
         }
-        failure(service.login(address, user.name(), user.phone(), user.code()), AuthResult.Reason.RATE_LIMITED);
+        failure(
+            service.login(address, user.name(), user.phone(), user.code()),
+            AuthResult.Reason.RATE_LIMITED
+        );
         assertEquals(60, events("ip", crypto.ipLimitKey(address)));
         assertEquals(0, events("combo", crypto.combinationLimitKey(user.name(), user.phone())));
         assertEquals(0, sessions(user, false));
@@ -501,6 +669,8 @@ class SessionJdbcTest {
      * IP·조합 차단이 겹치면 더 늦은 종료 시각을 반환하고 실패를 더 쌓지 않는다.
      * @created 2026-10-26
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-02 - 차단 결과 존재 전제를 해당 검증 지점에 명시
      */
     @Test
     void returnsLaterLimitWithoutCredentialWork() throws Exception {
@@ -508,13 +678,19 @@ class SessionJdbcTest {
         AuthResult.Failure blocked = null;
         for (int index = 0; index < 5; index++) {
             AuthResult result = service.login(peer(), user.name(), user.phone(), wrong);
-            if (index == 4) blocked = failure(result, AuthResult.Reason.RATE_LIMITED);
+            if (index == 4) {
+                blocked = failure(result, AuthResult.Reason.RATE_LIMITED);
+            }
         }
         InetAddress address = peer();
-        for (int index = 0; index < 60; index++) service.rejectMalformed(address);
-        AuthResult.Failure combined = failure(service.login(address, user.name(), user.phone(), user.code()),
-            AuthResult.Reason.RATE_LIMITED);
-        assertEquals(blocked.retryAt(), combined.retryAt());
+        for (int index = 0; index < 60; index++) {
+            service.rejectMalformed(address);
+        }
+        AuthResult.Failure combined = failure(
+            service.login(address, user.name(), user.phone(), user.code()),
+            AuthResult.Reason.RATE_LIMITED
+        );
+        assertEquals(Objects.requireNonNull(blocked).retryAt(), combined.retryAt());
         assertEquals(5, events("combo", crypto.combinationLimitKey(user.name(), user.phone())));
         assertEquals(0, sessions(user, false));
     }
@@ -523,6 +699,8 @@ class SessionJdbcTest {
      * 코드 형식 오류로 이미 차단된 이름·전화번호 조합의 제한 시각을 축소하지 않는다.
      * @created 2026-10-26
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-02 - 차단 결과 존재 전제를 해당 검증 지점에 명시
      */
     @Test
     void keepsBlockedCombinationForMalformedCode() throws Exception {
@@ -530,20 +708,30 @@ class SessionJdbcTest {
         AuthResult.Failure blocked = null;
         for (int index = 0; index < 5; index++) {
             AuthResult result = service.login(peer(), user.name(), user.phone(), wrong);
-            if (index == 4) blocked = failure(result, AuthResult.Reason.RATE_LIMITED);
+            if (index == 4) {
+                blocked = failure(result, AuthResult.Reason.RATE_LIMITED);
+            }
         }
-        AuthResult.Failure invalidCode = failure(service.login(peer(), user.name(), user.phone(), "bad"),
-            AuthResult.Reason.RATE_LIMITED);
-        AuthResult.Failure missingCode = failure(service.login(peer(), user.name(), user.phone(), null),
-            AuthResult.Reason.RATE_LIMITED);
-        assertEquals(blocked.retryAt(), invalidCode.retryAt());
-        assertEquals(blocked.retryAt(), missingCode.retryAt());
+        AuthResult.Failure invalidCode = failure(
+            service.login(peer(), user.name(), user.phone(), "bad"),
+            AuthResult.Reason.RATE_LIMITED
+        );
+        AuthResult.Failure missingCode = failure(
+            service.login(peer(), user.name(), user.phone(), null),
+            AuthResult.Reason.RATE_LIMITED
+        );
+        assertEquals(Objects.requireNonNull(blocked).retryAt(), invalidCode.retryAt());
+        assertEquals(Objects.requireNonNull(blocked).retryAt(), missingCode.retryAt());
 
         InetAddress address = peer();
-        for (int index = 0; index < 60; index++) service.rejectMalformed(address);
-        AuthResult.Failure combined = failure(service.login(address, user.name(), user.phone(), "bad"),
-            AuthResult.Reason.RATE_LIMITED);
-        assertEquals(blocked.retryAt(), combined.retryAt());
+        for (int index = 0; index < 60; index++) {
+            service.rejectMalformed(address);
+        }
+        AuthResult.Failure combined = failure(
+            service.login(address, user.name(), user.phone(), "bad"),
+            AuthResult.Reason.RATE_LIMITED
+        );
+        assertEquals(Objects.requireNonNull(blocked).retryAt(), combined.retryAt());
         assertEquals(60, events("ip", crypto.ipLimitKey(address)));
         assertEquals(5, events("combo", crypto.combinationLimitKey(user.name(), user.phone())));
         assertEquals(0, sessions(user, false));
@@ -557,8 +745,10 @@ class SessionJdbcTest {
     @Test
     void rejectsInvalidTokenWithoutCredentialFailure() throws Exception {
         InetAddress address = peer();
-        failure(service.reverify(address, "invalid", user.name(), user.phone(), user.code()),
-            AuthResult.Reason.SESSION_INVALID);
+        failure(
+            service.reverify(address, "invalid", user.name(), user.phone(), user.code()),
+            AuthResult.Reason.SESSION_INVALID
+        );
         failure(service.logout(null), AuthResult.Reason.SESSION_INVALID);
         assertEquals(1, events("ip", crypto.ipLimitKey(address)));
         assertEquals(0, events("combo", crypto.combinationLimitKey(user.name(), user.phone())));
@@ -572,15 +762,33 @@ class SessionJdbcTest {
      */
     @Test
     void deniesDirectSessionAccess() {
-        assertThrows(AuthStoreException.class, () -> transactions.run(() -> {
-            jdbc.queryForList("SELECT token_digest FROM payse.demo_sessions");
-            return null;
-        }));
-        assertThrows(AuthStoreException.class, () -> transactions.run(() -> {
-            jdbc.update("UPDATE payse.demo_sessions SET ended_at=clock_timestamp() WHERE user_id=?", user.id());
-            return null;
-        }));
-        assertNull(jdbc.queryForObject("SELECT NULLIF(current_setting('payse.user_id',true),'')", String.class));
+        assertThrows(
+            AuthStoreException.class,
+            () -> transactions.run(
+                () -> {
+                    jdbc.queryForList("SELECT token_digest FROM payse.demo_sessions");
+                    return null;
+                }
+            )
+        );
+        assertThrows(
+            AuthStoreException.class,
+            () -> transactions.run(
+                () -> {
+                    jdbc.update(
+                        "UPDATE payse.demo_sessions SET ended_at=clock_timestamp() WHERE user_id=?",
+                        user.id()
+                    );
+                    return null;
+                }
+            )
+        );
+        assertNull(
+            jdbc.queryForObject(
+                "SELECT NULLIF(current_setting('payse.user_id',true),'')",
+                String.class
+            )
+        );
     }
 
     /**
@@ -590,9 +798,12 @@ class SessionJdbcTest {
      */
     @Test
     void commitFailureRollsBackSessionButKeepsIp() throws Exception {
-        String name = "session_fail_" + UUID.randomUUID().toString().replace("-", "");
+        String name = "session_fail_" + UUID.randomUUID()
+            .toString()
+            .replace("-", "");
         // 검사 UUID만 리터럴로 전달하며 함수/트리거는 이 폐기용 DB에서만 만들고 제거한다.
-        admin.execute("""
+        admin.execute(
+            """
             CREATE FUNCTION payse.%s()
             RETURNS trigger
             LANGUAGE plpgsql
@@ -603,17 +814,22 @@ class SessionJdbcTest {
               END IF;
               RETURN NEW;
             END $$
-            """.formatted(name, user.id()));
-        admin.execute("""
+            """.formatted(name, user.id())
+        );
+        admin.execute(
+            """
             CREATE CONSTRAINT TRIGGER %s
               AFTER INSERT ON payse.demo_sessions
               DEFERRABLE INITIALLY DEFERRED
               FOR EACH ROW EXECUTE FUNCTION payse.%s()
-            """.formatted(name, name));
+            """.formatted(name, name)
+        );
         InetAddress address = peer();
         try {
-            AuthStoreException error = assertThrows(AuthStoreException.class,
-                () -> service.login(address, user.name(), user.phone(), user.code()));
+            AuthStoreException error = assertThrows(
+                AuthStoreException.class,
+                () -> service.login(address, user.name(), user.phone(), user.code())
+            );
             assertNull(error.getCause());
             assertFalse(error.toString().contains(user.phone()));
             assertEquals(0, sessions(user, false));
@@ -623,8 +839,10 @@ class SessionJdbcTest {
             admin.execute("DROP TRIGGER " + name + " ON payse.demo_sessions");
             admin.execute("DROP FUNCTION payse." + name + "()");
         }
-        assertInstanceOf(AuthResult.Login.class,
-            service.login(peer(), user.name(), user.phone(), user.code()));
+        assertInstanceOf(
+            AuthResult.Login.class,
+            service.login(peer(), user.name(), user.phone(), user.code())
+        );
     }
 
     /**
@@ -636,13 +854,16 @@ class SessionJdbcTest {
     void rechecksCodeAfterUserLock() throws Exception {
         InetAddress address = peer();
         String replacement = user.code().equals("000000") ? "000001" : "000000";
-        try (Connection blocker = adminPool.getConnection(); var executor = Executors.newSingleThreadExecutor()) {
+        try (Connection blocker = adminPool.getConnection();
+            var executor = Executors.newSingleThreadExecutor()) {
             blocker.setAutoCommit(false);
             lockUser(blocker, user.id());
             Future<AuthResult> pending = executor.submit(
-                () -> service.login(address, user.name(), user.phone(), user.code()));
+                () -> service.login(address, user.name(), user.phone(), user.code())
+            );
             awaitLock();
-            try (PreparedStatement statement = blocker.prepareStatement("UPDATE payse.users SET code_verifier=? WHERE id=?")) {
+            try (PreparedStatement statement = blocker
+                .prepareStatement("UPDATE payse.users SET code_verifier=? WHERE id=?")) {
                 statement.setString(1, crypto.codeVerifier(user.id(), replacement));
                 statement.setObject(2, user.id());
                 assertEquals(1, statement.executeUpdate());
@@ -663,14 +884,18 @@ class SessionJdbcTest {
     void reverifyObservesCommittedLogout() throws Exception {
         AuthResult.Login first = signIn(user);
         InetAddress address = peer();
-        try (Connection blocker = adminPool.getConnection(); var executor = Executors.newSingleThreadExecutor()) {
+        try (Connection blocker = adminPool.getConnection();
+            var executor = Executors.newSingleThreadExecutor()) {
             blocker.setAutoCommit(false);
             lockUser(blocker, user.id());
             Future<AuthResult> pending = executor.submit(
-                () -> service.reverify(address, first.accessToken(), user.name(), user.phone(), user.code()));
+                () -> service
+                    .reverify(address, first.accessToken(), user.name(), user.phone(), user.code())
+            );
             awaitLock();
             try (PreparedStatement statement = blocker.prepareStatement(
-                    "UPDATE payse.demo_sessions SET ended_at=clock_timestamp() WHERE id=? AND user_id=?")) {
+                "UPDATE payse.demo_sessions SET ended_at=clock_timestamp() WHERE id=? AND user_id=?"
+            )) {
                 statement.setObject(1, first.sessionId());
                 statement.setObject(2, user.id());
                 assertEquals(1, statement.executeUpdate());
@@ -685,6 +910,7 @@ class SessionJdbcTest {
      * 두 로그아웃 요청은 한 번만 종료하고 나머지는 무효 세션으로 끝난다.
      * @created 2026-10-26
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     @Test
     void concurrentLogoutChangesOneSession() throws Exception {
@@ -692,16 +918,25 @@ class SessionJdbcTest {
         CountDownLatch start = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(2)) {
             List<Future<AuthResult>> pending = new ArrayList<>();
-            for (int index = 0; index < 2; index++) pending.add(executor.submit(() -> {
-                assertTrue(start.await(5, TimeUnit.SECONDS));
-                return service.logout(first.accessToken());
-            }));
+            for (int index = 0; index < 2; index++) {
+                pending.add(
+                    executor.submit(
+                        () -> {
+                            assertTrue(start.await(5, TimeUnit.SECONDS));
+                            return service.logout(first.accessToken());
+                        }
+                    )
+                );
+            }
             start.countDown();
             int ended = 0;
             for (Future<AuthResult> future : pending) {
                 AuthResult result = future.get(8, TimeUnit.SECONDS);
-                if (result == AuthResult.LoggedOut.INSTANCE) ended++;
-                else failure(result, AuthResult.Reason.SESSION_INVALID);
+                if (result == AuthResult.LoggedOut.INSTANCE) {
+                    ended++;
+                } else {
+                    failure(result, AuthResult.Reason.SESSION_INVALID);
+                }
             }
             assertEquals(1, ended);
         }
@@ -718,18 +953,31 @@ class SessionJdbcTest {
     @Test
     void worksWithSingleConnection() throws Exception {
         try (HikariDataSource single = newPool(login, password, 1, application + "_single");
-                JpaTestContext singleJpa = new JpaTestContext(single)) {
+            JpaTestContext singleJpa = new JpaTestContext(single)) {
             JdbcTemplate singleJdbc = new JdbcTemplate(single);
-            AuthService singleService = new AuthService(new AuthRepository(singleJpa.entityManager()),
-                new AuthTransactions(singleJpa.entityManager(), singleJpa.manager()), crypto);
-            AuthResult.Login first = assertInstanceOf(AuthResult.Login.class,
-                singleService.login(peer(), user.name(), user.phone(), user.code()));
-            assertInstanceOf(AuthResult.Verified.class,
-                singleService.reverify(peer(), first.accessToken(), user.name(), user.phone(), user.code()));
+            AuthService singleService = new AuthService(
+                new AuthRepository(singleJpa.entityManager()),
+                new AuthTransactions(singleJpa.entityManager(), singleJpa.manager()),
+                crypto
+            );
+            AuthResult.Login first = assertInstanceOf(
+                AuthResult.Login.class,
+                singleService.login(peer(), user.name(), user.phone(), user.code())
+            );
+            assertInstanceOf(
+                AuthResult.Verified.class,
+                singleService
+                    .reverify(peer(), first.accessToken(), user.name(), user.phone(), user.code())
+            );
             assertEquals(AuthResult.LoggedOut.INSTANCE, singleService.logout(first.accessToken()));
             assertEquals(0, single.getHikariPoolMXBean().getActiveConnections());
             assertEquals(login, singleJdbc.queryForObject("SELECT current_user", String.class));
-            assertNull(singleJdbc.queryForObject("SELECT NULLIF(current_setting('payse.user_id',true),'')", String.class));
+            assertNull(
+                singleJdbc.queryForObject(
+                    "SELECT NULLIF(current_setting('payse.user_id',true),'')",
+                    String.class
+                )
+            );
         }
     }
 
@@ -741,7 +989,8 @@ class SessionJdbcTest {
      * @param userId 준비 단계에서 얻은 사용자 ID
      */
     private void lockUser(Connection connection, UUID userId) throws Exception {
-        try (PreparedStatement statement = connection.prepareStatement("SELECT id FROM payse.users WHERE id=? FOR UPDATE")) {
+        try (PreparedStatement statement = connection
+            .prepareStatement("SELECT id FROM payse.users WHERE id=? FOR UPDATE")) {
             statement.setObject(1, userId);
             try (var result = statement.executeQuery()) {
                 assertTrue(result.next());
@@ -755,15 +1004,22 @@ class SessionJdbcTest {
      * 대기 시간을 임의 추측하지 않고 실제 서비스 연결의 PostgreSQL Lock 상태를 관측한다.
      * @created 2026-10-26
      * @usedBy 실제 잠금 대기 검증
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     private void awaitLock() throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (System.nanoTime() < deadline) {
-            int waiting = admin.queryForObject("""
+            int waiting = admin.queryForObject(
+                """
                 SELECT count(*) FROM pg_stat_activity
                 WHERE application_name=? AND wait_event_type='Lock'
-                """, Integer.class, application);
-            if (waiting > 0) return;
+                """,
+                Integer.class,
+                application
+            );
+            if (waiting > 0) {
+                return;
+            }
             Thread.sleep(10);
         }
         fail("Session operation did not enter the expected database lock wait");

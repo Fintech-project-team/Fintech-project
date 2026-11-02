@@ -14,8 +14,17 @@ for (const p of [
   '.prettierrc.json',
   'eslint.config.mjs',
   'package-lock.json',
+  'apps/ai/build.gradle',
+  'apps/ai/gradle.lockfile',
+  'apps/ai/AGENTS.md',
 ]) {
   if (!fs.existsSync(p)) problems.push(`Missing ${p}`);
+}
+if (
+  !read('apps/api/settings.gradle').includes("include ':ai'") ||
+  !read('apps/api/build.gradle').includes("implementation project(':ai')")
+) {
+  problems.push('API must consume the shared AI Java module');
 }
 const manifest = JSON.parse(read('package.json'));
 const lock = JSON.parse(read('package-lock.json'));

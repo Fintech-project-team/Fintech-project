@@ -78,14 +78,42 @@ def make_snapshot(alias: str, as_of: str = '2026-10-19T12:00:00+09:00') -> dict:
     institutions = [{'code':code,'kind':kind,'name':name,'accountCount':(2 if code=='bank.kb' else 1) if kind=='bank' else 0,'cardCount':1 if kind=='card' else 0} for kind,listing in [('bank',BANKS),('card',CARDS)] for code,name in listing]
     accounts=[]
     for i in range(6):
-        accounts.append({**source('account',str(i)),'accountId':entity_id('account',i),'institutionCode':BANKS[i%5][0],'productType':'savings' if i==1 else 'time_deposit' if i==5 else 'demand','productName':['입출금 통장','자유 적금','생활비 통장','비상금 통장','내일채움 통장','정기예금'][i],'maskedNumber':f'***-****-{i+1:04}','balanceKRW':[1500000,500000,300000,200000,0,1000000][i],'asOf':as_of,'included':i in (0,1),'nickname':None})
+        account_row = {
+            **source('account',str(i)),
+            'accountId': entity_id('account',i),
+            'institutionCode': BANKS[i%5][0],
+            'productType': 'savings' if i==1 else 'time_deposit' if i==5 else 'demand',
+            'productName': ['입출금 통장','자유 적금','생활비 통장','비상금 통장','내일채움 통장','정기예금'][i],
+            'maskedNumber': f'***-****-{i+1:04}',
+            'balanceKRW': [1500000,500000,300000,200000,0,1000000][i],
+            'asOf': as_of,
+            'included': i in (0,1),
+            'nickname': None
+        }
+        accounts.append(account_row)
     cards=[]
     for i,(code,name) in enumerate(CARDS):
         schedules=[]
         for offset in range(-1,4):
             first=month_shift(today,offset,1)
-            schedules.append({'periodStart':first.isoformat(),'periodEnd':month_shift(first,0,31).isoformat(),'dueDate':month_shift(first,1,10).isoformat(),'evidenceRef':f'fixture-schedule/{alias}/{i}/{first:%Y-%m}'})
-        cards.append({**source('card',str(i)),'cardId':entity_id('card',i),'institutionCode':code,'productName':f'{name} 체크카드' if i==3 else f'{name} 신용카드','maskedNumber':f'****-****-****-{i+1:04}','cardType':'debit' if i==3 else 'credit','withdrawalAccountId':accounts[0 if i<3 else 2]['accountId'],'scheduleEvidence':[] if i==3 else schedules})
+            schedule_row = {
+                'periodStart': first.isoformat(),
+                'periodEnd': month_shift(first,0,31).isoformat(),
+                'dueDate': month_shift(first,1,10).isoformat(),
+                'evidenceRef': f'fixture-schedule/{alias}/{i}/{first:%Y-%m}'
+            }
+            schedules.append(schedule_row)
+        card_row = {
+            **source('card',str(i)),
+            'cardId': entity_id('card',i),
+            'institutionCode': code,
+            'productName': f'{name} 체크카드' if i==3 else f'{name} 신용카드',
+            'maskedNumber': f'****-****-****-{i+1:04}',
+            'cardType': 'debit' if i==3 else 'credit',
+            'withdrawalAccountId': accounts[0 if i<3 else 2]['accountId'],
+            'scheduleEvidence': [] if i==3 else schedules
+        }
+        cards.append(card_row)
     transactions=[]
     telecom_evidence=[]
     relations=[]
@@ -143,7 +171,20 @@ def make_snapshot(alias: str, as_of: str = '2026-10-19T12:00:00+09:00') -> dict:
     plan={'userId':user_id,'planId':plan_id,'firstOccurrenceMonth':first_month}
     obligations=[]
     for key,label,amount,day in [('rent','월세',300000,22),('repair','수리비',100000,18),('bill','카드 청구',110000,10),('telecom','통신비',50000,25)]:
-        obligations.append({'userId':user_id,'obligationId':entity_id('obligation',key),'label':label,'withdrawalAccountId':accounts[0]['accountId'],'amountKRW':amount,'dueDate':month_shift(today,0,day).isoformat(),'status':'active','statementId':statement['statementId'] if key=='bill' else None,'recurringPlanId':plan_id if key=='telecom' else None,'recurrenceKey':f'{plan_id}:{first_month}' if key=='telecom' else None,'planRevisionId':revision_id if key=='telecom' else None})
+        obligation_row = {
+            'userId': user_id,
+            'obligationId': entity_id('obligation',key),
+            'label': label,
+            'withdrawalAccountId': accounts[0]['accountId'],
+            'amountKRW': amount,
+            'dueDate': month_shift(today,0,day).isoformat(),
+            'status': 'active',
+            'statementId': statement['statementId'] if key=='bill' else None,
+            'recurringPlanId': plan_id if key=='telecom' else None,
+            'recurrenceKey': f'{plan_id}:{first_month}' if key=='telecom' else None,
+            'planRevisionId': revision_id if key=='telecom' else None
+        }
+        obligations.append(obligation_row)
     settlements=[]
     for key,transaction_id,amount in [('bill',payment_id,110000),('repair',partial_payment_id,40000)]:
         settlements.append({'userId':user_id,'linkId':entity_id('settlement',key),'obligationId':entity_id('obligation',key),'transactionId':transaction_id,'allocatedKRW':amount,'method':'automatic','evidenceRefs':[f'fixture-explicit-settlement/{key}'],'invalidatedAt':None})
@@ -213,13 +254,23 @@ def make_demo_snapshot(base: dict) -> dict:
     snapshot['recurringPlans'].append({
         'userId': snapshot['userId'], 'planId': plan_id, 'firstOccurrenceMonth': '2026-10',
     })
-    snapshot['recurringPlanRevisions'].append({
-        'userId': snapshot['userId'], 'revisionId': revision_id, 'planId': plan_id,
-        'effectiveFromMonth': '2026-10', 'label': PLAN_LABELS['rent'],
-        'amountKRW': 300000, 'monthlyDay': 22, 'paymentTiming': 'immediate',
-        'scheduleBasis': 'withdrawal', 'withdrawalAccountId': rent['withdrawalAccountId'],
-        'cardId': None, 'status': 'active', 'scheduleOverrides': [], 'isCurrent': True,
-    })
+    revision_row = {
+        'userId': snapshot['userId'],
+        'revisionId': revision_id,
+        'planId': plan_id,
+        'effectiveFromMonth': '2026-10',
+        'label': PLAN_LABELS['rent'],
+        'amountKRW': 300000,
+        'monthlyDay': 22,
+        'paymentTiming': 'immediate',
+        'scheduleBasis': 'withdrawal',
+        'withdrawalAccountId': rent['withdrawalAccountId'],
+        'cardId': None,
+        'status': 'active',
+        'scheduleOverrides': [],
+        'isCurrent': True
+    }
+    snapshot['recurringPlanRevisions'].append(revision_row)
     snapshot['recurringDecisions'].append({
         'userId': snapshot['userId'], 'decisionId': uid('alpha/demo-ready/decision/rent'),
         'candidateKey': 'fixture/demo-ready/rent/three-months', 'ruleVersion': RULE,

@@ -1,5 +1,8 @@
 package com.payse.api.finance.service;
 
+import com.payse.api.ApiTestConstants.FinanceCodes;
+import com.payse.api.ApiTestConstants.FinanceFields;
+
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -25,6 +28,7 @@ class AccountStatusTest {
      * 계좌 확정·미확인은 기존 반영 상태와 원천 값을 수정하지 않고 허용한다.
      * @created 2026-10-30
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조; 단일 제어문 본문 중괄호 명시
      */
     @Test
     void supportedAccountStates() throws Exception {
@@ -32,7 +36,9 @@ class AccountStatusTest {
             ObjectNode source = source();
             List<ObjectNode> rows = accounts(source);
             assertFalse(rows.isEmpty());
-            for (ObjectNode row : rows) row.put("status", status);
+            for (ObjectNode row : rows) {
+                row.put(FinanceFields.STATUS, status);
+            }
             ObjectNode before = source.deepCopy();
             assertDoesNotThrow(() -> FinancialShape.validate(source));
             assertEquals(before, source);
@@ -43,19 +49,31 @@ class AccountStatusTest {
      * 계좌 승인·취소는 원천 오류로 거절하며 숫자·null 상태도 묵시 변환하지 않는다.
      * @created 2026-10-30
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조; 단일 제어문 본문 중괄호 명시
      */
     @Test
     void unsupportedAccountStates() throws Exception {
-        for (String status : List.of("approved", "cancelled", "POSTED", "")) {
+        for (String status : List.of(
+            "approved",
+            "cancelled",
+            "POSTED",
+            ""
+        )) {
             ObjectNode source = source();
-            for (ObjectNode row : accounts(source)) row.put("status", status);
+            for (ObjectNode row : accounts(source)) {
+                row.put(FinanceFields.STATUS, status);
+            }
             reject(source);
         }
         ObjectNode numeric = source();
-        for (ObjectNode row : accounts(numeric)) row.put("status", 1);
+        for (ObjectNode row : accounts(numeric)) {
+            row.put(FinanceFields.STATUS, 1);
+        }
         reject(numeric);
         ObjectNode missing = source();
-        for (ObjectNode row : accounts(missing)) row.putNull("status");
+        for (ObjectNode row : accounts(missing)) {
+            row.putNull(FinanceFields.STATUS);
+        }
         reject(missing);
     }
 
@@ -63,14 +81,15 @@ class AccountStatusTest {
      * 관계 자료의 계좌 상태도 본 거래 배열과 같은 기준으로 검사한다.
      * @created 2026-10-30
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void relatedEntriesCannotBypassValidation() throws Exception {
         ObjectNode source = source();
         for (ObjectNode row : accounts(source)) {
             ObjectNode related = row.deepCopy();
-            related.put("status", "cancelled");
-            source.withArray("relatedTransactions").add(related);
+            related.put(FinanceFields.STATUS, "cancelled");
+            source.withArray(FinanceFields.RELATED_TRANSACTIONS).add(related);
         }
         reject(source);
     }
@@ -79,15 +98,29 @@ class AccountStatusTest {
      * 카드 종류별 기존 상태 허용 범위를 계좌 제한 때문에 바꾸지 않는다.
      * @created 2026-10-30
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조; 단일 제어문 본문 중괄호 명시
      */
     @Test
     void cardStatesRemainSupported() throws Exception {
-        for (String status : List.of("approved", "posted", "cancelled", "unknown")) {
+        for (String status : List.of(
+            "approved",
+            "posted",
+            "cancelled",
+            "unknown"
+        )) {
             ObjectNode source = source();
-            List<ObjectNode> cards = FinancialProjection.rows(source, "transactions").stream()
-                .filter(row -> !row.get("recordKind").asString().equals("account_entry")).toList();
+            List<ObjectNode> cards = FinancialProjection.rows(source, FinanceFields.TRANSACTIONS)
+                .stream()
+                .filter(
+                    row -> !row.get(FinanceFields.RECORD_KIND)
+                        .asString()
+                        .equals("account_entry")
+                )
+                .toList();
             assertFalse(cards.isEmpty());
-            for (ObjectNode row : cards) row.put("status", status);
+            for (ObjectNode row : cards) {
+                row.put(FinanceFields.STATUS, status);
+            }
             ObjectNode before = source.deepCopy();
             assertDoesNotThrow(() -> FinancialShape.validate(source));
             assertEquals(before, source);
@@ -100,29 +133,41 @@ class AccountStatusTest {
      * @usedBy AccountStatusTest의 상태 검사
      */
     private ObjectNode source() throws Exception {
-        return (ObjectNode) mapper.readTree(Files.readString(Path.of("fixtures/generated/snapshots/alpha-ready.json")));
+        return (ObjectNode) mapper
+            .readTree(Files.readString(Path.of("fixtures/generated/snapshots/alpha-ready.json")));
     }
 
     /**
      * 표시명·고정 ID·배열 순서 대신 사건 종류로 은행 거래 집합을 고른다.
      * @created 2026-10-30
      * @usedBy AccountStatusTest의 계좌 검사
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     private List<ObjectNode> accounts(ObjectNode source) {
-        return FinancialProjection.rows(source, "transactions").stream()
-            .filter(row -> row.get("recordKind").asString().equals("account_entry")).toList();
+        return FinancialProjection.rows(source, FinanceFields.TRANSACTIONS)
+            .stream()
+            .filter(
+                row -> row.get(FinanceFields.RECORD_KIND)
+                    .asString()
+                    .equals("account_entry")
+            )
+            .toList();
     }
 
     /**
      * 거절을 기존 금융 원천 오류로 반환하고 입력 객체는 보존하는지 검사한다.
      * @created 2026-10-30
      * @usedBy AccountStatusTest의 오류 검사
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     private void reject(ObjectNode source) {
         ObjectNode before = source.deepCopy();
-        FinancialException error = assertThrows(FinancialException.class, () -> FinancialShape.validate(source));
+        FinancialException error = assertThrows(
+            FinancialException.class,
+            () -> FinancialShape.validate(source)
+        );
         assertEquals(503, error.status());
-        assertEquals("TEMPORARILY_UNAVAILABLE", error.code());
+        assertEquals(FinanceCodes.TEMPORARILY_UNAVAILABLE, error.code());
         assertEquals(before, source);
     }
 }

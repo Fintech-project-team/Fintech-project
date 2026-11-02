@@ -63,7 +63,7 @@ Java DTO와 Dart 모델은 기존 JSON 이름·날짜 정밀도·금액 단위·
 
 ## 주석과 구조
 
-공통 코드 구조·설정·주석은 [CODE_SPEC](../../../docs/harness/CODE_SPEC.md), API 적용 범위·필수 Java 주석은 [src/AGENTS.md](../src/AGENTS.md)를 따른다. 초기화 안내에서 같은 규칙을 별도로 정의하지 않는다.
+공통 코드 구조·설정·주석은 [CODE_SPEC](../../../docs/harness/CODE_SPEC.md), API 적용 범위·필수 Java 주석은 [AGENTS.md](../AGENTS.md)를 따른다. 초기화 안내에서 같은 규칙을 별도로 정의하지 않는다.
 
 객체 수명·생성자 주입·가변 전역 상태 제한은 [앱 구조](../../../docs/app-architecture.md)를 따른다. 실제 기능의 책임·입출력·권한·실패·검사는 [문서 작성 기준](../../../docs/development-notes.md)에 따라 기존 API 상세를 보완한다. bootstrap만을 위해 빈 업무 계층을 생성하지 않는다.
 
@@ -108,3 +108,7 @@ VO는 기존 값·검증·민감 정보의 문자열 숨김을 유지한다. JPA
 - [Spring 요청 검증](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/requestbody.html): 기본 400과 PAYSE 업무 검증 422의 명시적 매핑 필요.
 
 작성·변경·검증 이력은 [API 문서 이력](history/2026-10-22-api-doc-history.md)에 보존한다.
+
+## 공유 AI 빌드
+
+`apps/ai`는 Java 21 라이브러리이며 API의 Gradle `:ai` 모듈로 함께 빌드·배포한다. 별도 실행 서버나 npm workspace는 없다. `node scripts/harness/run-api.mjs check`가 AI Java 테스트·주석과 Boot JAR의 운영 코드 포함/비공개 평가 자료 제외도 검사한다. [AI 지침](../../ai/AGENTS.md)과 [구조](../../ai/docs/README.md)를 해당 작업 전에 읽는다. 금융 HTTP·DB·KMS는 API 책임을 유지한다.

@@ -4,13 +4,17 @@ import com.payse.api.auth.crypto.AuthCrypto;
 import com.payse.api.auth.dto.AuthRows;
 import com.payse.api.auth.mapper.AuthRepository;
 import com.payse.api.auth.mapper.AuthTransactions;
+import com.payse.api.constants.ApiCodeConstants;
+import com.payse.api.constants.ApiConfigConstants;
+import com.payse.api.constants.ApiFieldConstants.FinanceDb;
+import com.payse.api.constants.ApiFieldConstants;
 import com.payse.api.finance.dto.StoredReceipt;
+import com.payse.api.finance.dto.TransactionQuery;
 import com.payse.api.finance.dto.WriteChange;
 import com.payse.api.finance.error.FinancialException;
 import com.payse.api.finance.mapper.FinancialReceipts;
 import com.payse.api.finance.mapper.FinancialRepository;
 import com.payse.api.finance.mapper.FinancialWrites;
-import com.payse.api.finance.service.FinancialProjection;
 import com.payse.api.finance.validation.FinancialInput;
 import jakarta.persistence.PersistenceException;
 import java.util.HashSet;
@@ -34,6 +38,7 @@ import tools.jackson.databind.node.ObjectNode;
 @Service
 @Profile("database & auth & finance")
 public final class FinancialService {
+
     private final AuthTransactions transactions;
     private final AuthRepository auth;
     private final AuthCrypto crypto;
@@ -49,9 +54,15 @@ public final class FinancialService {
      * @created 2026-10-29
      * @usedBy Spring 생성자 주입
      */
-    public FinancialService(AuthTransactions transactions, AuthRepository auth, AuthCrypto crypto,
-            FinancialRepository repository, FinancialWrites writes, FinancialReceipts receipts,
-            FinancialCursor cursors) {
+    public FinancialService(
+        AuthTransactions transactions,
+        AuthRepository auth,
+        AuthCrypto crypto,
+        FinancialRepository repository,
+        FinancialWrites writes,
+        FinancialReceipts receipts,
+        FinancialCursor cursors
+    ) {
         this.transactions = transactions;
         this.auth = auth;
         this.crypto = crypto;
@@ -67,58 +78,109 @@ public final class FinancialService {
      * @usedBy FinancialController.snapshot, page
      */
     public ObjectNode read(String token, Supplier<String> cursor, boolean pageOnly) {
-        return transactions.run(() -> {
-            AuthRows.Session session = authorize(token);
-            return snapshot(repository.load(session.userId()), session, cursor.get(), pageOnly);
-        });
+        return transactions.run(
+            () -> {
+                AuthRows.Session session = authorize(token);
+                return snapshot(repository.load(session.userId()), session, cursor.get(), pageOnly);
+            }
+        );
+    }
+
+    /**
+     * 인증된 사용자와 같은 DB 문맥에서 명시 기간 또는 기존 cursor의 거래 페이지를 읽는다.
+     * @created 2026-11-01
+     * @usedBy FinancialController.page
+     * @modified 2026-11-02 - 기존 인증·조회 경계를 보존하며 선택적 기간 경로 통합
+     */
+    public ObjectNode transactions(String token, Supplier<TransactionQuery> request) {
+        return transactions.run(
+            () -> {
+                AuthRows.Session session = authorize(token);
+                TransactionQuery query = request.get();
+                return snapshot(repository.load(session.userId()), session, query, true);
+            }
+        );
     }
 
     /**
      * 형식→멱등→새 요청 버전·권한→저장·영수증을 원자 처리하고 최신 자료를 별도 조회한다.
      * @created 2026-10-29
      * @usedBy FinancialController.write
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조
      */
     public ObjectNode write(String token, String method, String path, Supplier<JsonNode> body) {
-        WriteResult result = transactions.run(() -> {
-            AuthRows.Session session = authorize(token);
-            ObjectNode input = FinancialInput.validate(method, path, body.get());
-            String route = canonicalPath(path);
-            String key = input.get("idempotencyKey").asString();
-            String digest = FinancialJson.requestDigest(method, route, input);
-            var existing = receipts.find(session.userId(), key, digest);
-            if (existing.isPresent()) {
-                return new WriteResult(existing.get(), true);
-            }
-            ObjectNode source = repository.load(session.userId());
-            if (!input.get("expectedDataVersion").equals(source.get("dataVersion"))) {
-                throw new FinancialException(409, "STALE_DATA");
-            }
-            if (!input.get("ruleVersion").equals(source.get("ruleVersion"))) {
-                throw new FinancialException(409, "RULE_VERSION_MISMATCH");
-            }
-            try {
-                WriteChange change = writes.apply(session.userId(), method, route, input);
-                StoredReceipt receipt = receipts.save(session.userId(), key, digest, method + " " + route,
-                    change.changedRefs(), change.beforeAfter());
-                receipts.checkConstraints();
-                return new WriteResult(receipt, false);
-            } catch (DataIntegrityViolationException failure) {
-                throw new FinancialException(409, "RELATION_CONFLICT");
-            } catch (PersistenceException failure) {
-                if (new HibernateJpaDialect().translateExceptionIfPossible(failure)
-                        instanceof DataIntegrityViolationException) {
-                    throw new FinancialException(409, "RELATION_CONFLICT");
+        WriteResult result = transactions.run(
+            () -> {
+                AuthRows.Session session = authorize(token);
+                ObjectNode input = FinancialInput.validate(method, path, body.get());
+                String route = canonicalPath(path);
+                String key = input.get(ApiFieldConstants.Finance.IDEMPOTENCY_KEY).asString();
+                String digest = FinancialJson.requestDigest(method, route, input);
+                var existing = receipts.find(session.userId(), key, digest);
+                if (existing.isPresent()) {
+                    return new WriteResult(existing.get(), true);
                 }
-                throw new FinancialException(503, "TEMPORARILY_UNAVAILABLE");
+
+                ObjectNode source = repository.load(session.userId());
+                if (!input.get(ApiFieldConstants.Finance.EXPECTED_DATA_VERSION)
+                    .equals(source.get(ApiFieldConstants.Finance.DATA_VERSION))) {
+                    throw new FinancialException(409, ApiCodeConstants.Finance.STALE_DATA);
+                }
+                if (!input.get(ApiFieldConstants.Finance.RULE_VERSION)
+                    .equals(source.get(ApiFieldConstants.Finance.RULE_VERSION))) {
+                    throw new FinancialException(
+                        409,
+                        ApiCodeConstants.Finance.RULE_VERSION_MISMATCH
+                    );
+                }
+
+                try {
+                    WriteChange change = writes.apply(session.userId(), method, route, input);
+                    StoredReceipt receipt = receipts.save(
+                        session.userId(),
+                        key,
+                        digest,
+                        method + " " + route,
+                        change.changedRefs(),
+                        change.beforeAfter()
+                    );
+                    receipts.checkConstraints();
+                    return new WriteResult(receipt, false);
+                } catch (DataIntegrityViolationException failure) {
+                    throw new FinancialException(409, ApiCodeConstants.Finance.RELATION_CONFLICT);
+                } catch (PersistenceException failure) {
+                    if (new HibernateJpaDialect().translateExceptionIfPossible(
+                        failure
+                    ) instanceof DataIntegrityViolationException) {
+                        throw new FinancialException(
+                            409,
+                            ApiCodeConstants.Finance.RELATION_CONFLICT
+                        );
+                    }
+
+                    throw new FinancialException(
+                        503,
+                        ApiCodeConstants.Finance.TEMPORARILY_UNAVAILABLE
+                    );
+                }
             }
-        });
+        );
         // 이미 성공한 저장은 이후 응답 조립 실패로 되돌리지 않는다. 동일 키 재시도로 복구한다.
         ObjectNode snapshot = read(token, () -> null, false);
         ObjectNode receipt = result.stored().receipt();
-        receipt.set("changedRefs", visibleRefs((ArrayNode) receipt.get("changedRefs"), snapshot, result.stored().audit()));
-        ObjectNode response = json.createObjectNode().put("replayed", result.replayed());
-        response.set("receipt", receipt);
-        response.set("snapshot", snapshot);
+        receipt.set(
+            ApiFieldConstants.Finance.CHANGED_REFS,
+            visibleRefs(
+                (ArrayNode) receipt.get(ApiFieldConstants.Finance.CHANGED_REFS),
+                snapshot,
+                result.stored().audit()
+            )
+        );
+        ObjectNode response = json.createObjectNode()
+            .put(ApiFieldConstants.Finance.REPLAYED, result.replayed());
+        response.set(ApiFieldConstants.Finance.RECEIPT, receipt);
+        response.set(ApiFieldConstants.Finance.SNAPSHOT, snapshot);
         return response;
     }
 
@@ -126,32 +188,92 @@ public final class FinancialService {
      * 형식이 틀린 토큰도 DB 인증 함수로 보내 이전 문맥을 비우며 동일 401로 거절한다.
      * @created 2026-10-29
      * @usedBy read, write
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조
      */
     private AuthRows.Session authorize(String token) {
         String digest;
-        try { digest = crypto.tokenDigest(token); }
-        catch (IllegalArgumentException failure) { digest = null; }
-        return auth.authorize(digest).orElseThrow(() -> new FinancialException(401, "SESSION_INVALID"));
+        try {
+            digest = crypto.tokenDigest(token);
+        } catch (IllegalArgumentException failure) {
+            digest = null;
+        }
+
+        return auth.authorize(digest)
+            .orElseThrow(
+                () -> new FinancialException(401, ApiCodeConstants.Finance.SESSION_INVALID)
+            );
     }
 
     /**
      * 저장 원천에서 공개 범위와 페이지를 조립하고 서명된 위치를 추가한다.
      * @created 2026-10-29
      * @usedBy read
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-02 - 기존 기간 없는 조회를 공통 페이지 조립 경로로 위임
      */
-    private ObjectNode snapshot(ObjectNode source, AuthRows.Session session, String cursor, boolean pageOnly) {
+    private ObjectNode snapshot(
+        ObjectNode source,
+        AuthRows.Session session,
+        String cursor,
+        boolean pageOnly
+    ) {
+        return snapshot(source, session, new TransactionQuery(cursor, null, null), pageOnly);
+    }
+
+    /**
+     * 원천 문맥에 조회 날짜 쌍을 결합하되 금융 버전·coverage·원천을 변경하지 않는다.
+     * @created 2026-11-01
+     * @usedBy read, transactions
+     * @modified 2026-11-02 - 기존 페이지 서명·v4 응답을 보존하며 명시 기간 경로 통합
+     */
+    private ObjectNode snapshot(
+        ObjectNode source,
+        AuthRows.Session session,
+        TransactionQuery query,
+        boolean pageOnly
+    ) {
         Set<String> codes = new HashSet<>();
-        for (JsonNode link : source.path("institutionLinks")) {
-            if (link.path("disconnectedAt").isNull()) codes.add(link.path("institutionCode").asString());
+        for (JsonNode link : source.path(ApiFieldConstants.Finance.INSTITUTION_LINKS)) {
+            if (link.path(ApiFieldConstants.Finance.DISCONNECTED_AT).isNull()) {
+                codes.add(link.path(ApiFieldConstants.Finance.INSTITUTION_CODE).asString());
+            }
         }
+
         String context = cursors.context(source, codes);
-        UUID after = pageOnly ? cursors.decode(cursor, session.userId(), session.sessionId(), context) : null;
-        var slice = projection.project(source, codes, source.get("dataVersion").asString(), after, pageOnly);
+        if (query.hasPeriod()) {
+            ObjectNode periodContext = json.createObjectNode()
+                .put(ApiFieldConstants.Finance.PURPOSE, ApiConfigConstants.Finance.PERIOD_PURPOSE)
+                .put(ApiFieldConstants.Finance.SOURCE_CONTEXT, context)
+                .put(ApiFieldConstants.Finance.START_DATE, query.startDate().toString())
+                .put(ApiFieldConstants.Finance.END_DATE, query.endDate().toString());
+            context = FinancialJson.digest(periodContext);
+        }
+
+        UUID after = pageOnly && (!query.hasPeriod() || query.cursor() != null)
+            ? cursors.decode(query.cursor(), session.userId(), session.sessionId(), context)
+            : null;
+        var slice = projection.project(
+            source,
+            codes,
+            source.get(ApiFieldConstants.Finance.DATA_VERSION).asString(),
+            after,
+            pageOnly,
+            query.startDate(),
+            query.endDate()
+        );
         ObjectNode answer = slice.body();
-        if (answer.has("page")) {
-            ObjectNode page = (ObjectNode) answer.get("page");
-            if (slice.hasMore()) page.put("nextCursor", cursors.encode(session.userId(), session.sessionId(), context, slice.lastId()));
-            else page.putNull("nextCursor");
+        if (answer.has(ApiFieldConstants.Finance.PAGE)) {
+            ObjectNode page = (ObjectNode) answer.get(ApiFieldConstants.Finance.PAGE);
+            if (slice.hasMore()) {
+                page.put(
+                    ApiFieldConstants.Finance.NEXT_CURSOR,
+                    cursors.encode(session.userId(), session.sessionId(), context, slice.lastId())
+                );
+            } else {
+                page.putNull(ApiFieldConstants.Finance.NEXT_CURSOR);
+            }
         }
         return answer;
     }
@@ -160,42 +282,65 @@ public final class FinancialService {
      * 현재 공개된 자원의 영수증 참조만 반환한다. 연결 해제로 숨겨진 ID를 다시 노출하지 않는다.
      * @created 2026-10-29
      * @usedBy write
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
      */
     private ArrayNode visibleRefs(ArrayNode refs, ObjectNode snapshot, ObjectNode audit) {
         ArrayNode result = json.createArrayNode();
         for (JsonNode ref : refs) {
-            String resource = ref.path("resource").asString();
+            String resource = ref.path(ApiFieldConstants.Finance.RESOURCE).asString();
             String array = switch (resource) {
-                case "institutionLink" -> "institutionLinks";
-                case "account" -> "accounts";
-                case "obligation" -> "obligations";
-                case "reserve" -> "reserves";
-                case "allocation" -> "allocations";
-                default -> "";
+            case ApiCodeConstants.Finance.INSTITUTION_LINK ->
+                ApiFieldConstants.Finance.INSTITUTION_LINKS;
+            case ApiCodeConstants.Finance.ACCOUNT -> ApiFieldConstants.Finance.ACCOUNTS;
+            case ApiCodeConstants.Finance.OBLIGATION -> ApiFieldConstants.Finance.OBLIGATIONS;
+            case ApiCodeConstants.Finance.RESERVE -> ApiFieldConstants.Finance.RESERVES;
+            case ApiCodeConstants.Finance.ALLOCATION -> ApiFieldConstants.Finance.ALLOCATIONS;
+            default -> "";
             };
-            boolean visible = "settings".equals(resource) && snapshot.has("settings");
+            boolean visible = ApiCodeConstants.Finance.SETTINGS.equals(resource)
+                && snapshot.has(ApiFieldConstants.Finance.SETTINGS);
             String idKey = switch (resource) {
-                case "institutionLink" -> "linkId";
-                case "account" -> "accountId";
-                case "obligation" -> "obligationId";
-                case "reserve" -> "reserveId";
-                case "allocation" -> "allocationId";
-                default -> "id";
+            case ApiCodeConstants.Finance.INSTITUTION_LINK -> ApiFieldConstants.Finance.LINK_ID;
+            case ApiCodeConstants.Finance.ACCOUNT -> ApiFieldConstants.Finance.ACCOUNT_ID;
+            case ApiCodeConstants.Finance.OBLIGATION -> ApiFieldConstants.Finance.OBLIGATION_ID;
+            case ApiCodeConstants.Finance.RESERVE -> ApiFieldConstants.Finance.RESERVE_ID;
+            case ApiCodeConstants.Finance.ALLOCATION -> ApiFieldConstants.Finance.ALLOCATION_ID;
+            default -> FinanceDb.ID;
             };
             for (JsonNode item : snapshot.path(array)) {
-                if (item.path(idKey).equals(ref.path("id"))) visible = true;
-            }
-            if (!visible && "allocation".equals(resource)) {
-                for (JsonNode change : audit.path("changes")) {
-                    if (!"allocation".equals(change.path("resource").asString())
-                            || !ref.path("id").equals(change.path("id")) || !change.path("after").isNull()) continue;
-                    JsonNode before = change.path("before");
-                    visible = hasId(snapshot.path("reserves"), "reserveId", before.path("reserve_id"))
-                        && hasId(snapshot.path("obligations"), "obligationId", before.path("obligation_id"));
+                if (item.path(idKey).equals(ref.path(FinanceDb.ID))) {
+                    visible = true;
                 }
             }
-            if (visible) result.add(ref.deepCopy());
+
+            if (!visible && ApiCodeConstants.Finance.ALLOCATION.equals(resource)) {
+                for (JsonNode change : audit.path(ApiFieldConstants.Finance.CHANGES)) {
+                    if (!ApiCodeConstants.Finance.ALLOCATION
+                        .equals(change.path(ApiFieldConstants.Finance.RESOURCE).asString())
+                        || !ref.path(FinanceDb.ID).equals(change.path(FinanceDb.ID))
+                        || !change.path(ApiFieldConstants.Finance.AFTER).isNull()) {
+                        continue;
+                    }
+
+                    JsonNode before = change.path(ApiFieldConstants.Finance.BEFORE);
+                    visible = hasId(
+                        snapshot.path(ApiFieldConstants.Finance.RESERVES),
+                        ApiFieldConstants.Finance.RESERVE_ID,
+                        before.path(FinanceDb.RESERVE_ID)
+                    )
+                        && hasId(
+                            snapshot.path(ApiFieldConstants.Finance.OBLIGATIONS),
+                            ApiFieldConstants.Finance.OBLIGATION_ID,
+                            before.path(FinanceDb.OBLIGATION_ID)
+                        );
+                }
+            }
+            if (visible) {
+                result.add(ref.deepCopy());
+            }
         }
+
         return result;
     }
 
@@ -203,10 +348,19 @@ public final class FinancialService {
      * 삭제된 배정의 부모가 현재도 공개되는 경우에만 그 삭제 참조를 알린다.
      * @created 2026-10-29
      * @usedBy visibleRefs
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     private boolean hasId(JsonNode rows, String key, JsonNode id) {
-        if (!id.isString()) return false;
-        for (JsonNode row : rows) if (row.path(key).equals(id)) return true;
+        if (!id.isString()) {
+            return false;
+        }
+
+        for (JsonNode row : rows) {
+            if (row.path(key).equals(id)) {
+                return true;
+            }
+        }
+
         return false;
     }
 
@@ -214,10 +368,13 @@ public final class FinancialService {
      * 검증을 마친 자원 경로의 UUID를 정규 소문자로 통일한다. 본문 값은 지문에서 보존한다.
      * @created 2026-10-29
      * @usedBy write
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     private String canonicalPath(String path) {
         String[] parts = path.split("/");
-        if (parts.length >= 3) parts[2] = UUID.fromString(parts[2]).toString();
+        if (parts.length >= 3) {
+            parts[2] = UUID.fromString(parts[2]).toString();
+        }
         return String.join("/", parts);
     }
 
@@ -226,5 +383,6 @@ public final class FinancialService {
      * @created 2026-10-29
      * @usedBy write
      */
-    private record WriteResult(StoredReceipt stored, boolean replayed) {}
+    private record WriteResult(StoredReceipt stored, boolean replayed) {
+    }
 }

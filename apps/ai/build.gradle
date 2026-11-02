@@ -1,0 +1,59 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+
+plugins { id 'java-library' }
+
+group = 'com.payse'
+version = '0.1.0'
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+repositories { mavenCentral() }
+dependencies {
+    api 'tools.jackson.core:jackson-databind:3.1.5'
+    testImplementation 'org.junit.jupiter:junit-jupiter:6.0.3'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.0.3'
+}
+dependencyLocking { lockAllConfigurations() }
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+tasks.named('test') {
+    useJUnitPlatform()
+    testLogging { events 'failed', 'skipped' }
+    dependsOn 'contractCases'
+    def testDataPath = layout.buildDirectory.dir('test-data').get().asFile.absolutePath
+    systemProperty 'payse.testData', testDataPath
+}
+
+tasks.register('contractCases', Exec) {
+    inputs.dir('../api/testing/analysis')
+    inputs.dir('../api/fixtures/generated-v4')
+    inputs.dir('contracts')
+    inputs.file('testing/export_contracts.py')
+    outputs.dir(layout.buildDirectory.dir('test-data'))
+    def testDataPath = layout.buildDirectory.dir('test-data').get().asFile.absolutePath
+    commandLine 'python', '-B', 'testing/export_contracts.py', testDataPath
+}
+
+// Only public criteria and schemas enter the runtime JAR; examples and gold labels stay outside it.
+def publicRules = layout.buildDirectory.dir('generated/rules')
+tasks.register('publicRules') {
+    inputs.dir('contracts')
+    outputs.dir(publicRules)
+    doLast {
+        def target = publicRules.get().dir('com/payse/ai/rules').asFile
+        target.mkdirs()
+        fileTree('contracts').matching { include '*.schema.json' }.each { source ->
+            new File(target, source.name).text = source.getText('UTF-8')
+        }
+        def policy = new JsonSlurper().parse(file('contracts/meaning-policy.json'), 'UTF-8')
+        def criteria = [version: policy.version, meanings: policy.meanings.collect { row ->
+            ['code', 'label', 'requiredEvidence', 'insufficientEvidence'].collectEntries { key -> [(key): row[key]] }
+        }]
+        def criteriaFile = new File(target, 'criteria.json')
+        def criteriaJson = JsonOutput.toJson(criteria)
+        criteriaFile.setText(criteriaJson, 'UTF-8')
+    }
+}
+sourceSets.main.resources.srcDir(publicRules)
+tasks.named('processResources') { dependsOn 'publicRules' }

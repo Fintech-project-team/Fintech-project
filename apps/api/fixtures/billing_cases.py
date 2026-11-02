@@ -52,16 +52,34 @@ def example(snapshot, alias):
     card = cards[0]
     purchase_id = uid(f'{alias}/billing-example/purchase')
     purchase_day = month_shift(today, -1, 8).isoformat()
-    result['transactions'].append({
-        'userId': owner, 'sourceRef': f'fixture/{alias}/billing-example/purchase', 'sourceVersion': version,
-        'transactionId': purchase_id, 'accountId': None, 'cardId': card['cardId'],
-        'recordKind': 'card_purchase', 'amountKRW': 600000, 'direction': 'out', 'status': 'posted',
-        'merchantName': '다온결가전 은솔점', 'description': '신용카드', 'purchaseDate': purchase_day,
-        'withdrawalDate': None, 'refundDate': None, 'cancellationDate': None, 'bookingDate': None,
-        'occurredAt': None, 'occurredAtBasis': None, 'balanceReflected': None,
-        'reflectionReason': 'not_applicable', 'originalTransactionId': None,
-        'payseTransactionType': 'expense', 'installmentCurrent': 2, 'installmentTotal': 6,
-    })
+    purchase_row = {
+        'userId': owner,
+        'sourceRef': f'fixture/{alias}/billing-example/purchase',
+        'sourceVersion': version,
+        'transactionId': purchase_id,
+        'accountId': None,
+        'cardId': card['cardId'],
+        'recordKind': 'card_purchase',
+        'amountKRW': 600000,
+        'direction': 'out',
+        'status': 'posted',
+        'merchantName': '다온결가전 은솔점',
+        'description': '신용카드',
+        'purchaseDate': purchase_day,
+        'withdrawalDate': None,
+        'refundDate': None,
+        'cancellationDate': None,
+        'bookingDate': None,
+        'occurredAt': None,
+        'occurredAtBasis': None,
+        'balanceReflected': None,
+        'reflectionReason': 'not_applicable',
+        'originalTransactionId': None,
+        'payseTransactionType': 'expense',
+        'installmentCurrent': 2,
+        'installmentTotal': 6
+    }
+    result['transactions'].append(purchase_row)
     new_bills = []
     for offset, round_no, total in ((0, 2, 105000), (1, 3, 100000)):
         key = f'{alias}/billing-example/bill-{round_no}'
@@ -81,10 +99,17 @@ def example(snapshot, alias):
                     ('annual', '카드 연회비', 20000, 20000),
                     ('credit', '청구 조정 환급', -10000, -10000),
                     ('unknown', '청구 조정', None, None)):
-                items.append({**source, **{name: None for name in sorted(NULL_FIELDS)},
-                    'itemId': uid(key + '/' + kind), 'sourceRef': f'fixture/{key}/{kind}',
-                    'transactionId': None, 'label': label,
-                    'feeOrAdjustmentAmountKRW': adjustment, 'billedAmountKRW': billed})
+                standalone_item = {
+                    **source,
+                    **{name: None for name in sorted(NULL_FIELDS)},
+                    'itemId': uid(key + '/' + kind),
+                    'sourceRef': f'fixture/{key}/{kind}',
+                    'transactionId': None,
+                    'label': label,
+                    'feeOrAdjustmentAmountKRW': adjustment,
+                    'billedAmountKRW': billed
+                }
+                items.append(standalone_item)
         bill = {**source, 'statementId': bill_id, 'sourceRef': f'fixture/{key}',
             'cardId': card['cardId'], 'amountKRW': total, 'dueDate': due_date,
             'periodStart': None, 'periodEnd': None, 'detailCompleteness': 'complete',

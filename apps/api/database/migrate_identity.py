@@ -187,16 +187,22 @@ def validate_snapshot(snapshot):
         require(sessions['installation_id']['type'] == 'text', 'Unexpected legacy installation type')
     session_types = {'id':'uuid','user_id':'uuid','token_digest':'text','issued_at':'timestamp with time zone','ended_at':'timestamp with time zone'}
     require(all(sessions[key]['type'] == kind and sessions[key]['notNull'] == (key != 'ended_at') for key, kind in session_types.items()), 'Unexpected session column contract')
-    require(all(any(row['table'] == table and row['rls'] and row['forced'] for row in snapshot['tableSecurity']) for table in ('demo_users','demo_sessions')), 'Identity RLS contract is missing')
+    has_identity_rls = all(
+        any(row['table'] == table and row['rls'] and row['forced'] for row in snapshot['tableSecurity'])
+        for table in ('demo_users','demo_sessions'))
+    require(has_identity_rls, 'Identity RLS contract is missing')
     for table, owner_key in [('demo_users', 'id'), ('demo_sessions', 'user_id')]:
         policies = [row for row in (snapshot['policies'] or []) if row['tablename'] == table]
         require(len(policies) == 1, 'Identity row policy count differs from contract')
         policy = policies[0]
         expression = normalized_expression(owner_key + " = NULLIF(current_setting('payse.user_id', true), '')::uuid")
-        require(policy['policyname'] == 'own_rows' and policy['permissive'] == 'PERMISSIVE'
-                and policy['roles'] == ['public'] and policy['cmd'] == 'ALL'
-                and normalized_expression(policy['qual']) == expression
-                and normalized_expression(policy['with_check']) == expression, 'Identity row policy differs from contract')
+        matches_policy = (
+            policy['policyname'] == 'own_rows' and policy['permissive'] == 'PERMISSIVE'
+            and policy['roles'] == ['public'] and policy['cmd'] == 'ALL'
+            and normalized_expression(policy['qual']) == expression
+            and normalized_expression(policy['with_check']) == expression
+        )
+        require(matches_policy, 'Identity row policy differs from contract')
     for table, kind, keys in [('demo_users','p',['id']),('demo_sessions','p',['id']),('demo_sessions','u',['user_id','id']),('demo_sessions','u',['token_digest'])]:
         require(any(row['table'] == table and row['type'] == kind and row['valid'] and row['columns'] == keys for row in snapshot['constraints']), 'Identity key constraint is missing')
     mapping = {row['user_id']: row for row in IDENTITY_USERS}

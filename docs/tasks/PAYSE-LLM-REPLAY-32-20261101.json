@@ -1,0 +1,39 @@
+{
+  "id": "PAYSE-LLM-REPLAY-32-20261101",
+  "role": "data",
+  "baseCommit": "6da2b3a4d3170592ec1365843d49b67ff661060d",
+  "branch": "fix/api/llm-provider-validation-32",
+  "allowedPaths": [
+    "apps/api/testing/analysis/replay.py",
+    "apps/api/testing/analysis/replay_score.py",
+    "apps/api/testing/analysis/test_replay.py",
+    "apps/api/testing/analysis/README.md",
+    "docs/tasks/PAYSE-LLM-REPLAY-32-20261101.json"
+  ],
+  "readBefore": [
+    "AGENTS.md",
+    "apps/api/AGENT.md",
+    "apps/api/src/AGENTS.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/AGENT_REVIEW.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/ownership.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/data-contracts.md",
+    "docs/database-schema.md",
+    "docs/payse-execution-contract.md",
+    "apps/api/docs/llm-execution.md",
+    "apps/api/docs/analysis-api.md",
+    "apps/api/docs/analysis-meaning.md",
+    "apps/api/testing/analysis/README.md"
+  ],
+  "acceptance": [
+    "관련 이슈 #32. 사용자가 요청한 기존 변경 commit/push 이후 후속 평가 준비를 진행한다. 최신 develop은 기존 작업을 보존한 병합 커밋으로 반영했다.",
+    "원천·사용자 확인·유효 결과 재사용과 기록된 공급자 응답을 오프라인 재현한다. 자동 외부 호출·재시도·KMS·DB 연결을 추가하지 않는다.",
+    "사례·사용자 문맥·요청/시도·버전·입력 지문을 대조하고 요청별 짧은 ID를 원래 ID로 복원한다. 정답은 요청 준비·응답 실행에 입력하지 않는다.",
+    "불완전 공급자 배치는 전체 실패로 처리하되 독립 재사용 결과는 보존한다. 실패·누락·무효 응답과 정상 unknown을 구분해 항목별 채점한다.",
+    "기존 저장 분류를 따로 보존하며 새 후보를 자동 확정하거나 후보 채점을 PAYSE 전체 판단 정확도로 보고하지 않는다.",
+    "금융 공개 계약·원천·DB·모바일·계산 패키지·기존 평가 사례·의미 코드는 유지한다. 실제 모델/분기 정확도·운영 권한·통합 검증 미실시를 명시한다.",
+    "정상·부분 재사용/실패·원천 변경·다른 응답 교환·만료/삭제·의존 배치·중복·정답 비노출·기존 분류 보존을 검사하고 기존 필수 API 검사를 수행한다."
+  ]
+}

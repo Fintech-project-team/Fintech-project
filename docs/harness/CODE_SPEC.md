@@ -52,10 +52,14 @@ Dart 문서 주석은 현재 Node 검사기의 자동 검사 대상이 아니다
 
 ## API Java에만 적용하는 주석 규칙
 
-API 개발은 [API 필수 규칙](../../apps/api/src/AGENTS.md)을 따른다. 공통 개발 원칙은 `apps/api/` 전체, Java 주석 의무·자동 검사는 `src/main/java`·`src/test/java`·`tools` 아래 직접 작성한 Java 코드에 적용한다.
+API 개발은 [API 필수 규칙](../../apps/api/AGENTS.md)을 따른다. 공통 개발 원칙은 `apps/api/` 전체, Java 주석 의무·자동 검사는 `src/main/java`·`src/test/java`·`tools` 아래 직접 작성한 Java 코드에 적용한다.
 
 - 모든 이름 있는 클래스·인터페이스·annotation·enum·record, 직접 작성한 메서드·명시적 생성자에 목적·생성일·주요 사용처를 기록한다. DTO/VO의 필드·타입·의미·검증 조건 변경과 기존 메서드의 구현·시그니처·계약 변경에는 수정일·목적을 남긴다.
 - 작업 기준 커밋에 없는 선언을 완성하는 편집은 생성 작업이다. 기준 커밋에 있던 선언의 위 변경에는 수정 이력을 남긴다. 신규 작업의 기준을 바꿔 기존 선언을 신규로 취급하지 않는다.
 - 생성일이 확인되지 않는 기존 코드만 `@created unknown - 이력 확인 불가: 구체적 사유`를 허용한다. 새 코드의 실제 날짜, unknown 허용 사유, 목적·사용처·수정 이력 누락은 diff 리뷰로 확인한다.
 - 자동 생성 코드·record 자동 접근자·람다 본문에는 주석을 복제하지 않는다. 익명 클래스에 직접 선언한 메서드는 포함한다. 기재된 모든 `@modified`에는 유효한 날짜와 목적이 있어야 한다.
 - 자동 검사는 API Gradle `apiDocsCheck`로 연결한다. 이 예외는 Flutter/Dart·JS/TS에 적용하지 않는다.
+
+## 공유 AI Java
+
+`apps/ai`의 직접 작성한 Java에도 위 API Java 주석 규칙을 적용한다. [AI 필수 규칙](../../apps/ai/AGENTS.md)을 함께 읽으며 API의 `apiDocsCheck`가 두 모듈의 main/test 코드를 검사한다. AI는 별도 HTTP/DB 계층을 요구하지 않는다.
