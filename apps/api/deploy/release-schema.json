@@ -1,0 +1,40 @@
+{
+  "format": "payse-schema-prerequisites-v1",
+  "supportedProfiles": ["database", "auth", "finance", "salary-notices"],
+  "requiredProfiles": ["database", "auth", "finance", "salary-notices"],
+  "tables": [
+    "users",
+    "demo_sessions",
+    "institutions",
+    "source_contexts",
+    "institution_links",
+    "financial_accounts",
+    "financial_cards",
+    "transaction_references",
+    "financial_transactions",
+    "card_statements",
+    "statement_items",
+    "transaction_relations",
+    "user_attributes",
+    "recurring_plans",
+    "recurring_plan_revisions",
+    "obligations",
+    "occurrence_overrides",
+    "recurring_decisions",
+    "settlement_links",
+    "reserves",
+    "reserve_allocations",
+    "write_receipts",
+    "auth_rate_limits",
+    "salary_notice_dismissals"
+  ],
+  "columns": [
+    "users.id",
+    "users.data_version",
+    "users.code_verifier",
+    "financial_transactions.cancellation_date",
+    "financial_transactions.id",
+    "statement_items.id"
+  ],
+  "functions": ["auth_credentials", "auth_authorize", "auth_require_transaction", "auth_ip_request"]
+}

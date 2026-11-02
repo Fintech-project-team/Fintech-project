@@ -1,0 +1,16 @@
+# Private server.properties for a NEW PC. Configure interactively or fill outside Git.
+# Every example value is empty. The configure command supplies reviewed non-secret defaults.
+spring.profiles.active=
+PAYSE_BIND_ADDRESS=
+PAYSE_PORT=
+PAYSE_JDBC_URL=
+PAYSE_DB_USER=
+PAYSE_DB_PASSWORD=
+PAYSE_DB_MAX_POOL_SIZE=
+PAYSE_DB_CONNECTION_TIMEOUT_MS=
+PAYSE_DB_VALIDATION_TIMEOUT_MS=
+PAYSE_AUTH_CODE_KEY_ID=
+PAYSE_AUTH_CODE_KEY_BASE64=
+PAYSE_AUTH_LIMIT_KEY_BASE64=
+PAYSE_FINANCE_CURSOR_KEY_BASE64=
+PAYSE_AUTH_PEER_MODE=

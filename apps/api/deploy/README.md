@@ -1,5 +1,7 @@
 # PAYSE 서버 설치·이동
 
+CI가 검증한 JAR를 기존 서버에 수동 교체하거나 새 PC에 설치할 때는 [검증된 산출물·수동 배포](continuous-delivery.md)를 따른다. 실행 중인 서버는 push만으로 교체하지 않는다.
+
 동일한 실행 JAR를 유지하고 설치 환경값만 바꾼다. API 응답·원천·계산 계약을 바꾸지 않는다. Windows 전용 개발 DB 관리 도구와 독립적이며, 실행에는 Java 21과 준비된 PostgreSQL이 필요하다. Node·Gradle·Python·Flutter는 배포 서버의 실행 의존성이 아니다. Java가 지원하는 Windows·Linux·macOS에 같은 실행 명령을 사용하며, 실제 검증한 OS는 작업 보고에서 구분한다.
 
 ## 1. 배포 묶음 만들기
