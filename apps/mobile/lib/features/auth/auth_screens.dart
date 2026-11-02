@@ -381,7 +381,9 @@ class _CodeScreenState extends State<CodeScreen> {
     CodeStatus.invalidInput => '입력한 정보를 다시 확인해주세요',
     CodeStatus.rateLimited =>
       '여러 번 틀려서 잠시 멈췄어요. ${_wait(_vm.retryRemaining)} 후 다시 시도해주세요',
-    CodeStatus.unavailable => '연결하지 못했어요. 잠시 후 다시 시도해주세요',
+    CodeStatus.unavailable => connectionFailedMessage,
+    CodeStatus.resultUnknown => '로그인 결과를 확인하지 못했어요. 서버에서 로그인이 처리되었을 수 있어요. 다시 시도해도 로그인되지 않으면 테스트 담당자에게 세션 종료를 요청해 주세요.',
+    CodeStatus.secureConnection => secureConnectionMessage,
     CodeStatus.editing ||
     CodeStatus.submitting ||
     CodeStatus.sessionInvalid => null,
@@ -572,6 +574,8 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
           final String? message;
           if (locked) {
             message = '비밀번호를 5번 틀렸어요';
+          } else if (_vm.storageError) {
+            message = storageReadFailedMessage;
           } else if (_vm.failures > 0) {
             message =
                 '비밀번호가 맞지 않아요 (${_vm.failures}/${PinLoginViewModel.maxFailures})';
@@ -606,7 +610,24 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
 }
 
 /// 2026-10-21: 10-4에서 뒤로 갈 때 처음부터 다시 할지 묻는다. 다시 하기를 고르면 true를 반환한다.
-Future<bool> confirmRestartIdentity(BuildContext context) async {
+/// 2026-11-02: 같은 틀의 [confirmChoice]를 쓴다.
+Future<bool> confirmRestartIdentity(BuildContext context) => confirmChoice(
+  context,
+  message: '본인 확인을 처음부터 다시 할까요?',
+  cancelLabel: '취소',
+  confirmLabel: '다시 하기',
+  confirmKey: const ValueKey('restart-identity-confirm'),
+);
+
+/// 2026-11-02: 두 버튼 확인 창(10-4 처음부터 다시 하기와 같은 틀). [message] 아래 [cancelLabel]·[confirmLabel]을 두고,
+/// 확인을 고르면 true를 반환한다. 바깥을 눌러 닫으면 false다.
+Future<bool> confirmChoice(
+  BuildContext context, {
+  required String message,
+  required String cancelLabel,
+  required String confirmLabel,
+  required Key confirmKey,
+}) async {
   final result = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
@@ -615,9 +636,9 @@ Future<bool> confirmRestartIdentity(BuildContext context) async {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(PayseRadius.lg),
       ),
-      content: const Text(
-        '본인 확인을 처음부터 다시 할까요?',
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      content: Text(
+        message,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
       ),
       actions: [
         TextButton(
@@ -625,13 +646,13 @@ Future<bool> confirmRestartIdentity(BuildContext context) async {
           style: TextButton.styleFrom(
             foregroundColor: PayseColors.textSecondary,
           ),
-          child: const Text('취소'),
+          child: Text(cancelLabel),
         ),
         TextButton(
-          key: const ValueKey('restart-identity-confirm'),
+          key: confirmKey,
           onPressed: () => Navigator.of(context).pop(true),
           style: TextButton.styleFrom(foregroundColor: PayseColors.textPrimary),
-          child: const Text('다시 하기'),
+          child: Text(confirmLabel),
         ),
       ],
     ),

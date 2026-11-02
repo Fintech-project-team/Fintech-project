@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:payse_calculation/payse_calculation.dart' as calc;
 
 import '../data/coachmark_record_store.dart';
+import '../data/salary_notice_api.dart';
 import '../data/connection/transaction_history.dart';
 import '../data/financial_snapshot.dart';
 import '../data/first_calc_record_store.dart';
@@ -17,6 +18,7 @@ import '../features/overview/pull_refresh.dart';
 import '../features/overview/salary_notice.dart';
 import '../features/overview/slide_switch.dart';
 import '../shared/design/payse_tokens.dart';
+import 'logout_action.dart';
 import 'placeholder_screens.dart';
 
 /// 2026-10-20: 하단 탭(홈·계좌·계획·내 정보) 골격. 각 탭은 기능 화면이 들어갈 자리다.
@@ -33,8 +35,8 @@ class AppShell extends StatefulWidget {
   /// 콜백이 없으면 코치마크를 띄우지 않는다.
   /// 2026-10-29: [accountsWriter]는 계좌 탭의 저장 연결(세션 저장소·세션 무효·저장 뒤 Snapshot 반영)이며 없으면 계좌 탭에서
   /// 저장할 수 없다.
-  /// 2026-10-29: [salaryNoticeFolded]는 이 사용자가 접은 월급 입금 확인 안내 키, [onSalaryNoticeFolded]는 접기·펴기를 기기에
-  /// 남기는 콜백이다. 홈 안내의 '월급 정보 확인'은 [accountsWriter]로 저장한다.
+  /// 2026-11-01: [salaryNotices]는 이 세션의 월급 입금 확인 안내 접힘 상태(서버 회차 기록·세션 접기)다. 없으면 안내를 펼친 채
+  /// 보인다. 홈 안내의 '월급 정보 확인'은 [accountsWriter]로 저장한다.
   const AppShell({
     super.key,
     required this.snapshot,
@@ -46,8 +48,8 @@ class AppShell extends StatefulWidget {
     this.coachmarkRecord,
     this.onCoachmarkRecord,
     this.accountsWriter,
-    this.salaryNoticeFolded,
-    this.onSalaryNoticeFolded,
+    this.salaryNotices,
+    this.onLogout,
     this.onPullRefresh,
     this.history,
   });
@@ -66,8 +68,10 @@ class AppShell extends StatefulWidget {
   /// [history](현재 [snapshot]과 자료 버전이 같을 때만 거래 내역이 그대로 쓴다).
   final PullRefresh? onPullRefresh;
   final TransactionHistoryReady? history;
-  final String? salaryNoticeFolded;
-  final ValueChanged<String?>? onSalaryNoticeFolded;
+  final SalaryNoticeController? salaryNotices;
+
+  /// 2026-11-02: 내 정보 탭의 로그아웃(성공이면 null, 실패면 안내 문구). 없으면 버튼을 두지 않는다.
+  final Future<String?> Function()? onLogout;
 
   static const List<String> tabTitles = ['홈', '계좌·카드', '계획', '내 정보'];
 
@@ -93,7 +97,7 @@ class _AppShellState extends State<AppShell> {
   bool _coachClosed = false;
   final HomeCoachTargets _coachTargets = HomeCoachTargets();
   final GlobalKey _navKey = GlobalKey(debugLabel: 'coach-nav');
-  late String? _salaryNoticeFolded = widget.salaryNoticeFolded;
+  String? _salaryNoticePeek;
 
   /// 2026-10-31: 홈·계좌·카드 탭과 그 위에 쌓인 화면이 함께 보는 현재 상태와 고른 안쪽 탭(#163).
   late final ValueNotifier<OverviewState> _state = ValueNotifier((
@@ -115,22 +119,56 @@ class _AppShellState extends State<AppShell> {
   /// 2026-10-31: 계좌·카드 탭의 이번 기간 내역으로 간다.
   void _showPeriod() {
     _accountsTab.value = AccountsCardsTab.period;
-    setState(() => _index = 1);
+    _select(1);
+  }
+
+  /// 2026-11-01: 탭 [index]로 바꾼다. 홈을 떠나면 잠시 다시 펼친 월급 안내를 접힌 상태로 되돌린다.
+  void _select(int index) {
+    setState(() {
+      if (index != _index) _salaryNoticePeek = null;
+      _index = index;
+    });
   }
 
   /// 2026-10-31: 공통 상태를 폐기한다.
   @override
   void dispose() {
+    widget.salaryNotices?.removeListener(_onSalaryNotices);
     _state.dispose();
     _accountsTab.dispose();
     super.dispose();
   }
 
-  /// 2026-10-29: 월급 입금 확인 안내를 접거나(키) 다시 편다(null). 화면은 바로 바꾸고 기록은 콜백에 맡긴다.
-  void _foldSalaryNotice(String? key) {
-    setState(() => _salaryNoticeFolded = key);
-    widget.onSalaryNoticeFolded?.call(key);
+  /// 2026-11-02: 내 정보 탭 아래쪽의 로그아웃 버튼과 개발 진입점을 반환한다. 둘 다 없으면 null이다.
+  Widget? _accountFooter() {
+    final logout = widget.onLogout;
+    final dev = widget.devEntry;
+    if (logout == null && dev == null) return null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (logout != null) LogoutAction(onLogout: logout),
+        if (logout != null && dev != null) const SizedBox(height: 12),
+        ?dev,
+      ],
+    );
   }
+
+  /// 2026-11-01: 월급 입금 확인 안내 [notice]를 접는다(회차를 알면 서버 저장, 모르면 이 세션 동안만).
+  void _foldSalaryNotice(SalaryNotice notice) {
+    setState(() => _salaryNoticePeek = null);
+    widget.salaryNotices?.fold(notice.payMonth, notice.key);
+  }
+
+  /// 2026-11-01: 접힌 안내 [notice]를 이 화면에서만 잠시 다시 펼친다. 서버 닫기 기록은 그대로 둔다.
+  void _peekSalaryNotice(SalaryNotice notice) {
+    setState(() => _salaryNoticePeek = notice.key);
+  }
+
+  /// 2026-11-01: 안내 [notice]가 지금 접혀 보여야 하면 true를 반환한다.
+  bool _salaryNoticeFolded(SalaryNotice notice) =>
+      _salaryNoticePeek != notice.key &&
+      (widget.salaryNotices?.isFolded(notice.payMonth, notice.key) ?? false);
 
   /// 2026-10-29: 홈 안내에서 월급 정보 편집 화면을 연다.
   void _editSalary(BuildContext context, AccountsWriter writer) {
@@ -219,11 +257,28 @@ class _AppShellState extends State<AppShell> {
     return box.top < nav.top ? box.shift(Offset(0, nav.top - box.top)) : box;
   }
 
+  /// 2026-11-01: 급여 안내 상태가 바뀌면(서버 응답 도착) 다시 그린다.
+  @override
+  void initState() {
+    super.initState();
+    widget.salaryNotices?.addListener(_onSalaryNotices);
+  }
+
+  /// 2026-11-01: 급여 안내 상태 변화를 화면에 반영한다.
+  void _onSalaryNotices() {
+    if (mounted) setState(() {});
+  }
+
   /// 2026-10-23: 다른 스냅샷이 오면 그 스냅샷으로 다시 계산한다.
   /// 2026-10-31: 공통 상태도 같은 계산·거래로 바꾼다.
+  /// 2026-11-01: 급여 안내 상태 객체가 바뀌면 듣는 대상을 바꾼다.
   @override
   void didUpdateWidget(covariant AppShell oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.salaryNotices, widget.salaryNotices)) {
+      oldWidget.salaryNotices?.removeListener(_onSalaryNotices);
+      widget.salaryNotices?.addListener(_onSalaryNotices);
+    }
     if (!identical(oldWidget.snapshot, widget.snapshot)) {
       _calculation = computeHomeCalculation(widget.snapshot);
     }
@@ -274,8 +329,9 @@ class _AppShellState extends State<AppShell> {
             onShowFirstCalc: () => setState(() => _replay = true),
             coachTargets: _coachTargets,
             salaryNotice: (
-              foldedKey: _salaryNoticeFolded,
-              onFoldedKey: _foldSalaryNotice,
+              isFolded: _salaryNoticeFolded,
+              onFold: _foldSalaryNotice,
+              onOpen: _peekSalaryNotice,
               onEdit: switch (widget.accountsWriter) {
                 final writer? => () => _editSalary(context, writer),
                 null => null,
@@ -292,13 +348,13 @@ class _AppShellState extends State<AppShell> {
             writer: widget.accountsWriter,
           ),
           const TabPlaceholder(title: '계획'),
-          TabPlaceholder(title: '내 정보', footer: widget.devEntry),
+          TabPlaceholder(title: '내 정보', footer: _accountFooter()),
         ],
       ),
       bottomNavigationBar: NavigationBar(
         key: _navKey,
         selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        onDestinationSelected: _select,
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), label: '홈'),
           NavigationDestination(

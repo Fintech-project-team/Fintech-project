@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:payse/data/auth/auth_repository.dart';
 import 'package:payse/data/auth/credential_stores.dart';
 import 'package:payse/data/auth/session_cleanup.dart';
+import 'package:payse/data/http/api_transport.dart';
 import 'package:payse/features/auth/auth_services.dart';
 import 'package:payse/features/auth/auth_view_models.dart';
 
@@ -81,6 +82,9 @@ final _session = DemoSession(
 );
 
 void main() {
+  mainSaveFailure();
+  mainPinStorageFailures();
+  mainConnectionProblems();
   testWidgets('each failure outcome maps to its own status and keeps input', (
     tester,
   ) async {
@@ -237,6 +241,113 @@ void main() {
       expect(env.repo.endedTokens, ['tok', 'tok'], reason: '다음 발급 전에 다시 종료');
       expect(env.cleanup.pendingCount, 0);
       second.dispose();
+    },
+  );
+}
+
+/// 2026-11-01: 저장하면 실패하는 세션 저장소(기기 보안 저장소 오류 흉내).
+class _FailingSessionStore extends MemorySessionStore {
+  @override
+  Future<void> save(StoredSession session) async => throw Exception('keystore');
+}
+
+void mainConnectionProblems() {
+  testWidgets(
+    'a lost login response and a certificate failure each get their own status',
+    (tester) async {
+      final env = _Env();
+      final vm = env.vm(IdentityPurpose.signup);
+      vm.code.text = '123456';
+      for (final (error, status) in [
+        (
+          const ApiTransportException(ApiFailureKind.unknown, 'timeout'),
+          CodeStatus.resultUnknown,
+        ),
+        (
+          const ApiTransportException(ApiFailureKind.tls, 'handshake'),
+          CodeStatus.secureConnection,
+        ),
+        (const ApiNonContractResponse(403), CodeStatus.secureConnection),
+        (
+          const ApiTransportException(ApiFailureKind.notSent, 'down'),
+          CodeStatus.unavailable,
+        ),
+      ]) {
+        env.repo.createResult = AuthNetworkFailure<DemoSession>(error);
+        expect(await vm.submit(), isFalse);
+        expect(vm.status, status, reason: '$error');
+      }
+      expect(env.repo.createCalls, 4, reason: '실패마다 자동 재시도 없음');
+      vm.dispose();
+    },
+  );
+}
+
+/// 2026-11-02: 모든 작업이 실패하는 PIN 저장소(기기 보안 저장소 오류 흉내).
+class _FailingPinStore extends MemoryLocalPinStore {
+  @override
+  Future<void> setPin(String pin) async => throw Exception('keystore');
+
+  @override
+  Future<PinCheckResult> verify(String pin) async =>
+      throw Exception('keystore');
+
+  @override
+  Future<int> failureCount() async => throw Exception('keystore');
+}
+
+void mainPinStorageFailures() {
+  test('a PIN that cannot be saved stays on the confirm step', () async {
+    final vm = PinSetupViewModel(_FailingPinStore());
+    for (final d in [1, 3, 5, 7, 9, 0]) {
+      await vm.addDigit(d);
+    }
+    expect(vm.phase, PinSetupPhase.confirm);
+    for (final d in [1, 3, 5, 7, 9, 0]) {
+      await vm.addDigit(d);
+    }
+    expect(vm.completed, isFalse);
+    expect(vm.error, storageWriteFailedMessage);
+    expect(vm.phase, PinSetupPhase.confirm);
+  });
+
+  test('an unreadable PIN store never unlocks', () async {
+    final vm = PinLoginViewModel(_FailingPinStore());
+    await Future<void>.delayed(Duration.zero);
+    expect(vm.storageError, isTrue);
+    var unlocked = false;
+    for (final d in [1, 3, 5, 7, 9, 0]) {
+      unlocked = await vm.addDigit(d) || unlocked;
+    }
+    expect(unlocked, isFalse);
+    expect(vm.storageError, isTrue);
+  });
+}
+
+void mainSaveFailure() {
+  testWidgets(
+    'a session that cannot be saved is ended on the server and reported as a failure',
+    (tester) async {
+      final env = _Env();
+      final repo = env.repo..createResult = AuthOk(_session);
+      final vm = CodeViewModel(
+        services: AuthServices(
+          repository: repo,
+          sessionStore: _FailingSessionStore(),
+          pinStore: env.pins,
+          consentStore: MemoryConsentStore(),
+          now: env.clock.now,
+          cleanup: env.cleanup,
+        ),
+        draft: _draft,
+        purpose: IdentityPurpose.signup,
+      );
+      vm.code.text = '123456';
+      expect(await vm.submit(), isFalse);
+      expect(vm.status, CodeStatus.unavailable);
+      expect(repo.endedTokens, ['tok'], reason: '토큰을 잃지 않도록 서버 세션 종료');
+      expect(repo.createCalls, 1, reason: '로그인은 다시 보내지 않음');
+      vm.dispose();
     },
   );
 }
