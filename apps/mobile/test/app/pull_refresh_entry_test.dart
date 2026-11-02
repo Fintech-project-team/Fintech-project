@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +10,7 @@ import 'package:payse/data/auth/fake_auth_repository.dart';
 import 'package:payse/data/connection/fake_financial_server.dart';
 import 'package:payse/data/connection/financial_api.dart';
 import 'package:payse/data/first_calc_record_store.dart';
+import 'package:payse/features/planning/card_bill_screen.dart';
 import 'package:payse/shared/design/payse_theme.dart';
 
 import '../data/connection/connection_test_utils.dart';
@@ -387,6 +389,57 @@ void main() {
       reason: '기준 시각은 응답값',
     );
     await _settleDone(tester);
+  });
+
+  testWidgets('새로고침 응답의 계좌 내역이 approved면 형식 오류로 실패하고 모든 화면이 이전 정보 유지', (
+    tester,
+  ) async {
+    final json = _plain;
+    final next = (jsonDecode(jsonEncode(json)) as Map).cast<String, Object?>()
+      ..['asOf'] = '2026-10-20T09:00:00+09:00'
+      ..['dataVersion'] = '99';
+    rows(next, 'transactions').firstWhere(
+      (t) => t['recordKind'] == 'account_entry',
+    )['status'] = 'approved';
+    final repo = _Gate()
+      ..loadResults.add(FinancialOk(json))
+      ..loadResults.add(FinancialOk(next));
+    await _openTab(tester, repo);
+    await _pull(tester, find.byKey(const ValueKey('transactions-list')));
+    await tester.pumpAndSettle();
+    expect(find.text('새로고침하지 못했어요'), findsOneWidget);
+    expect(find.textContaining('10월 19일 12:00 기준'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('inner-tab-accounts')));
+    await tester.pumpAndSettle();
+    expect(find.text('계좌 4개 · 10월 19일 12:00 기준'), findsOneWidget);
+    await tester.tap(
+      find.descendant(of: find.byType(NavigationBar), matching: find.text('홈')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('10월 20일'), findsNothing);
+  });
+
+  testWidgets('계획 탭: 청구를 대표하는 예정 지출 → 카드 결제 상세 → 뒤로 가면 계획 탭', (tester) async {
+    final repo = _Gate()..loadResults.add(FinancialOk(_plain));
+    await _openTab(tester, repo);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('계획'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('plan-period')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('plan-fold-done')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('카드 청구'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CardBillScreen), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('카드 청구'), findsOneWidget, reason: '펼침 유지');
+    expect(find.byType(NavigationBar), findsOneWidget);
   });
 
   testWidgets('성공 표시 중에도 목록을 스크롤하고 거래를 누를 수 있다', (tester) async {

@@ -220,6 +220,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         transaction: t,
         original: original,
         peer: peer,
+        transactions: _all,
       ),
     );
   }

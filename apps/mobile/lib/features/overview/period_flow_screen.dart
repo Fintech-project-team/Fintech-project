@@ -206,7 +206,11 @@ class _PeriodFlowScreenState extends State<PeriodFlowScreen> {
       case FlowRecord(:final transaction):
         showPayseSheet<void>(
           context,
-          TransactionDetailSheet(snapshot: _snap, transaction: transaction),
+          TransactionDetailSheet(
+            snapshot: _snap,
+            transaction: transaction,
+            transactions: widget.feed.all,
+          ),
         );
       case final FlowTransfer transfer:
         showPayseSheet<void>(

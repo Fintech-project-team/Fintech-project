@@ -127,7 +127,7 @@ class _AccountsCardsScreenState extends State<AccountsCardsScreen> {
                       (AccountsCardsTab.accounts, '계좌 관리'),
                     ].indexed) ...[
                       if (i > 0) const SizedBox(width: PayseSpace.x6),
-                      _InnerTab(
+                      InnerTab(
                         key: ValueKey('inner-tab-${t.name}'),
                         label: label,
                         selected: tab == t,
@@ -187,9 +187,9 @@ class _AccountsCardsScreenState extends State<AccountsCardsScreen> {
 }
 
 /// 2026-10-30: 안쪽 탭 하나(높이 48, 고르면 700·차콜과 아래 3dp 달빛 노랑 막대, 아니면 500·textSecondary).
-class _InnerTab extends StatelessWidget {
+class InnerTab extends StatelessWidget {
   /// 2026-10-30: 문구 [label], 선택 [selected], 누르기 [onTap]으로 만든다.
-  const _InnerTab({
+  const InnerTab({
     required this.label,
     required this.selected,
     required this.onTap,

@@ -17,12 +17,14 @@ import '../features/overview/overview_links.dart';
 import '../features/overview/pull_refresh.dart';
 import '../features/overview/salary_notice.dart';
 import '../features/overview/slide_switch.dart';
+import '../features/planning/plan_screen.dart';
 import '../shared/design/payse_tokens.dart';
 import 'logout_action.dart';
 import 'placeholder_screens.dart';
 
 /// 2026-10-20: 하단 탭(홈·계좌·계획·내 정보) 골격. 각 탭은 기능 화면이 들어갈 자리다.
 /// 2026-10-29: 계좌 탭은 02-3 계좌 관리다(29-1).
+/// 2026-11-02: 계획 탭은 예정 지출·남겨둘 돈 조회다(29-3).
 /// 2026-10-21: PIN 확인 뒤 금융사 연결을 마친 사용자의 첫 화면으로 쓴다(main_entry.dart).
 /// 2026-10-23: 진입 조회에 성공한 [snapshot]으로 홈 계산을 한 번 수행해 탭들이 같은 결과를 쓰게 한다.
 class AppShell extends StatefulWidget {
@@ -347,7 +349,7 @@ class _AppShellState extends State<AppShell> {
             calculation: _calculation,
             writer: widget.accountsWriter,
           ),
-          const TabPlaceholder(title: '계획'),
+          PlanScreen(links: links),
           TabPlaceholder(title: '내 정보', footer: _accountFooter()),
         ],
       ),
