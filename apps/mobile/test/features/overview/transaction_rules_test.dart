@@ -56,46 +56,54 @@ void main() {
       expect(statusLabel(original), '승인 취소');
     });
 
-    test(
-      '상태 라벨: 카드 승인·미확인, 계좌 미반영, 계좌 approved·cancelled는 카드 문구·미확인으로 바꾸지 않음',
-      () {
-        final card = _first(s, (t) => t.recordKind == 'card_purchase');
-        final acct = _first(s, isAccountEntry);
-        expect(
-          statusLabel(
-            _first(
-              _patched(card.transactionId, {'status': 'approved'}),
-              (t) => t.transactionId == card.transactionId,
-            ),
+    test('상태 라벨: 카드 승인·미확인, 계좌 미반영, 계좌는 posted 라벨 없음·unknown 미확인', () {
+      final card = _first(s, (t) => t.recordKind == 'card_purchase');
+      final acct = _first(s, isAccountEntry);
+      expect(
+        statusLabel(
+          _first(
+            _patched(card.transactionId, {'status': 'approved'}),
+            (t) => t.transactionId == card.transactionId,
           ),
-          '승인',
-        );
-        expect(
-          statusLabel(
-            _first(
-              _patched(card.transactionId, {'status': 'unknown'}),
-              (t) => t.transactionId == card.transactionId,
-            ),
+        ),
+        '승인',
+      );
+      expect(
+        statusLabel(
+          _first(
+            _patched(card.transactionId, {'status': 'unknown'}),
+            (t) => t.transactionId == card.transactionId,
           ),
-          '처리 상태 미확인',
-        );
-        for (final status in ['approved', 'cancelled']) {
-          final t = _first(
-            _patched(acct.transactionId, {'status': status}),
+        ),
+        '처리 상태 미확인',
+      );
+      expect(
+        statusLabel(
+          _first(
+            _patched(acct.transactionId, {'status': 'posted'}),
             (t) => t.transactionId == acct.transactionId,
-          );
-          expect(statusLabel(t), isNull, reason: 'A 답변 전 표시 미완료');
-        }
-        final notReflected = _first(
-          _patched(acct.transactionId, {
-            'reflectionReason': 'not_reflected',
-            'balanceReflected': false,
-          }),
-          (t) => t.transactionId == acct.transactionId,
-        );
-        expect(reflectionLabel(notReflected), '잔액 미반영');
-      },
-    );
+          ),
+        ),
+        isNull,
+      );
+      expect(
+        statusLabel(
+          _first(
+            _patched(acct.transactionId, {'status': 'unknown'}),
+            (t) => t.transactionId == acct.transactionId,
+          ),
+        ),
+        '처리 상태 미확인',
+      );
+      final notReflected = _first(
+        _patched(acct.transactionId, {
+          'reflectionReason': 'not_reflected',
+          'balanceReflected': false,
+        }),
+        (t) => t.transactionId == acct.transactionId,
+      );
+      expect(reflectionLabel(notReflected), '잔액 미반영');
+    });
 
     test('내 계좌 이체·카드대금 납부는 데이터 분류가 있을 때만', () {
       final transfer = _first(

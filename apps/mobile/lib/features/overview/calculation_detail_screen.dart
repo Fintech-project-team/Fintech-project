@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:payse_calculation/payse_calculation.dart' as calc;
 
 import '../../data/financial_snapshot.dart';
+import '../../data/statement_relations.dart';
 import '../../shared/design/amount_format.dart';
 import '../../shared/design/payse_tokens.dart';
 import '../connection/connection_review.dart' show institutionName;
@@ -1620,19 +1621,13 @@ class SnapshotNames {
       _reserves = {
         for (final r in snapshot.reserves ?? <Reserve>[]) r.reserveId: r,
       },
-      _transactions = {
-        for (final t in [
-          ...?snapshot.transactions,
-          ...?snapshot.relatedTransactions,
-        ])
-          t.transactionId: t,
-      };
+      _relations = StatementRelations(snapshot);
 
   final FinancialSnapshot snapshot;
   final Map<String, Account> _accounts;
   final Map<String, Obligation> _obligations;
   final Map<String, Reserve> _reserves;
-  final Map<String, SourceTransaction> _transactions;
+  final StatementRelations _relations;
 
   /// 2026-10-26: 계좌 이름(별명이 있으면 별명, 없으면 '기관 상품명').
   String accountName(String accountId) {
@@ -1695,14 +1690,12 @@ class SnapshotNames {
   String? settlementCaption(String obligationId) {
     final dates = <String>[];
     final accounts = <String>[];
-    for (final s in snapshot.settlements ?? <Settlement>[]) {
-      if (s.obligationId != obligationId || s.invalidatedAt != null) continue;
-      final tx = _transactions[s.transactionId];
-      final date = tx?.withdrawalDate;
+    for (final tx in _relations.settledTransactions(obligationId)) {
+      final date = tx.withdrawalDate;
       if (date != null && !dates.contains(mdText(date))) {
         dates.add(mdText(date));
       }
-      final account = tx?.accountId;
+      final account = tx.accountId;
       if (account != null && !accounts.contains(account)) {
         accounts.add(account);
       }

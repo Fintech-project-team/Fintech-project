@@ -511,6 +511,7 @@ class Reserve {
 class Obligation {
   /// 2026-10-22: 서버 ID [obligationId], 이름 [label], 출금 계좌 [withdrawalAccountId], 금액 [amountKrw],
   /// 날짜 [dueDate], 상태 [status](active·cancelled)로 만든다.
+  /// 2026-11-02: 이 예정 지출이 대표하는 카드 청구 [statementId]를 더했다.
   const Obligation({
     required this.obligationId,
     required this.label,
@@ -518,6 +519,7 @@ class Obligation {
     required this.amountKrw,
     required this.dueDate,
     required this.status,
+    this.statementId,
   });
 
   final String obligationId;
@@ -527,6 +529,9 @@ class Obligation {
   final String dueDate;
   final String status;
 
+  /// 2026-11-02: 대표하는 청구. null이면 청구 연결이 없거나, 청구가 미연결이라 키가 생략된 것이다(제한 표식으로 구분).
+  final String? statementId;
+
   static Obligation _parse(_Fields f) => Obligation(
     obligationId: f.string('obligationId'),
     label: f.string('label'),
@@ -534,6 +539,7 @@ class Obligation {
     amountKrw: f.krw('amountKRW', allowNegative: false),
     dueDate: f.businessDate('dueDate'),
     status: f.oneOf('status', const {'active', 'cancelled'}),
+    statementId: f.stringOrNull('statementId'),
   );
 }
 
@@ -683,7 +689,8 @@ class SourceTransaction {
     this.installmentTotal,
   });
 
-  /// 2026-10-30: 계약 열거값(docs/data-model.md). 그 밖의 값은 형식 오류다. 계좌 내역의 approved·cancelled도 허용 값이다.
+  /// 2026-10-30: 계약 열거값(docs/data-model.md). 그 밖의 값은 형식 오류다.
+  /// 2026-11-02: 계좌 내역(account_entry)은 [accountStatuses]만 허용하고 카드 기록은 [statuses] 전체를 허용한다.
   static const Set<String> recordKinds = {
     'account_entry',
     'card_purchase',
@@ -697,6 +704,7 @@ class SourceTransaction {
     'cancelled',
     'unknown',
   };
+  static const Set<String> accountStatuses = {'posted', 'unknown'};
 
   /// 2026-10-30: 원천 표시 설명(화면 '거래 내용'). null은 미제공이다.
   final String? description;
@@ -741,6 +749,7 @@ class SourceTransaction {
   final String? sourceVersion;
 
   /// 2026-10-20: 거래 한 건을 읽는다. 계좌·카드 ID가 모두 null이면 계약 위반(적어도 하나 필요)이다.
+  /// 2026-11-02: 계좌 내역의 approved·cancelled는 계약 위반이라 형식 오류다. 다른 값으로 바꾸거나 건너뛰지 않는다.
   static SourceTransaction _parse(_Fields f) {
     final accountId = f.stringOrNull('accountId');
     final cardId = f.stringOrNull('cardId');
@@ -750,14 +759,18 @@ class SourceTransaction {
         'accountId와 cardId가 모두 null(적어도 하나 필요)',
       );
     }
+    final recordKind = f.oneOf('recordKind', recordKinds);
     return SourceTransaction(
       transactionId: f.string('transactionId'),
       accountId: accountId,
       cardId: cardId,
-      recordKind: f.oneOf('recordKind', recordKinds),
+      recordKind: recordKind,
       amountKrw: f.krw('amountKRW', allowNegative: false),
       direction: f.oneOf('direction', directions),
-      status: f.oneOf('status', statuses),
+      status: f.oneOf(
+        'status',
+        recordKind == 'account_entry' ? accountStatuses : statuses,
+      ),
       merchantName: f.string('merchantName'),
       bookingDate: f.businessDateOrNull('bookingDate'),
       purchaseDate: f.businessDateOrNull('purchaseDate'),
@@ -970,11 +983,17 @@ class Statement {
     required this.includedTransactionRefs,
     required this.detailCompleteness,
     required this.items,
+    this.periodStart,
+    this.periodEnd,
   });
 
   final String statementId;
   final String cardId;
   final int amountKrw;
+
+  /// 2026-11-02: 확인된 이용기간(양 끝 포함). 둘 다 있거나 둘 다 null이다.
+  final String? periodStart;
+  final String? periodEnd;
 
   /// 2026-10-31: 확인된 결제 예정일. null은 미확보이며 다른 날짜로 채우지 않는다(docs/data-model.md).
   final String? dueDate;
@@ -1011,6 +1030,14 @@ class Statement {
         );
       }
     }
+    final start = f.businessDateOrNull('periodStart');
+    final end = f.businessDateOrNull('periodEnd');
+    if ((start == null) != (end == null)) {
+      throw SnapshotFormatException(
+        '${f.path}.periodStart',
+        '이용기간은 양 끝을 함께 제공해야 함',
+      );
+    }
     return Statement(
       statementId: f.string('statementId'),
       cardId: f.string('cardId'),
@@ -1019,6 +1046,8 @@ class Statement {
       includedTransactionRefs: refs,
       detailCompleteness: f.string('detailCompleteness'),
       items: items,
+      periodStart: start,
+      periodEnd: end,
     );
   }
 }
