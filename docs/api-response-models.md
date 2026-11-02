@@ -28,6 +28,8 @@ v4는 Statement.items와 `statementItem` 접근 제한을 함께 도입한다. A
 
 같은 원천 버전의 내용을 변경하지 않는다. 원천 형식 전환은 새 sourceVersion과 현재 원천 자원의 참조를 일관되게 갱신하되, 기존 ID·금액·날짜·asOf·사용자 dataVersion·과거 승인 기록의 sourceVersion을 바꾸지 않는다. ruleVersion은 형식 전환만으로 올리지 않는다. 급여 근거가 제한되면 기존 salary.receiptEvidence 부모 키 생략·표식을 그대로 사용하고 payMonth만 우회 공개하지 않는다. 신규 accessRestrictions tuple은 추가하지 않는다.
 
+원천에 거래를 추가하는 갱신(새로고침 확인용 합성 자료 포함)은 새 sourceVersion과 그 자료의 asOf·계좌 잔액 asOf를 함께 내려주고 dataVersion을 올린다. 원천 거래의 사실 날짜가 asOf보다 늦은 응답은 계약 위반이며 Flutter가 정상 계산으로 표시하지 않는다. 기준은 [데이터 모델의 기준 시각](data-model.md#기준-시각asof과-원천-갱신)이다.
+
 급여 원천의 유효성과 계산 가능 여부는 [급여 모델](data-model.md#급여-회차와-예정일)에 따라 구분한다. 유효한 원천의 먼 예정일·역전·동일 예정일·큰 입금만으로 조회를 실패시키거나 근거를 생략하지 않는다. 반대로 잘못된 형식·동일 회차 중복을 정상 근거로 내려보내지 않는다. 공개가 허용된 원천의 `confirmation`을 계산 상태나 사용자 확인 응답으로 덮어쓰지 않는다. 계산 정보 부족은 Flutter가 산출할 수 없는 구간에 대해 판정하며, 접근 제한 표식으로 대신 표현하지 않는다.
 
 DB의 `source_contexts.salary_evidence`는 필드 의미와 값을 유지해 `settings.salary.receiptEvidence`에 매핑한다. `unknown`·`transactionIds=[]`인 미래 예정 원천도 공개 권한이 있으면 포함한다. 해당 회차 원천이 없으면 생성하지 않는다. 반복 설정을 이용한 예상 예정일은 Flutter에서 계산하며, 원천 배열이나 서버 응답의 새 계산 필드로 추가하지 않는다. 기존 부모 키 생략·접근 제한 표식은 유지한다.

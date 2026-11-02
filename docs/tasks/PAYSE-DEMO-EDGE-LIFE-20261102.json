@@ -1,0 +1,39 @@
+{
+  "id": "PAYSE-DEMO-EDGE-LIFE-20261102",
+  "role": "integration",
+  "baseCommit": "e1e8eddd6b46b0b34288b17da44bed6b63fc743c",
+  "branch": "feat/integration/demo-edge-life",
+  "allowedPaths": [
+    "docs/tasks/PAYSE-DEMO-EDGE-LIFE-20261102.json",
+    "apps/api/fixtures/edge_life_cases.py",
+    "apps/api/fixtures/generate.py",
+    "apps/api/fixtures/generated/",
+    "apps/api/fixtures/generated-v4/",
+    "apps/mobile/assets/fixtures/beta-life.json",
+    "apps/mobile/assets/fixtures/gamma-life.json",
+    "apps/mobile/pubspec.yaml",
+    "apps/mobile/lib/data/fixture_scenario.dart",
+    "apps/mobile/lib/app/dev/dev_user_fixtures.dart",
+    "apps/mobile/test/",
+    "apps/api/tests/test_fixtures.py",
+    "apps/api/tests/test_billing_cases.py"
+  ],
+  "acceptance": [
+    "목적: 데모베타·데모감마 계정의 1년 생활 흐름 더미를 만든다(2026-11-02 혜연 지시). 알파(demo-life)와 거래명·생활권·금액이 겹치지 않고, docs/edgecase/베타_감마_데모_엣지케이스_초안.md의 LLM 엣지 사례를 담는다. 앱에서 로그아웃 후 베타·감마로 로그인하면 바로 확인할 수 있어야 한다. 근거: docs/demo/realism/README.md §0 A·B 합의, 2026-10-29 A가 확정한 B 작업 범위",
+    "결정(2026-11-02 혜연): 기준 시각 2026-11-05 12:00(시연일). 감마 기본은 G14(이번 회차 10/15 '입금' 2,850,000원이 실제로는 대출금, 월급 미입금). 베타·감마 각 1개 사례만 만들고 충돌 사례(감마 이직 G04·미입금 G05/G06 등)는 후속 후보로 둔다. 2026-11-02 추가 결정(혜연): 앱에 회차 확인 저장 기능이 없어 베타는 10월 회차를 급여 3,084,620원 한 건으로 확인된 상태로 두고(홈 계산 가능), 감마는 이번 회차 확인 전(G14)으로 둔다",
+    "등록 방식: 생성 규칙을 apps/api/fixtures/edge_life_cases.py에 두고 generate.build()에 'beta-life'·'gamma-life'를 add_case로 등록한다. 골격은 make_snapshot(alias, '2026-11-05T12:00:00+09:00')이며 거래·관계·청구·계획은 새로 만든다. 정답 라벨은 catalog expected.edgeLabels에만 두고 거래 표시값에 넣지 않는다. v4는 기존 billing_cases.py 변환을 그대로 거친다. 기존 사례 파일은 내용이 바뀌지 않아야 한다(catalog·manifest에 새 사례만 추가). 생성 결과를 손으로 고치지 않고 Prettier만 적용한다",
+    "보존: 기존 v3 22개·v4 25개 사례, server-seeds의 initialCase와 identity_contract.py(기본 사례 서버 연결은 A). 더미 전용 테이블·컬럼·계약·Java API·DB 권한은 범위 밖",
+    "앱: beta-life·gamma-life 자산(generated-v4 사본), FixtureScenario 추가, pubspec 자산 등록, 개발용 데모베타·데모감마 계정을 새 사례에 연결(dev_user_fixtures.dart)",
+    "검증: 생성 재현성, 원본 검증기, 기존 사례 불변, apps/api 파이썬 테스트(새 실패 0건), 잔액 정합성(조회 시작·일별 잔액 ≥0), 앱 fixture_copy_test·계산 테스트(베타 B·U 4,924,500·E 0, 감마 B 7,791,550·이번 회차 입금 근거 없음으로 E·U 정보 부족, 대출금을 잘못 확인하면 대출금이 쓸 수 있는 돈에 섞임), 하네스. A 테스트는 새 사례 때문에 실패하는 사례 수(v3 22→24, v4 25→27)와 원천 버전 끝(beta-life·gamma-life는 ':base:life-1') 검사만 고친다(2026-11-02 성현 승인, 혜연 전달)",
+    "범위 밖: 데모알파 기준 시각 변경(후속), 기본 사례 서버 연결(A), DB 적재 SQL·폐기용 DB 검증, 예정 지출·반복 계획 등록 상태 사례"
+  ],
+  "readBefore": [
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/demo/realism/README.md",
+    "docs/edgecase/베타_감마_데모_엣지케이스_초안.md",
+    "apps/api/fixtures/docs/dummy-data.md",
+    "docs/harness/AGENT_REVIEW.md"
+  ]
+}
