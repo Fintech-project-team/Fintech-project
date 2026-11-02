@@ -1,0 +1,44 @@
+{
+  "id": "PAYSE-MANUAL-DEPLOY-20261102",
+  "role": "integration",
+  "baseCommit": "4a037d3ff41893ce3a88589846fd333f68646048",
+  "branch": "feat/api/manual-deployment",
+  "allowedPaths": [
+    ".github/workflows/release.yml",
+    "apps/api/tools/release_server.py",
+    "apps/api/tests/test_release_server.py",
+    "apps/api/tests/Test-Release.ps1",
+    "apps/api/deploy/Deploy-Payse.ps1",
+    "apps/api/deploy/Release-Control.psm1",
+    "apps/api/deploy/deployment.properties.example",
+    "apps/api/deploy/release-schema.json",
+    "apps/api/deploy/continuous-delivery.md",
+    "apps/api/deploy/README.md",
+    "apps/api/tools/server_runtime.py",
+    "apps/api/tools/portable_server.py",
+    "apps/api/tests/test_portable_server.py",
+    "apps/api/tests/test_server_runtime.py",
+    "apps/api/deploy/requirements.txt",
+    "apps/api/deploy/portable.properties.example"
+  ],
+  "acceptance": [
+    "GitHub CI가 기존 API 검사와 격리 PostgreSQL 회귀를 통과한 동일 커밋의 JAR만 배포 산출물로 제공한다.",
+    "사용자가 선택한 CI 통과 후 수동 배포 정책을 유지하며 push만으로 현재 서버를 중단하지 않는다.",
+    "배포는 커밋·CI 실행·파일 해시·설치 정체성·현재 프로필의 DB 전제·Java 21·메모리 여유를 검증하고 기본은 점검만 수행한다.",
+    "API JAR만 교체하고 정상 기동 실패 시 이전 JAR로 복구한다. DB·설정·키·Caddy·폰 인증서·원격 연결은 보존한다.",
+    "실제 민감값은 저장소 밖 properties로 관리하고 Git에는 빈 예제만 포함한다.",
+    "변조·잘못된 CI·호환성 실패·교체 및 복구 실패·동시 배포를 검사하고 실제 서버 교체와 원격 CI 미실행을 구분한다.",
+    "Gradle 중복 정리 변경은 기존 fix/gradle-project-discovery 브랜치에 보존하며 별도 커밋으로 준비한다.",
+    "사용자 추가 요청: 새 Windows·Linux·macOS PC에서 환경을 감지하고 명시 설정·승인으로 설치 및 수동 배포한다. IP 감지만으로 외부 공개나 방화벽을 변경하지 않는다."
+  ],
+  "readBefore": [
+    "docs/development-workflow.md",
+    "docs/toolchain.md",
+    "docs/harness/AGENT_REVIEW.md",
+    "docs/harness/COMMIT_PR_POLICY.md",
+    "apps/api/AGENTS.md",
+    "apps/api/deploy/README.md",
+    "apps/api/docs/local-server-guide.md",
+    "apps/api/docs/database-tests.md"
+  ]
+}
