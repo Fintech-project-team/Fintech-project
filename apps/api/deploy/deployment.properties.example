@@ -1,0 +1,10 @@
+# Copy outside Git. Leave repository examples empty; never commit actual paths or tokens.
+github.repository=
+github.branch=
+# Optional: existing gh authentication is used when empty. Only Actions/contents read access is needed.
+github.token=
+deployment.installRoot=
+deployment.maxHeapMiB=
+deployment.minFreeGiB=
+server.java=
+server.psql=
