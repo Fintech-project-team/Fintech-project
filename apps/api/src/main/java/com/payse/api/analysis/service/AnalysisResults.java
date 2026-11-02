@@ -126,6 +126,7 @@ public final class AnalysisResults {
      * @usedBy AnalysisJobs.execute
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-02 - 관리 조회의 전체 근거 접근 검증용 불변 참조·지문 저장
      */
     public UUID save(
         UUID owner,
@@ -138,7 +139,8 @@ public final class AnalysisResults {
         Instant now = clock.instant();
         String kind = input.path(ApiFieldConstants.Analysis.SEMANTIC_TASK_KIND).asString();
         Map<String, AnalysisIdentity.Item> bound = new HashMap<>();
-        identity.boundItems(finances.load(owner), input)
+        ObjectNode source = finances.load(owner);
+        identity.boundItems(source, input)
             .forEach(item -> bound.put(item.itemKey(), item));
         ObjectNode header = row(owner, resultId)
             .put(AnalysisDb.SEMANTIC_KIND, kind)
@@ -195,6 +197,13 @@ public final class AnalysisResults {
                 .put(AnalysisDb.METADATA_VERSION, 1)
                 .put(AnalysisDb.POLICY_VERSION, ApiConfigConstants.Analysis.MEMORY_CONTRACT)
                 .put(AnalysisDb.POLICY_ACTOR, ApiCodeConstants.Analysis.AI);
+            List<UUID> refs = identity.sourceRefs(input, value.identity().itemKey());
+            var referenceIds = stored.putArray(ApiFieldConstants.AnalysisDb.SOURCE_REFS);
+            refs.forEach(id -> referenceIds.add(id.toString()));
+            stored.put(
+                ApiFieldConstants.AnalysisDb.SOURCE_HASH,
+                identity.referenceHash(source, refs)
+            );
             stored.putObject(AnalysisDb.CRYPTO_META)
                 .put(ApiFieldConstants.Analysis.KEY_REF, encrypted.key().keyRef())
                 .put(
@@ -355,6 +364,7 @@ public final class AnalysisResults {
      * @modified 2026-11-02 - 긴 식 지역변수 분리
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-02 - 관리 목록과 단일 기억 복호화 구현 공유
      */
     public Map<UUID, ObjectNode> decrypt(UUID owner, Selection selection) {
         Map<UUID, ObjectNode> bodies = new HashMap<>();
@@ -364,30 +374,40 @@ public final class AnalysisResults {
             }
 
             ObjectNode memory = entry.memory();
-            JsonNode meta = memory.path(AnalysisDb.CRYPTO_META);
-            byte[] ciphertext = HexFormat.of()
-                .parseHex(
-                    memory.path(ApiFieldConstants.Analysis.CIPHERTEXT)
-                        .asString()
-                        .substring(2)
-                );
-            byte[] nonce = Base64.getDecoder()
-                .decode(meta.path(ApiFieldConstants.Analysis.NONCE).asString());
-            String keyRef = meta.path(ApiFieldConstants.Analysis.KEY_REF).asString();
-            byte[] wrappedBytes = Base64.getDecoder()
-                .decode(meta.path(ApiFieldConstants.Analysis.WRAPPED_KEY).asString());
-            WrappedKey wrapped = new WrappedKey(keyRef, wrappedBytes);
-            EncryptedMemory encrypted = new EncryptedMemory(ciphertext, nonce, wrapped);
             UUID id = uuid(memory, AnalysisDb.ID);
-            byte[] plaintext = runtime.decrypt(owner, id, encrypted);
-            try {
-                bodies.put(id, (ObjectNode) AnalysisJson.JSON.readTree(plaintext));
-            } finally {
-                Arrays.fill(plaintext, (byte) 0);
-            }
+            bodies.put(id, decryptMemory(owner, memory));
         }
 
         return bodies;
+    }
+
+    /**
+     * 호출자가 현재 열람 자격을 확인한 기억 하나만 사용자·항목 AAD로 복호화한다.
+     * @created 2026-11-01
+     * @usedBy decrypt, MemoryCatalog.read
+     * @modified 2026-11-02 - 최신 암호화 필드 상수와 단일 기억 복호화 경계를 통합
+     */
+    public ObjectNode decryptMemory(UUID owner, ObjectNode memory) {
+        JsonNode meta = memory.path(AnalysisDb.CRYPTO_META);
+        byte[] ciphertext = HexFormat.of()
+            .parseHex(
+                memory.path(ApiFieldConstants.Analysis.CIPHERTEXT)
+                    .asString()
+                    .substring(2)
+            );
+        byte[] nonce = Base64.getDecoder()
+            .decode(meta.path(ApiFieldConstants.Analysis.NONCE).asString());
+        String keyRef = meta.path(ApiFieldConstants.Analysis.KEY_REF).asString();
+        byte[] wrappedBytes = Base64.getDecoder()
+            .decode(meta.path(ApiFieldConstants.Analysis.WRAPPED_KEY).asString());
+        WrappedKey wrapped = new WrappedKey(keyRef, wrappedBytes);
+        EncryptedMemory encrypted = new EncryptedMemory(ciphertext, nonce, wrapped);
+        byte[] plaintext = runtime.decrypt(owner, uuid(memory, AnalysisDb.ID), encrypted);
+        try {
+            return (ObjectNode) AnalysisJson.JSON.readTree(plaintext);
+        } finally {
+            Arrays.fill(plaintext, (byte) 0);
+        }
     }
 
     /**
@@ -665,7 +685,7 @@ public final class AnalysisResults {
          */
         @Override
         public String toString() {
-            return "Entry[REDACTED]";
+            return ApiMessageConstants.Analysis.MEMORY_ENTRY_REDACTED;
         }
     }
 

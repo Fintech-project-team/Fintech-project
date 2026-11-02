@@ -63,6 +63,17 @@ public final class ApiMessageConstants {
         public static final String REFERENCE_REQUIRED = "Important memory must be reference data";
         public static final String DELETION_BEFORE_STORAGE = "Deletion precedes storage";
 
+        // 기간 조회·기억 관리
+        public static final String MISSING_MEMORY_BODY = "Missing authorized memory body";
+        public static final String MEMORY_ENTRY_REDACTED = "Entry[REDACTED]";
+        public static final String MEMORY_PAGE_REDACTED = "Page[REDACTED]";
+        public static final String MEMORY_QUERY_REDACTED = "MemoryQuery[REDACTED]";
+
+        // 기간 조회·기억 관리
+        public static final String INVALID_MEMORY_PERIOD =
+            "Valid memory period and clock are required";
+        public static final String INVALID_MEMORY_PAGE = "Valid memory page bounds are required";
+
         /**
          * 분석 상수 구간의 인스턴스 생성을 막는다.
          * @created 2026-11-02
@@ -172,6 +183,9 @@ public final class ApiMessageConstants {
         public static final String INVALID_CURSOR_KEY =
             "Invalid required financial cursor key configuration";
         public static final String DIGEST_UNAVAILABLE = "Required financial digest unavailable";
+
+        // 기간 조회·기억 관리
+        public static final String INVALID_PAGE_SIZE = "Invalid page size";
 
         /**
          * 금융 상수 구간의 인스턴스 생성을 막는다.
