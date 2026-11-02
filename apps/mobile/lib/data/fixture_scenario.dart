@@ -9,7 +9,9 @@ enum FixtureScenario {
   salaryWait('salary-wait', '월급일 입금 전'),
   alphaUnconnected('alpha-unconnected', '금융사 연결 전'),
   betaReady('beta-ready', 'beta 계정 원본'),
-  gammaMonthEnd('gamma-month-end', 'gamma 계정 원본(말일)');
+  betaLife('beta-life', '베타 생활 흐름(비정기 현금 흐름)'),
+  gammaMonthEnd('gamma-month-end', 'gamma 계정 원본(말일)'),
+  gammaLife('gamma-life', '감마 생활 흐름(월급 회차 해석)');
 
   /// 2026-10-20: [fileStem]은 catalog.json의 사례 id, [devLabel]은 개발용 화면의 짧은 설명이다.
   const FixtureScenario(this.fileStem, this.devLabel);
