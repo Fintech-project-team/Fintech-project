@@ -60,7 +60,11 @@ def main():
     for key in ('cases', 'expected', 'responses', 'output'):
         parser.add_argument('--' + key, type=Path, required=True)
     args = parser.parse_args()
-    write_new(args.output, score_replay(read_json(args.cases), read_json(args.expected), read_json(args.responses)))
+    cases = read_json(args.cases)
+    expected = read_json(args.expected)
+    responses = read_json(args.responses)
+    report = score_replay(cases, expected, responses)
+    write_new(args.output, report)
 
 
 if __name__ == '__main__':

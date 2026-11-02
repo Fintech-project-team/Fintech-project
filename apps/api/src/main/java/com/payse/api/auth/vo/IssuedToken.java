@@ -13,5 +13,7 @@ public record IssuedToken(String value, String digest) {
      * @return 원문이 없는 고정 표현
      */
     @Override
-    public String toString() { return "IssuedToken[REDACTED]"; }
+    public String toString() {
+        return "IssuedToken[REDACTED]";
+    }
 }

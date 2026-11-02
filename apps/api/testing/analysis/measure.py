@@ -73,7 +73,8 @@ def main():
     expected = read_cases(args.directory / 'expected.private.jsonl', 'expected')
     report = measure(inputs, expected, args.limit)
     (args.directory / 'size-report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-    print(json.dumps({key: value for key, value in report.items() if key != 'sampleIds'}, ensure_ascii=False, indent=2))
+    summary = {key: value for key, value in report.items() if key != 'sampleIds'}
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
 if __name__ == '__main__':

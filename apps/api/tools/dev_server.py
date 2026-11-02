@@ -125,15 +125,20 @@ class DevServer:
     def load(self, *, ready=True):
         """2026-10-29: 위치·소유 종류·단계가 맞는 표식만 받는다. 사용: CLI 제어."""
         state = json.loads(self.state_file.read_text(encoding='utf-8'))
-        if state.get('kind') != KIND or state.get('home') != str(self.home) \
-                or state.get('data') != str(self.data) or (ready and state.get('phase') != 'ready'):
+        owner_differs = (
+            state.get('kind') != KIND or state.get('home') != str(self.home)
+            or state.get('data') != str(self.data) or (ready and state.get('phase') != 'ready')
+        )
+        if owner_differs:
             raise ValueError('Development owner marker or preparation state differs')
         self.state = state
         self.check_data()
 
     def read_secrets(self):
         """2026-10-29: 저장소 밖 DPAPI 자료를 현재 사용자로만 복호화한다. 사용: DB·API 시작."""
-        return json.loads(protect('unprotect', (self.home / 'secrets.dpapi').read_text(encoding='ascii')))
+        sealed = (self.home / 'secrets.dpapi').read_text(encoding='ascii')
+        plain = protect('unprotect', sealed)
+        return json.loads(plain)
 
     def binary(self, name):
         """2026-10-29: 기록된 PostgreSQL 도구를 사용한다. 사용: DB 준비·제어."""
@@ -183,9 +188,12 @@ class DevServer:
             "'directory',current_setting('data_directory'),'host',current_setting('listen_addresses'),"
             "'port',current_setting('port'),'owner',current_user,'cluster',current_setting('cluster_name'),"
             "'system',(SELECT system_identifier::text FROM pg_control_system()));", database='postgres'))
-        if Path(row['directory']).resolve() != self.data.resolve() or row['host'] != '127.0.0.1' \
-                or row['port'] != str(self.state['pgPort']) or row['owner'] != ADMIN \
-                or row['cluster'] != self.state['marker']:
+        identity_differs = (
+            Path(row['directory']).resolve() != self.data.resolve() or row['host'] != '127.0.0.1'
+            or row['port'] != str(self.state['pgPort']) or row['owner'] != ADMIN
+            or row['cluster'] != self.state['marker']
+        )
+        if identity_differs:
             raise RuntimeError('Database identity does not match the owned development cluster')
         if self.state.get('systemId') not in (None, row['system']):
             raise RuntimeError('Database system identifier changed')
@@ -243,7 +251,9 @@ class DevServer:
         prepared = initial_sql(directory, demo_state=demo_state)
         self.home.parent.mkdir(parents=True, exist_ok=True)
         self.home.mkdir()
-        sid = next(csv.reader(run(['whoami', '/user', '/fo', 'csv', '/nh']).splitlines()))[1]
+        account_output = run(['whoami', '/user', '/fo', 'csv', '/nh'])
+        account_rows = csv.reader(account_output.splitlines())
+        sid = next(account_rows)[1]
         run(['icacls', self.home, '/inheritance:r', '/grant:r', f'*{sid}:(OI)(CI)F'])
         self.state = {'kind': KIND, 'phase': 'preparing', 'home': str(self.home), 'data': str(self.data),
             'pgBin': str(pg_bin), 'pgPort': pg_port, 'apiPort': api_port,
@@ -311,6 +321,7 @@ class DevServer:
         """2026-10-29: 기존 AuthCrypto로 확인한 세 합성 계정만 활성화한다. 사용: 최초 init.
 
         2026-10-30: 새 환경에 명시적으로 적재한 v3/v4 시드의 동일 사용자 ID를 사용한다.
+        2026-11-02: 분리한 인증·도구 상수 소스를 같은 컴파일에 연결한다.
         """
         seeds = json.loads((self.fixtures() / 'server-seeds.json').read_text(encoding='utf-8'))['users']
         if {row['name'] for row in seeds} != set(DEMO_CODES) or len(seeds) != 3:
@@ -321,11 +332,12 @@ class DevServer:
         sources = [API / 'src/main/java/com/payse/api' / name for name in (
             'auth/crypto/AuthCrypto.java', 'auth/crypto/AuthSecrets.java',
             'auth/vo/AuthCredentials.java', 'auth/vo/IssuedToken.java')]
-        run([java.parent / 'javac.exe', '-encoding', 'UTF-8', '-d', output,
-             *sources, API / 'tools/PrepareDemo.java'])
+        source_path = os.pathsep.join(str(path) for path in (API / 'src/main/java', API / 'tools'))
+        run([java.parent / 'javac.exe', '-encoding', 'UTF-8', '-sourcepath', source_path,
+             '-d', output, *sources, API / 'tools/PrepareDemo.java'])
         environment = {**clean_environment(), **{key: value for key, value in values.items() if key.startswith('PAYSE_AUTH_')}}
-        result = run([java, '-cp', output, 'PrepareDemo'], environment=environment,
-            content=''.join(row['userId'] + '\t' + DEMO_CODES[row['name']] + '\n' for row in seeds))
+        credentials = ''.join(row['userId'] + '\t' + DEMO_CODES[row['name']] + '\n' for row in seeds)
+        result = run([java, '-cp', output, 'PrepareDemo'], environment=environment, content=credentials)
         verifiers = dict(line.split('\t', 1) for line in result.splitlines())
         if set(verifiers) != {row['userId'] for row in seeds}:
             raise RuntimeError('Prepared credential ownership differs')
@@ -377,9 +389,12 @@ class DevServer:
             kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
             kernel32.LocalFree.argtypes = [ctypes.c_void_p]
             kernel32.LocalFree(ctypes.cast(arguments, ctypes.c_void_p))
-        if process['path'].lower() != self.state['java'].lower() \
-                or command != [self.state['java'], '-jar', str(self.home / 'server.jar')] \
-                or (self.state.get('apiStarted') and process['started'] != self.state['apiStarted']):
+        process_differs = (
+            process['path'].lower() != self.state['java'].lower()
+            or command != [self.state['java'], '-jar', str(self.home / 'server.jar')]
+            or (self.state.get('apiStarted') and process['started'] != self.state['apiStarted'])
+        )
+        if process_differs:
             raise RuntimeError('Recorded PID is not the owned API; no process was stopped')
         return process
 

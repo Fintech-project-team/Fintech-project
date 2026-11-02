@@ -5,6 +5,8 @@ import com.payse.api.auth.controller.AuthHttpInput;
 import com.payse.api.auth.controller.AuthHttpResponse;
 import com.payse.api.auth.dto.AuthResponse;
 import com.payse.api.auth.error.AuthStoreException;
+import com.payse.api.constants.ApiCodeConstants;
+import com.payse.api.constants.ApiConfigConstants;
 import com.payse.api.finance.controller.FinancialHttpInput;
 import com.payse.api.finance.error.FinancialException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,6 +31,7 @@ import tools.jackson.databind.node.ObjectNode;
 @RestController
 @Profile("database & auth & finance & analysis")
 public final class AnalysisController {
+
     private final AnalysisJobs jobs;
     private final AuthHttpInput auth;
     private final FinancialHttpInput input;
@@ -98,27 +101,43 @@ public final class AnalysisController {
      * 지정 기억의 동일 근거 사본을 차단하며 금융 원천은 삭제하지 않는다.
      * @created 2026-11-01
      * @usedBy DELETE /analysis-memories/{id}
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조
      */
     @DeleteMapping("/analysis-memories/{id}")
     public ResponseEntity<Void> delete(@PathVariable String id, HttpServletRequest request) {
         jobs.deleteMemory(auth.bearer(request), id, () -> deleteKey(request));
-        return ResponseEntity.noContent().header(HttpHeaders.CACHE_CONTROL, "no-store").build();
+        return ResponseEntity.noContent()
+            .header(HttpHeaders.CACHE_CONTROL, ApiConfigConstants.Analysis.NO_STORE)
+            .build();
     }
 
     /**
      * 삭제는 단일 멱등 헤더와 빈 본문만 허용하고 금융 쓰기 W 헤더를 요구하지 않는다.
      * @created 2026-11-01
      * @usedBy delete의 인증 후 지연 파서
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조; 단일 제어문 본문 중괄호 명시
      */
     private String deleteKey(HttpServletRequest request) {
         try {
             if (!request.getParameterMap().isEmpty() || request.getInputStream().read() != -1
-                    || request.getHeader("Content-Encoding") != null
-                    || request.getHeader("Payse-Expected-Data-Version") != null
-                    || request.getHeader("Payse-Rule-Version") != null) throw new FinancialException(422, "VALIDATION_FAILED");
-        } catch (IOException failure) { throw new FinancialException(400, "INVALID_JSON"); }
-        var keys = Collections.list(request.getHeaders("Idempotency-Key"));
-        if (keys.size() != 1) throw new FinancialException(422, "VALIDATION_FAILED");
+                || request.getHeader(ApiConfigConstants.Analysis.CONTENT_ENCODING) != null
+                || request
+                    .getHeader(ApiConfigConstants.Analysis.PAYSE_EXPECTED_DATA_VERSION) != null
+                || request.getHeader(ApiConfigConstants.Analysis.PAYSE_RULE_VERSION) != null) {
+                throw new FinancialException(422, ApiCodeConstants.Analysis.VALIDATION_FAILED);
+            }
+        } catch (IOException failure) {
+            throw new FinancialException(400, ApiCodeConstants.Analysis.INVALID_JSON);
+        }
+
+        var keys = Collections
+            .list(request.getHeaders(ApiConfigConstants.Analysis.IDEMPOTENCY_KEY));
+        if (keys.size() != 1) {
+            throw new FinancialException(422, ApiCodeConstants.Analysis.VALIDATION_FAILED);
+        }
+
         return keys.getFirst();
     }
 
@@ -126,9 +145,13 @@ public final class AnalysisController {
      * 사용자별 분석 결과가 브라우저·중간 프록시 캐시에 저장되지 않게 한다.
      * @created 2026-11-01
      * @usedBy 모든 조회·접수 경로
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조
      */
     private ResponseEntity<ObjectNode> response(AnalysisJobs.Reply reply) {
-        return ResponseEntity.status(reply.status()).header(HttpHeaders.CACHE_CONTROL, "no-store").body(reply.body());
+        return ResponseEntity.status(reply.status())
+            .header(HttpHeaders.CACHE_CONTROL, ApiConfigConstants.Analysis.NO_STORE)
+            .body(reply.body());
     }
 
     /**
@@ -145,9 +168,11 @@ public final class AnalysisController {
      * 저장·암호화 장애의 SQL·본문·키를 외부 응답에 넣지 않는다.
      * @created 2026-11-01
      * @usedBy Spring MVC 예외 처리
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조
      */
-    @ExceptionHandler({AuthStoreException.class, RuntimeException.class})
+    @ExceptionHandler({ AuthStoreException.class, RuntimeException.class })
     public ResponseEntity<AuthResponse.Error> unavailable() {
-        return AuthHttpResponse.error(503, "TEMPORARILY_UNAVAILABLE", null);
+        return AuthHttpResponse.error(503, ApiCodeConstants.Analysis.TEMPORARILY_UNAVAILABLE, null);
     }
 }

@@ -25,12 +25,16 @@ public final class FinancialException extends RuntimeException {
      * @created 2026-10-29
      * @usedBy FinancialController.failure
      */
-    public int status() { return status; }
+    public int status() {
+        return status;
+    }
 
     /**
      * 계약의 공개 오류 코드만 반환한다.
      * @created 2026-10-29
      * @usedBy FinancialController.failure
      */
-    public String code() { return code; }
+    public String code() {
+        return code;
+    }
 }

@@ -63,7 +63,7 @@ Java DTO와 Dart 모델은 기존 JSON 이름·날짜 정밀도·금액 단위·
 
 ## 주석과 구조
 
-공통 코드 구조·설정·주석은 [CODE_SPEC](../../../docs/harness/CODE_SPEC.md), API 적용 범위·필수 Java 주석은 [src/AGENTS.md](../src/AGENTS.md)를 따른다. 초기화 안내에서 같은 규칙을 별도로 정의하지 않는다.
+공통 코드 구조·설정·주석은 [CODE_SPEC](../../../docs/harness/CODE_SPEC.md), API 적용 범위·필수 Java 주석은 [AGENTS.md](../AGENTS.md)를 따른다. 초기화 안내에서 같은 규칙을 별도로 정의하지 않는다.
 
 객체 수명·생성자 주입·가변 전역 상태 제한은 [앱 구조](../../../docs/app-architecture.md)를 따른다. 실제 기능의 책임·입출력·권한·실패·검사는 [문서 작성 기준](../../../docs/development-notes.md)에 따라 기존 API 상세를 보완한다. bootstrap만을 위해 빈 업무 계층을 생성하지 않는다.
 

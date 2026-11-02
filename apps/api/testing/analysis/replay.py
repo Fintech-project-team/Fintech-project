@@ -164,7 +164,9 @@ def main():
         _, requests = prepare(cases)
         write_new(args.export_requests, requests)
     else:
-        write_new(args.output, replay(cases, read_json(args.responses)))
+        responses = read_json(args.responses)
+        report = replay(cases, responses)
+        write_new(args.output, report)
 
 
 if __name__ == '__main__':

@@ -136,16 +136,19 @@ def validate_output(payload, output):
         if task == 'transactionMeaning':
             target = requested[key]['targetTransactionId']
             basic = row['classification']['value']
-            current = {entry['transactionId']: entry['value'] for entry in payload['currentClassifications']}.get(target)
+            classifications = {entry['transactionId']: entry['value'] for entry in payload['currentClassifications']}
+            current = classifications.get(target)
             if basic is not None and current is not None and basic != current:
                 raise ValueError('Existing classification conflict')
             if basic == 'card_payment' and current != 'card_payment':
                 raise ValueError('Card bill settlement evidence not in this input contract')
             item_refs = set(requested[key]['evidenceTransactionIds'])
-            if basic == 'internal_transfer' and current != basic and not any(
+            if basic == 'internal_transfer' and current != basic:
+                has_transfer_evidence = any(
                     r['kind'] == 'internal_transfer' and target in (r['fromId'], r['toId'])
-                    and {r['fromId'], r['toId']} <= item_refs for r in payload['relations']):
-                raise ValueError('Basic relation classification without explicit relation')
+                    and {r['fromId'], r['toId']} <= item_refs for r in payload['relations'])
+                if not has_transfer_evidence:
+                    raise ValueError('Basic relation classification without explicit relation')
 
 
 def model_input(payload):

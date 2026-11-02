@@ -21,7 +21,9 @@ public class AnalysisConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(AnalysisRuntime.class)
-    public AnalysisRuntime analysisRuntime() { return new AnalysisRuntime(); }
+    public AnalysisRuntime analysisRuntime() {
+        return new AnalysisRuntime();
+    }
 
     /**
      * 금융 날짜를 계산하지 않고 작업·보관 시각을 관리할 UTC 시계를 제공한다.
@@ -29,5 +31,7 @@ public class AnalysisConfiguration {
      * @usedBy AnalysisJobs, AnalysisResults
      */
     @Bean
-    public Clock analysisClock() { return Clock.systemUTC(); }
+    public Clock analysisClock() {
+        return Clock.systemUTC();
+    }
 }

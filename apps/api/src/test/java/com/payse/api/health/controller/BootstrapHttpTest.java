@@ -1,5 +1,8 @@
 package com.payse.api.health.controller;
 
+import com.payse.api.ApiTestConstants.HealthHttp;
+import com.payse.api.ApiTestConstants.HealthPaths;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.payse.api.PayseApiApplication;
@@ -25,7 +28,9 @@ import org.springframework.context.ConfigurableApplicationContext;
 class BootstrapHttpTest {
     private ConfigurableApplicationContext context;
     private int port;
-    private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+    private final HttpClient client = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(5))
+        .build();
 
     /**
      * 임의 로컬 포트에서 실제 서버를 시작한다. 외부 DB와 모킹 에이전트가 필요 없다.
@@ -42,10 +47,13 @@ class BootstrapHttpTest {
      * 테스트가 연 서버와 HTTP 자원을 종료한다.
      * @created 2026-10-20
      * @usedBy JUnit AfterAll
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     @AfterAll
     void stopServer() {
-        if (context != null) context.close();
+        if (context != null) {
+            context.close();
+        }
         client.close();
     }
 
@@ -54,14 +62,24 @@ class BootstrapHttpTest {
      * @created 2026-10-20
      * @usedBy JUnit test
      * @modified 2026-10-25 - 이름을 역할에 맞게 정리
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void exposesOnlyHealthStatus() throws Exception {
-        var response = get("/internal/health/live", null);
+        var response = get(HealthPaths.LIVE_PATH, null);
         assertEquals(200, response.statusCode());
         assertEquals("{\"status\":\"UP\"}", response.body());
-        assertTrue(response.headers().firstValue("content-type").orElse("").contains("application/json"));
-        assertTrue(response.headers().allValues("set-cookie").isEmpty());
+        assertTrue(
+            response.headers()
+                .firstValue(HealthHttp.LOWER_CONTENT_TYPE)
+                .orElse("")
+                .contains(HealthHttp.JSON_TYPE)
+        );
+        assertTrue(
+            response.headers()
+                .allValues(HealthHttp.LOWER_SET_COOKIE)
+                .isEmpty()
+        );
     }
 
     /**
@@ -69,13 +87,23 @@ class BootstrapHttpTest {
      * @created 2026-10-20
      * @usedBy JUnit test
      * @modified 2026-10-25 - 이름을 역할에 맞게 정리
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void blocksBusinessRoutes() throws Exception {
-        for (String route : new String[]{"/snapshot", "/transactions", "/demo-sessions", "/actuator/env"}) {
+        for (String route : new String[] {
+            HealthPaths.SNAPSHOT_PATH,
+            HealthPaths.TRANSACTIONS_PATH,
+            HealthPaths.SESSIONS_PATH,
+            HealthPaths.ACTUATOR_ENV_PATH
+        }) {
             var response = get(route, null);
             assertEquals(401, response.statusCode(), route);
-            assertTrue(response.headers().allValues("set-cookie").isEmpty());
+            assertTrue(
+                response.headers()
+                    .allValues(HealthHttp.LOWER_SET_COOKIE)
+                    .isEmpty()
+            );
             assertFalse(response.body().contains("token"));
         }
     }
@@ -85,11 +113,12 @@ class BootstrapHttpTest {
      * @created 2026-10-20
      * @usedBy JUnit test
      * @modified 2026-10-25 - 이름을 역할에 맞게 정리
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void rejectsInvalidCredentials() throws Exception {
-        assertEquals(401, get("/snapshot", "Bearer demo-token").statusCode());
-        assertEquals(401, get("/snapshot", "Basic dXNlcjpwYXNz").statusCode());
+        assertEquals(401, get(HealthPaths.SNAPSHOT_PATH, "Bearer demo-token").statusCode());
+        assertEquals(401, get(HealthPaths.SNAPSHOT_PATH, "Basic dXNlcjpwYXNz").statusCode());
     }
 
     /**
@@ -97,16 +126,23 @@ class BootstrapHttpTest {
      * @created 2026-10-20
      * @usedBy JUnit test
      * @modified 2026-10-25 - 이름을 역할에 맞게 정리
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void blocksUnauthenticatedWrites() throws Exception {
-        var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/snapshot"))
+        var request = HttpRequest
+            .newBuilder(URI.create("http://127.0.0.1:" + port + HealthPaths.SNAPSHOT_PATH))
             .timeout(Duration.ofSeconds(5))
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString("{\"userId\":\"other-user\"}")).build();
+            .header(HealthHttp.CONTENT_TYPE, HealthHttp.JSON_TYPE)
+            .POST(HttpRequest.BodyPublishers.ofString("{\"userId\":\"other-user\"}"))
+            .build();
         var response = client.send(request, HttpResponse.BodyHandlers.ofString());
         assertEquals(401, response.statusCode());
-        assertTrue(response.headers().allValues("set-cookie").isEmpty());
+        assertTrue(
+            response.headers()
+                .allValues(HealthHttp.LOWER_SET_COOKIE)
+                .isEmpty()
+        );
     }
 
     /**
@@ -116,11 +152,14 @@ class BootstrapHttpTest {
      * @param route 검사 경로
      * @param authorization 테스트용 헤더 또는 null
      * @return 실제 HTTP 응답
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조; 단일 제어문 본문 중괄호 명시
      */
     private HttpResponse<String> get(String route, String authorization) throws Exception {
         var builder = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + route))
             .timeout(Duration.ofSeconds(5));
-        if (authorization != null) builder.header("Authorization", authorization);
+        if (authorization != null) {
+            builder.header(HealthHttp.AUTHORIZATION, authorization);
+        }
         return client.send(builder.GET().build(), HttpResponse.BodyHandlers.ofString());
     }
 }

@@ -14,14 +14,16 @@ public final class AuthRows {
      * @created 2026-10-29
      * @usedBy AuthRows 클래스 초기화
      */
-    private AuthRows() {}
+    private AuthRows() {
+    }
 
     /**
      * IP 요청 저장 결과다. allowed=false이면 retryAt이 있으며 외부 응답 DTO로 사용하지 않는다.
      * @created 2026-10-25
      * @usedBy AuthRepository.recordIp, AuthJdbcTest
      */
-    public record IpLimit(boolean allowed, Instant retryAt) {}
+    public record IpLimit(boolean allowed, Instant retryAt) {
+    }
 
     /**
      * 서버 내부 코드 비교용 후보다. 계정 활성/세션 판정이나 인증 성공 결과가 아니다.
@@ -36,7 +38,9 @@ public final class AuthRows {
          * @return 원문 없는 고정 문자열
          */
         @Override
-        public String toString() { return "StoredCode[redacted]"; }
+        public String toString() {
+            return "StoredCode[redacted]";
+        }
     }
 
     /**
@@ -44,7 +48,8 @@ public final class AuthRows {
      * @created 2026-10-25
      * @usedBy AuthRepository.authorize, AuthJdbcTest
      */
-    public record Session(UUID userId, UUID sessionId) {}
+    public record Session(UUID userId, UUID sessionId) {
+    }
 
     /**
      * 사용자 잠금 뒤 확보한 내부 코드 비교 자료다. 외부 응답으로 직렬화하지 않는다.
@@ -58,7 +63,9 @@ public final class AuthRows {
          * @usedBy Java 문자열 변환, AuthServiceTest
          */
         @Override
-        public String toString() { return "LoginAccount[REDACTED]"; }
+        public String toString() {
+            return "LoginAccount[REDACTED]";
+        }
     }
 
     /**
@@ -73,6 +80,8 @@ public final class AuthRows {
          * @usedBy Java 문자열 변환
          */
         @Override
-        public String toString() { return "OpenedSession[REDACTED]"; }
+        public String toString() {
+            return "OpenedSession[REDACTED]";
+        }
     }
 }

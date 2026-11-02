@@ -54,9 +54,12 @@ class StatementItemTests(unittest.TestCase):
             if len(statements) != 1 or len(purchases) != 1:
                 raise ValueError('Missing or duplicate statement preparation')
             statement, purchase = statements[0], purchases[0]
-            if (statement['userId'] != snapshot['userId'] or purchase['userId'] != snapshot['userId']
-                    or purchase['cardId'] != statement['cardId']
-                    or purchase['transactionId'] not in statement['includedTransactionRefs']):
+            purchase_differs = (
+                statement['userId'] != snapshot['userId'] or purchase['userId'] != snapshot['userId']
+                or purchase['cardId'] != statement['cardId']
+                or purchase['transactionId'] not in statement['includedTransactionRefs']
+            )
+            if purchase_differs:
                 raise ValueError('Prepared statement has a foreign or absent purchase')
             key = ':'.join((snapshot['userId'], statement['statementId'], purchase['transactionId']))
             identity = str(UUID(hashlib.md5(('payse:statement-item:' + key).encode('utf-8')).hexdigest()))

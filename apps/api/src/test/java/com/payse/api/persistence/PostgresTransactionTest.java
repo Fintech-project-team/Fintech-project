@@ -1,5 +1,7 @@
 package com.payse.api.persistence;
 
+import com.payse.api.ApiTestConstants.DatabaseConfig;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
@@ -29,64 +31,193 @@ class PostgresTransactionTest {
     @Test
     void clearsTransactionContext() {
         var environment = testEnvironment();
-        try (var dataSource = (HikariDataSource) new DatabaseConfiguration().dataSource(environment)) {
+        try (var dataSource = (HikariDataSource) new DatabaseConfiguration()
+            .dataSource(environment)) {
             var jdbc = new JdbcTemplate(dataSource);
             var transaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
             var role = jdbc.queryForMap(
-                "SELECT rolsuper, rolbypassrls FROM pg_catalog.pg_roles WHERE rolname = current_user");
+                "SELECT rolsuper, rolbypassrls FROM pg_catalog.pg_roles WHERE rolname = current_user"
+            );
             assertEquals(false, role.get("rolsuper"), "Use a non-superuser test role");
             assertEquals(false, role.get("rolbypassrls"), "Use a test role without BYPASSRLS");
-            jdbc.execute("CREATE TEMP TABLE payse_connection_probe (id uuid PRIMARY KEY) ON COMMIT PRESERVE ROWS");
+            jdbc.execute(
+                "CREATE TEMP TABLE payse_connection_probe (id uuid PRIMARY KEY) ON COMMIT PRESERVE ROWS"
+            );
 
             UUID committedId = UUID.randomUUID();
             UUID rolledBackId = UUID.randomUUID();
             Integer backendPid = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
-            assertNull(jdbc.queryForObject("SELECT NULLIF(current_setting('payse.user_id', true), '')", String.class));
+            assertNull(
+                jdbc.queryForObject(
+                    "SELECT NULLIF(current_setting('payse.user_id', true), '')",
+                    String.class
+                )
+            );
 
-            transaction.executeWithoutResult(status -> {
-                assertEquals(backendPid, jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
-                assertEquals(committedId.toString(), jdbc.queryForObject(
-                    "SELECT set_config('payse.user_id', ?, true)", String.class, committedId.toString()));
-                assertEquals(1, jdbc.update("INSERT INTO pg_temp.payse_connection_probe(id) VALUES (?)", committedId));
-                assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM pg_temp.payse_connection_probe", Integer.class));
-            });
+            transaction.executeWithoutResult(
+                status -> {
+                    assertEquals(
+                        backendPid,
+                        jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)
+                    );
+                    assertEquals(
+                        committedId.toString(),
+                        jdbc.queryForObject(
+                            "SELECT set_config('payse.user_id', ?, true)",
+                            String.class,
+                            committedId.toString()
+                        )
+                    );
+                    assertEquals(
+                        1,
+                        jdbc.update(
+                            "INSERT INTO pg_temp.payse_connection_probe(id) VALUES (?)",
+                            committedId
+                        )
+                    );
+                    assertEquals(
+                        1,
+                        jdbc.queryForObject(
+                            "SELECT count(*) FROM pg_temp.payse_connection_probe",
+                            Integer.class
+                        )
+                    );
+                }
+            );
 
             assertEquals(backendPid, jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
-            assertNull(jdbc.queryForObject("SELECT NULLIF(current_setting('payse.user_id', true), '')", String.class));
-            assertEquals(1, jdbc.queryForObject(
-                "SELECT count(*) FROM pg_temp.payse_connection_probe WHERE id = ?", Integer.class, committedId));
+            assertNull(
+                jdbc.queryForObject(
+                    "SELECT NULLIF(current_setting('payse.user_id', true), '')",
+                    String.class
+                )
+            );
+            assertEquals(
+                1,
+                jdbc.queryForObject(
+                    "SELECT count(*) FROM pg_temp.payse_connection_probe WHERE id = ?",
+                    Integer.class,
+                    committedId
+                )
+            );
 
-            transaction.executeWithoutResult(status -> {
-                assertEquals(backendPid, jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
-                assertEquals(rolledBackId.toString(), jdbc.queryForObject(
-                    "SELECT set_config('payse.user_id', ?, true)", String.class, rolledBackId.toString()));
-                assertEquals(1, jdbc.update("INSERT INTO pg_temp.payse_connection_probe(id) VALUES (?)", rolledBackId));
-                assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM pg_temp.payse_connection_probe", Integer.class));
-                status.setRollbackOnly();
-            });
+            transaction.executeWithoutResult(
+                status -> {
+                    assertEquals(
+                        backendPid,
+                        jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)
+                    );
+                    assertEquals(
+                        rolledBackId.toString(),
+                        jdbc.queryForObject(
+                            "SELECT set_config('payse.user_id', ?, true)",
+                            String.class,
+                            rolledBackId.toString()
+                        )
+                    );
+                    assertEquals(
+                        1,
+                        jdbc.update(
+                            "INSERT INTO pg_temp.payse_connection_probe(id) VALUES (?)",
+                            rolledBackId
+                        )
+                    );
+                    assertEquals(
+                        2,
+                        jdbc.queryForObject(
+                            "SELECT count(*) FROM pg_temp.payse_connection_probe",
+                            Integer.class
+                        )
+                    );
+                    status.setRollbackOnly();
+                }
+            );
 
             assertEquals(backendPid, jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
-            assertNull(jdbc.queryForObject("SELECT NULLIF(current_setting('payse.user_id', true), '')", String.class));
-            assertEquals(0, jdbc.queryForObject(
-                "SELECT count(*) FROM pg_temp.payse_connection_probe WHERE id = ?", Integer.class, rolledBackId));
-            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM pg_temp.payse_connection_probe", Integer.class));
+            assertNull(
+                jdbc.queryForObject(
+                    "SELECT NULLIF(current_setting('payse.user_id', true), '')",
+                    String.class
+                )
+            );
+            assertEquals(
+                0,
+                jdbc.queryForObject(
+                    "SELECT count(*) FROM pg_temp.payse_connection_probe WHERE id = ?",
+                    Integer.class,
+                    rolledBackId
+                )
+            );
+            assertEquals(
+                1,
+                jdbc.queryForObject(
+                    "SELECT count(*) FROM pg_temp.payse_connection_probe",
+                    Integer.class
+                )
+            );
 
             UUID failedId = UUID.randomUUID();
-            assertThrows(DataIntegrityViolationException.class, () -> transaction.executeWithoutResult(status -> {
-                assertEquals(backendPid, jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
-                assertEquals(failedId.toString(), jdbc.queryForObject(
-                    "SELECT set_config('payse.user_id', ?, true)", String.class, failedId.toString()));
-                assertEquals(1, jdbc.update("INSERT INTO pg_temp.payse_connection_probe(id) VALUES (?)", failedId));
-                jdbc.update("INSERT INTO pg_temp.payse_connection_probe(id) VALUES (?)", committedId);
-            }));
+            assertThrows(
+                DataIntegrityViolationException.class,
+                () -> transaction.executeWithoutResult(
+                    status -> {
+                        assertEquals(
+                            backendPid,
+                            jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)
+                        );
+                        assertEquals(
+                            failedId.toString(),
+                            jdbc.queryForObject(
+                                "SELECT set_config('payse.user_id', ?, true)",
+                                String.class,
+                                failedId.toString()
+                            )
+                        );
+                        assertEquals(
+                            1,
+                            jdbc.update(
+                                "INSERT INTO pg_temp.payse_connection_probe(id) VALUES (?)",
+                                failedId
+                            )
+                        );
+                        jdbc.update(
+                            "INSERT INTO pg_temp.payse_connection_probe(id) VALUES (?)",
+                            committedId
+                        );
+                    }
+                )
+            );
 
             assertEquals(backendPid, jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
-            assertNull(jdbc.queryForObject("SELECT NULLIF(current_setting('payse.user_id', true), '')", String.class));
-            assertEquals(0, jdbc.queryForObject(
-                "SELECT count(*) FROM pg_temp.payse_connection_probe WHERE id = ?", Integer.class, failedId));
-            assertEquals(1, jdbc.queryForObject(
-                "SELECT count(*) FROM pg_temp.payse_connection_probe WHERE id = ?", Integer.class, committedId));
-            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM pg_temp.payse_connection_probe", Integer.class));
+            assertNull(
+                jdbc.queryForObject(
+                    "SELECT NULLIF(current_setting('payse.user_id', true), '')",
+                    String.class
+                )
+            );
+            assertEquals(
+                0,
+                jdbc.queryForObject(
+                    "SELECT count(*) FROM pg_temp.payse_connection_probe WHERE id = ?",
+                    Integer.class,
+                    failedId
+                )
+            );
+            assertEquals(
+                1,
+                jdbc.queryForObject(
+                    "SELECT count(*) FROM pg_temp.payse_connection_probe WHERE id = ?",
+                    Integer.class,
+                    committedId
+                )
+            );
+            assertEquals(
+                1,
+                jdbc.queryForObject(
+                    "SELECT count(*) FROM pg_temp.payse_connection_probe",
+                    Integer.class
+                )
+            );
         }
     }
 
@@ -96,22 +227,34 @@ class PostgresTransactionTest {
      * @usedBy PostgresTransactionTest.clearsTransactionContext
      * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      * @return 동일 물리 연결을 검사하기 위해 풀 크기를 1로 지정한 테스트 환경
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     private MockEnvironment testEnvironment() {
         String url = System.getenv("PAYSE_TEST_JDBC_URL");
         String username = System.getenv("PAYSE_TEST_DB_USER");
         String password = System.getenv("PAYSE_TEST_DB_PASSWORD");
-        assumeFalse(url == null && username == null && password == null,
-            "PostgreSQL integration skipped: provide PAYSE_TEST_JDBC_URL, PAYSE_TEST_DB_USER and PAYSE_TEST_DB_PASSWORD");
-        assertTrue(url != null && !url.isBlank(), "PAYSE_TEST_JDBC_URL is required for PostgreSQL integration");
-        assertTrue(username != null && !username.isBlank(), "PAYSE_TEST_DB_USER is required for PostgreSQL integration");
-        assertTrue(password != null && !password.isBlank(), "PAYSE_TEST_DB_PASSWORD is required for PostgreSQL integration");
+        assumeFalse(
+            url == null && username == null && password == null,
+            "PostgreSQL integration skipped: provide PAYSE_TEST_JDBC_URL, PAYSE_TEST_DB_USER and PAYSE_TEST_DB_PASSWORD"
+        );
+        assertTrue(
+            url != null && !url.isBlank(),
+            "PAYSE_TEST_JDBC_URL is required for PostgreSQL integration"
+        );
+        assertTrue(
+            username != null && !username.isBlank(),
+            "PAYSE_TEST_DB_USER is required for PostgreSQL integration"
+        );
+        assertTrue(
+            password != null && !password.isBlank(),
+            "PAYSE_TEST_DB_PASSWORD is required for PostgreSQL integration"
+        );
         return new MockEnvironment()
-            .withProperty("PAYSE_JDBC_URL", url)
-            .withProperty("PAYSE_DB_USER", username)
-            .withProperty("PAYSE_DB_PASSWORD", password)
-            .withProperty("PAYSE_DB_MAX_POOL_SIZE", "1")
-            .withProperty("PAYSE_DB_CONNECTION_TIMEOUT_MS", "5000")
-            .withProperty("PAYSE_DB_VALIDATION_TIMEOUT_MS", "1000");
+            .withProperty(DatabaseConfig.PAYSE_JDBC_URL, url)
+            .withProperty(DatabaseConfig.PAYSE_DB_USER, username)
+            .withProperty(DatabaseConfig.PAYSE_DB_PASSWORD, password)
+            .withProperty(DatabaseConfig.PAYSE_DB_MAX_POOL_SIZE, "1")
+            .withProperty(DatabaseConfig.PAYSE_DB_CONNECTION_TIMEOUT_MS, "5000")
+            .withProperty(DatabaseConfig.PAYSE_DB_VALIDATION_TIMEOUT_MS, "1000");
     }
 }

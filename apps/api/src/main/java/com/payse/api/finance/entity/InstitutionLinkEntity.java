@@ -38,7 +38,8 @@ public class InstitutionLinkEntity implements OwnedEntity {
      * @created 2026-10-29
      * @usedBy Hibernate 엔티티 복원
      */
-    protected InstitutionLinkEntity() { }
+    protected InstitutionLinkEntity() {
+    }
 
     /**
      * 같은 인증 사용자 소유인지 검증할 내부 소유자 ID를 반환한다.
@@ -54,7 +55,12 @@ public class InstitutionLinkEntity implements OwnedEntity {
      * @created 2026-10-29
      * @usedBy SettingsWrites
      */
-    public InstitutionLinkEntity(UUID id, UUID userId, String institutionCode, OffsetDateTime consentedAt) {
+    public InstitutionLinkEntity(
+        UUID id,
+        UUID userId,
+        String institutionCode,
+        OffsetDateTime consentedAt
+    ) {
         this.id = id;
         this.userId = userId;
         this.institutionCode = institutionCode;

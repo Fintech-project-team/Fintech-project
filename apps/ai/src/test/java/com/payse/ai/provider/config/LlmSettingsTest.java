@@ -2,6 +2,8 @@ package com.payse.ai.provider.config;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.payse.ai.AiTestConstants.Llm;
+import com.payse.ai.AiTestConstants.Schema;
 import com.payse.ai.provider.openai.OpenAiGateway;
 import com.payse.ai.transport.ProviderHttp;
 import java.net.http.HttpClient;
@@ -19,6 +21,7 @@ import tools.jackson.databind.json.JsonMapper;
  * @usedBy JUnit
  */
 class LlmSettingsTest {
+
     @TempDir
     Path directory;
 
@@ -26,15 +29,23 @@ class LlmSettingsTest {
      * 공유 예시는 연결정보가 비어 있고 비활성 상태이며 팩토리 생성을 막는다.
      * @created 2026-11-01
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리; 독립 테스트 상수 통합; 상수 타입 명시 참조
+     * @modified 2026-11-02 - 긴 식 지역변수 분리
      */
     @Test
     void blankExampleStaysDisabled() throws Exception {
-        Path example = Path.of("config", "llm.properties.example");
+        Path example = Path.of(Llm.CONFIG_DIRECTORY, Llm.EXAMPLE_FILE);
         var values = new java.util.Properties();
         try (var reader = Files.newBufferedReader(example, StandardCharsets.UTF_8)) {
             values.load(reader);
         }
-        for (String key : java.util.List.of("provider", "model", "apiKey", "reasoningEffort")) {
+        var configurationKeys = java.util.List.of(
+            Llm.PROVIDER,
+            Llm.MODEL,
+            Llm.API_KEY,
+            Llm.REASONING_EFFORT
+        );
+        for (String key : configurationKeys) {
             assertEquals("", values.getProperty(key));
         }
         var settings = LlmSettings.read(example);
@@ -46,16 +57,22 @@ class LlmSettingsTest {
      * 합성 설정으로 기존 팩토리·게이트웨이 생성까지만 실행한다. 계수·생성 호출은 하지 않는다.
      * @created 2026-11-01
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리; 독립 테스트 상수 통합; 상수 타입 명시 참조
      */
     @Test
     void createsGatewayWithoutCallingProvider() throws Exception {
         var settings = LlmSettings.read(write(valid()));
         assertTrue(settings.enabled());
-        assertEquals("LlmSettings[REDACTED]", settings.toString());
-        try (var client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build()) {
+        assertEquals(Llm.REDACTED_SETTINGS, settings.toString());
+        try (var client = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(1))
+            .build()) {
             var http = new ProviderHttp(client, Duration.ofSeconds(2), 1024);
             var factory = settings.factory(http, 6000, 1200);
-            var schema = JsonMapper.builder().build().createObjectNode().put("type", "object");
+            var schema = JsonMapper.builder()
+                .build()
+                .createObjectNode()
+                .put(Schema.TYPE_KEY, Schema.OBJECT_TYPE);
             assertInstanceOf(OpenAiGateway.class, factory.create("test instructions", schema));
             assertThrows(IllegalArgumentException.class, () -> settings.factory(http, 0, 1200));
         }
@@ -65,12 +82,15 @@ class LlmSettingsTest {
      * 파일 누락을 개인 환경의 키로 대체하지 않고 경로·원인 예외를 감춘다.
      * @created 2026-11-01
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리; 독립 테스트 상수 통합; 상수 타입 명시 참조
      */
     @Test
     void rejectsMissingFileWithoutFallback() {
-        var failure = assertThrows(IllegalArgumentException.class,
-            () -> LlmSettings.read(directory.resolve("private-file-name")));
-        assertEquals("LLM configuration is invalid or unavailable", failure.getMessage());
+        var failure = assertThrows(
+            IllegalArgumentException.class,
+            () -> LlmSettings.read(directory.resolve("private-file-name"))
+        );
+        assertEquals(Llm.INVALID_CONFIGURATION, failure.getMessage());
         assertNull(failure.getCause());
         assertThrows(IllegalArgumentException.class, () -> LlmSettings.read(null));
     }
@@ -79,22 +99,30 @@ class LlmSettingsTest {
      * 빈 자격·미지원 공급자·중복/오타 키·잘못된 옵션을 호출 전에 거절한다.
      * @created 2026-11-01
      * @usedBy JUnit
+     * @modified 2026-11-02 - 긴 식 지역변수 분리; 상수 타입 명시 참조
+     * @modified 2026-11-02 - 계약 문자열 상수 분리; 독립 테스트 상수 통합
      */
     @Test
     void rejectsIncompleteAndAmbiguousSettings() throws Exception {
-        for (String content : java.util.List.of(
-                valid().replace("enabled=true", "enabled=yes"),
-                valid().replace("provider=openai", "provider=local"),
-                valid().replace("apiKey=test-key", "apiKey="),
-                valid().replace("apiKey=test-key", "apiKey=test key"),
-                valid().replace("model=test-model", "model="),
-                valid().replace("reasoningEffort=low", "reasoningEffort=invalid"),
-                valid() + "apiKey=replacement-test-key\n",
-                valid() + "baseUrl=https://untrusted.invalid\n",
-                valid().replace("apiKey=test-key\n", ""))) {
+        var invalidSettings = java.util.List.of(
+            valid().replace("enabled=true", "enabled=yes"),
+            valid().replace("provider=openai", "provider=local"),
+            valid().replace("apiKey=test-key", "apiKey="),
+            valid().replace("apiKey=test-key", "apiKey=test key"),
+            valid().replace("model=test-model", "model="),
+            valid().replace("reasoningEffort=low", "reasoningEffort=invalid"),
+            valid() + "apiKey=replacement-test-key\n",
+            valid() + "baseUrl=https://untrusted.invalid\n",
+            valid().replace("apiKey=test-key\n", "")
+        );
+        for (String content : invalidSettings) {
             Path file = write(content);
-            var failure = assertThrows(IllegalArgumentException.class, () -> LlmSettings.read(file));
-            assertEquals("LLM configuration is invalid or unavailable", failure.getMessage());
+
+            var failure = assertThrows(
+                IllegalArgumentException.class,
+                () -> LlmSettings.read(file)
+            );
+            assertEquals(Llm.INVALID_CONFIGURATION, failure.getMessage());
             assertNull(failure.getCause());
         }
     }
@@ -103,19 +131,30 @@ class LlmSettingsTest {
      * UTF-8 BOM은 허용하되 비정상 인코딩·파서 원문·과대 파일은 비밀 없이 거절한다.
      * @created 2026-11-01
      * @usedBy JUnit
+     * @modified 2026-11-02 - 긴 식 지역변수 분리; 상수 타입 명시 참조
+     * @modified 2026-11-02 - 계약 문자열 상수 분리; 독립 테스트 상수 통합
      */
     @Test
     void boundsInputAndSanitizesParseFailures() throws Exception {
-        assertTrue(LlmSettings.read(write("\uFEFF" + valid())).enabled());
-        for (String content : java.util.List.of(valid() + "#".repeat(16385),
-                valid().replace("test-key", "\\u-not-a-key"))) {
+        Path bomFile = write("\uFEFF" + valid());
+        LlmSettings withBom = LlmSettings.read(bomFile);
+        assertTrue(withBom.enabled());
+        var malformedSettings = java.util.List.of(
+            valid() + "#".repeat(16385),
+            valid().replace("test-key", "\\u-not-a-key")
+        );
+        for (String content : malformedSettings) {
             Path file = write(content);
-            var failure = assertThrows(IllegalArgumentException.class, () -> LlmSettings.read(file));
-            assertEquals("LLM configuration is invalid or unavailable", failure.getMessage());
+
+            var failure = assertThrows(
+                IllegalArgumentException.class,
+                () -> LlmSettings.read(file)
+            );
+            assertEquals(Llm.INVALID_CONFIGURATION, failure.getMessage());
             assertNull(failure.getCause());
         }
         Path file = directory.resolve("invalid.properties");
-        Files.write(file, new byte[] {(byte) 0xC3, (byte) 0x28});
+        Files.write(file, new byte[] { (byte) 0xC3, (byte) 0x28 });
         assertThrows(IllegalArgumentException.class, () -> LlmSettings.read(file));
     }
 
@@ -148,6 +187,7 @@ class LlmSettingsTest {
      * @usedBy 설정 검증 테스트
      */
     private Path write(String content) throws Exception {
-        return Files.writeString(directory.resolve("llm.properties"), content, StandardCharsets.UTF_8);
+        return Files
+            .writeString(directory.resolve("llm.properties"), content, StandardCharsets.UTF_8);
     }
 }

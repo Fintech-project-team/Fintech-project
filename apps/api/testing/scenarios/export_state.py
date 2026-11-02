@@ -27,23 +27,111 @@ def state_rows(snapshot):
     for plan in snapshot['recurringPlans']:
         add_row('recurring_plans',{'id':plan['planId'],'user_id':owner,'first_occurrence_month':plan['firstOccurrenceMonth']+'-01'})
     for revision in snapshot['recurringPlanRevisions']:
-        add_row('recurring_plan_revisions',{'id':revision['revisionId'],'user_id':owner,'plan_id':revision['planId'],'effective_from_month':revision['effectiveFromMonth']+'-01','label':revision['label'],'amount_krw':revision['amountKRW'],'monthly_day':revision['monthlyDay'],'payment_timing':revision['paymentTiming'],'schedule_basis':revision['scheduleBasis'],'withdrawal_account_id':revision['withdrawalAccountId'],'card_id':revision['cardId'],'status':revision['status'],'schedule_overrides':revision['scheduleOverrides'],'is_current':revision['isCurrent']})
+        revision_row = {
+            'id': revision['revisionId'],
+            'user_id': owner,
+            'plan_id': revision['planId'],
+            'effective_from_month': revision['effectiveFromMonth']+'-01',
+            'label': revision['label'],
+            'amount_krw': revision['amountKRW'],
+            'monthly_day': revision['monthlyDay'],
+            'payment_timing': revision['paymentTiming'],
+            'schedule_basis': revision['scheduleBasis'],
+            'withdrawal_account_id': revision['withdrawalAccountId'],
+            'card_id': revision['cardId'],
+            'status': revision['status'],
+            'schedule_overrides': revision['scheduleOverrides'],
+            'is_current': revision['isCurrent']
+        }
+        add_row('recurring_plan_revisions', revision_row)
     for obligation in snapshot['obligations']:
-        add_row('obligations',{'id':obligation['obligationId'],'user_id':owner,'label':obligation['label'],'withdrawal_account_id':obligation['withdrawalAccountId'],'amount_krw':obligation['amountKRW'],'due_date':obligation['dueDate'],'status':obligation['status'],'statement_id':obligation['statementId'],'plan_id':obligation['recurringPlanId'],'plan_revision_id':obligation['planRevisionId'],'occurrence_month':obligation['recurrenceKey'][-7:]+'-01' if obligation['recurrenceKey'] else None})
+        obligation_row = {
+            'id': obligation['obligationId'],
+            'user_id': owner,
+            'label': obligation['label'],
+            'withdrawal_account_id': obligation['withdrawalAccountId'],
+            'amount_krw': obligation['amountKRW'],
+            'due_date': obligation['dueDate'],
+            'status': obligation['status'],
+            'statement_id': obligation['statementId'],
+            'plan_id': obligation['recurringPlanId'],
+            'plan_revision_id': obligation['planRevisionId'],
+            'occurrence_month': obligation['recurrenceKey'][-7:]+'-01' if obligation['recurrenceKey'] else None
+        }
+        add_row('obligations', obligation_row)
     for override in snapshot['occurrenceOverrides']:
-        add_row('occurrence_overrides',{'user_id':owner,'plan_id':override['recurrenceKey'][:-8],'occurrence_month':override['recurrenceKey'][-7:]+'-01','plan_revision_id':override['planRevisionId'],'amount_krw':override['amountKRW'],'due_date':override['dueDate'],'withdrawal_account_id':override['withdrawalAccountId'],'status':override['status']})
+        override_row = {
+            'user_id': owner,
+            'plan_id': override['recurrenceKey'][:-8],
+            'occurrence_month': override['recurrenceKey'][-7:]+'-01',
+            'plan_revision_id': override['planRevisionId'],
+            'amount_krw': override['amountKRW'],
+            'due_date': override['dueDate'],
+            'withdrawal_account_id': override['withdrawalAccountId'],
+            'status': override['status']
+        }
+        add_row('occurrence_overrides', override_row)
     for decision in snapshot['recurringDecisions']:
-        add_row('recurring_decisions',{'id':decision['decisionId'],'user_id':owner,'candidate_key':decision['candidateKey'],'rule_version':decision['ruleVersion'],'source_version':decision['sourceVersion'],'evidence_refs':decision['evidenceTransactionIds'],'normalized_name':decision['normalizedName'],'decision':decision['decision'],'plan_id':decision['planId']})
+        decision_row = {
+            'id': decision['decisionId'],
+            'user_id': owner,
+            'candidate_key': decision['candidateKey'],
+            'rule_version': decision['ruleVersion'],
+            'source_version': decision['sourceVersion'],
+            'evidence_refs': decision['evidenceTransactionIds'],
+            'normalized_name': decision['normalizedName'],
+            'decision': decision['decision'],
+            'plan_id': decision['planId']
+        }
+        add_row('recurring_decisions', decision_row)
     for link in snapshot['settlements']:
-        add_row('settlement_links',{'id':link['linkId'],'user_id':owner,'obligation_id':link['obligationId'],'transaction_id':link['transactionId'],'allocated_krw':link['allocatedKRW'],'method':link['method'],'evidence':link['evidenceRefs'],'invalidated_at':link['invalidatedAt']})
+        settlement_row = {
+            'id': link['linkId'],
+            'user_id': owner,
+            'obligation_id': link['obligationId'],
+            'transaction_id': link['transactionId'],
+            'allocated_krw': link['allocatedKRW'],
+            'method': link['method'],
+            'evidence': link['evidenceRefs'],
+            'invalidated_at': link['invalidatedAt']
+        }
+        add_row('settlement_links', settlement_row)
     for reserve in snapshot['reserves']:
-        add_row('reserves',{'id':reserve['reserveId'],'user_id':owner,'account_id':reserve['accountId'],'label':reserve['label'],'amount_krw':reserve['amountKRW'],'cancelled_at':reserve['cancelledAt']})
+        reserve_row = {
+            'id': reserve['reserveId'],
+            'user_id': owner,
+            'account_id': reserve['accountId'],
+            'label': reserve['label'],
+            'amount_krw': reserve['amountKRW'],
+            'cancelled_at': reserve['cancelledAt']
+        }
+        add_row('reserves', reserve_row)
     receipt_ids=set()
     for allocation in snapshot['allocations']:
-        add_row('reserve_allocations',{'id':allocation['allocationId'],'user_id':owner,'reserve_id':allocation['reserveId'],'obligation_id':allocation['obligationId'],'amount_krw':allocation['amountKRW'],'released_krw':allocation['releasedKRW'],'release_evidence':allocation['releaseEvidence']})
+        allocation_row = {
+            'id': allocation['allocationId'],
+            'user_id': owner,
+            'reserve_id': allocation['reserveId'],
+            'obligation_id': allocation['obligationId'],
+            'amount_krw': allocation['amountKRW'],
+            'released_krw': allocation['releasedKRW'],
+            'release_evidence': allocation['releaseEvidence']
+        }
+        add_row('reserve_allocations', allocation_row)
         receipt_ids.update(evidence['writeReceiptId'] for evidence in allocation['releaseEvidence'])
     for receipt_id in sorted(receipt_ids):
-        add_row('write_receipts',{'id':receipt_id,'user_id':owner,'operation_key':'import-user-state/'+receipt_id,'request_digest':state_digest(snapshot),'action':'import_user_state','changed_refs':[{'allocationId':allocation['allocationId']} for allocation in snapshot['allocations']],'before_after':{'before':None,'after':{'allocations':snapshot['allocations'],'settlements':snapshot['settlements']}},'result_version':int(snapshot['dataVersion']),'created_at':snapshot['asOf']})
+        receipt_row = {
+            'id': receipt_id,
+            'user_id': owner,
+            'operation_key': 'import-user-state/'+receipt_id,
+            'request_digest': state_digest(snapshot),
+            'action': 'import_user_state',
+            'changed_refs': [{'allocationId':allocation['allocationId']} for allocation in snapshot['allocations']],
+            'before_after': {'before':None,'after':{'allocations':snapshot['allocations'],'settlements':snapshot['settlements']}},
+            'result_version': int(snapshot['dataVersion']),
+            'created_at': snapshot['asOf']
+        }
+        add_row('write_receipts', receipt_row)
     return rows
 
 

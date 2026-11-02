@@ -3,6 +3,10 @@ package com.payse.ai.analysis.validation;
 import static com.payse.ai.analysis.validation.SchemaRules.require;
 
 import com.payse.ai.analysis.dto.MemoryDecision;
+import com.payse.ai.constants.AiCodeConstants;
+import com.payse.ai.constants.AiConfigConstants;
+import com.payse.ai.constants.AiFieldConstants.Analysis;
+import com.payse.ai.constants.AiFieldConstants.Schema;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -23,26 +27,71 @@ public final class StorageContract {
      * 현재 요청의 의미 규격·itemKey만 사용해 단일 응답의 완전한 보존 목록을 요구한다.
      * @created 2026-11-01
      * @usedBy InputMapper.storageSchema
+     * @modified 2026-11-02 - 긴 식 지역변수 분리; 상수 타입 명시 참조
+     * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조
      */
     public static ObjectNode schema(ObjectNode meaningSchema, int itemCount) {
-        require(itemCount > 0, "EMPTY_ITEMS");
-        ObjectNode root = JSON.createObjectNode().put("type", "object").put("additionalProperties", false);
-        root.putArray("required").add("output").add("memories");
-        ObjectNode properties = root.putObject("properties");
-        properties.set("output", meaningSchema.deepCopy());
-        ObjectNode memories = properties.putObject("memories").put("type", "array")
-            .put("minItems", itemCount).put("maxItems", itemCount);
-        ObjectNode item = memories.putObject("items").put("type", "object").put("additionalProperties", false);
-        ObjectNode fields = item.putObject("properties");
-        fields.set("itemKey", meaningSchema.path("properties").path("items").path("items")
-            .path("properties").path("itemKey").deepCopy());
-        for (String flag : List.of("active", "isReference", "important")) fields.putObject(flag).put("type", "boolean");
-        fields.putObject("referencePolicy").put("type", "string").putArray("enum").add("optional").add("required");
-        fields.putObject("reason").put("type", "string").put("minLength", 1).put("maxLength", 240);
-        var required = item.putArray("required");
-        for (String field : List.of("itemKey", "active", "isReference", "important", "referencePolicy", "reason")) {
+        require(itemCount > 0, AiCodeConstants.Memory.EMPTY_ITEMS);
+
+        ObjectNode root = JSON.createObjectNode()
+            .put(Schema.TYPE_KEY, Schema.OBJECT_TYPE)
+            .put(Schema.ADDITIONAL_PROPERTIES, false);
+        root.putArray(Schema.REQUIRED_FIELDS)
+            .add(Analysis.OUTPUT)
+            .add(Analysis.MEMORIES);
+        ObjectNode properties = root.putObject(Schema.PROPERTIES);
+        properties.set(Analysis.OUTPUT, meaningSchema.deepCopy());
+
+        ObjectNode memories = properties.putObject(Analysis.MEMORIES)
+            .put(Schema.TYPE_KEY, Schema.ARRAY_TYPE)
+            .put(Schema.MIN_ITEMS, itemCount)
+            .put(Schema.MAX_ITEMS, itemCount);
+        ObjectNode item = memories.putObject(Schema.ITEMS)
+            .put(Schema.TYPE_KEY, Schema.OBJECT_TYPE)
+            .put(Schema.ADDITIONAL_PROPERTIES, false);
+        ObjectNode fields = item.putObject(Schema.PROPERTIES);
+
+        JsonNode itemKeySchema = meaningSchema.path(Schema.PROPERTIES)
+            .path(Analysis.ITEMS)
+            .path(Schema.ITEMS)
+            .path(Schema.PROPERTIES)
+            .path(Analysis.ITEM_KEY)
+            .deepCopy();
+        fields.set(Analysis.ITEM_KEY, itemKeySchema);
+
+        List<String> retentionFlags = List.of(
+            Analysis.ACTIVE,
+            Analysis.IS_REFERENCE,
+            Analysis.IMPORTANT
+        );
+        for (String flag : retentionFlags) {
+            fields.putObject(flag).put(Schema.TYPE_KEY, Schema.BOOLEAN_TYPE);
+        }
+
+        fields.putObject(Analysis.REFERENCE_POLICY)
+            .put(Schema.TYPE_KEY, Schema.STRING_TYPE)
+            .putArray(Schema.ENUM)
+            .add(AiConfigConstants.Memory.OPTIONAL_REFERENCE)
+            .add(AiConfigConstants.Memory.REFERENCE_REQUIRED);
+
+        fields.putObject(Analysis.REASON)
+            .put(Schema.TYPE_KEY, Schema.STRING_TYPE)
+            .put(Schema.MIN_LENGTH, 1)
+            .put(Schema.MAX_LENGTH, 240);
+
+        var required = item.putArray(Schema.REQUIRED_FIELDS);
+        List<String> requiredFields = List.of(
+            Analysis.ITEM_KEY,
+            Analysis.ACTIVE,
+            Analysis.IS_REFERENCE,
+            Analysis.IMPORTANT,
+            Analysis.REFERENCE_POLICY,
+            Analysis.REASON
+        );
+        for (String field : requiredFields) {
             required.add(field);
         }
+
         SchemaRules.supported(root);
         return root;
     }
@@ -51,21 +100,45 @@ public final class StorageContract {
      * 복원한 보존 항목의 중복·누락·임의 식별자·중요보존 조합을 확인한다.
      * @created 2026-11-01
      * @usedBy InputMapper.restoreStorage
+     * @modified 2026-11-02 - 긴 식 지역변수 분리; 상수 타입 명시 참조
+     * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조
      */
     public static List<MemoryDecision> decisions(JsonNode rows, Set<String> expected) {
         List<MemoryDecision> decisions = new ArrayList<>();
         Set<String> seen = new HashSet<>();
+
         for (JsonNode row : rows) {
-            String key = row.get("itemKey").asString();
-            require(expected.contains(key) && seen.add(key), "MEMORY_ITEM_MISMATCH");
-            boolean reference = row.get("isReference").asBoolean();
-            boolean important = row.get("important").asBoolean();
-            require(!important || reference, "INVALID_RETENTION_FLAGS");
-            require(!row.get("reason").asString().isBlank(), "EMPTY_MEMORY_REASON");
-            decisions.add(new MemoryDecision(key, row.get("active").asBoolean(), reference, important,
-                row.get("referencePolicy").asString(), row.get("reason").asString()));
+            String key = row.get(Analysis.ITEM_KEY).asString();
+            require(
+                expected.contains(key) && seen.add(key),
+                AiCodeConstants.Memory.MEMORY_ITEM_MISMATCH
+            );
+
+            boolean reference = row.get(Analysis.IS_REFERENCE).asBoolean();
+            boolean important = row.get(Analysis.IMPORTANT).asBoolean();
+            require(!important || reference, AiCodeConstants.Memory.INVALID_RETENTION_FLAGS);
+            require(
+                !row.get(Analysis.REASON)
+                    .asString()
+                    .isBlank(),
+                AiCodeConstants.Memory.EMPTY_MEMORY_REASON
+            );
+
+            boolean active = row.get(Analysis.ACTIVE).asBoolean();
+            String policy = row.get(Analysis.REFERENCE_POLICY).asString();
+            String reason = row.get(Analysis.REASON).asString();
+            MemoryDecision decision = new MemoryDecision(
+                key,
+                active,
+                reference,
+                important,
+                policy,
+                reason
+            );
+            decisions.add(decision);
         }
-        require(seen.equals(expected), "INCOMPLETE_MEMORIES");
+
+        require(seen.equals(expected), AiCodeConstants.Memory.INCOMPLETE_MEMORIES);
         return List.copyOf(decisions);
     }
 

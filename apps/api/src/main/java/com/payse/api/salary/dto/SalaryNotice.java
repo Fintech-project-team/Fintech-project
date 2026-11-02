@@ -8,6 +8,11 @@ import java.util.UUID;
  * @created 2026-10-30
  * @usedBy SalaryNoticeService, SalaryNoticeController
  */
-public record SalaryNotice(String contractVersion, UUID userId, String payMonth,
-        boolean dismissed, Instant dismissedAt) {}
-
+public record SalaryNotice(
+    String contractVersion,
+    UUID userId,
+    String payMonth,
+    boolean dismissed,
+    Instant dismissedAt
+) {
+}

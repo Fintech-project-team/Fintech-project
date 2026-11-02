@@ -1,11 +1,14 @@
 package com.payse.api.auth.vo;
 
+import com.payse.api.constants.ApiMessageConstants.Auth;
+
 /**
  * 공유 ASCII 입력 규칙으로 검증한 합성 인증 자격이다. 자격 존재 여부는 판단하지 않는다.
  * @created 2026-10-22
  * @usedBy AuthService, AuthRepository, AuthCrypto, AuthCredentialsTest
  */
 public record AuthCredentials(String name, String phone, String code) {
+
     /**
      * 이름·전화번호만 허용된 구분자로 정규화하고 코드는 원문 형식을 검사한다.
      * @created 2026-10-22
@@ -28,17 +31,29 @@ public record AuthCredentials(String name, String phone, String code) {
      * @param raw 정규화 전 이름
      * @return 검증된 이름
      * @modified 2026-10-29 - 분리한 서비스·암호화·저장 패키지에서 같은 입력 검증 재사용
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
      */
     public static String normalizeName(String raw) {
-        if (raw == null) throw new IllegalArgumentException("Invalid authentication name");
+        if (raw == null) {
+            throw new IllegalArgumentException(Auth.INVALID_NAME);
+        }
+
         int start = 0;
         int end = raw.length();
-        while (start < end && raw.charAt(start) == ' ') start++;
-        while (end > start && raw.charAt(end - 1) == ' ') end--;
+        while (start < end && raw.charAt(start) == ' ') {
+            start++;
+        }
+
+        while (end > start && raw.charAt(end - 1) == ' ') {
+            end--;
+        }
+
         String normalized = raw.substring(start, end);
         if (!normalized.matches("[가-힣A-Za-z]{2,20}")) {
-            throw new IllegalArgumentException("Invalid authentication name");
+            throw new IllegalArgumentException(Auth.INVALID_NAME);
         }
+
         return normalized;
     }
 
@@ -49,15 +64,19 @@ public record AuthCredentials(String name, String phone, String code) {
      * @param raw 정규화 전 전화번호
      * @return 검증된 전화번호
      * @modified 2026-10-29 - 분리한 서비스·암호화·저장 패키지에서 같은 입력 검증 재사용
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리
      */
     public static String normalizePhone(String raw) {
         if (raw == null || !raw.matches("[0-9 -]*")) {
-            throw new IllegalArgumentException("Invalid authentication phone");
+            throw new IllegalArgumentException(Auth.INVALID_PHONE);
         }
+
         String normalized = raw.replace(" ", "").replace("-", "");
         if (!normalized.matches("010[0-9]{8}")) {
-            throw new IllegalArgumentException("Invalid authentication phone");
+            throw new IllegalArgumentException(Auth.INVALID_PHONE);
         }
+
         return normalized;
     }
 
@@ -67,10 +86,12 @@ public record AuthCredentials(String name, String phone, String code) {
      * @usedBy AuthCredentials 생성자, AuthCrypto.codeVerifier
      * @param code 검증할 코드
      * @modified 2026-10-29 - 분리한 서비스·암호화·저장 패키지에서 같은 입력 검증 재사용
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리
      */
     public static void requireCode(String code) {
         if (code == null || !code.matches("[0-9]{6}")) {
-            throw new IllegalArgumentException("Invalid authentication code");
+            throw new IllegalArgumentException(Auth.INVALID_CODE);
         }
     }
 

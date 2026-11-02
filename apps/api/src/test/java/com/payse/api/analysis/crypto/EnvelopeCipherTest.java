@@ -22,6 +22,7 @@ class EnvelopeCipherTest {
      * 같은 본문도 기억별 키·암호문을 분리하고 API 반환 평문이 원문과 같은지 확인한다.
      * @created 2026-10-29
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     @Test
     void separatesMemoryKeys() {
@@ -37,7 +38,9 @@ class EnvelopeCipherTest {
         assertFalse(Arrays.equals(left.key().ciphertext(), right.key().ciphertext()));
         assertArrayEquals(plaintext, cipher.decrypt(user, first, left));
         assertArrayEquals(plaintext, cipher.decrypt(user, second, right));
-        for (byte[] exposed : keys.exposedKeys) assertArrayEquals(new byte[32], exposed);
+        for (byte[] exposed : keys.exposedKeys) {
+            assertArrayEquals(new byte[32], exposed);
+        }
         assertEquals("EncryptedMemory[REDACTED]", left.toString());
         assertEquals("WrappedKey[REDACTED]", left.key().toString());
     }
@@ -53,9 +56,23 @@ class EnvelopeCipherTest {
         var cipher = new EnvelopeCipher(keys);
         UUID user = UUID.randomUUID();
         UUID item = UUID.randomUUID();
-        EncryptedMemory encrypted = cipher.encrypt(user, item, new byte[]{1, 2, 3});
-        assertThrows(IllegalStateException.class, () -> cipher.decrypt(UUID.randomUUID(), item, encrypted));
-        assertThrows(IllegalStateException.class, () -> cipher.decrypt(user, UUID.randomUUID(), encrypted));
+        EncryptedMemory encrypted = cipher.encrypt(
+            user,
+            item,
+            new byte[] {
+                1,
+                2,
+                3
+            }
+        );
+        assertThrows(
+            IllegalStateException.class,
+            () -> cipher.decrypt(UUID.randomUUID(), item, encrypted)
+        );
+        assertThrows(
+            IllegalStateException.class,
+            () -> cipher.decrypt(user, UUID.randomUUID(), encrypted)
+        );
         assertArrayEquals(new byte[32], keys.exposedKeys.getLast());
     }
 
@@ -69,18 +86,52 @@ class EnvelopeCipherTest {
         var cipher = new EnvelopeCipher(new TestKeys());
         UUID user = UUID.randomUUID();
         UUID item = UUID.randomUUID();
-        EncryptedMemory encrypted = cipher.encrypt(user, item, new byte[]{1, 2, 3});
+        EncryptedMemory encrypted = cipher.encrypt(
+            user,
+            item,
+            new byte[] {
+                1,
+                2,
+                3
+            }
+        );
         byte[] changed = encrypted.ciphertext();
         changed[0] ^= 1;
-        assertThrows(IllegalStateException.class,
-            () -> cipher.decrypt(user, item, new EncryptedMemory(changed, encrypted.nonce(), encrypted.key())));
+        assertThrows(
+            IllegalStateException.class,
+            () -> cipher.decrypt(
+                user,
+                item,
+                new EncryptedMemory(changed, encrypted.nonce(), encrypted.key())
+            )
+        );
         byte[] nonce = encrypted.nonce();
         nonce[0] ^= 1;
-        assertThrows(IllegalStateException.class,
-            () -> cipher.decrypt(user, item, new EncryptedMemory(encrypted.ciphertext(), nonce, encrypted.key())));
-        EncryptedMemory other = cipher.encrypt(user, UUID.randomUUID(), new byte[]{1, 2, 3});
-        assertThrows(IllegalStateException.class,
-            () -> cipher.decrypt(user, item, new EncryptedMemory(encrypted.ciphertext(), encrypted.nonce(), other.key())));
+        assertThrows(
+            IllegalStateException.class,
+            () -> cipher.decrypt(
+                user,
+                item,
+                new EncryptedMemory(encrypted.ciphertext(), nonce, encrypted.key())
+            )
+        );
+        EncryptedMemory other = cipher.encrypt(
+            user,
+            UUID.randomUUID(),
+            new byte[] {
+                1,
+                2,
+                3
+            }
+        );
+        assertThrows(
+            IllegalStateException.class,
+            () -> cipher.decrypt(
+                user,
+                item,
+                new EncryptedMemory(encrypted.ciphertext(), encrypted.nonce(), other.key())
+            )
+        );
     }
 
     /**
@@ -90,7 +141,7 @@ class EnvelopeCipherTest {
      */
     @Test
     void protectsStoredArrays() {
-        byte[] wrappedBytes = new byte[]{4};
+        byte[] wrappedBytes = new byte[] { 4 };
         WrappedKey wrapped = new WrappedKey("test-key", wrappedBytes);
         wrappedBytes[0] = 7;
         wrapped.ciphertext()[0] = 8;
@@ -104,8 +155,14 @@ class EnvelopeCipherTest {
         memory.nonce()[1] = 4;
         assertArrayEquals(new byte[16], memory.ciphertext());
         assertArrayEquals(new byte[12], memory.nonce());
-        assertThrows(IllegalArgumentException.class, () -> new EncryptedMemory(new byte[15], nonce, wrapped));
-        assertThrows(IllegalArgumentException.class, () -> new EncryptedMemory(ciphertext, new byte[11], wrapped));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new EncryptedMemory(new byte[15], nonce, wrapped)
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new EncryptedMemory(ciphertext, new byte[11], wrapped)
+        );
     }
 
     /**
@@ -118,8 +175,10 @@ class EnvelopeCipherTest {
         var keys = new TestKeys();
         keys.failWrap = true;
         var cipher = new EnvelopeCipher(keys);
-        assertThrows(IllegalStateException.class,
-            () -> cipher.encrypt(UUID.randomUUID(), UUID.randomUUID(), new byte[]{1}));
+        assertThrows(
+            IllegalStateException.class,
+            () -> cipher.encrypt(UUID.randomUUID(), UUID.randomUUID(), new byte[] { 1 })
+        );
         assertArrayEquals(new byte[32], keys.exposedKeys.getFirst());
     }
 
@@ -134,7 +193,7 @@ class EnvelopeCipherTest {
         var cipher = new EnvelopeCipher(keys);
         UUID user = UUID.randomUUID();
         UUID item = UUID.randomUUID();
-        EncryptedMemory encrypted = cipher.encrypt(user, item, new byte[]{1});
+        EncryptedMemory encrypted = cipher.encrypt(user, item, new byte[] { 1 });
         keys.returnShortKey = true;
         assertThrows(IllegalStateException.class, () -> cipher.decrypt(user, item, encrypted));
         assertArrayEquals(new byte[31], keys.exposedKeys.getLast());
@@ -155,12 +214,17 @@ class EnvelopeCipherTest {
          * 키 복사본에 불투명 식별자를 붙여 실제 KMS 호출 없이 봉투 바인딩을 검사한다.
          * @created 2026-10-29
          * @usedBy EnvelopeCipher.encrypt
+         * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
          */
         @Override
         public WrappedKey wrap(byte[] key, byte[] context) {
             exposedKeys.add(key);
-            if (failWrap) throw new IllegalStateException("Test key service unavailable");
-            byte[] identifier = UUID.randomUUID().toString().getBytes(StandardCharsets.US_ASCII);
+            if (failWrap) {
+                throw new IllegalStateException("Test key service unavailable");
+            }
+            byte[] identifier = UUID.randomUUID()
+                .toString()
+                .getBytes(StandardCharsets.US_ASCII);
             keys.put(Base64.getEncoder().encodeToString(identifier), key.clone());
             return new WrappedKey("test-only", identifier);
         }
@@ -169,11 +233,14 @@ class EnvelopeCipherTest {
          * 독립 배열을 반환한다. GCM의 AAD 검사를 단독 확인하려고 대역은 문맥을 검증하지 않는다.
          * @created 2026-10-29
          * @usedBy EnvelopeCipher.decrypt
+         * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
          */
         @Override
         public byte[] unwrap(WrappedKey wrapped, byte[] context) {
             byte[] stored = keys.get(Base64.getEncoder().encodeToString(wrapped.ciphertext()));
-            if (stored == null) throw new IllegalStateException("Unknown test key");
+            if (stored == null) {
+                throw new IllegalStateException("Unknown test key");
+            }
             byte[] result = returnShortKey ? Arrays.copyOf(stored, 31) : stored.clone();
             exposedKeys.add(result);
             return result;

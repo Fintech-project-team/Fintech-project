@@ -1,5 +1,7 @@
 package com.payse.api.salary.vo;
 
+import com.payse.api.ApiTestConstants.SalaryCodes;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.payse.api.finance.error.FinancialException;
@@ -18,7 +20,12 @@ class SalaryMonthTest {
      */
     @Test
     void preservesNominalMonth() {
-        for (String value : new String[]{"0001-01", "2026-10", "2026-11", "9999-12"}) {
+        for (String value : new String[] {
+            "0001-01",
+            "2026-10",
+            "2026-11",
+            "9999-12"
+        }) {
             assertEquals(value, new SalaryMonth(value).value());
         }
     }
@@ -27,15 +34,30 @@ class SalaryMonthTest {
      * 회차가 불명확하거나 잘못된 입력은 동일한 검증 오류로 거절한다.
      * @created 2026-10-30
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void rejectsMissingAndMalformedMonth() {
-        for (String value : new String[]{null, "", "2026-1", "0000-01", "2026-00", "2026-13",
-                " 2026-10", "2026-10 ", "2026-10-25", "2026-10\n", "２０２６-１０", "10000-01"}) {
-            FinancialException failure = assertThrows(FinancialException.class, () -> new SalaryMonth(value));
+        for (String value : new String[] {
+            null,
+            "",
+            "2026-1",
+            "0000-01",
+            "2026-00",
+            "2026-13",
+            " 2026-10",
+            "2026-10 ",
+            "2026-10-25",
+            "2026-10\n",
+            "２０２６-１０",
+            "10000-01"
+        }) {
+            FinancialException failure = assertThrows(
+                FinancialException.class,
+                () -> new SalaryMonth(value)
+            );
             assertEquals(422, failure.status());
-            assertEquals("VALIDATION_FAILED", failure.code());
+            assertEquals(SalaryCodes.VALIDATION_FAILED, failure.code());
         }
     }
 }
-

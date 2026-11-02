@@ -8,4 +8,5 @@ import tools.jackson.databind.node.ObjectNode;
  * @created 2026-10-29
  * @usedBy FinancialProjection.project, FinancialService
  */
-public record PageSlice(ObjectNode body, UUID lastId, boolean hasMore) {}
+public record PageSlice(ObjectNode body, UUID lastId, boolean hasMore) {
+}

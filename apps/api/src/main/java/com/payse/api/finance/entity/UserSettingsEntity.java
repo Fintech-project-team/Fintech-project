@@ -39,7 +39,8 @@ public class UserSettingsEntity implements OwnedEntity {
      * @created 2026-10-29
      * @usedBy Hibernate 엔티티 복원
      */
-    protected UserSettingsEntity() { }
+    protected UserSettingsEntity() {
+    }
 
     /**
      * 같은 인증 사용자 소유인지 검증할 내부 소유자 ID를 반환한다.

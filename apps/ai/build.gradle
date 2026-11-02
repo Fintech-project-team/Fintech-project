@@ -21,7 +21,8 @@ tasks.named('test') {
     useJUnitPlatform()
     testLogging { events 'failed', 'skipped' }
     dependsOn 'contractCases'
-    systemProperty 'payse.testData', layout.buildDirectory.dir('test-data').get().asFile.absolutePath
+    def testDataPath = layout.buildDirectory.dir('test-data').get().asFile.absolutePath
+    systemProperty 'payse.testData', testDataPath
 }
 
 tasks.register('contractCases', Exec) {
@@ -30,7 +31,8 @@ tasks.register('contractCases', Exec) {
     inputs.dir('contracts')
     inputs.file('testing/export_contracts.py')
     outputs.dir(layout.buildDirectory.dir('test-data'))
-    commandLine 'python', '-B', 'testing/export_contracts.py', layout.buildDirectory.dir('test-data').get().asFile.absolutePath
+    def testDataPath = layout.buildDirectory.dir('test-data').get().asFile.absolutePath
+    commandLine 'python', '-B', 'testing/export_contracts.py', testDataPath
 }
 
 // Only public criteria and schemas enter the runtime JAR; examples and gold labels stay outside it.
@@ -48,7 +50,9 @@ tasks.register('publicRules') {
         def criteria = [version: policy.version, meanings: policy.meanings.collect { row ->
             ['code', 'label', 'requiredEvidence', 'insufficientEvidence'].collectEntries { key -> [(key): row[key]] }
         }]
-        new File(target, 'criteria.json').setText(JsonOutput.toJson(criteria), 'UTF-8')
+        def criteriaFile = new File(target, 'criteria.json')
+        def criteriaJson = JsonOutput.toJson(criteria)
+        criteriaFile.setText(criteriaJson, 'UTF-8')
     }
 }
 sourceSets.main.resources.srcDir(publicRules)

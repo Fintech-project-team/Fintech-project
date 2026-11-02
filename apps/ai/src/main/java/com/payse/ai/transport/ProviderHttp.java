@@ -1,5 +1,9 @@
 package com.payse.ai.transport;
 
+import com.payse.ai.constants.AiCodeConstants.Provider;
+import com.payse.ai.constants.AiConfigConstants;
+import com.payse.ai.constants.AiFieldConstants;
+import com.payse.ai.constants.AiMessageConstants;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -34,13 +38,20 @@ public final class ProviderHttp {
      * 연결 제한을 설정한 클라이언트와 응답 읽기 상한을 받는다. 자동 리디렉션은 거절한다.
      * @created 2026-10-29
      * @usedBy 공급자 어댑터 설정, ProviderHttpTest
+     * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조
      */
     public ProviderHttp(HttpClient client, Duration timeout, int responseLimit) {
-        this.client = Objects.requireNonNull(client, "client");
-        if (client.followRedirects() != HttpClient.Redirect.NEVER || client.connectTimeout().isEmpty()
-                || timeout == null || timeout.isNegative() || timeout.isZero() || responseLimit < 1) {
-            throw new IllegalArgumentException("Bounded provider HTTP settings are required");
+        this.client = Objects.requireNonNull(client, AiMessageConstants.Http.CLIENT_PARAMETER);
+        if (client.followRedirects() != HttpClient.Redirect.NEVER
+            || client.connectTimeout()
+                .isEmpty()
+            || timeout == null
+            || timeout.isNegative()
+            || timeout.isZero()
+            || responseLimit < 1) {
+            throw new IllegalArgumentException(AiMessageConstants.Http.INVALID_HTTP_SETTINGS);
         }
+
         this.timeout = timeout;
         this.responseLimit = responseLimit;
     }
@@ -50,14 +61,23 @@ public final class ProviderHttp {
      * @created 2026-10-29
      * @usedBy GoogleKms.wrap, GoogleKms.unwrap, OpenAiGateway
      * @modified 2026-11-01 - Bearer 형식을 헤더 생성 전 검증하여 잘못된 키의 예외 노출 차단
+     * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조; 상수 타입 명시 참조; 제어문 본문 구분
      */
     public JsonNode post(URI endpoint, String bearer, JsonNode body) {
-        if (bearer == null || !bearer.matches("[-A-Za-z0-9._~+/]+=*")) {
-            throw new ProviderFailure("CREDENTIAL_UNAVAILABLE", false);
+        if (bearer == null || !bearer.matches(AiConfigConstants.Http.BEARER_PATTERN)) {
+            throw new ProviderFailure(Provider.CREDENTIAL_UNAVAILABLE, false);
         }
-        HttpRequest request = HttpRequest.newBuilder(endpoint).timeout(timeout)
-            .header("Authorization", "Bearer " + bearer).header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
+
+        HttpRequest request = HttpRequest.newBuilder(endpoint)
+            .timeout(timeout)
+            .header(
+                AiFieldConstants.Http.AUTHORIZATION,
+                AiConfigConstants.Http.BEARER_PREFIX + bearer
+            )
+            .header(AiFieldConstants.Http.CONTENT_TYPE, AiConfigConstants.Http.JSON_MEDIA_TYPE)
+            .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)))
+            .build();
+
         var exchange = client.sendAsync(request, info -> new LimitedBody(responseLimit));
         try {
             // get의 제한시간은 헤더 이후 본문이 멈춘 경우까지 포함한다.
@@ -65,16 +85,21 @@ public final class ProviderHttp {
             byte[] bytes = response.body();
             try {
                 if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                    throw new ProviderFailure("PROVIDER_HTTP_" + response.statusCode(), true);
+                    throw new ProviderFailure(
+                        Provider.HTTP_FAILURE_PREFIX + response.statusCode(),
+                        true
+                    );
                 }
                 try {
                     JsonNode result = json.readTree(bytes);
-                    if (result == null || !result.isObject()) throw new ProviderFailure("INVALID_PROVIDER_JSON", true);
+                    if (result == null || !result.isObject()) {
+                        throw new ProviderFailure(Provider.INVALID_PROVIDER_JSON, true);
+                    }
                     return result;
                 } catch (ProviderFailure failure) {
                     throw failure;
                 } catch (RuntimeException failure) {
-                    throw new ProviderFailure("INVALID_PROVIDER_JSON", true);
+                    throw new ProviderFailure(Provider.INVALID_PROVIDER_JSON, true);
                 }
             } finally {
                 Arrays.fill(bytes, (byte) 0);
@@ -82,13 +107,15 @@ public final class ProviderHttp {
         } catch (InterruptedException failure) {
             exchange.cancel(true);
             Thread.currentThread().interrupt();
-            throw new ProviderFailure("TRANSMISSION_UNKNOWN", true);
+            throw new ProviderFailure(Provider.TRANSMISSION_UNKNOWN, true);
         } catch (TimeoutException failure) {
             exchange.cancel(true);
-            throw new ProviderFailure("TRANSMISSION_UNKNOWN", true);
+            throw new ProviderFailure(Provider.TRANSMISSION_UNKNOWN, true);
         } catch (ExecutionException failure) {
-            if (failure.getCause() instanceof ProviderFailure known) throw known;
-            throw new ProviderFailure("TRANSMISSION_UNKNOWN", true);
+            if (failure.getCause() instanceof ProviderFailure known) {
+                throw known;
+            }
+            throw new ProviderFailure(Provider.TRANSMISSION_UNKNOWN, true);
         }
     }
 
@@ -108,7 +135,9 @@ public final class ProviderHttp {
          * @created 2026-10-29
          * @usedBy post
          */
-        private LimitedBody(int limit) { this.limit = limit; }
+        private LimitedBody(int limit) {
+            this.limit = limit;
+        }
 
         /**
          * 전체 제한 본문의 완료 또는 실패를 HTTP 클라이언트에 전달한다.
@@ -116,7 +145,9 @@ public final class ProviderHttp {
          * @usedBy HttpClient BodySubscriber
          */
         @Override
-        public CompletionStage<byte[]> getBody() { return body; }
+        public CompletionStage<byte[]> getBody() {
+            return body;
+        }
 
         /**
          * 한 청크씩 받아 과도한 선행 버퍼링을 하지 않는다.
@@ -125,7 +156,10 @@ public final class ProviderHttp {
          */
         @Override
         public void onSubscribe(Flow.Subscription value) {
-            if (subscription != null) { value.cancel(); return; }
+            if (subscription != null) {
+                value.cancel();
+                return;
+            }
             subscription = value;
             subscription.request(1);
         }
@@ -134,13 +168,16 @@ public final class ProviderHttp {
          * 허용 크기 이내 청크만 복사하고 초과하면 즉시 종료한다.
          * @created 2026-10-29
          * @usedBy HttpClient BodySubscriber
+         * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조; 상수 타입 명시 참조
          */
         @Override
         public void onNext(List<ByteBuffer> chunks) {
             for (ByteBuffer chunk : chunks) {
                 if (chunk.remaining() > limit - bytes.size()) {
                     subscription.cancel();
-                    body.completeExceptionally(new ProviderFailure("RESPONSE_TOO_LARGE", true));
+                    body.completeExceptionally(
+                        new ProviderFailure(Provider.RESPONSE_TOO_LARGE, true)
+                    );
                     return;
                 }
                 byte[] part = new byte[chunk.remaining()];
@@ -155,10 +192,11 @@ public final class ProviderHttp {
          * 외부 예외의 민감 본문을 이어붙이지 않고 실패만 전파한다.
          * @created 2026-10-29
          * @usedBy HttpClient BodySubscriber
+         * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조; 상수 타입 명시 참조
          */
         @Override
         public void onError(Throwable failure) {
-            body.completeExceptionally(new ProviderFailure("TRANSMISSION_UNKNOWN", true));
+            body.completeExceptionally(new ProviderFailure(Provider.TRANSMISSION_UNKNOWN, true));
         }
 
         /**
@@ -167,7 +205,9 @@ public final class ProviderHttp {
          * @usedBy HttpClient BodySubscriber
          */
         @Override
-        public void onComplete() { body.complete(bytes.toByteArray()); }
+        public void onComplete() {
+            body.complete(bytes.toByteArray());
+        }
     }
 
     /**
@@ -193,6 +233,8 @@ public final class ProviderHttp {
          * @created 2026-10-29
          * @usedBy 미연결: 예정 사용처 분석 시도 상태 서비스
          */
-        public boolean mayHaveBeenSent() { return mayHaveBeenSent; }
+        public boolean mayHaveBeenSent() {
+            return mayHaveBeenSent;
+        }
     }
 }

@@ -52,7 +52,7 @@ Dart 문서 주석은 현재 Node 검사기의 자동 검사 대상이 아니다
 
 ## API Java에만 적용하는 주석 규칙
 
-API 개발은 [API 필수 규칙](../../apps/api/src/AGENTS.md)을 따른다. 공통 개발 원칙은 `apps/api/` 전체, Java 주석 의무·자동 검사는 `src/main/java`·`src/test/java`·`tools` 아래 직접 작성한 Java 코드에 적용한다.
+API 개발은 [API 필수 규칙](../../apps/api/AGENTS.md)을 따른다. 공통 개발 원칙은 `apps/api/` 전체, Java 주석 의무·자동 검사는 `src/main/java`·`src/test/java`·`tools` 아래 직접 작성한 Java 코드에 적용한다.
 
 - 모든 이름 있는 클래스·인터페이스·annotation·enum·record, 직접 작성한 메서드·명시적 생성자에 목적·생성일·주요 사용처를 기록한다. DTO/VO의 필드·타입·의미·검증 조건 변경과 기존 메서드의 구현·시그니처·계약 변경에는 수정일·목적을 남긴다.
 - 작업 기준 커밋에 없는 선언을 완성하는 편집은 생성 작업이다. 기준 커밋에 있던 선언의 위 변경에는 수정 이력을 남긴다. 신규 작업의 기준을 바꿔 기존 선언을 신규로 취급하지 않는다.

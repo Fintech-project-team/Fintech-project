@@ -249,8 +249,11 @@ class Cluster(AbstractContextManager):
                          self.work / "server.log", "-w", "-t", "30", "start"], timeout=40)
             identity = json.loads(self.sql("SELECT json_build_object('directory',current_setting('data_directory'),"
                 "'host',current_setting('listen_addresses'),'port',current_setting('port'),'user',current_user);")[0])
-            if (Path(identity["directory"]).resolve() != self.data.resolve() or identity["host"] != "127.0.0.1"
-                    or identity["port"] != str(port) or identity["user"] != self.role):
+            identity_differs = (
+                Path(identity["directory"]).resolve() != self.data.resolve() or identity["host"] != "127.0.0.1"
+                or identity["port"] != str(port) or identity["user"] != self.role
+            )
+            if identity_differs:
                 raise RuntimeError("The new PostgreSQL endpoint did not match its isolated directory")
             self.report["serverVersion"] = self.sql("SHOW server_version;")[0]
             return self

@@ -1,11 +1,15 @@
 package com.payse.api.finance.mapper;
 
+import com.payse.api.constants.ApiCodeConstants;
+import com.payse.api.constants.ApiFieldConstants.FinanceDb;
+import com.payse.api.constants.ApiFieldConstants;
 import com.payse.api.finance.entity.ObligationEntity;
 import com.payse.api.finance.entity.ReserveEntity;
 import com.payse.api.finance.error.FinancialException;
 import com.payse.api.finance.validation.FinancialInput;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Objects;
 import java.util.UUID;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -14,9 +18,10 @@ import tools.jackson.databind.node.ObjectNode;
  * 단건 의무·저장된 개별 회차·보호 설정을 저장하고 지급 이력과 원천 청구를 보존한다.
  * @created 2026-10-29
  * @usedBy FinancialWrites
-     * @modified 2026-10-29 - JPA 관리 엔티티와 같은 영속성 문맥으로 저장 경계 유지
+ * @modified 2026-10-29 - JPA 관리 엔티티와 같은 영속성 문맥으로 저장 경계 유지
  */
 final class PlanWrites {
+
     private final WriteStore store;
     private final AllocationWrites allocations;
 
@@ -36,29 +41,52 @@ final class PlanWrites {
      * @created 2026-10-29
      * @usedBy FinancialWrites.apply
      * @modified 2026-10-29 - JPA 관리 엔티티와 같은 영속성 문맥으로 저장 경계 유지
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-02 - 기존값을 읽는 분기에서만 저장 대상 존재 전제를 명시
      */
     void obligation(UUID owner, UUID existingId, JsonNode body, WriteStore.Journal journal) {
         UUID id = existingId == null ? UUID.randomUUID() : existingId;
         ObjectNode before = existingId == null ? null : store.obligation(owner, id);
-        if (before != null) mutableObligation(before, body);
-        UUID account = body.has("withdrawalAccountId") ? FinancialInput.id(body.get("withdrawalAccountId"))
-            : store.uuid(before, "withdrawal_account_id");
+        if (before != null) {
+            mutableObligation(before, body);
+        }
+        UUID account = body.has(ApiFieldConstants.Finance.WITHDRAWAL_ACCOUNT_ID)
+            ? FinancialInput.id(body.get(ApiFieldConstants.Finance.WITHDRAWAL_ACCOUNT_ID))
+            : store.uuid(before, FinanceDb.WITHDRAWAL_ACCOUNT_ID);
         store.account(owner, account);
-        long amount = body.has("amountKRW") ? body.get("amountKRW").asLong() : before.get("amount_krw").asLong();
-        String label = body.has("label") ? FinancialInput.trimLabel(body.get("label").asString()) : before.get("label").asString();
-        LocalDate dueDate = LocalDate.parse(body.has("dueDate") ? body.get("dueDate").asString() : before.get("due_date").asString());
+        long amount = body.has(ApiFieldConstants.Finance.AMOUNT_KRW)
+            ? body.get(ApiFieldConstants.Finance.AMOUNT_KRW).asLong()
+            : Objects.requireNonNull(before).get(FinanceDb.AMOUNT_KRW).asLong();
+        String label = body.has(ApiFieldConstants.Finance.LABEL)
+            ? FinancialInput.trimLabel(body.get(ApiFieldConstants.Finance.LABEL).asString())
+            : Objects.requireNonNull(before).get(ApiFieldConstants.Finance.LABEL).asString();
+        LocalDate dueDate = LocalDate.parse(
+            body.has(ApiFieldConstants.Finance.DUE_DATE)
+                ? body.get(ApiFieldConstants.Finance.DUE_DATE).asString()
+                : Objects.requireNonNull(before).get(FinanceDb.DUE_DATE).asString()
+        );
         long paid = before == null ? 0 : paid(owner, id);
-        if (amount < paid || (paid > 0 && !account.equals(store.uuid(before, "withdrawal_account_id")))) throw WriteStore.history();
+        if (amount < paid
+            || (paid > 0 && !account.equals(store.uuid(before, FinanceDb.WITHDRAWAL_ACCOUNT_ID)))) {
+            throw WriteStore.history();
+        }
+
         if (before == null) {
             store.persist(new ObligationEntity(id, owner, label, account, amount, dueDate));
-        } else if (!before.get("statement_id").isNull()) {
+        } else if (!before.get(FinanceDb.STATEMENT_ID).isNull()) {
             store.entity(owner, ObligationEntity.class, id).rename(label);
         } else {
             store.entity(owner, ObligationEntity.class, id).change(label, account, amount, dueDate);
         }
         allocations.limits(owner);
         ObjectNode after = store.obligation(owner, id);
-        journal.add("obligation", id, obligationFields(before), obligationFields(after));
+        journal.add(
+            ApiCodeConstants.Finance.OBLIGATION,
+            id,
+            obligationFields(before),
+            obligationFields(after)
+        );
     }
 
     /**
@@ -66,26 +94,54 @@ final class PlanWrites {
      * @created 2026-10-29
      * @usedBy FinancialWrites.apply
      * @modified 2026-10-29 - JPA 관리 엔티티와 같은 영속성 문맥으로 저장 경계 유지
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-02 - 기존값을 읽는 분기에서만 저장 대상 존재 전제를 명시
      */
     void reserve(UUID owner, UUID existingId, JsonNode body, WriteStore.Journal journal) {
         UUID id = existingId == null ? UUID.randomUUID() : existingId;
         ObjectNode before = existingId == null ? null : store.reserve(owner, id);
-        if (before != null && !before.get("cancelled_at").isNull()) throw WriteStore.conflict();
-        UUID account = body.has("accountId") ? FinancialInput.id(body.get("accountId")) : store.uuid(before, "account_id");
+        if (before != null && !before.get(FinanceDb.CANCELLED_AT).isNull()) {
+            throw WriteStore.conflict();
+        }
+
+        UUID account = body.has(ApiFieldConstants.Finance.ACCOUNT_ID)
+            ? FinancialInput.id(body.get(ApiFieldConstants.Finance.ACCOUNT_ID))
+            : store.uuid(before, FinanceDb.ACCOUNT_ID);
         ObjectNode accountRow = store.account(owner, account);
-        long amount = body.has("amountKRW") ? body.get("amountKRW").asLong() : before.get("amount_krw").asLong();
-        String label = body.has("label") ? FinancialInput.trimLabel(body.get("label").asString()) : before.get("label").asString();
-        boolean increased = before == null || !account.equals(store.uuid(before, "account_id")) || amount > before.get("amount_krw").asLong();
-        if (increased && !accountRow.get("included").asBoolean()) throw WriteStore.invalid();
+        long amount = body.has(ApiFieldConstants.Finance.AMOUNT_KRW)
+            ? body.get(ApiFieldConstants.Finance.AMOUNT_KRW).asLong()
+            : Objects.requireNonNull(before).get(FinanceDb.AMOUNT_KRW).asLong();
+        String label = body.has(ApiFieldConstants.Finance.LABEL)
+            ? FinancialInput.trimLabel(body.get(ApiFieldConstants.Finance.LABEL).asString())
+            : Objects.requireNonNull(before).get(ApiFieldConstants.Finance.LABEL).asString();
+        boolean increased = before == null
+            || !account.equals(store.uuid(before, FinanceDb.ACCOUNT_ID))
+            || amount > before.get(FinanceDb.AMOUNT_KRW).asLong();
+        if (increased && !accountRow.get(ApiFieldConstants.Finance.INCLUDED).asBoolean()) {
+            throw WriteStore.invalid();
+        }
+
         if (before == null) {
             store.persist(new ReserveEntity(id, owner, account, label, amount));
         } else {
             store.entity(owner, ReserveEntity.class, id).change(account, label, amount);
         }
-        if (body.has("allocationChanges")) allocations.change(owner, id, body.get("allocationChanges"), journal);
+        if (body.has(ApiFieldConstants.Finance.ALLOCATION_CHANGES)) {
+            allocations
+                .change(owner, id, body.get(ApiFieldConstants.Finance.ALLOCATION_CHANGES), journal);
+        }
         allocations.limits(owner);
-        if (increased) reserveLimits(owner, account, accountRow.get("balance_krw").asLong());
-        journal.add("reserve", id, reserveFields(before), reserveFields(store.reserve(owner, id)));
+        if (increased) {
+            reserveLimits(owner, account, accountRow.get(FinanceDb.BALANCE_KRW).asLong());
+        }
+
+        journal.add(
+            ApiCodeConstants.Finance.RESERVE,
+            id,
+            reserveFields(before),
+            reserveFields(store.reserve(owner, id))
+        );
     }
 
     /**
@@ -93,22 +149,56 @@ final class PlanWrites {
      * @created 2026-10-29
      * @usedBy FinancialWrites.apply
      * @modified 2026-10-29 - JPA 관리 엔티티와 같은 영속성 문맥으로 저장 경계 유지
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
      */
-    void cancel(UUID owner, UUID id, boolean obligation, JsonNode body, boolean explicit, WriteStore.Journal journal) {
+    void cancel(
+        UUID owner,
+        UUID id,
+        boolean obligation,
+        JsonNode body,
+        boolean explicit,
+        WriteStore.Journal journal
+    ) {
         ObjectNode before = obligation ? store.obligation(owner, id) : store.reserve(owner, id);
-        if (obligation && (!before.get("statement_id").isNull() || paid(owner, id) > 0)) throw WriteStore.history();
-        if (explicit) allocations.detach(owner, id, obligation, body.get("detachAllocations"), journal);
-        else allocations.requireDetached(owner, id, obligation);
+        if (obligation && (!before.get(FinanceDb.STATEMENT_ID).isNull() || paid(owner, id) > 0)) {
+            throw WriteStore.history();
+        }
+
+        if (explicit) {
+            allocations.detach(
+                owner,
+                id,
+                obligation,
+                body.get(ApiFieldConstants.Finance.DETACH_ALLOCATIONS),
+                journal
+            );
+        } else {
+            allocations.requireDetached(owner, id, obligation);
+        }
         if (obligation) {
-            if ("active".equals(before.get("status").asString())) {
+            if (ApiCodeConstants.Finance.ACTIVE
+                .equals(before.get(ApiFieldConstants.Finance.STATUS).asString())) {
                 store.entity(owner, ObligationEntity.class, id).cancel();
             }
-            journal.add("obligation", id, obligationFields(before), obligationFields(store.obligation(owner, id)));
+
+            journal.add(
+                ApiCodeConstants.Finance.OBLIGATION,
+                id,
+                obligationFields(before),
+                obligationFields(store.obligation(owner, id))
+            );
         } else {
-            if (before.get("cancelled_at").isNull()) {
+            if (before.get(FinanceDb.CANCELLED_AT).isNull()) {
                 store.entity(owner, ReserveEntity.class, id).cancel(store.now());
             }
-            journal.add("reserve", id, reserveFields(before), reserveFields(store.reserve(owner, id)));
+
+            journal.add(
+                ApiCodeConstants.Finance.RESERVE,
+                id,
+                reserveFields(before),
+                reserveFields(store.reserve(owner, id))
+            );
         }
     }
 
@@ -117,13 +207,21 @@ final class PlanWrites {
      * @created 2026-10-29
      * @usedBy PlanWrites.reserve
      * @modified 2026-10-29 - JPA 관리 엔티티와 같은 영속성 문맥으로 저장 경계 유지
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조; 단일 제어문 본문 중괄호 명시
      */
     private void reserveLimits(UUID owner, UUID account, long balance) {
-        BigDecimal perAccount = store.scalar("""
+        BigDecimal perAccount = store.scalar(
+            """
             SELECT coalesce(sum(amount_krw), 0) FROM payse.reserves
             WHERE user_id = ? AND account_id = ? AND cancelled_at IS NULL
-            """, BigDecimal.class, owner, account);
-        BigDecimal selectedBalance = store.scalar("""
+            """,
+            BigDecimal.class,
+            owner,
+            account
+        );
+        BigDecimal selectedBalance = store.scalar(
+            """
             SELECT coalesce(sum(a.balance_krw), 0)
             FROM payse.financial_accounts a
             WHERE a.user_id = ? AND a.included AND EXISTS (
@@ -131,8 +229,12 @@ final class PlanWrites {
                 WHERE l.user_id = a.user_id AND l.institution_code = a.institution_code
                   AND l.disconnected_at IS NULL
             )
-            """, BigDecimal.class, owner);
-        BigDecimal selectedReserve = store.scalar("""
+            """,
+            BigDecimal.class,
+            owner
+        );
+        BigDecimal selectedReserve = store.scalar(
+            """
             SELECT coalesce(sum(r.amount_krw), 0)
             FROM payse.reserves r
             JOIN payse.financial_accounts a ON a.user_id = r.user_id AND a.id = r.account_id
@@ -141,13 +243,21 @@ final class PlanWrites {
                 WHERE l.user_id = a.user_id AND l.institution_code = a.institution_code
                   AND l.disconnected_at IS NULL
             )
-            """, BigDecimal.class, owner);
-        if (perAccount == null || selectedBalance == null || selectedReserve == null) throw WriteStore.unavailable();
+            """,
+            BigDecimal.class,
+            owner
+        );
+        if (perAccount == null || selectedBalance == null || selectedReserve == null) {
+            throw WriteStore.unavailable();
+        }
+
         BigDecimal maximum = BigDecimal.valueOf(FinancialInput.MAX_MONEY);
         if (perAccount.compareTo(BigDecimal.valueOf(Math.max(0, balance))) > 0
-                || selectedReserve.compareTo(selectedBalance.max(BigDecimal.ZERO)) > 0
-                || perAccount.compareTo(maximum) > 0 || selectedReserve.compareTo(maximum) > 0
-                || selectedBalance.abs().compareTo(maximum) > 0) throw new FinancialException(422, "LIMIT_EXCEEDED");
+            || selectedReserve.compareTo(selectedBalance.max(BigDecimal.ZERO)) > 0
+            || perAccount.compareTo(maximum) > 0 || selectedReserve.compareTo(maximum) > 0
+            || selectedBalance.abs().compareTo(maximum) > 0) {
+            throw new FinancialException(422, ApiCodeConstants.Finance.LIMIT_EXCEEDED);
+        }
     }
 
     /**
@@ -155,13 +265,23 @@ final class PlanWrites {
      * @created 2026-10-29
      * @usedBy PlanWrites.obligation, cancel
      * @modified 2026-10-29 - JPA 관리 엔티티와 같은 영속성 문맥으로 저장 경계 유지
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     private long paid(UUID owner, UUID id) {
-        BigDecimal amount = store.scalar("""
+        BigDecimal amount = store.scalar(
+            """
             SELECT coalesce(sum(allocated_krw), 0) FROM payse.settlement_links
             WHERE user_id = ? AND obligation_id = ? AND invalidated_at IS NULL
-            """, BigDecimal.class, owner, id);
-        if (amount == null || amount.signum() < 0 || amount.compareTo(BigDecimal.valueOf(FinancialInput.MAX_MONEY)) > 0) throw WriteStore.unavailable();
+            """,
+            BigDecimal.class,
+            owner,
+            id
+        );
+        if (amount == null || amount.signum() < 0
+            || amount.compareTo(BigDecimal.valueOf(FinancialInput.MAX_MONEY)) > 0) {
+            throw WriteStore.unavailable();
+        }
+
         return amount.longValueExact();
     }
 
@@ -170,11 +290,20 @@ final class PlanWrites {
      * @created 2026-10-29
      * @usedBy PlanWrites.obligation
      * @modified 2026-10-29 - JPA 관리 엔티티와 같은 영속성 문맥으로 저장 경계 유지
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
      */
     private void mutableObligation(JsonNode obligation, JsonNode body) {
-        if (!obligation.get("statement_id").isNull()
-                && (body.has("amountKRW") || body.has("dueDate") || body.has("withdrawalAccountId"))) throw WriteStore.history();
-        if (!"active".equals(obligation.get("status").asString())) throw WriteStore.conflict();
+        if (!obligation.get(FinanceDb.STATEMENT_ID).isNull()
+            && (body.has(ApiFieldConstants.Finance.AMOUNT_KRW)
+                || body.has(ApiFieldConstants.Finance.DUE_DATE)
+                || body.has(ApiFieldConstants.Finance.WITHDRAWAL_ACCOUNT_ID))) {
+            throw WriteStore.history();
+        }
+        if (!ApiCodeConstants.Finance.ACTIVE
+            .equals(obligation.get(ApiFieldConstants.Finance.STATUS).asString())) {
+            throw WriteStore.conflict();
+        }
     }
 
     /**
@@ -182,9 +311,19 @@ final class PlanWrites {
      * @created 2026-10-29
      * @usedBy PlanWrites.obligation, cancel
      * @modified 2026-10-29 - JPA 관리 엔티티와 같은 영속성 문맥으로 저장 경계 유지
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리
      */
     private ObjectNode obligationFields(JsonNode row) {
-        return row == null ? null : store.select(row, "label", "withdrawal_account_id", "amount_krw", "due_date", "status");
+        return row == null ? null
+            : store.select(
+                row,
+                ApiFieldConstants.Finance.LABEL,
+                FinanceDb.WITHDRAWAL_ACCOUNT_ID,
+                FinanceDb.AMOUNT_KRW,
+                FinanceDb.DUE_DATE,
+                ApiFieldConstants.Finance.STATUS
+            );
     }
 
     /**
@@ -192,8 +331,17 @@ final class PlanWrites {
      * @created 2026-10-29
      * @usedBy PlanWrites.reserve, cancel
      * @modified 2026-10-29 - JPA 관리 엔티티와 같은 영속성 문맥으로 저장 경계 유지
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리
      */
     private ObjectNode reserveFields(JsonNode row) {
-        return row == null ? null : store.select(row, "account_id", "label", "amount_krw", "cancelled_at");
+        return row == null ? null
+            : store.select(
+                row,
+                FinanceDb.ACCOUNT_ID,
+                ApiFieldConstants.Finance.LABEL,
+                FinanceDb.AMOUNT_KRW,
+                FinanceDb.CANCELLED_AT
+            );
     }
 }

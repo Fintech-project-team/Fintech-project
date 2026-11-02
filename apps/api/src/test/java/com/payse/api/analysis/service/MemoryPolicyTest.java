@@ -40,12 +40,18 @@ class MemoryPolicyTest {
      */
     @Test
     void usesSeoulCalendar() {
-        assertEquals(Instant.parse("2026-04-30T15:10:00Z"),
-            policy.normalExpiry(Instant.parse("2026-01-31T15:10:00Z")));
-        assertEquals(Instant.parse("2024-02-29T06:00:00Z"),
-            policy.normalExpiry(Instant.parse("2023-11-30T06:00:00Z")));
-        assertEquals(Instant.parse("2027-02-28T06:00:00Z"),
-            policy.normalExpiry(Instant.parse("2026-11-30T06:00:00Z")));
+        assertEquals(
+            Instant.parse("2026-04-30T15:10:00Z"),
+            policy.normalExpiry(Instant.parse("2026-01-31T15:10:00Z"))
+        );
+        assertEquals(
+            Instant.parse("2024-02-29T06:00:00Z"),
+            policy.normalExpiry(Instant.parse("2023-11-30T06:00:00Z"))
+        );
+        assertEquals(
+            Instant.parse("2027-02-28T06:00:00Z"),
+            policy.normalExpiry(Instant.parse("2026-11-30T06:00:00Z"))
+        );
     }
 
     /**
@@ -56,10 +62,14 @@ class MemoryPolicyTest {
     @Test
     void removalDoesNotRestartRetention() {
         Instant later = Instant.parse("2026-06-01T06:00:00Z");
-        assertEquals(Retention.RETAINED,
-            policy.retention(new Memory(storedAt, true, true, true, null, null), later));
-        assertEquals(Retention.EXPIRED,
-            policy.retention(new Memory(storedAt, true, true, false, null, null), later));
+        assertEquals(
+            Retention.RETAINED,
+            policy.retention(new Memory(storedAt, true, true, true, null, null), later)
+        );
+        assertEquals(
+            Retention.EXPIRED,
+            policy.retention(new Memory(storedAt, true, true, false, null, null), later)
+        );
     }
 
     /**
@@ -72,12 +82,20 @@ class MemoryPolicyTest {
         Instant withdrawn = Instant.parse("2026-02-01T06:00:00Z");
         Memory memory = new Memory(storedAt, true, true, true, null, withdrawn);
         assertEquals(Retention.RETAINED, policy.retention(memory, withdrawn));
-        assertEquals(Availability.FORBIDDEN, policy.availability(memory, withdrawn, new Access(true, true)));
-        assertEquals(Retention.WITHDRAWAL_EXPIRED,
-            policy.retention(memory, Instant.parse("2027-02-01T06:00:00Z")));
+        assertEquals(
+            Availability.FORBIDDEN,
+            policy.availability(memory, withdrawn, new Access(true, true))
+        );
+        assertEquals(
+            Retention.WITHDRAWAL_EXPIRED,
+            policy.retention(memory, Instant.parse("2027-02-01T06:00:00Z"))
+        );
         Memory deleted = new Memory(storedAt, true, true, true, withdrawn, null);
         assertEquals(Retention.DELETED, policy.retention(deleted, withdrawn));
-        assertEquals(Availability.DELETED, policy.availability(deleted, withdrawn, new Access(true, true)));
+        assertEquals(
+            Availability.DELETED,
+            policy.availability(deleted, withdrawn, new Access(true, true))
+        );
     }
 
     /**
@@ -87,8 +105,18 @@ class MemoryPolicyTest {
      */
     @Test
     void withdrawalDoesNotExtendOrdinaryMemory() {
-        Memory memory = new Memory(storedAt, true, false, false, null, Instant.parse("2026-02-01T06:00:00Z"));
-        assertEquals(Retention.EXPIRED, policy.retention(memory, Instant.parse("2026-05-01T06:00:00Z")));
+        Memory memory = new Memory(
+            storedAt,
+            true,
+            false,
+            false,
+            null,
+            Instant.parse("2026-02-01T06:00:00Z")
+        );
+        assertEquals(
+            Retention.EXPIRED,
+            policy.retention(memory, Instant.parse("2026-05-01T06:00:00Z"))
+        );
     }
 
     /**
@@ -101,11 +129,26 @@ class MemoryPolicyTest {
         Instant later = Instant.parse("2026-06-01T06:00:00Z");
         Memory memory = new Memory(storedAt, true, true, true, null, null);
         assertEquals(Retention.RETAINED, policy.retention(memory, later));
-        assertEquals(Availability.AVAILABLE, policy.availability(memory, later, new Access(true, true)));
-        assertEquals(Availability.STALE, policy.availability(memory, later, new Access(true, false)));
-        assertEquals(Availability.FORBIDDEN, policy.availability(memory, later, new Access(false, true)));
-        assertEquals(Availability.INACTIVE, policy.availability(
-            new Memory(storedAt, false, true, true, null, null), later, new Access(true, true)));
+        assertEquals(
+            Availability.AVAILABLE,
+            policy.availability(memory, later, new Access(true, true))
+        );
+        assertEquals(
+            Availability.STALE,
+            policy.availability(memory, later, new Access(true, false))
+        );
+        assertEquals(
+            Availability.FORBIDDEN,
+            policy.availability(memory, later, new Access(false, true))
+        );
+        assertEquals(
+            Availability.INACTIVE,
+            policy.availability(
+                new Memory(storedAt, false, true, true, null, null),
+                later,
+                new Access(true, true)
+            )
+        );
     }
 
     /**
@@ -115,11 +158,20 @@ class MemoryPolicyTest {
      */
     @Test
     void rejectsInvalidMetadata() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new Memory(storedAt, true, false, true, null, null));
-        assertThrows(IllegalArgumentException.class,
-            () -> new Memory(storedAt, true, false, false, storedAt.minusSeconds(1), null));
-        assertThrows(IllegalArgumentException.class,
-            () -> policy.retention(new Memory(storedAt, true, false, false, null, null), storedAt.minusSeconds(1)));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new Memory(storedAt, true, false, true, null, null)
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new Memory(storedAt, true, false, false, storedAt.minusSeconds(1), null)
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> policy.retention(
+                new Memory(storedAt, true, false, false, null, null),
+                storedAt.minusSeconds(1)
+            )
+        );
     }
 }

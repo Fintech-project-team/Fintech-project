@@ -1,5 +1,9 @@
 package com.payse.api.finance.validation;
 
+import com.payse.api.ApiTestConstants.FinanceFields;
+import com.payse.api.ApiTestConstants.FinanceHttp;
+import com.payse.api.ApiTestConstants.FinancePaths;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -23,38 +27,55 @@ class FinancialInputTest {
      * 숫자 버전·선행 0·범위 초과·알 수 없는 키는 변환하지 않고 거절한다.
      * @created 2026-10-29
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void rejectsInvalidWriteContext() {
-        for (String version : new String[] {"0", "01", "9223372036854775808", "1.0", "-1"}) {
+        for (String version : new String[] {
+            "0",
+            "01",
+            "9223372036854775808",
+            "1.0",
+            "-1"
+        }) {
             ObjectNode body = salary();
-            body.put("expectedDataVersion", version);
-            reject("PATCH", "/settings", body);
+            body.put(FinanceFields.EXPECTED_DATA_VERSION, version);
+            reject(FinanceHttp.PATCH, FinancePaths.SETTINGS_PATH, body);
         }
-        ObjectNode number = salary().put("expectedDataVersion", 1);
-        reject("PATCH", "/settings", number);
-        ObjectNode unknown = salary().put("userId", UUID.randomUUID().toString());
-        reject("PATCH", "/settings", unknown);
-        ObjectNode key = salary().put("idempotencyKey", "with spaces");
-        reject("PATCH", "/settings", key);
+        ObjectNode number = salary().put(FinanceFields.EXPECTED_DATA_VERSION, 1);
+        reject(FinanceHttp.PATCH, FinancePaths.SETTINGS_PATH, number);
+        ObjectNode unknown = salary().put(FinanceFields.USER_ID, UUID.randomUUID().toString());
+        reject(FinanceHttp.PATCH, FinancePaths.SETTINGS_PATH, unknown);
+        ObjectNode key = salary().put(FinanceFields.IDEMPOTENCY_KEY, "with spaces");
+        reject(FinanceHttp.PATCH, FinancePaths.SETTINGS_PATH, key);
     }
 
     /**
      * 금액 정수 상·하한을 허용하고 문자열·실수·boolean을 거절한다.
      * @created 2026-10-29
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void enforcesIntegerMoney() {
-        for (String amount : new String[] {"0", "9000000000000"}) {
+        for (String amount : new String[] { "0", "9000000000000" }) {
             ObjectNode body = context();
-            body.set("salary", mapper.readTree("{\"salaryAmountKRW\":" + amount + "}"));
-            assertEquals(body, FinancialInput.validate("PATCH", "/settings", body));
+            body.set(FinanceFields.SALARY, mapper.readTree("{\"salaryAmountKRW\":" + amount + "}"));
+            assertEquals(
+                body,
+                FinancialInput.validate(FinanceHttp.PATCH, FinancePaths.SETTINGS_PATH, body)
+            );
         }
-        for (String amount : new String[] {"-1", "9000000000001", "1.0", "true", "\"100\""}) {
+        for (String amount : new String[] {
+            "-1",
+            "9000000000001",
+            "1.0",
+            "true",
+            "\"100\""
+        }) {
             ObjectNode body = context();
-            body.set("salary", mapper.readTree("{\"salaryAmountKRW\":" + amount + "}"));
-            reject("PATCH", "/settings", body);
+            body.set(FinanceFields.SALARY, mapper.readTree("{\"salaryAmountKRW\":" + amount + "}"));
+            reject(FinanceHttp.PATCH, FinancePaths.SETTINGS_PATH, body);
         }
     }
 
@@ -62,164 +83,232 @@ class FinancialInputTest {
      * 급여의 생략·명시 null을 유지하고 빈 PATCH나 원천 근거 변경을 거절한다.
      * @created 2026-10-29
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void preservesPatchMeaning() {
         ObjectNode body = context();
-        body.putObject("salary").putNull("salaryDay");
-        JsonNode result = FinancialInput.validate("PATCH", "/settings", body);
-        assertTrue(result.get("salary").has("salaryDay"));
-        assertTrue(result.get("salary").get("salaryDay").isNull());
-        assertEquals(1, result.get("salary").size());
-        reject("PATCH", "/settings", context());
+        body.putObject(FinanceFields.SALARY).putNull(FinanceFields.SALARY_DAY);
+        JsonNode result = FinancialInput
+            .validate(FinanceHttp.PATCH, FinancePaths.SETTINGS_PATH, body);
+        assertTrue(result.get(FinanceFields.SALARY).has(FinanceFields.SALARY_DAY));
+        assertTrue(
+            result.get(FinanceFields.SALARY)
+                .get(FinanceFields.SALARY_DAY)
+                .isNull()
+        );
+        assertEquals(1, result.get(FinanceFields.SALARY).size());
+        reject(FinanceHttp.PATCH, FinancePaths.SETTINGS_PATH, context());
         ObjectNode empty = context();
-        empty.putObject("salary");
-        reject("PATCH", "/settings", empty);
+        empty.putObject(FinanceFields.SALARY);
+        reject(FinanceHttp.PATCH, FinancePaths.SETTINGS_PATH, empty);
         ObjectNode source = salary();
-        ((ObjectNode) source.get("salary")).putArray("receiptEvidence");
-        reject("PATCH", "/settings", source);
+        ((ObjectNode) source.get(FinanceFields.SALARY)).putArray(FinanceFields.RECEIPT_EVIDENCE);
+        reject(FinanceHttp.PATCH, FinancePaths.SETTINGS_PATH, source);
     }
 
     /**
      * 별칭은 12 grapheme·이모지·null을 지원하고 특수문자 전용 값을 거절한다.
      * @created 2026-10-29
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void validatesNicknameGraphemes() {
-        String path = "/accounts/" + UUID.randomUUID();
-        ObjectNode body = context().put("nickname", "  " + "가".repeat(12) + "  ");
-        assertEquals(body, FinancialInput.validate("PATCH", path, body));
-        assertEquals(body.get("nickname").asString(), "  " + "가".repeat(12) + "  ");
-        FinancialInput.validate("PATCH", path, context().put("nickname", "👨‍👩‍👧‍👦"));
-        FinancialInput.validate("PATCH", path, context().putNull("nickname"));
-        reject("PATCH", path, context().put("nickname", "가".repeat(13)));
-        reject("PATCH", path, context().put("nickname", "!!!"));
+        String path = FinancePaths.ACCOUNT_PATH + UUID.randomUUID();
+        ObjectNode body = context().put(FinanceFields.NICKNAME, "  " + "가".repeat(12) + "  ");
+        assertEquals(body, FinancialInput.validate(FinanceHttp.PATCH, path, body));
+        assertEquals(body.get(FinanceFields.NICKNAME).asString(), "  " + "가".repeat(12) + "  ");
+        FinancialInput.validate(
+            FinanceHttp.PATCH,
+            path,
+            context().put(FinanceFields.NICKNAME, "👨‍👩‍👧‍👦")
+        );
+        FinancialInput.validate(FinanceHttp.PATCH, path, context().putNull(FinanceFields.NICKNAME));
+        reject(FinanceHttp.PATCH, path, context().put(FinanceFields.NICKNAME, "가".repeat(13)));
+        reject(FinanceHttp.PATCH, path, context().put(FinanceFields.NICKNAME, "!!!"));
     }
 
     /**
      * 의무명 80자와 윤일은 허용하되 존재하지 않는 날짜·원천 필드는 거절한다.
      * @created 2026-10-29
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void validatesObligationFields() {
-        ObjectNode body = obligation().put("label", "가".repeat(80)).put("dueDate", "2028-02-29");
-        FinancialInput.validate("POST", "/obligations", body);
-        reject("POST", "/obligations", body.deepCopy().put("label", "가".repeat(81)));
-        reject("POST", "/obligations", body.deepCopy().put("dueDate", "2027-02-29"));
-        reject("POST", "/obligations", body.deepCopy().put("dueDate", "0000-01-01"));
-        reject("POST", "/obligations", body.deepCopy().put("status", "active"));
-        reject("PATCH", "/obligations/" + UUID.randomUUID(), context());
+        ObjectNode body = obligation()
+            .put(FinanceFields.LABEL, "가".repeat(80))
+            .put(FinanceFields.DUE_DATE, "2028-02-29");
+        FinancialInput.validate(FinanceHttp.POST, FinancePaths.OBLIGATIONS_PATH, body);
+        reject(
+            FinanceHttp.POST,
+            FinancePaths.OBLIGATIONS_PATH,
+            body.deepCopy().put(FinanceFields.LABEL, "가".repeat(81))
+        );
+        reject(
+            FinanceHttp.POST,
+            FinancePaths.OBLIGATIONS_PATH,
+            body.deepCopy().put(FinanceFields.DUE_DATE, "2027-02-29")
+        );
+        reject(
+            FinanceHttp.POST,
+            FinancePaths.OBLIGATIONS_PATH,
+            body.deepCopy().put(FinanceFields.DUE_DATE, "0000-01-01")
+        );
+        reject(
+            FinanceHttp.POST,
+            FinancePaths.OBLIGATIONS_PATH,
+            body.deepCopy().put(FinanceFields.STATUS, "active")
+        );
+        reject(FinanceHttp.PATCH, FinancePaths.OBLIGATION_PATH + UUID.randomUUID(), context());
     }
 
     /**
      * NBSP·BOM만 있는 이름을 거절하며 Flutter와 같은 경계 공백·grapheme 처리를 확인한다.
      * @created 2026-10-29
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void trimsUnicodeLabelSpaces() {
-        reject("POST", "/obligations", obligation().put("label", "\u00a0\ufeff\u202f"));
+        reject(
+            FinanceHttp.POST,
+            FinancePaths.OBLIGATIONS_PATH,
+            obligation().put(FinanceFields.LABEL, "\u00a0\ufeff\u202f")
+        );
         assertEquals("이름", FinancialInput.trimLabel("\ufeff\u00a0이름\u3000\ufeff"));
-        ObjectNode family = obligation().put("label", "\ufeff" + "👨‍👩‍👧‍👦".repeat(80) + "\u00a0");
-        FinancialInput.validate("POST", "/obligations", family);
-        reject("POST", "/obligations", family.put("label", "👨‍👩‍👧‍👦".repeat(81)));
+        ObjectNode family = obligation()
+            .put(FinanceFields.LABEL, "\ufeff" + "👨‍👩‍👧‍👦".repeat(80) + "\u00a0");
+        FinancialInput.validate(FinanceHttp.POST, FinancePaths.OBLIGATIONS_PATH, family);
+        reject(
+            FinanceHttp.POST,
+            FinancePaths.OBLIGATIONS_PATH,
+            family.put(FinanceFields.LABEL, "👨‍👩‍👧‍👦".repeat(81))
+        );
     }
 
     /**
      * 대소문자만 다른 UUID와 배정 update/remove 중복을 거절한다.
      * @created 2026-10-29
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void rejectsDuplicateIds() {
         String id = UUID.randomUUID().toString();
         ObjectNode selection = context();
-        selection.putArray("accountIds").add(id).add(id.toUpperCase());
-        reject("PATCH", "/account-selection", selection);
+        selection.putArray(FinanceFields.ACCOUNT_IDS)
+            .add(id)
+            .add(id.toUpperCase());
+        reject(FinanceHttp.PATCH, FinancePaths.ACCOUNT_SELECTION_PATH, selection);
         ObjectNode reserve = reserve();
-        ObjectNode changes = (ObjectNode) reserve.get("allocationChanges");
-        changes.withArray("update").addObject().put("allocationId", id).put("amountKRW", 1);
+        ObjectNode changes = (ObjectNode) reserve.get(FinanceFields.ALLOCATION_CHANGES);
+        changes.withArray("update")
+            .addObject()
+            .put(FinanceFields.ALLOCATION_ID, id)
+            .put(FinanceFields.AMOUNT_KRW, 1);
         changes.withArray("remove").add(id);
-        reject("POST", "/reserves", reserve);
+        reject(FinanceHttp.POST, FinancePaths.RESERVES_PATH, reserve);
     }
 
     /**
      * 배정은 양수이며 호출자가 해제 금액·근거를 수정하지 못한다.
      * @created 2026-10-29
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void validatesAllocationChanges() {
-        FinancialInput.validate("POST", "/reserves", reserve());
+        FinancialInput.validate(FinanceHttp.POST, FinancePaths.RESERVES_PATH, reserve());
         ObjectNode body = reserve();
-        ObjectNode entry = ((ObjectNode) body.get("allocationChanges")).withArray("create")
-            .addObject().put("obligationId", UUID.randomUUID().toString()).put("amountKRW", 0);
-        reject("POST", "/reserves", body);
-        entry.put("amountKRW", 1).put("releasedKRW", 0);
-        reject("POST", "/reserves", body);
+        ObjectNode entry = ((ObjectNode) body.get(FinanceFields.ALLOCATION_CHANGES))
+            .withArray("create")
+            .addObject()
+            .put(FinanceFields.OBLIGATION_ID, UUID.randomUUID().toString())
+            .put(FinanceFields.AMOUNT_KRW, 0);
+        reject(FinanceHttp.POST, FinancePaths.RESERVES_PATH, body);
+        entry.put(FinanceFields.AMOUNT_KRW, 1).put(FinanceFields.RELEASED_KRW, 0);
+        reject(FinanceHttp.POST, FinancePaths.RESERVES_PATH, body);
     }
 
     /**
      * cancel의 빈 확인 목록을 형식상 허용하되 null·중복·0원은 거절한다.
      * @created 2026-10-29
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void validatesCancelConfirmation() {
-        String path = "/reserves/" + UUID.randomUUID() + "/cancel";
+        String path = FinancePaths.RESERVE_PATH + UUID.randomUUID() + FinancePaths.CANCEL_SUFFIX;
         ObjectNode body = context();
-        body.putArray("detachAllocations");
-        FinancialInput.validate("POST", path, body);
-        reject("POST", path, context().putNull("detachAllocations"));
-        body.withArray("detachAllocations").addObject()
-            .put("allocationId", UUID.randomUUID().toString()).put("unreleasedKRW", 0);
-        reject("POST", path, body);
+        body.putArray(FinanceFields.DETACH_ALLOCATIONS);
+        FinancialInput.validate(FinanceHttp.POST, path, body);
+        reject(FinanceHttp.POST, path, context().putNull(FinanceFields.DETACH_ALLOCATIONS));
+        body.withArray(FinanceFields.DETACH_ALLOCATIONS)
+            .addObject()
+            .put(FinanceFields.ALLOCATION_ID, UUID.randomUUID().toString())
+            .put(FinanceFields.UNRELEASED_KRW, 0);
+        reject(FinanceHttp.POST, path, body);
     }
 
     /**
      * 카드 override 해제는 null로 허용하며 중복 카드·원천 계좌 변경은 거절한다.
      * @created 2026-10-29
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void validatesCardOverrides() {
         String id = UUID.randomUUID().toString();
         ObjectNode body = context();
-        body.putArray("cardPlans").addObject().put("cardId", id).putNull("plannedPaymentDay");
-        FinancialInput.validate("PATCH", "/settings", body);
-        body.withArray("cardPlans").addObject().put("cardId", id).put("plannedPaymentDay", 31);
-        reject("PATCH", "/settings", body);
+        body.putArray(FinanceFields.CARD_PLANS)
+            .addObject()
+            .put(FinanceFields.CARD_ID, id)
+            .putNull(FinanceFields.PLANNED_PAYMENT_DAY);
+        FinancialInput.validate(FinanceHttp.PATCH, FinancePaths.SETTINGS_PATH, body);
+        body.withArray(FinanceFields.CARD_PLANS)
+            .addObject()
+            .put(FinanceFields.CARD_ID, id)
+            .put(FinanceFields.PLANNED_PAYMENT_DAY, 31);
+        reject(FinanceHttp.PATCH, FinancePaths.SETTINGS_PATH, body);
     }
 
     /**
      * 빈 카드 배열은 명시한 카드가 없다는 뜻이며 급여 PATCH나 기존 카드 설정을 지우지 않는다.
      * @created 2026-10-29
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void allowsEmptyCardPatchList() {
         ObjectNode salaryOnly = salary();
-        salaryOnly.putArray("cardPlans");
-        FinancialInput.validate("PATCH", "/settings", salaryOnly);
+        salaryOnly.putArray(FinanceFields.CARD_PLANS);
+        FinancialInput.validate(FinanceHttp.PATCH, FinancePaths.SETTINGS_PATH, salaryOnly);
         ObjectNode emptyCards = context();
-        emptyCards.putArray("cardPlans");
-        FinancialInput.validate("PATCH", "/settings", emptyCards);
-        reject("PATCH", "/settings", context().putNull("cardPlans"));
+        emptyCards.putArray(FinanceFields.CARD_PLANS);
+        FinancialInput.validate(FinanceHttp.PATCH, FinancePaths.SETTINGS_PATH, emptyCards);
+        reject(
+            FinanceHttp.PATCH,
+            FinancePaths.SETTINGS_PATH,
+            context().putNull(FinanceFields.CARD_PLANS)
+        );
     }
 
     /**
      * 동일성 검증용 원본 요청의 배열 순서와 공백을 변경하지 않는다.
      * @created 2026-10-29
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void keepsOriginalRequest() {
         ObjectNode body = context();
-        body.putArray("institutionCodes").add("bank.b").add("bank.a");
+        body.putArray(FinanceFields.INSTITUTION_CODES)
+            .add("bank.b")
+            .add("bank.a");
         String before = body.toString();
-        FinancialInput.validate("POST", "/institution-links", body);
+        FinancialInput.validate(FinanceHttp.POST, FinancePaths.INSTITUTION_LINKS_PATH, body);
         assertEquals(before, body.toString());
     }
 
@@ -227,20 +316,24 @@ class FinancialInputTest {
      * 다른 테스트에 종속되지 않는 유효 금융 W를 만든다.
      * @created 2026-10-29
      * @usedBy FinancialInputTest
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     private ObjectNode context() {
-        return mapper.createObjectNode().put("expectedDataVersion", "1").put("ruleVersion", "test-rule")
-            .put("idempotencyKey", UUID.randomUUID().toString());
+        return mapper.createObjectNode()
+            .put(FinanceFields.EXPECTED_DATA_VERSION, "1")
+            .put(FinanceFields.RULE_VERSION, "test-rule")
+            .put(FinanceFields.IDEMPOTENCY_KEY, UUID.randomUUID().toString());
     }
 
     /**
      * 급여 날짜만 바꾸는 최소 요청을 만든다.
      * @created 2026-10-29
      * @usedBy FinancialInputTest
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     private ObjectNode salary() {
         ObjectNode body = context();
-        body.putObject("salary").put("salaryDay", 25);
+        body.putObject(FinanceFields.SALARY).put(FinanceFields.SALARY_DAY, 25);
         return body;
     }
 
@@ -248,20 +341,28 @@ class FinancialInputTest {
      * 원천 DB와 무관한 단건 의무 형식 자료를 만든다.
      * @created 2026-10-29
      * @usedBy FinancialInputTest
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     private ObjectNode obligation() {
-        return context().put("label", "월세").put("withdrawalAccountId", UUID.randomUUID().toString())
-            .put("amountKRW", 300000).put("dueDate", "2026-10-29");
+        return context()
+            .put(FinanceFields.LABEL, "월세")
+            .put(FinanceFields.WITHDRAWAL_ACCOUNT_ID, UUID.randomUUID().toString())
+            .put(FinanceFields.AMOUNT_KRW, 300000)
+            .put(FinanceFields.DUE_DATE, "2026-10-29");
     }
 
     /**
      * 세 배정 배열이 명시된 최소 보호 요청을 만든다.
      * @created 2026-10-29
      * @usedBy FinancialInputTest
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     private ObjectNode reserve() {
-        ObjectNode body = context().put("accountId", UUID.randomUUID().toString()).put("label", "비상금").put("amountKRW", 100);
-        ObjectNode changes = body.putObject("allocationChanges");
+        ObjectNode body = context()
+            .put(FinanceFields.ACCOUNT_ID, UUID.randomUUID().toString())
+            .put(FinanceFields.LABEL, "비상금")
+            .put(FinanceFields.AMOUNT_KRW, 100);
+        ObjectNode changes = body.putObject(FinanceFields.ALLOCATION_CHANGES);
         changes.putArray("create");
         changes.putArray("update");
         changes.putArray("remove");

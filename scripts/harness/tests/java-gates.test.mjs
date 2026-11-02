@@ -7,12 +7,12 @@ const policy = JSON.parse(fs.readFileSync(new URL('../policy.json', import.meta.
 test('API rules are mandatory for API work without imposing them on Flutter', () => {
   assert.ok(
     references({ allowedPaths: ['apps/api/'], readBefore: [] }, [], policy).includes(
-      'apps/api/src/AGENTS.md',
+      'apps/api/AGENTS.md',
     ),
   );
   assert.equal(
     references({ allowedPaths: ['apps/mobile/'], readBefore: [] }, [], policy).includes(
-      'apps/api/src/AGENTS.md',
+      'apps/api/AGENTS.md',
     ),
     false,
   );
@@ -67,4 +67,17 @@ test('AI Java changes select the API gate and AI rules without changing Flutter 
     ),
     false,
   );
+});
+
+test('legacy API reading paths resolve once without changing the task write scope', () => {
+  const task = {
+    allowedPaths: ['apps/api/AGENT.md'],
+    readBefore: ['apps/api/AGENT.md', 'apps/api/src/AGENTS.md', 'apps/api/AGENTS.md'],
+  };
+  const original = structuredClone(task);
+  const refs = references(task, [], policy);
+  assert.equal(refs.filter((ref) => ref === 'apps/api/AGENTS.md').length, 1);
+  assert.ok(!refs.includes('apps/api/AGENT.md'));
+  assert.ok(!refs.includes('apps/api/src/AGENTS.md'));
+  assert.deepEqual(task, original);
 });

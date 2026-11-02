@@ -1,3 +1,5 @@
+import com.payse.api.constants.ApiConfigConstants;
+import com.payse.api.constants.ApiMessageConstants;
 import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.doctree.UnknownBlockTagTree;
 import com.sun.source.tree.ClassTree;
@@ -22,9 +24,11 @@ import javax.tools.ToolProvider;
  * @modified 2026-10-20 - 블록 태그 전체 검증과 생성일 불명 사유 및 복수 소스 경로 검사 추가
  */
 public class VerifyApiDocs {
+
     private static final Pattern DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
     private static final Pattern UNKNOWN_CREATION = Pattern.compile("unknown\\s+-\\s+\\S[\\s\\S]*");
-    private static final Pattern MODIFICATION = Pattern.compile("(\\d{4}-\\d{2}-\\d{2})\\s+-\\s+\\S[\\s\\S]*");
+    private static final Pattern MODIFICATION = Pattern
+        .compile("(\\d{4}-\\d{2}-\\d{2})\\s+-\\s+\\S[\\s\\S]*");
 
     /**
      * 지정한 소스 경로의 타입·직접 작성한 메서드·생성자 주석을 검사한다.
@@ -34,23 +38,52 @@ public class VerifyApiDocs {
      * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      * @param args 검사할 소스 디렉터리 목록. 빌드 생성물은 전달하지 않는다.
      * @throws Exception 소스 접근 또는 JDK 구문 분석 준비에 실패한 경우
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조; 단일 제어문 본문 중괄호 명시
      */
     public static void main(String[] args) throws Exception {
-        if (args.length == 0) throw new IllegalArgumentException("Expected Java source directories");
+        if (args.length == 0) {
+            throw new IllegalArgumentException(
+                ApiMessageConstants.Tools.SOURCE_DIRECTORIES_REQUIRED
+            );
+        }
         var compiler = ToolProvider.getSystemJavaCompiler();
-        if (compiler == null) throw new IllegalStateException("JDK 21 compiler required");
+        if (compiler == null) {
+            throw new IllegalStateException(ApiMessageConstants.Tools.JDK_REQUIRED);
+        }
         List<String> errors = new ArrayList<>();
         List<Path> paths = new ArrayList<>();
         for (String argument : args) {
             try (var stream = Files.walk(Path.of(argument))) {
-                paths.addAll(stream.filter(path -> path.toString().endsWith(".java")).toList());
+                paths.addAll(
+                    stream
+                        .filter(
+                            path -> path.toString()
+                                .endsWith(ApiConfigConstants.Tools.JAVA_EXTENSION)
+                        )
+                        .toList()
+                );
             }
         }
-        if (paths.isEmpty()) throw new IllegalStateException("No API Java source");
-        paths = paths.stream().map(path -> path.toAbsolutePath().normalize()).distinct().sorted().toList();
-        try (var fileManager = compiler.getStandardFileManager(null, null, java.nio.charset.StandardCharsets.UTF_8)) {
+        if (paths.isEmpty()) {
+            throw new IllegalStateException(ApiMessageConstants.Tools.SOURCE_NOT_FOUND);
+        }
+        paths = paths.stream()
+            .map(path -> path.toAbsolutePath().normalize())
+            .distinct()
+            .sorted()
+            .toList();
+        try (var fileManager = compiler
+            .getStandardFileManager(null, null, java.nio.charset.StandardCharsets.UTF_8)) {
             var units = fileManager.getJavaFileObjectsFromPaths(paths);
-            var task = (JavacTask) compiler.getTask(null, fileManager, null, List.of("-proc:none"), null, units);
+            var task = (JavacTask) compiler.getTask(
+                null,
+                fileManager,
+                null,
+                List.of(ApiConfigConstants.Tools.NO_PROCESSORS),
+                null,
+                units
+            );
             var trees = DocTrees.instance(task);
             for (CompilationUnitTree unit : task.parse()) {
                 new TreePathScanner<Void, Void>() {
@@ -74,9 +107,15 @@ public class VerifyApiDocs {
                      * @param node 클래스·인터페이스·enum·record·annotation 선언
                      * @param ignored 사용하지 않는 순회 상태
                      * @return 부모 순회기의 처리 결과
+                     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
                      */
-                    @Override public Void visitClass(ClassTree node, Void ignored) {
-                        if (!node.getSimpleName().toString().isEmpty()) inspect(node.getSimpleName().toString());
+                    @Override
+                    public Void visitClass(ClassTree node, Void ignored) {
+                        if (!node.getSimpleName()
+                            .toString()
+                            .isEmpty()) {
+                            inspect(node.getSimpleName().toString());
+                        }
                         return super.visitClass(node, ignored);
                     }
 
@@ -88,7 +127,8 @@ public class VerifyApiDocs {
                      * @param ignored 사용하지 않는 순회 상태
                      * @return 부모 순회기의 처리 결과
                      */
-                    @Override public Void visitMethod(MethodTree node, Void ignored) {
+                    @Override
+                    public Void visitMethod(MethodTree node, Void ignored) {
                         inspect(node.getName().toString());
                         return super.visitMethod(node, ignored);
                     }
@@ -99,7 +139,8 @@ public class VerifyApiDocs {
             errors.forEach(System.err::println);
             System.exit(1);
         }
-        System.out.println("PASS: API Java purpose/created/usedBy and supplied modified-date format");
+        System.out
+            .println("PASS: API Java purpose/created/usedBy and supplied modified-date format");
     }
 
     /**
@@ -110,42 +151,54 @@ public class VerifyApiDocs {
      * @param doc 현재 선언의 Javadoc 또는 null
      * @param location 오류를 표시할 파일과 선언 이름
      * @param errors 발견한 형식 오류를 추가할 목록
+     * @modified 2026-11-02 - 긴 식 지역변수 분리
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조; 단일 제어문 본문 중괄호 명시
      */
     private static void validate(DocCommentTree doc, String location, List<String> errors) {
-        if (doc == null || doc.getFullBody().stream().map(Object::toString).collect(Collectors.joining()).isBlank()) {
-            errors.add(location + " missing purpose/Javadoc");
+        String purpose = doc == null ? ""
+            : doc.getFullBody()
+                .stream()
+                .map(Object::toString)
+                .collect(Collectors.joining());
+        if (purpose.isBlank()) {
+            errors.add(location + ApiMessageConstants.Tools.MISSING_JAVADOC);
             return;
         }
-        List<String> createdTags = tagValues(doc, "created");
+        List<String> createdTags = tagValues(doc, ApiConfigConstants.Tools.CREATED);
         LocalDate createdDate = null;
         if (createdTags.size() != 1) {
-            errors.add(location + " expected exactly one @created");
+            errors.add(location + ApiMessageConstants.Tools.INVALID_CREATED_TAG);
         } else if (!UNKNOWN_CREATION.matcher(createdTags.getFirst()).matches()) {
             String value = createdTags.getFirst();
             try {
-                if (!DATE.matcher(value).matches()) throw new IllegalArgumentException("Invalid date format");
+                if (!DATE.matcher(value).matches()) {
+                    throw new IllegalArgumentException(
+                        ApiMessageConstants.Tools.INVALID_DATE_FORMAT
+                    );
+                }
                 createdDate = LocalDate.parse(value);
             } catch (RuntimeException ex) {
-                errors.add(location + " invalid @created date or unknown reason");
+                errors.add(location + ApiMessageConstants.Tools.INVALID_CREATED_DATE);
             }
         }
-        List<String> usages = tagValues(doc, "usedBy");
+        List<String> usages = tagValues(doc, ApiConfigConstants.Tools.USED_BY);
         if (usages.isEmpty() || usages.stream().anyMatch(String::isBlank)) {
-            errors.add(location + " missing or empty @usedBy");
+            errors.add(location + ApiMessageConstants.Tools.INVALID_USED_BY_TAG);
         }
-        for (String value : tagValues(doc, "modified")) {
+        for (String value : tagValues(doc, ApiConfigConstants.Tools.MODIFIED)) {
             var match = MODIFICATION.matcher(value);
             if (!match.matches()) {
-                errors.add(location + " invalid @modified date/reason");
+                errors.add(location + ApiMessageConstants.Tools.INVALID_MODIFIED_TAG);
                 continue;
             }
             try {
                 LocalDate date = LocalDate.parse(match.group(1));
                 if (createdDate != null && date.isBefore(createdDate)) {
-                    errors.add(location + " modification precedes creation");
+                    errors.add(location + ApiMessageConstants.Tools.MODIFIED_BEFORE_CREATION);
                 }
             } catch (RuntimeException ex) {
-                errors.add(location + " invalid modification date");
+                errors.add(location + ApiMessageConstants.Tools.INVALID_MODIFIED_DATE);
             }
         }
     }
@@ -157,13 +210,23 @@ public class VerifyApiDocs {
      * @param doc 읽을 선언의 Javadoc
      * @param tagName created·usedBy·modified 중 필요한 태그 이름
      * @return 각 블록 태그의 앞뒤 공백을 제거한 본문. 빈 본문도 빈 문자열로 보존한다.
+     * @modified 2026-11-02 - 긴 식 지역변수 분리
      */
     private static List<String> tagValues(DocCommentTree doc, String tagName) {
-        return doc.getBlockTags().stream()
+        return doc.getBlockTags()
+            .stream()
             .filter(UnknownBlockTagTree.class::isInstance)
             .map(UnknownBlockTagTree.class::cast)
             .filter(tag -> tag.getTagName().equals(tagName))
-            .map(tag -> tag.getContent().stream().map(Object::toString).collect(Collectors.joining()).strip())
+            .map(
+                tag -> {
+                    String content = tag.getContent()
+                        .stream()
+                        .map(Object::toString)
+                        .collect(Collectors.joining());
+                    return content.strip();
+                }
+            )
             .toList();
     }
 }
