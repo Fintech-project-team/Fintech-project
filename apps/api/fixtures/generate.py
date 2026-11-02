@@ -437,17 +437,21 @@ def build() -> tuple[dict, dict, dict]:
     )
     # 2026-11-02: B 생활 흐름 사례(beta-life·gamma-life). 기준 시각 11/5의 골격에서 새로 만들며 엣지 사례 정답 라벨은 expected에만 둔다.
     from edge_life_cases import AS_OF, bump, make_beta_life, make_gamma_life
-    # Flutter 기대값: 베타는 10월 회차가 확인돼 계산되고(예정 지출 없음), 감마는 이번 회차(10월) 입금 근거가 없어 E·U 정보 부족이다.
+    # Flutter 기대값: 베타는 10월 회차가 확인돼 계산되고(예정 지출 없음), 감마는 마이데이터 원천만 있어 계산 포함 계좌·월급일이 없다.
+    # 감마는 연결 뒤 계좌 선택·월급 설정을 해도 이번 회차(10/15) 입금 확인 기록이 없어 E·U 정보 부족이다(그 입금은 대출금, G14).
     edge_expected = {'beta-life': {'b': 4924500, 'e': 0, 'r': 0, 'o': 0, 'u': 4924500, 'insufficient': []},
-                     'gamma-life': {'b': 7791550, 'e': None, 'r': 0, 'o': None, 'u': None,
-                                    'insufficient': ['receiptEvidenceAbsent']}}
+                     'gamma-life': {'b': None, 'e': None, 'r': 0, 'o': None, 'u': None,
+                                    'insufficient': ['noIncludedAccount', 'salaryDayMissing'],
+                                    'afterSetup': {'includedAccounts': ['주거래 통장'], 'salaryDay': 15,
+                                                   'salaryAmountKRW': 2850000, 'b': 7791550,
+                                                   'insufficient': ['receiptEvidenceAbsent']}}}
     for name, maker, alias, goal in (
             ('beta-life', make_beta_life, 'beta',
              '생활 흐름 시연(B 작성): 비정기 현금 흐름. 급여·경비·상여 동시 입금, 큰 일괄 입금, 부수입·가족 입금·환불·분할 납부'),
             ('gamma-life', make_gamma_life, 'gamma',
              '생활 흐름 시연(B 작성): 급여 회차 해석. 표시값 변형·이른/늦은 입금·분할 지급·대출금을 월급처럼 보이는 이번 회차')):
         snapshot, labels = maker(make_snapshot(alias, AS_OF))
-        snapshot = bump(snapshot)
+        snapshot = bump(snapshot, alias)
         add_case(name, snapshot, goal, {
             'transactionCount': len(snapshot['transactions']),
             'flutterExpected': edge_expected[name],
