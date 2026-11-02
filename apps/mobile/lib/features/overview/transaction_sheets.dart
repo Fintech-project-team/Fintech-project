@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../data/financial_snapshot.dart';
+import '../../data/statement_relations.dart';
+import '../../shared/design/amount_format.dart';
 import '../../shared/design/payse_tokens.dart';
 import '../connection/connection_review.dart';
+import '../planning/card_bill_screen.dart';
 import 'transaction_query.dart';
 import 'transaction_rules.dart';
 import 'transactions_screen.dart' show amountColor;
@@ -27,14 +30,23 @@ Future<T?> showPayseSheet<T>(BuildContext context, Widget child) =>
     );
 
 /// 2026-10-30: 선택 시트 틀. 손잡이·제목·닫기 → 본문(스크롤) → 보조 문구 → 고정 '적용'. 닫으면 null(기존 조건 유지).
-class _SelectSheet extends StatelessWidget {
-  const _SelectSheet({
+class SelectSheet extends StatelessWidget {
+  /// 2026-10-30: 제목 [title], 본문 [children], 적용 [onApply](null이면 비활성), 적용 위 문구 [note]와 오류 색 여부
+  /// [noteIsError]로 만든다. [header]는 제목 아래 고정 영역(본문과 함께 스크롤하지 않음)이다.
+  const SelectSheet({
     required this.title,
     required this.children,
     required this.onApply,
     this.note,
     this.noteIsError = false,
+    this.header,
+    super.key,
   });
+
+  final Widget? header;
+
+  /// 2026-11-02: 본문 끝과 적용 위 선 사이 여백. 기기 하단 안전 영역과 무관하게 같다.
+  static const double bottomGap = PayseSpace.x6;
 
   final String title;
   final List<Widget> children;
@@ -86,11 +98,15 @@ class _SelectSheet extends StatelessWidget {
             ],
           ),
         ),
+        ?header,
         Flexible(
           child: ListView(
             shrinkWrap: true,
-            padding: const EdgeInsets.symmetric(
-              horizontal: PayseSpace.screenHorizontal,
+            padding: const EdgeInsets.fromLTRB(
+              PayseSpace.screenHorizontal,
+              0,
+              PayseSpace.screenHorizontal,
+              bottomGap,
             ),
             children: children,
           ),
@@ -145,14 +161,18 @@ class _SelectSheet extends StatelessWidget {
 }
 
 /// 2026-10-30: 라디오 줄(최소 56dp).
-class _RadioRow extends StatelessWidget {
-  const _RadioRow({
+class RadioRow extends StatelessWidget {
+  /// 2026-10-30: 문구 [label], 선택 [selected], 누르기 [onTap]으로 만든다.
+  /// 2026-11-02: [caption]은 문구 아래 보조 줄(계획 탭 월급 기간 위치)이다.
+  const RadioRow({
     required this.label,
     required this.selected,
     required this.onTap,
+    this.caption,
     super.key,
   });
 
+  final String? caption;
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -181,13 +201,22 @@ class _RadioRow extends StatelessWidget {
               ),
               const SizedBox(width: PayseSpace.x3),
               Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                    color: PayseColors.textPrimary,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        color: PayseColors.textPrimary,
+                      ),
+                    ),
+                    if (caption case final caption?)
+                      Text(caption, style: PayseTypography.caption),
+                  ],
                 ),
               ),
             ],
@@ -231,13 +260,13 @@ class _PeriodSheetState extends State<PeriodSheet> {
               ? PeriodSelection.thisMonth
               : PeriodSelection(PeriodKind.month, month: _month))
         : _sel;
-    return _SelectSheet(
+    return SelectSheet(
       title: '기간 선택',
       note: '조회 기간 ${widget.bounds.rangeText(effective)}',
       onApply: () => Navigator.of(context).pop(effective),
       children: [
         if (widget.inherited case final inherited?)
-          _RadioRow(
+          RadioRow(
             key: const ValueKey('period-cycle'),
             label: inherited.name,
             selected: _sel == inherited,
@@ -245,7 +274,7 @@ class _PeriodSheetState extends State<PeriodSheet> {
           ),
         for (final kind in PeriodKind.values)
           if (kind != PeriodKind.cycle)
-            _RadioRow(
+            RadioRow(
               key: ValueKey('period-${kind.name}'),
               label: PeriodSelection(kind).name,
               selected: _sel.kind == kind,
@@ -279,6 +308,7 @@ class _PeriodSheetState extends State<PeriodSheet> {
             GridView.count(
               crossAxisCount: 4,
               shrinkWrap: true,
+              padding: EdgeInsets.zero,
               physics: const NeverScrollableScrollPhysics(),
               mainAxisSpacing: PayseSpace.x2,
               crossAxisSpacing: PayseSpace.x2,
@@ -554,7 +584,7 @@ class _MeansSheetState extends State<MeansSheet> {
         );
       }
     }
-    return _SelectSheet(
+    return SelectSheet(
       title: '거래 수단 선택',
       note: count == 0 ? '거래 수단을 1개 이상 골라 주세요' : '$count개 선택',
       noteIsError: count == 0,
@@ -592,12 +622,12 @@ class _TypeSheetState extends State<TypeSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return _SelectSheet(
+    return SelectSheet(
       title: widget.title,
       onApply: () => Navigator.of(context).pop((value: _sel)),
       children: [
         for (final (type, label) in widget.options)
-          _RadioRow(
+          RadioRow(
             key: ValueKey('type-${type?.name ?? 'all'}'),
             label: label,
             selected: _sel == type,
@@ -612,11 +642,13 @@ class _TypeSheetState extends State<TypeSheet> {
 class TransactionDetailSheet extends StatelessWidget {
   /// 2026-10-30: [snapshot]의 거래 [transaction]과 확보한 원거래 [original]로 만든다.
   /// 2026-11-01: 근거 있는 내 계좌 이체의 상대 거래 [peer]를 더했다.
+  /// 2026-11-02: [transactions]는 받은 거래 전체(같은 자료 버전)이며 카드 결제 상세에서 청구 항목의 거래를 찾는 데 쓴다.
   const TransactionDetailSheet({
     required this.snapshot,
     required this.transaction,
     this.original,
     this.peer,
+    this.transactions = const [],
     super.key,
   });
 
@@ -624,11 +656,88 @@ class TransactionDetailSheet extends StatelessWidget {
   final SourceTransaction transaction;
   final SourceTransaction? original;
   final SourceTransaction? peer;
+  final List<SourceTransaction> transactions;
+
+  /// 2026-11-02: 시트를 닫고 청구 [statementId]의 카드 결제 상세를 연다. 뒤로 가면 시트를 열었던 목록으로 돌아간다.
+  void _openBill(BuildContext context, String statementId) {
+    Navigator.of(context)
+      ..pop()
+      ..push(
+        MaterialPageRoute<void>(
+          builder: (_) => CardBillScreen(
+            snapshot: snapshot,
+            statementId: statementId,
+            transactions: transactions,
+          ),
+        ),
+      );
+  }
+
+  /// 2026-11-02: 거래 상세의 청구 연결(T6). 카드 기록은 그 거래를 포함한 청구 전부('포함된 청구'), 계좌 출금은 유효 정산 →
+  /// 예정 지출 → 청구가 이어질 때만 '결제한 카드 대금'이다. 관계가 없으면 null, 제한 표식으로 끊겼으면 안내만 둔다.
+  Widget? _statementLinks(BuildContext context) {
+    final t = transaction;
+    final relations = StatementRelations(snapshot);
+    final List<Statement> statements;
+    final String title;
+    var restricted = false;
+    if (!isAccountEntry(t)) {
+      statements = relations.statementsIncluding(t.transactionId);
+      title = '포함된 청구';
+    } else if (t.direction == 'out') {
+      final paid = relations.paidStatements(t.transactionId);
+      statements = paid.statements;
+      restricted = paid.restricted;
+      title = '결제한 카드 대금';
+    } else {
+      return null;
+    }
+    if (statements.isEmpty && !restricted) return null;
+    return Column(
+      key: const ValueKey('detail-statements'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(
+            top: PayseSpace.x6,
+            bottom: PayseSpace.x1,
+          ),
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: PayseColors.textSecondary,
+            ),
+          ),
+        ),
+        const Divider(height: 1, color: PayseColors.dividerSection),
+        for (final s in statements)
+          _StatementLink(
+            key: ValueKey('detail-statement-${s.statementId}'),
+            snapshot: snapshot,
+            statement: s,
+            byCard: isAccountEntry(t),
+            onTap: () => _openBill(context, s.statementId),
+          ),
+        if (restricted)
+          const Padding(
+            padding: EdgeInsets.only(top: PayseSpace.x3),
+            child: Text(
+              '연결된 청구를 확인할 수 없어요',
+              key: ValueKey('detail-statement-restricted'),
+              style: PayseTypography.caption,
+            ),
+          ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = transaction;
     final rows = detailRows(snapshot, t, original: original, peer: peer);
+    final links = _statementLinks(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -756,10 +865,86 @@ class TransactionDetailSheet extends StatelessWidget {
                     ],
                   ),
                 ),
+              ?links,
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 2026-11-02: 거래 상세의 청구 한 줄. 카드 기록에서는 결제 예정일 중심, 계좌 출금에서는 결제한 카드 중심으로 보이고 누르면
+/// 카드 결제 상세로 간다. 결제 예정일이 없으면 '결제 예정일 미확인'이며 다른 날짜로 채우지 않는다.
+class _StatementLink extends StatelessWidget {
+  /// 2026-11-02: [snapshot]의 청구 [statement], 카드 중심 표시 [byCard], 누르기 [onTap]으로 만든다.
+  const _StatementLink({
+    required this.snapshot,
+    required this.statement,
+    required this.byCard,
+    required this.onTap,
+    super.key,
+  });
+
+  final FinancialSnapshot snapshot;
+  final Statement statement;
+  final bool byCard;
+  final VoidCallback onTap;
+
+  /// 2026-11-02: 줄을 반환한다.
+  @override
+  Widget build(BuildContext context) {
+    final s = statement;
+    final card = cardById(snapshot, s.cardId);
+    final cardText = card == null
+        ? '카드 정보 없음'
+        : '${card.productName} ····${lastFour(card.maskedNumber)}';
+    final due = s.dueDate;
+    final dueText = due == null
+        ? '결제 예정일 미확인 청구'
+        : '${int.parse(due.substring(5, 7))}월 ${int.parse(due.substring(8, 10))}일 결제 청구';
+    final amount = '청구 금액 ${formatKrw(s.amountKrw)}';
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 56),
+          padding: const EdgeInsets.symmetric(vertical: PayseSpace.x3),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: PayseColors.dividerRow)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      byCard ? cardText : dueText,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 22 / 15,
+                        fontWeight: FontWeight.w600,
+                        color: PayseColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      byCard ? '$dueText · $amount' : '$cardText · $amount',
+                      style: PayseTypography.caption,
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right,
+                size: 16,
+                color: PayseColors.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

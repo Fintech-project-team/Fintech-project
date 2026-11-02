@@ -83,8 +83,8 @@ String? recordTime(SourceTransaction t) {
 }
 
 /// 2026-10-30: 처리 상태 라벨. posted는 없음. 카드 기록은 approved '승인', cancelled '승인 취소'(거래 종류가 이미 승인 취소면
-/// 다시 붙이지 않음), unknown은 '처리 상태 미확인'. 계좌 내역은 posted·unknown만 제공되고 잔액 반영은 reflectionReason으로
-/// 판단한다. 계약상 허용되는 계좌 approved·cancelled가 오면 오류로 보지 않고 라벨을 붙이지 않는다.
+/// 다시 붙이지 않음), unknown은 '처리 상태 미확인'. 계좌 내역은 계약상 posted·unknown뿐이며(그 밖은 파싱에서 형식 오류)
+/// 잔액 반영은 reflectionReason으로 판단한다.
 String? statusLabel(SourceTransaction t) {
   if (t.status == 'unknown') return '처리 상태 미확인';
   if (isAccountEntry(t)) return null;
