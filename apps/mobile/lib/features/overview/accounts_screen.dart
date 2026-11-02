@@ -163,20 +163,27 @@ class AccountsScreen extends StatelessWidget {
         scrollKey: const ValueKey('accounts-list'),
         onRefresh: onRefresh,
         slivers: [
+          const SliverToBoxAdapter(
+            child: TabPurpose(
+              key: ValueKey('accounts-purpose'),
+              icon: Icons.account_balance_outlined,
+              title: '계산할 계좌 관리',
+              description: '계산에 쓸 계좌를 바꾸고 연결 정보를 확인해요.',
+            ),
+          ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(
               PayseSpace.screenHorizontal,
-              tabTopGap,
+              PayseSpace.x4,
               PayseSpace.screenHorizontal,
               PayseSpace.x6,
             ),
             sliver: SliverList.list(
               children: [
                 const TabScope('계산에 포함한 계좌 잔액'),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    minHeight: tabKeyLineHeight,
-                  ),
+                // 2026-11-02: 잔액 라벨과 금액을 한 덩어리로 붙인다(목적 안내가 위에 생겨 거래 탭과의 줄 맞춤 높이는 쓰지 않음).
+                Padding(
+                  padding: const EdgeInsets.only(top: PayseSpace.x1),
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: b == null
