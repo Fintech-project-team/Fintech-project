@@ -10,8 +10,8 @@ import 'package:payse_calculation/payse_calculation.dart'
     show InsufficientReason;
 
 /// 2026-11-02: 데모베타·데모감마 생활 흐름(beta-life·gamma-life, 기준 시각 11/5) 앱 사본을 계산 패키지로 읽은 결과가
-/// 생성기 catalog의 Flutter 기대값과 같은지 확인한다. 베타는 10월 회차까지 확인돼 계산되고, 감마는 이번 회차(10월)
-/// 입금 근거가 없다(앱에는 아직 회차 확인을 저장하는 기능이 없어 데이터로 정한다).
+/// 생성기 catalog의 Flutter 기대값과 같은지 확인한다. 베타는 10월 회차까지 확인돼 계산된다(앱에는 아직 회차 확인을
+/// 저장하는 기능이 없어 데이터로 정한다). 감마는 마이데이터로 받을 수 있는 원천만 있어 설정·분류·연결 관계가 없다.
 void main() {
   /// [stem] 앱 사본 JSON을 읽는다.
   Map<String, Object?> read(String stem) =>
@@ -73,23 +73,58 @@ void main() {
     expect(result.u, 4924500);
   });
 
-  test(
-    'gamma-life waits for this cycle receipt: B 7,791,550, E·U insufficient',
-    () {
-      final json = read('gamma-life');
-      expect(json['asOf'], '2026-11-05T12:00:00+09:00');
-      final result = calculate(json).result;
-      expect(result.b, 7791550);
-      expect(result.r, 0);
-      expect(result.e, isNull);
-      expect(result.u, isNull);
-      expect(result.insufficient, [InsufficientReason.receiptEvidenceAbsent]);
-    },
-  );
+  /// 감마 원천에 연결 뒤 사용자가 할 설정(주거래 통장 선택, 월급 15일·2,850,000원)을 더한 사본을 반환한다.
+  Map<String, Object?> gammaAfterSetup() {
+    final json = read('gamma-life');
+    final main = (json['accounts']! as List).cast<Map>().singleWhere(
+      (a) => a['productName'] == '주거래 통장',
+    );
+    main['included'] = true;
+    final salary = (json['settings']! as Map)['salary']! as Map;
+    salary['salaryDay'] = 15;
+    salary['salaryAmountKRW'] = 2850000;
+    salary['salaryAccountId'] = main['accountId'];
+    return json;
+  }
+
+  test('gamma-life keeps only source data: no settings, types, links', () {
+    final json = read('gamma-life');
+    expect(json['asOf'], '2026-11-05T12:00:00+09:00');
+    final salary = (json['settings']! as Map)['salary']! as Map;
+    expect(salary['salaryDay'], isNull);
+    expect(salary['salaryAmountKRW'], isNull);
+    expect(salary['salaryAccountId'], isNull);
+    expect(salary['receiptEvidence'], isEmpty);
+    expect(
+      (json['accounts']! as List).every((a) => a['included'] == false),
+      isTrue,
+    );
+    expect(json['transactionRelations'], isEmpty);
+    expect(
+      (json['transactions']! as List).every(
+        (t) => t['payseTransactionType'] == null,
+      ),
+      isTrue,
+    );
+    final result = calculate(json).result;
+    expect(result.b, isNull);
+    expect(result.insufficient, [
+      InsufficientReason.noIncludedAccount,
+      InsufficientReason.salaryDayMissing,
+    ]);
+  });
+
+  test('gamma-life after setup still waits for the 10/15 receipt', () {
+    final result = calculate(gammaAfterSetup()).result;
+    expect(result.b, 7791550);
+    expect(result.e, isNull);
+    expect(result.u, isNull);
+    expect(result.insufficient, [InsufficientReason.receiptEvidenceAbsent]);
+  });
 
   test('gamma-life also computes if the loan deposit is wrongly confirmed', () {
     final json = confirm(
-      read('gamma-life'),
+      gammaAfterSetup(),
       '/life/loan/2026-10',
       '2026-10',
       '2026-10-15',

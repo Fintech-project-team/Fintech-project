@@ -1162,12 +1162,19 @@
       "expected": {
         "transactionCount": 528,
         "flutterExpected": {
-          "b": 7791550,
+          "b": null,
           "e": null,
           "r": 0,
           "o": null,
           "u": null,
-          "insufficient": ["receiptEvidenceAbsent"]
+          "insufficient": ["noIncludedAccount", "salaryDayMissing"],
+          "afterSetup": {
+            "includedAccounts": ["주거래 통장"],
+            "salaryDay": 15,
+            "salaryAmountKRW": 2850000,
+            "b": 7791550,
+            "insufficient": ["receiptEvidenceAbsent"]
+          }
         },
         "edgeLabels": [
           {
