@@ -1,0 +1,34 @@
+{
+  "id": "PAYSE-GRADLE-DISCOVERY-20261102",
+  "role": "integration",
+  "baseCommit": "4a037d3ff41893ce3a88589846fd333f68646048",
+  "branch": "fix/gradle-project-discovery",
+  "allowedPaths": [
+    ".vscode/settings.json",
+    "docs/toolchain.md",
+    "apps/mobile/devtools_options.yaml"
+  ],
+  "acceptance": [
+    "Gradle 확장이 실제 빌드 루트 apps/api와 apps/mobile/android만 검색한다.",
+    "AI는 API 빌드의 :ai 모듈로 유지하고 npm 연결 경로와 백업·worktree의 중복 프로젝트를 가져오지 않는다.",
+    "Java 언어 서버를 재가져오기하여 Spring Dashboard의 API가 한 개임을 확인한다.",
+    "기존 Gradle Wrapper·잠금 파일·배포 JAR·Flutter 플러그인 모듈의 빌드 계약을 유지한다.",
+    "작업 전 존재한 미추적 apps/mobile/devtools_options.yaml은 검증 입력으로만 포함하며 수정하거나 커밋 대상으로 삼지 않는다.",
+    "공통 검사, API·AI check, Android projects와 Flutter 검사를 확인하고 미검증은 구분한다."
+  ],
+  "readBefore": [
+    "docs/development-workflow.md",
+    "docs/toolchain.md",
+    "docs/harness/AGENT_REVIEW.md",
+    "docs/harness/FLUTTER_TRANSITION.md",
+    "apps/api/AGENTS.md",
+    "apps/ai/AGENTS.md",
+    "apps/api/docs/spring-bootstrap.md"
+  ],
+  "existingChanges": [
+    {
+      "path": "apps/mobile/devtools_options.yaml",
+      "status": "untracked before task; preserve without edits"
+    }
+  ]
+}

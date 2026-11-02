@@ -38,6 +38,21 @@ Claude Code/Codex는 각자 설치·로그인한다. 스킬 파일과 승인된 
 
 Flutter SDK 버전은 `apps/mobile/flutter-toolchain.json`, 앱 pubspec, CI와 함께 유지한다. 설치된 SDK를 자동 업그레이드하지 않는다. 원격 CI 실행 결과는 로컬 검사와 별도로 확인한다.
 
+## VS Code의 Gradle 프로젝트
+
+저장소 루트를 열면 `.vscode/settings.json`의 `gradle.nestedProjects`에 지정된 두 빌드만 검색한다. npm workspace의 `node_modules` 연결 경로, `.harness` 백업, 별도 worktree를 빌드 루트로 추가하지 않는다. Java 가져오기도 같은 복사 경로를 제외한다.
+
+| 실제 빌드 루트        | 구성                                    | 실행 기준                        |
+| --------------------- | --------------------------------------- | -------------------------------- |
+| `apps/api`            | `payse-api`와 `:ai` (`apps/ai`)         | API의 Gradle Wrapper             |
+| `apps/mobile/android` | Android 루트와 `:app`, Flutter 플러그인 | Flutter의 Android Gradle Wrapper |
+
+`apps/ai`는 API의 `settings.gradle`에서 연결하는 Java 라이브러리다. 별도 빌드 루트나 Spring 실행 앱으로 가져오지 않는다. Android의 `jni`·`shared_preferences_android` 등은 Flutter가 연결한 실제 플러그인이므로 제거하지 않는다. 두 빌드는 서로 다른 Wrapper·플러그인 구성을 유지한다.
+
+Gradle 확장의 빌드 폴더 행과 그 아래 루트 프로젝트 행은 같은 빌드의 표현이다. 동일한 실제 경로가 여러 빌드로 나타나는 것과 구분한다. [Gradle 확장](https://github.com/microsoft/vscode-gradle#project-discovery)의 검색 설정과 Java 가져오기 제외 설정은 별개이므로 둘을 함께 유지한다.
+
+이 설정 전에 백업이나 연결 경로를 가져왔다면 명령 팔레트의 `Java: Clean Java Language Server Workspace`로 기존 등록을 초기화하고 창을 다시 로드한다. 필요하면 `Gradle: Refresh Gradle Projects`를 실행한다. Java 가져오기가 끝난 뒤 Gradle 빌드 루트 두 개와 Spring 실행 앱 한 개를 확인한다. 소스·백업·npm 연결이나 전체 Gradle 캐시를 삭제하는 절차가 아니다. 새 독립 빌드가 생기면 검색 목록과 이 표를 함께 갱신한다.
+
 ## API Java 준비
 
 API 개발자는 JDK 21을 준비한다. `node scripts/harness/run-api.mjs check`로 실제 Java 검사와 실행 JAR 생성을 확인한다. 기존 Node/npm은 공통 검사에 유지한다. Flutter만 개발하는 팀원에게 JDK 21 설치나 모바일 SDK 변경을 요구하지 않는다. Java 프레임워크 선택으로 PostgreSQL 운영 버전·LLM SDK·배포 환경을 확정하지 않는다.
