@@ -19,7 +19,8 @@ from life_cases import months, on, won
 
 NAMESPACE = UUID('bdc76ac7-c7c9-4a66-8b3d-7fd0ef7bdb6b')
 AS_OF = '2026-11-05T12:00:00+09:00'
-SOURCE_SUFFIX = ':life-1'
+# 원천 버전 꼬리표. 감마 life-2: 마이데이터로 받을 수 있는 원천만 남김(설정·분류·연결 관계 없음)
+SOURCE_SUFFIX = {'beta': ':life-1', 'gamma': ':life-2'}
 EMPTY = ('statements', 'obligations', 'reserves', 'allocations', 'settlements', 'recurringPlans',
          'recurringDecisions', 'recurringPlanRevisions', 'occurrenceOverrides', 'relatedTransactions',
          'referenceResolutions', 'occurrenceLinks')
@@ -337,6 +338,8 @@ def make_gamma_life(gamma):
     """데모감마(gamma-life): 월급 15일·2,850,000원 예상, 생활비·이체·급여가 섞인 주거래 계좌 하나.
 
     이번 회차(10/15)에는 '입금' 2,850,000원(정답: 대출금)만 있고 월급은 아직 없다(G14).
+    2026-11-02: 금융사 연결 직후 LLM 분석을 시험하려고 마이데이터로 받을 수 있는 원천만 남긴다(as_source_only).
+    월급 설정·확인 기록·계산 포함 선택·거래 분류·거래 연결 관계는 비우며, 월급일·금액은 정답 라벨로만 남는다.
     """
     s = copy.deepcopy(gamma)
     accounts, cards = ids(s)
@@ -416,10 +419,23 @@ def make_gamma_life(gamma):
         included={'입출금 통장'},
         salary={'salaryDay': 15, 'salaryAmountKRW': 2850000, 'salaryAccountId': main},
         confirmed=[('2026-09', '2026-09-15', september)])
-    return s, L.labels
+    return as_source_only(s), L.labels
 
 
-def bump(snapshot):
-    """원천 버전 끝에 SOURCE_SUFFIX를 붙인다(스냅샷·페이지·각 행)."""
+def as_source_only(snapshot):
+    """금융사가 주는 원천만 남긴다. PAYSE·LLM·사용자가 정하는 값(거래 분류, 체크카드 짝·내 계좌 이체 연결,
+    월급 설정·입금 확인 기록, 계산 포함 계좌 선택)을 비운다. 거래·잔액·카드 결제 계좌·청구 일정·할부 회차·원거래 연결은 둔다."""
+    for row in snapshot['transactions']:
+        row['payseTransactionType'] = None
+    snapshot['transactionRelations'] = []
+    for account in snapshot['accounts']:
+        account['included'] = False
+    snapshot['settings'] = {'salary': {'salaryDay': None, 'salaryAmountKRW': None, 'salaryAccountId': None,
+                                       'receiptEvidence': []}, 'cardPlans': []}
+    return snapshot
+
+
+def bump(snapshot, alias):
+    """원천 버전 끝에 사람별 SOURCE_SUFFIX를 붙인다(스냅샷·페이지·각 행)."""
     from life_cases import bump_source_version
-    return bump_source_version(snapshot, SOURCE_SUFFIX)
+    return bump_source_version(snapshot, SOURCE_SUFFIX[alias])

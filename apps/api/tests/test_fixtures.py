@@ -78,7 +78,7 @@ class FixtureTests(unittest.TestCase):
         """2026-10-28: 원천 개정이 사용자 계획명이나 과거 승인 버전을 덮지 않는다. 사용: unittest.
 
         2026-10-30: 거래명 정리 뒤 생활 흐름을 더한 demo-life는 ':labels-1:life-2'로 끝난다.
-        2026-11-02: 기준 시각 11/5 골격에서 새로 만든 beta-life·gamma-life는 ':base:life-1'로 끝난다.
+        2026-11-02: 기준 시각 11/5 골격에서 새로 만든 beta-life는 ':base:life-1', 원천만 남긴 gamma-life는 ':base:life-2'로 끝난다.
         """
         for name, snapshot in self.cases.items():
             for revision in snapshot.get('recurringPlanRevisions', []):
@@ -87,7 +87,7 @@ class FixtureTests(unittest.TestCase):
                 self.assertFalse(decision['sourceVersion'].endswith(':labels-1'))
             if 'transactions' in snapshot:
                 suffix = {'demo-life': ':labels-1:life-2', 'beta-life': ':base:life-1',
-                          'gamma-life': ':base:life-1'}.get(name, ':labels-1')
+                          'gamma-life': ':base:life-2'}.get(name, ':labels-1')
                 self.assertTrue(snapshot['sourceVersion'].endswith(suffix))
 
     def test_unknown_source_requires_authoring(self):
