@@ -1,5 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 실제 PAYSE 서버(HTTPS) 연결. release 검증에 필요하다. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 세션·PIN 암호문과 기기 인증서 설정이 다른 기기로 백업·복원되지 않게 한다(Keystore 키는 옮겨지지 않음).
+         allowBackup=false는 Android 11 이하 백업과 12+ 클라우드 백업을, dataExtractionRules는 12+ 기기 간 이전까지 막는다. -->
     <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:label="PAYSE"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
