@@ -479,6 +479,26 @@ void main() {
     for (final a in rows(json, 'accounts')) {
       a['asOf'] = '2026-09-26T12:00:00+09:00';
     }
+    // 기준 시각을 앞당긴 사본이므로 그 뒤에 일어난 원천 거래와 그 거래의 정산은 뺀다(asOf 이후 원천 날짜는 계약 위반).
+    bool after(Object? t) =>
+        [
+          'purchaseDate',
+          'bookingDate',
+          'withdrawalDate',
+          'refundDate',
+          'cancellationDate',
+        ].any((k) {
+          final date = (t! as Map)[k];
+          return date is String && date.compareTo('2026-09-26') > 0;
+        });
+    final transactions = json['transactions']! as List;
+    final removed = {
+      for (final t in transactions.where(after)) (t! as Map)['transactionId'],
+    };
+    transactions.removeWhere(after);
+    (json['settlements']! as List).removeWhere(
+      (l) => removed.contains((l! as Map)['transactionId']),
+    );
     final calculation = computeHomeCalculation(
       FinancialSnapshot.fromJson(json),
     );

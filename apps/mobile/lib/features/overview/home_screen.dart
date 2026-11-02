@@ -177,7 +177,7 @@ class _HomeReady extends StatelessWidget {
         : salaryNoticeOf(calculation.snapshot, result);
     final control = this.salaryNotice;
     final folded =
-        salaryNotice != null && control?.foldedKey == salaryNotice.key;
+        salaryNotice != null && (control?.isFolded(salaryNotice) ?? false);
     final waiting =
         result.placementTotals?[calc.ObligationPlacement.awaitingSalary];
 
@@ -319,7 +319,7 @@ class _HomeReady extends StatelessWidget {
                         Padding(
                           padding: const EdgeInsets.only(top: PayseSpace.x1),
                           child: SalaryNoticeFolded(
-                            onOpen: () => control?.onFoldedKey(null),
+                            onOpen: () => control?.onOpen(salaryNotice),
                           ),
                         ),
                       ),
@@ -332,7 +332,7 @@ class _HomeReady extends StatelessWidget {
                         key: const ValueKey('home-salary-notice'),
                         notice: salaryNotice,
                         onEdit: control?.onEdit,
-                        onLater: () => control?.onFoldedKey(salaryNotice.key),
+                        onLater: () => control?.onFold(salaryNotice),
                       ),
                     ),
                   ],

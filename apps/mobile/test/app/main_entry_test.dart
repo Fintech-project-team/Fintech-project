@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:payse/app/main_entry.dart';
+import 'package:payse/data/salary_notice_api.dart';
 import 'package:payse/data/connection/financial_api.dart';
 import 'package:payse/features/connection/connection_presentation_policy.dart';
 import 'package:payse/shared/design/payse_theme.dart';
@@ -29,6 +30,7 @@ Future<void> pumpEntry(
   VoidCallback? onSessionInvalid,
   bool settle = true,
   ConnectionPresentationPolicy? policy,
+  SalaryNoticeApi? salaryNoticeApi,
 }) async {
   tester.view.physicalSize = const Size(1170, 2532);
   tester.view.devicePixelRatio = 3;
@@ -42,6 +44,7 @@ Future<void> pumpEntry(
         reloadKey: 0,
         devEntryBuilder: (_) => null,
         onSessionInvalid: onSessionInvalid ?? () {},
+        salaryNoticeApi: salaryNoticeApi,
       ),
     ),
   );
@@ -475,4 +478,48 @@ void main() {
       expect(find.text('다시 시도'), findsOneWidget, reason: '다시 시도는 띠 하나에만');
     },
   );
+
+  testWidgets(
+    'salary notice: fold, peek on this screen only, folded again after leaving the tab',
+    (tester) async {
+      final repo = _CountingRepository()
+        ..loadResults.addAll([FinancialOk(_homeJson())]);
+      final api = _RecordingNoticeApi();
+      await pumpEntry(tester, repo, salaryNoticeApi: api);
+      expect(find.byKey(const ValueKey('home-salary-notice')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('salary-notice-later')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('home-salary-notice')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('salary-notice-open')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('home-salary-notice')), findsOneWidget);
+
+      await tester.tap(find.text('계좌·카드'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('홈'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('home-salary-notice')),
+        findsNothing,
+        reason: '다시 펼치기는 이 화면에서만',
+      );
+    },
+  );
+}
+
+/// 2026-11-01: 받은 닫기 요청을 남기고 성공으로 답하는 급여 안내 API.
+class _RecordingNoticeApi implements SalaryNoticeApi {
+  final List<String> dismissed = [];
+
+  @override
+  Future<SalaryNoticeResult> read(String payMonth) async =>
+      const SalaryNoticeFailed('not stored');
+
+  @override
+  Future<SalaryNoticeResult> dismiss(String payMonth) async {
+    dismissed.add(payMonth);
+    return const SalaryNoticeFailed('not stored');
+  }
 }
