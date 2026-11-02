@@ -1,0 +1,40 @@
+{
+  "id": "PAYSE-PHONE-PREP-22-23-20261102",
+  "role": "data",
+  "baseCommit": "897c6ff10c2767d59cc4e7bb65fef0ab07ff54f5",
+  "branch": "feat/api/phone-connection-prep-22-23",
+  "allowedPaths": [
+    "apps/api/tools/issue_phone.py",
+    "apps/api/tests/test_phone_enrollment.py",
+    "apps/api/deploy/phone-registration.md",
+    "apps/api/deploy/android-https.md",
+    "apps/api/docs/local-server-guide.md",
+    "apps/api/docs/history/2026-11-02-phone-preparation.md",
+    "docs/tasks/PAYSE-PHONE-PREP-22-23-20261102.json"
+  ],
+  "readBefore": [
+    "AGENTS.md",
+    "apps/api/AGENT.md",
+    "apps/api/src/AGENTS.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/harness/AGENT_REVIEW.md",
+    "docs/ownership.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/data-contracts.md",
+    "docs/database-schema.md",
+    "docs/api-contract.md",
+    "docs/api-response-models.md",
+    "apps/api/docs/local-server-guide.md",
+    "apps/api/deploy/android-https.md",
+    "apps/api/docs/salary-notices.md"
+  ],
+  "acceptance": [
+    "관련 이슈 #22, #23. 사용자 요청에 따라 현재 Git·서버·DB·HTTPS 준비 상태를 확인하고 오후 실제 Android 연결 전에 가능한 서버 준비를 완료한다.",
+    "기존 DB·금융 원천·설정·인증 키·실행 JAR·모바일·계산 파일을 보존한다. 원터치 수동 시작 정책을 유지하며 자동 실행·공유기 설정·미등록 폰 허용·인증서 검증 우회를 추가하지 않는다.",
+    "폰 CSR의 검증과 clientAuth 인증서 발급 도구를 준비한다. 실제 폰 개인키를 생성·수령하지 않고 CSR 요청 확장으로 CA 권한을 부여하지 않는다. 명시한 유효기간·기존 출력 보존·실패 원자성을 검증한다.",
+    "포트포워딩 이후의 시험·운영 인증서 발급과 미등록 접속 차단을 검증한다. 인증기관의 외부 경로 검증, PC의 TLS 검증, 폰 인증서 등록과 실제 Android 통합 검증을 각각 구분하며 미완료 항목은 완료로 기록하지 않는다.",
+    "폐기용 키·CSR·로컬 TLS로 성공·거절 경계를 검증하고 실제 DB 연결·기존 API 조회를 확인한다. 실제 휴대폰·외부 네트워크 검증과 로컬 검사 결과를 구분한다.",
+    "팀원에게 HTTPS 주소 후보·CSR 등록 절차·v4/급여 안내·토큰 보관·실제 HTTP 연결의 준비사항을 전달할 초안과 서버측 검증 결과를 남긴다. 직접 발송·PR 생성·병합·develop 직접 push는 하지 않는다."
+  ]
+}
