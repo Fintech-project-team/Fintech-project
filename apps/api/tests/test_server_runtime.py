@@ -3,10 +3,12 @@ import json
 import os
 from pathlib import Path
 import socket
+import subprocess
 import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import server_runtime as runtime
@@ -48,6 +50,24 @@ class RuntimeTests(unittest.TestCase):
                 runtime.stop(dict(record, **{key: value}), self.root, timeout=1)
         self.assertIsNotNone(runtime.owned_process(record))
 
+    def test_launch_records_settled_executable_identity(self):
+        first = {'pid': 99999, 'created': 1, 'exe': 'launcher', 'argv': ['launcher']}
+        final = dict(first, exe='runtime', argv=['runtime', 'server'])
+        child = Mock(pid=99999)
+        child.poll.return_value = None
+        with patch.object(runtime.subprocess, 'Popen', return_value=child), \
+                patch.object(runtime, 'identity', side_effect=[first, final, final, final, final, final]), \
+                (self.root / 'mock.log').open('wb') as log:
+            self.assertEqual(runtime.launch(['runtime', 'server'], self.root, log), final)
+        runtime._children.pop(99999)
+
+    def test_denied_detach_does_not_silently_change_launch_mode(self):
+        with patch.object(runtime.subprocess, 'Popen', side_effect=PermissionError('denied')) as launch, \
+                (self.root / 'mock.log').open('wb') as log:
+            with self.assertRaises(PermissionError):
+                runtime.launch(['runtime'], self.root, log)
+        launch.assert_called_once()
+
     def test_detached_child_listener_and_graceful_stop(self):
         child = self.root / 'child.py'
         child.write_text(
@@ -66,7 +86,21 @@ class RuntimeTests(unittest.TestCase):
         os.environ['PAYSE_RUNTIME_TEST'] = 'must-not-inherit'
         try:
             with (self.root / 'child.log').open('wb') as log:
-                record = runtime.launch([sys._base_executable, '-u', str(child)], self.root, log)
+                argv = [sys._base_executable, '-u', str(child)]
+                try:
+                    record = runtime.launch(argv, self.root, log)
+                except PermissionError as failure:
+                    if os.name != 'nt' or not os.environ.get('GITHUB_ACTIONS') or failure.winerror != 5:
+                        raise
+                    create = subprocess.Popen
+                    def runner_child(arguments, **options):
+                        """2026-11-02: CI가 금지한 job 이탈만 시험 fixture에서 제거한다. 제품은 여전히 거절한다."""
+                        self.assertTrue(options['creationflags'] & subprocess.CREATE_BREAKAWAY_FROM_JOB)
+                        options['creationflags'] &= ~subprocess.CREATE_BREAKAWAY_FROM_JOB
+                        return create(arguments, **options)
+                    with patch.object(runtime.subprocess, 'Popen', side_effect=runner_child):
+                        record = runtime.launch(argv, self.root, log)
+                    print('Runner denies Windows job breakaway; console lifecycle tested within its job.')
         finally:
             if prior is None:
                 os.environ.pop('PAYSE_RUNTIME_TEST', None)

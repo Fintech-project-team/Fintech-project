@@ -176,7 +176,19 @@ def launch(argv, home, log):
         options['start_new_session'] = True
     child = subprocess.Popen(argv, **options)
     _children[child.pid] = child
-    return identity(child.pid)
+    record = identity(child.pid)
+    stable_since = time.monotonic()
+    deadline = stable_since + 5
+    while time.monotonic() < deadline:
+        time.sleep(0.05)
+        current = identity(child.pid)
+        if current['created'] != record['created'] or child.poll() is not None:
+            raise RuntimeError('Launched process exited or its PID changed before identity recording')
+        if current != record:
+            record, stable_since = current, time.monotonic()
+        elif time.monotonic() - stable_since >= 0.15:
+            return record
+    raise RuntimeError('Launched process identity did not settle')
 
 
 def signal_windows(record):
