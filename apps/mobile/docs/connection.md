@@ -54,11 +54,12 @@ lib/app/dev/dev_user_fixtures.dart              개발 데모 계정 userId → 
 | `FakeFinancialServer`         | 실제 서버로 대체(앱에서 제거). 투영 규칙 테스트는 서버·Fake 공통 검증 벡터로 유지    |
 | `dev_user_fixtures.dart`      | 서버가 userId로 원본을 정하므로 앱에서는 제거                                        |
 
+빌드 설정에 서버 주소가 있으면 `HttpUserFinancialRepository`(실제 서버)를, 없으면 기존 Fake를 쓴다. 어느 쪽이든 `AssembledFinancialRepository`가 거래 페이지를 끝까지 받아 합친 Snapshot만 화면에 넘긴다. 주입 규칙·검증 상태는 [실제 서버 연결 계획](server-connection-plan.md)을 따른다.
+
 ## 5. 미확정·후속
 
 - beta·gamma 금융사 구성 변경은 A와 논의 중이다. 원본이 바뀌면 원본 일치 테스트가 알려 주며 사람이 에셋을 동기화한다. 기관 개수를 코드에 고정하지 않는다.
 - 화면 모델(`FinancialSnapshot`)은 제한 표식(`accessRestrictions`)을 보존하고 지원 형식(PAYSE-DRAFT-3·PAYSE-API-0.6-3, payMonth가 없는 v2는 받지 않음)·등록 조합을 검사한다. 카드 출금 계좌·거래 계좌/카드는 '연결 제한으로 생략'과 '원래 미확인 null'을 구분한다(표식 없는 생략은 형식 오류). 연결 정보가 필요하다는 화면 문구는 UI 단계에서 정한다.
-- `GET /transactions` 페이지 조회와 cursor 폐기는 화면이 페이지를 쓰기 시작할 때 구현한다(지금 Snapshot은 page.nextCursor=null).
 - 개발용 스냅샷은 3단계부터 개발 설정 안의 읽기 전용 미리보기로만 쓴다. 첫 화면 판단·저장 대상을 바꾸지 않는다(7절).
 - 별도 점검: 화면 모델의 `stringOrNull`·`krwOrNull` 등 기존 null 허용 읽기는 키 생략도 null로 받는다. 필드마다 허용되는 생략 조건(제한 표식·연결 전 키 구성)이 달라 일괄 변경하지 않고 계약별로 확인한다. 월급 일·금액과 카드 계획 결제일은 2단계에서 키 생략을 형식 오류로 바꿨다.
 

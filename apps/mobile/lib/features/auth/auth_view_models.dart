@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../data/auth/auth_repository.dart';
 import '../../data/auth/credential_stores.dart';
+import '../../data/http/api_transport.dart';
 import 'auth_services.dart';
 import 'auth_validation.dart';
 
@@ -93,6 +94,13 @@ class IdentityViewModel extends ChangeNotifier {
   }
 }
 
+/// 2026-11-02: 인증·로그아웃 실패 안내 문구. 화면마다 같은 상황은 같은 문구를 쓴다.
+const String connectionFailedMessage = '연결하지 못했어요. 잠시 후 다시 시도해주세요';
+const String secureConnectionMessage =
+    '보안 연결을 확인하지 못했어요. 서버 인증서 또는 이 기기의 인증서 등록 상태를 확인해 주세요.';
+const String storageReadFailedMessage = '기기 정보를 읽지 못했어요. 잠시 후 다시 시도해주세요';
+const String storageWriteFailedMessage = '기기에 저장하지 못했어요. 잠시 후 다시 시도해주세요';
+
 /// 2026-10-21: 10-3 요청 상태. 입력 중·요청 중과 실패 종류를 하나의 값으로 구분한다.
 /// [sessionInvalid]는 복구 중 저장된 토큰이 이미 무효라 신규 로그인으로 가야 하는 상태다(09-13).
 enum CodeStatus {
@@ -103,6 +111,12 @@ enum CodeStatus {
   rateLimited,
   unavailable,
   sessionInvalid,
+
+  /// 2026-11-02: 로그인 요청을 보낸 뒤 응답을 받지 못했다. 서버에서 로그인이 처리됐을 수 있다(자동 재시도 없음).
+  resultUnknown,
+
+  /// 2026-11-02: 보안 연결(서버 인증서·기기 인증서 등록)을 확인하지 못했다.
+  secureConnection,
 }
 
 /// 2026-10-21: 10-3 인증번호 입력과 표시용 3분 타이머. 실패하면 입력을 유지한다.
@@ -204,6 +218,8 @@ class CodeViewModel extends ChangeNotifier {
   /// 받은 세션을 [PendingSessionCleanup]으로 끝낸다. 종료가 확인되지 않으면 정리 담당이 토큰을 보관하고,
   /// 다음 발급 요청 전에 다시 시도한다. 복구는 저장된 토큰으로 재확인만 하며,
   /// 토큰이 이미 무효면 기기 세션·PIN을 정리하고 [CodeStatus.sessionInvalid]로 둔다(화면 생존과 무관).
+  /// 2026-11-02: 복구 중 기기 세션을 읽지 못하면 서비스 불가로 알린다(재확인을 건너뛰거나 세션 없음으로 바꾸지 않음).
+  /// 2026-11-01: 받은 세션을 기기에 저장하지 못하면 토큰을 잃지 않도록 정리 담당으로 서버 세션을 끝내고 연결 실패로 알린다.
   Future<bool> submit() async {
     if (!canSubmit) return false;
     _status = CodeStatus.submitting;
@@ -217,29 +233,47 @@ class CodeViewModel extends ChangeNotifier {
     if (purpose == IdentityPurpose.signup) {
       await services.cleanup.retryPending();
       final result = await services.repository.createSession(credentials);
+      var saved = true;
       if (result case AuthOk(:final value)) {
         if (_disposed) {
           await services.cleanup.end(value.accessToken);
           return false;
         }
-        await services.sessionStore.save(
-          StoredSession(
-            userId: value.userId,
-            name: value.name,
-            sessionId: value.sessionId,
-            accessToken: value.accessToken,
-          ),
-        );
+        try {
+          await services.sessionStore.save(
+            StoredSession(
+              userId: value.userId,
+              name: value.name,
+              sessionId: value.sessionId,
+              accessToken: value.accessToken,
+            ),
+          );
+        } on Exception {
+          saved = false;
+          await services.cleanup.end(value.accessToken);
+        }
       }
-      outcome = result;
+      outcome = saved ? result : const AuthUnavailable();
     } else {
-      final stored = await services.sessionStore.read();
-      outcome = stored == null
+      StoredSession? stored;
+      var readable = true;
+      try {
+        stored = await services.sessionStore.read();
+      } on Exception {
+        readable = false;
+      }
+      outcome = !readable
+          ? const AuthUnavailable()
+          : stored == null
           ? const AuthSessionInvalid()
           : await services.repository.reverify(stored.accessToken, credentials);
       if (outcome is AuthSessionInvalid) {
-        await services.sessionStore.clear();
-        await services.pinStore.clear();
+        try {
+          await services.sessionStore.clear();
+          await services.pinStore.clear();
+        } on Exception {
+          // 서버가 이미 무효로 확인한 토큰이다. 남아도 다음 조회에서 다시 무효로 처리된다.
+        }
       }
     }
     if (_disposed) return outcome is AuthOk;
@@ -260,8 +294,15 @@ class CodeViewModel extends ChangeNotifier {
       case AuthSessionInvalid():
         _status = CodeStatus.sessionInvalid;
       case AuthUnavailable():
-      case AuthNetworkFailure():
         _status = CodeStatus.unavailable;
+      case AuthNetworkFailure(:final error):
+        _status = switch (connectionProblemOf(error)) {
+          ConnectionProblem.secureConnection => CodeStatus.secureConnection,
+          ConnectionProblem.resultUnknown
+              when purpose == IdentityPurpose.signup =>
+            CodeStatus.resultUnknown,
+          _ => CodeStatus.unavailable,
+        };
     }
     notifyListeners();
     return false;
@@ -307,6 +348,7 @@ class PinSetupViewModel extends ChangeNotifier {
   bool get completed => _completed;
 
   /// 2026-10-21: 숫자 [digit]을 더하고 6자리가 되면 단계 규칙을 적용한다.
+  /// 2026-11-02: 확인 단계에서 기기에 저장하지 못하면 확인 단계에 머물며 다시 입력하게 한다(완료로 바꾸지 않음).
   Future<void> addDigit(int digit) async {
     if (_completed || _entry.length >= length) return;
     _entry += '$digit';
@@ -325,10 +367,14 @@ class PinSetupViewModel extends ChangeNotifier {
         _phase = PinSetupPhase.confirm;
       }
     } else if (pin == _first) {
-      await pinStore.setPin(pin);
-      _first = null;
-      _error = null;
-      _completed = true;
+      try {
+        await pinStore.setPin(pin);
+        _first = null;
+        _error = null;
+        _completed = true;
+      } on Exception {
+        _error = storageWriteFailedMessage;
+      }
     } else {
       _error = '비밀번호가 일치하지 않아요. 다시 입력해주세요';
     }
@@ -368,6 +414,7 @@ class PinLoginViewModel extends ChangeNotifier {
   int _failures = 0;
   bool _verifying = false;
   bool _disposed = false;
+  bool _storageError = false;
 
   /// 2026-10-21: 입력한 자리 수를 반환한다.
   int get filled => _entry.length;
@@ -378,15 +425,25 @@ class PinLoginViewModel extends ChangeNotifier {
   /// 2026-10-21: 5번 틀려 복구가 필요하면 true를 반환한다.
   bool get recoveryRequired => _failures >= maxFailures;
 
+  /// 2026-11-02: 마지막 기기 저장소 읽기·확인이 실패했으면 true를 반환한다. 이때는 잠금을 풀지 않는다.
+  bool get storageError => _storageError;
+
   /// 2026-10-21: 저장된 실패 횟수를 읽어 표시에 반영한다.
+  /// 2026-11-02: 읽지 못하면 실패 횟수를 0으로 보지 않고 저장소 오류로 표시한다(다음 확인에서 저장소가 횟수를 다시 검사).
   Future<void> _loadFailures() async {
-    final count = await pinStore.failureCount();
-    if (_disposed) return;
-    _failures = count;
+    try {
+      final count = await pinStore.failureCount();
+      if (_disposed) return;
+      _failures = count;
+    } on Exception {
+      if (_disposed) return;
+      _storageError = true;
+    }
     notifyListeners();
   }
 
   /// 2026-10-21: 숫자 [digit]을 더하고 6자리가 되면 저장소로 확인한다. 맞으면 true를 반환한다.
+  /// 2026-11-02: 저장소가 확인하지 못하면 맞지 않은 것으로 보고 잠금을 풀지 않는다.
   Future<bool> addDigit(int digit) async {
     if (recoveryRequired || _verifying || _entry.length >= length) return false;
     _entry += '$digit';
@@ -395,10 +452,21 @@ class PinLoginViewModel extends ChangeNotifier {
       return false;
     }
     _verifying = true;
-    final result = await pinStore.verify(_entry);
+    final PinCheckResult result;
+    try {
+      result = await pinStore.verify(_entry);
+    } on Exception {
+      _verifying = false;
+      _entry = '';
+      if (_disposed) return false;
+      _storageError = true;
+      notifyListeners();
+      return false;
+    }
     _verifying = false;
     _entry = '';
     if (_disposed) return result.matched;
+    _storageError = false;
     _failures = result.failures;
     notifyListeners();
     return result.matched;

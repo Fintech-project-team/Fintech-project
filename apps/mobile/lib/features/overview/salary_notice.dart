@@ -7,11 +7,13 @@ import '../../shared/design/payse_tokens.dart';
 import '../connection/salary_settings_controller.dart';
 import '../connection/salary_settings_screen.dart';
 
-/// 2026-10-29: 홈 월급 입금 확인 안내 연결. [foldedKey]는 이 사용자가 접은 안내 키, [onFoldedKey]는 접기(키)·다시 펴기(null),
-/// [onEdit]은 월급 정보 편집 화면 열기다(없으면 버튼이 눌리지 않는다).
+/// 2026-10-29: 홈 월급 입금 확인 안내 연결. [onEdit]은 월급 정보 편집 화면 열기다(없으면 버튼이 눌리지 않는다).
+/// 2026-11-01: [isFolded]는 안내가 지금 접혀 보이는지, [onFold]는 '나중에 확인'으로 접기, [onOpen]은 작은 표시를 눌러 이 화면에서만
+/// 잠시 다시 펼치기다(서버 닫기 기록은 지우지 않음).
 typedef SalaryNoticeControl = ({
-  String? foldedKey,
-  ValueChanged<String?> onFoldedKey,
+  bool Function(SalaryNotice notice) isFolded,
+  ValueChanged<SalaryNotice> onFold,
+  ValueChanged<SalaryNotice> onOpen,
   VoidCallback? onEdit,
 });
 
@@ -30,15 +32,18 @@ enum SalaryNoticeKind {
 /// 2026-10-29: 지금 홈에 보일 월급 입금 확인 안내. [key]가 같으면 같은 회차·같은 상태·같은 월급 설정의 안내다.
 class SalaryNotice {
   /// 2026-10-29: 종류 [kind], 확인할 회차 예정일 [payDate], 접힘 기록 키 [key]로 만든다.
+  /// 2026-11-01: [payMonth]는 계산 결과가 확인한 명목 회차(YYYY-MM)이며 모르면 null이다(서버 안내 기록의 대상).
   const SalaryNotice({
     required this.kind,
     required this.payDate,
     required this.key,
+    this.payMonth,
   });
 
   final SalaryNoticeKind kind;
   final calc.BusinessDate? payDate;
   final String key;
+  final String? payMonth;
 
   /// 2026-10-29: 큰 안내 제목을 반환한다.
   String get title => kind == SalaryNoticeKind.unlinked
@@ -92,7 +97,15 @@ SalaryNotice? salaryNoticeOf(
     salary?.salaryAmountKrw ?? '-',
     salary?.salaryAccountId ?? '-',
   ].join('|');
-  return SalaryNotice(kind: kind, payDate: payDate, key: key);
+  final month = cycle?.previousPayDate?.payMonth;
+  return SalaryNotice(
+    kind: kind,
+    payDate: payDate,
+    key: key,
+    payMonth: month == null
+        ? null
+        : '${month.year.toString().padLeft(4, '0')}-${month.month.toString().padLeft(2, '0')}',
+  );
 }
 
 /// 2026-10-29: 큰 안내 띠. 홈 새로고침 실패 띠와 같은 면(회색 전폭·아이콘·제목+설명·밑줄 글자 버튼)에

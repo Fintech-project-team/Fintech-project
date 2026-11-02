@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../data/auth/auth_repository.dart';
+import '../../data/auth/credential_stores.dart';
 import 'auth_screens.dart';
 import 'auth_services.dart';
+import 'auth_view_models.dart';
 
 /// 2026-10-21: 첫 가입 흐름(00-1 → 10-1 → 10-2 → 10-3 → 10-4/10-5). 자체 Navigator로 단계를 쌓는다.
 /// [startAtPin]이면 세션은 있고 PIN이 없는 기기로 보고 10-4부터, [startAtIdentity]이면 무효 세션 정리 뒤
@@ -48,21 +50,33 @@ class _SignupFlowState extends State<SignupFlow> {
       MaterialPageRoute<void>(builder: (_) => page);
 
   /// 2026-10-21: 00-1 화면을 반환한다. 이미 약관에 동의한 기기는 10-2로 바로 간다.
+  /// 2026-11-02: 동의 기록을 읽지 못하면 동의하지 않은 것으로 보고 10-1을 다시 보인다.
   Widget _start() => StartScreen(
     onStart: () async {
-      final agreed = await widget.services.consentStore.hasAgreed();
+      var agreed = false;
+      try {
+        agreed = await widget.services.consentStore.hasAgreed();
+      } on Exception {
+        agreed = false;
+      }
       if (!mounted) return;
       _navigator.push(_route(agreed ? _identity() : _terms()));
     },
   );
 
   /// 2026-10-21: 10-1 화면을 반환한다. 동의하면 기기에 기록하고 10-2로 간다.
+  /// 2026-11-02: 동의를 기록하지 못하면 10-1에 머물며 저장 실패를 알린다.
   Widget _terms() => TermsScreen(
     onBack: () => _navigator.pop(),
     onViewTerm: (title) =>
         _navigator.push(_route(TermDetailScreen(title: title))),
     onAgreed: () async {
-      await widget.services.consentStore.saveAgreed();
+      try {
+        await widget.services.consentStore.saveAgreed();
+      } on Exception {
+        _notify(storageWriteFailedMessage);
+        return;
+      }
       if (!mounted) return;
       _navigator.push(_route(_identity()));
     },
@@ -107,34 +121,49 @@ class _SignupFlowState extends State<SignupFlow> {
   /// 2026-10-21: 10-4 뒤로 가기. 확인 후 세션 종료가 성공했거나 토큰이 이미 무효일 때만 기기 정보를 지우고 10-2로 간다.
   /// 전송 실패만으로 종료 성공 처리하지 않는다(api-contract §2). 종료 중에는 PIN 완료와 중복 요청을 막고,
   /// 기기 정보 정리는 화면이 사라져도 끝까지 수행한다. 화면 이동과 화면용 상태 알림 갱신은 화면이 있을 때만 한다.
+  /// 2026-11-02: 기기 세션을 읽거나 지우지 못하면 이 화면에 머물며 안내한다.
   Future<void> _restartIdentity() async {
     if (_restarting.value) return;
     final context = _nav.currentContext!;
     if (!await confirmRestartIdentity(context) || !mounted) return;
     _restarting.value = true;
     try {
-      final stored = await widget.services.sessionStore.read();
+      final StoredSession? stored;
+      try {
+        stored = await widget.services.sessionStore.read();
+      } on Exception {
+        _notify(storageReadFailedMessage);
+        return;
+      }
       if (stored != null) {
         final result = await widget.services.repository.endSession(
           stored.accessToken,
         );
         if (result is! AuthOk && result is! AuthSessionInvalid) {
-          if (mounted) {
-            ScaffoldMessenger.of(_nav.currentContext!).showSnackBar(
-              const SnackBar(content: Text('연결하지 못했어요. 잠시 후 다시 시도해주세요')),
-            );
-          }
+          _notify(connectionFailedMessage);
           return;
         }
       }
-      await widget.services.sessionStore.clear();
-      await widget.services.pinStore.clear();
+      try {
+        await widget.services.sessionStore.clear();
+        await widget.services.pinStore.clear();
+      } on Exception {
+        _notify(storageWriteFailedMessage);
+        return;
+      }
       if (!mounted) return;
       _draft = null;
       _navigator.pushAndRemoveUntil(_route(_identity()), (_) => false);
     } finally {
       if (mounted) _restarting.value = false;
     }
+  }
+
+  /// 2026-11-02: 화면이 있으면 [message]를 아래 알림으로 보인다.
+  void _notify(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(_nav.currentContext!)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   /// 2026-10-21: 시스템 뒤로 가기를 흐름 Navigator로 넘기는 흐름 화면을 반환한다.
