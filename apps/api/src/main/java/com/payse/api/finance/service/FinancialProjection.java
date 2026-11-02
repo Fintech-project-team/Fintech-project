@@ -4,6 +4,7 @@ import com.payse.api.constants.ApiCodeConstants;
 import com.payse.api.constants.ApiConfigConstants;
 import com.payse.api.constants.ApiFieldConstants;
 import com.payse.api.finance.dto.PageSlice;
+import com.payse.api.finance.dto.TransactionQuery;
 import com.payse.api.finance.error.FinancialException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -30,26 +31,29 @@ import tools.jackson.databind.node.ObjectNode;
 public final class FinancialProjection {
 
     private static final List<String> HEADERS = List.of(
-        "userId",
-        "schemaVersion",
-        "currency",
-        "dataVersion",
-        "sourceVersion",
-        "ruleVersion",
-        "asOf"
+        ApiFieldConstants.Finance.USER_ID,
+        ApiFieldConstants.Finance.SCHEMA_VERSION,
+        ApiFieldConstants.Finance.CURRENCY,
+        ApiFieldConstants.Finance.DATA_VERSION,
+        ApiFieldConstants.Finance.SOURCE_VERSION,
+        ApiFieldConstants.Finance.RULE_VERSION,
+        ApiFieldConstants.Finance.AS_OF
     );
     private static final Map<String, String> IDS = Map.ofEntries(
-        Map.entry("accounts", "accountId"),
-        Map.entry("cards", "cardId"),
-        Map.entry("transactions", "transactionId"),
-        Map.entry("statements", "statementId"),
-        Map.entry("obligations", "obligationId"),
-        Map.entry("reserves", "reserveId"),
-        Map.entry("allocations", "allocationId"),
-        Map.entry("settlements", "linkId"),
-        Map.entry("recurringPlans", "planId"),
-        Map.entry("recurringPlanRevisions", "revisionId"),
-        Map.entry("recurringDecisions", "decisionId")
+        Map.entry(ApiFieldConstants.Finance.ACCOUNTS, ApiFieldConstants.Finance.ACCOUNT_ID),
+        Map.entry(ApiFieldConstants.Finance.CARDS, ApiFieldConstants.Finance.CARD_ID),
+        Map.entry(ApiFieldConstants.Finance.TRANSACTIONS, ApiFieldConstants.Finance.TRANSACTION_ID),
+        Map.entry(ApiFieldConstants.Finance.STATEMENTS, ApiFieldConstants.Finance.STATEMENT_ID),
+        Map.entry(ApiFieldConstants.Finance.OBLIGATIONS, ApiFieldConstants.Finance.OBLIGATION_ID),
+        Map.entry(ApiFieldConstants.Finance.RESERVES, ApiFieldConstants.Finance.RESERVE_ID),
+        Map.entry(ApiFieldConstants.Finance.ALLOCATIONS, ApiFieldConstants.Finance.ALLOCATION_ID),
+        Map.entry(ApiFieldConstants.Finance.SETTLEMENTS, ApiFieldConstants.Finance.LINK_ID),
+        Map.entry(ApiFieldConstants.Finance.RECURRING_PLANS, ApiFieldConstants.Finance.PLAN_ID),
+        Map.entry(
+            ApiFieldConstants.Finance.RECURRING_PLAN_REVISIONS,
+            ApiFieldConstants.Finance.REVISION_ID
+        ),
+        Map.entry(ApiFieldConstants.Finance.RECURRING_DECISIONS, "decisionId")
     );
 
     /**
@@ -64,6 +68,7 @@ public final class FinancialProjection {
      * @param pageOnly 후속 거래 페이지 여부
      * @return cursor 서명 전 응답과 마지막 거래 ID·다음 페이지 여부
      * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-02 - 기존 조회를 기간 없는 공통 투영 경로로 위임
      */
     public PageSlice project(
         ObjectNode source,
@@ -72,6 +77,27 @@ public final class FinancialProjection {
         UUID afterId,
         boolean pageOnly
     ) {
+        return project(source, connectedCodes, dataVersion, afterId, pageOnly, null, null);
+    }
+
+    /**
+     * 현재 공개 권한을 유지하며 명시 날짜 범위의 거래를 같은 페이지 계약으로 제공한다.
+     * @created 2026-11-01
+     * @usedBy FinancialService.snapshot, FinancialPeriodTest
+     * @param startDate 명시 범위 시작일. endDate와 함께 생략하면 원천 coverage 범위를 사용한다.
+     * @param endDate 명시 범위 종료일. 양 끝 날짜를 포함하며 보유하지 않은 원천은 생성하지 않는다.
+     * @modified 2026-11-02 - 기존 v3/v4·권한 투영을 보존하며 선택적 기간 경로 통합
+     */
+    public PageSlice project(
+        ObjectNode source,
+        Set<String> connectedCodes,
+        String dataVersion,
+        UUID afterId,
+        boolean pageOnly,
+        LocalDate startDate,
+        LocalDate endDate
+    ) {
+        new TransactionQuery(null, startDate, endDate);
         try {
             Context context = new Context(source, connectedCodes, dataVersion);
             ObjectNode visible = context.build();
@@ -82,7 +108,7 @@ public final class FinancialProjection {
 
                 return new PageSlice(visible, null, false);
             }
-            return FinancialPages.slice(visible, afterId, pageOnly);
+            return FinancialPages.slice(visible, afterId, pageOnly, startDate, endDate);
         } catch (FinancialException failure) {
             throw failure;
         } catch (RuntimeException failure) {
@@ -160,6 +186,7 @@ public final class FinancialProjection {
             }
 
             // DB 저장에서는 본문/보조 거래가 같은 테이블이다. 기존 fixture 입력도 한 인덱스로 합친다.
+
             ArrayNode transactions = array();
             Map<String, ObjectNode> merged = new LinkedHashMap<>();
             for (String key : List.of(

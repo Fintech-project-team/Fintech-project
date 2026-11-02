@@ -1,14 +1,15 @@
 package com.payse.api.finance.controller;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.payse.api.ApiTestConstants.FinanceCodes;
 import com.payse.api.ApiTestConstants.FinanceFields;
 import com.payse.api.ApiTestConstants.FinanceHttp;
 import com.payse.api.ApiTestConstants.FinancePaths;
-
-import static org.junit.jupiter.api.Assertions.*;
-
+import com.payse.api.finance.dto.TransactionQuery;
 import com.payse.api.finance.error.FinancialException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
@@ -68,6 +69,7 @@ class FinancialHttpInputTest {
                 ).status()
             );
         }
+
         MockHttpServletRequest invalid = request(FinanceHttp.POST, "{}");
         invalid.setContent(new byte[] { (byte) 0xc3, (byte) 0x28 });
         assertEquals(
@@ -125,6 +127,151 @@ class FinancialHttpInputTest {
             400,
             assertThrows(FinancialException.class, () -> input.cursor(request, true)).status()
         );
+    }
+
+    /**
+     * 날짜 쌍은 최초 페이지와 후속 페이지에 동일하게 전달하며 윤일도 실제 달력대로 읽는다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void readsPeriodWithOptionalCursor() {
+        MockHttpServletRequest request = request(FinanceHttp.GET, "");
+        request.addParameter(FinanceFields.START_DATE, "2024-02-29");
+        request.addParameter(FinanceFields.END_DATE, "2026-10-19");
+        var first = input.transactions(request);
+        assertNull(first.cursor());
+        assertEquals(LocalDate.of(2024, 2, 29), first.startDate());
+        assertEquals(LocalDate.of(2026, 10, 19), first.endDate());
+        request.addParameter(FinanceFields.CURSOR, "opaque");
+        assertEquals("opaque", input.transactions(request).cursor());
+        assertEquals(
+            422,
+            assertThrows(FinancialException.class, () -> input.cursor(request, false)).status()
+        );
+    }
+
+    /**
+     * 기간 없는 기존 후속 조회는 cursor 하나만 받는 규칙을 그대로 지킨다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void preservesLegacyTransactionQuery() {
+        MockHttpServletRequest request = request(FinanceHttp.GET, "");
+        assertEquals(
+            400,
+            assertThrows(FinancialException.class, () -> input.transactions(request)).status()
+        );
+        request.addParameter(FinanceFields.CURSOR, "opaque");
+        assertEquals("opaque", input.transactions(request).cursor());
+        assertFalse(input.transactions(request).hasPeriod());
+        request.addParameter("offset", "0");
+        assertEquals(
+            400,
+            assertThrows(FinancialException.class, () -> input.transactions(request)).status()
+        );
+    }
+
+    /**
+     * 일부 날짜·중복 인자·역전·없는 날짜·공백·시각·본문을 임의 보정하지 않는다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void rejectsAmbiguousPeriods() {
+        for (String start : new String[] {
+            "2025-02-29",
+            "2026-13-01",
+            "2026-11-01",
+            "0000-01-01",
+            "2026-1-01",
+            " 2026-01-01",
+            "2026-01-01T00:00:00Z"
+        }) {
+            MockHttpServletRequest request = period(start, "2026-10-19");
+            assertEquals(
+                422,
+                assertThrows(FinancialException.class, () -> input.transactions(request)).status(),
+                start
+            );
+        }
+
+        MockHttpServletRequest missing = request(FinanceHttp.GET, "");
+        missing.addParameter(FinanceFields.START_DATE, "2026-01-01");
+        assertEquals(
+            422,
+            assertThrows(FinancialException.class, () -> input.transactions(missing)).status()
+        );
+        MockHttpServletRequest duplicate = period("2026-01-01", "2026-10-19");
+        duplicate.addParameter(FinanceFields.START_DATE, "2026-01-02");
+        assertEquals(
+            422,
+            assertThrows(FinancialException.class, () -> input.transactions(duplicate)).status()
+        );
+        MockHttpServletRequest unrelated = period("2026-01-01", "2026-10-19");
+        unrelated.addParameter(FinanceFields.OWNER_ID, "foreign");
+        assertEquals(
+            422,
+            assertThrows(FinancialException.class, () -> input.transactions(unrelated)).status()
+        );
+        MockHttpServletRequest body = period("2026-01-01", "2026-10-19");
+        body.setContent("{}".getBytes(StandardCharsets.UTF_8));
+        assertEquals(
+            422,
+            assertThrows(FinancialException.class, () -> input.transactions(body)).status()
+        );
+    }
+
+    /**
+     * 단일 날짜 양끝을 포함하는 요청도 정상 범위다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void acceptsSingleDayPeriod() {
+        var query = input.transactions(period("2026-10-19", "2026-10-19"));
+        assertEquals(query.startDate(), query.endDate());
+    }
+
+    /**
+     * 날짜 쌍 직접 생성에서도 누락·역전·연도 한계를 업무 오류로 거절한다.
+     * @created 2026-11-02
+     * @usedBy JUnit
+     */
+    @Test
+    void validatesOptionalPeriodPair() {
+        LocalDate first = LocalDate.of(1, 1, 1);
+        LocalDate last = LocalDate.of(9999, 12, 31);
+        assertFalse(new TransactionQuery(null, null, null).hasPeriod());
+        assertTrue(new TransactionQuery(null, first, last).hasPeriod());
+
+        LocalDate[][] invalidPeriods = {
+            { null, last },
+            { first, null },
+            { last, first },
+            { first.minusDays(1), last },
+            { first, last.plusDays(1) }
+        };
+        for (LocalDate[] period : invalidPeriods) {
+            FinancialException failure = assertThrows(
+                FinancialException.class,
+                () -> new TransactionQuery(null, period[0], period[1])
+            );
+            assertEquals(422, failure.status());
+        }
+    }
+
+    /**
+     * 각 검증에 독립적인 조회 요청과 날짜 쌍을 준비한다.
+     * @created 2026-11-01
+     * @usedBy rejectsAmbiguousPeriods, acceptsSingleDayPeriod
+     */
+    private MockHttpServletRequest period(String start, String end) {
+        MockHttpServletRequest request = request(FinanceHttp.GET, "");
+        request.addParameter(FinanceFields.START_DATE, start);
+        request.addParameter(FinanceFields.END_DATE, end);
+        return request;
     }
 
     /**

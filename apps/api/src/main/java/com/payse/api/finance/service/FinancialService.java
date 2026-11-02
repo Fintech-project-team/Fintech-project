@@ -5,9 +5,11 @@ import com.payse.api.auth.dto.AuthRows;
 import com.payse.api.auth.mapper.AuthRepository;
 import com.payse.api.auth.mapper.AuthTransactions;
 import com.payse.api.constants.ApiCodeConstants;
+import com.payse.api.constants.ApiConfigConstants;
 import com.payse.api.constants.ApiFieldConstants.FinanceDb;
 import com.payse.api.constants.ApiFieldConstants;
 import com.payse.api.finance.dto.StoredReceipt;
+import com.payse.api.finance.dto.TransactionQuery;
 import com.payse.api.finance.dto.WriteChange;
 import com.payse.api.finance.error.FinancialException;
 import com.payse.api.finance.mapper.FinancialReceipts;
@@ -80,6 +82,22 @@ public final class FinancialService {
             () -> {
                 AuthRows.Session session = authorize(token);
                 return snapshot(repository.load(session.userId()), session, cursor.get(), pageOnly);
+            }
+        );
+    }
+
+    /**
+     * 인증된 사용자와 같은 DB 문맥에서 명시 기간 또는 기존 cursor의 거래 페이지를 읽는다.
+     * @created 2026-11-01
+     * @usedBy FinancialController.page
+     * @modified 2026-11-02 - 기존 인증·조회 경계를 보존하며 선택적 기간 경로 통합
+     */
+    public ObjectNode transactions(String token, Supplier<TransactionQuery> request) {
+        return transactions.run(
+            () -> {
+                AuthRows.Session session = authorize(token);
+                TransactionQuery query = request.get();
+                return snapshot(repository.load(session.userId()), session, query, true);
             }
         );
     }
@@ -193,11 +211,27 @@ public final class FinancialService {
      * @usedBy read
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-02 - 기존 기간 없는 조회를 공통 페이지 조립 경로로 위임
      */
     private ObjectNode snapshot(
         ObjectNode source,
         AuthRows.Session session,
         String cursor,
+        boolean pageOnly
+    ) {
+        return snapshot(source, session, new TransactionQuery(cursor, null, null), pageOnly);
+    }
+
+    /**
+     * 원천 문맥에 조회 날짜 쌍을 결합하되 금융 버전·coverage·원천을 변경하지 않는다.
+     * @created 2026-11-01
+     * @usedBy read, transactions
+     * @modified 2026-11-02 - 기존 페이지 서명·v4 응답을 보존하며 명시 기간 경로 통합
+     */
+    private ObjectNode snapshot(
+        ObjectNode source,
+        AuthRows.Session session,
+        TransactionQuery query,
         boolean pageOnly
     ) {
         Set<String> codes = new HashSet<>();
@@ -208,15 +242,26 @@ public final class FinancialService {
         }
 
         String context = cursors.context(source, codes);
-        UUID after = pageOnly
-            ? cursors.decode(cursor, session.userId(), session.sessionId(), context)
+        if (query.hasPeriod()) {
+            ObjectNode periodContext = json.createObjectNode()
+                .put(ApiFieldConstants.Finance.PURPOSE, ApiConfigConstants.Finance.PERIOD_PURPOSE)
+                .put(ApiFieldConstants.Finance.SOURCE_CONTEXT, context)
+                .put(ApiFieldConstants.Finance.START_DATE, query.startDate().toString())
+                .put(ApiFieldConstants.Finance.END_DATE, query.endDate().toString());
+            context = FinancialJson.digest(periodContext);
+        }
+
+        UUID after = pageOnly && (!query.hasPeriod() || query.cursor() != null)
+            ? cursors.decode(query.cursor(), session.userId(), session.sessionId(), context)
             : null;
         var slice = projection.project(
             source,
             codes,
             source.get(ApiFieldConstants.Finance.DATA_VERSION).asString(),
             after,
-            pageOnly
+            pageOnly,
+            query.startDate(),
+            query.endDate()
         );
         ObjectNode answer = slice.body();
         if (answer.has(ApiFieldConstants.Finance.PAGE)) {

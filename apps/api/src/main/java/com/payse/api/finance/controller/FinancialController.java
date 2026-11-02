@@ -59,13 +59,14 @@ public final class FinancialController {
     }
 
     /**
-     * 검증된 불투명 cursor로 같은 자료 버전의 후속 페이지를 반환한다.
+     * 기존 cursor 후속 조회 또는 명시 기간의 첫/후속 거래 페이지를 반환한다.
      * @created 2026-10-29
      * @usedBy GET /transactions
+     * @modified 2026-11-01 - 선택적 날짜 쌍을 인증 후 해석하는 거래 조회 경로 연결
      */
     @GetMapping("/transactions")
     public ResponseEntity<ObjectNode> page(HttpServletRequest request) {
-        return ok(service.read(auth.bearer(request), () -> input.cursor(request, true), true));
+        return ok(service.transactions(auth.bearer(request), () -> input.transactions(request)));
     }
 
     /**
@@ -75,16 +76,16 @@ public final class FinancialController {
      */
     @RequestMapping(
         path = {
-            "/institution-links",
-            "/account-selection",
-            "/accounts/{id}",
-            "/settings",
-            "/obligations",
-            "/obligations/{id}",
-            "/obligations/{id}/cancel",
-            "/reserves",
-            "/reserves/{id}",
-            "/reserves/{id}/cancel"
+            ApiConfigConstants.Finance.LINKS_PATH,
+            ApiConfigConstants.Finance.SELECTION_PATH,
+            ApiConfigConstants.Finance.ACCOUNT_PATH,
+            ApiConfigConstants.Finance.SETTINGS_PATH,
+            ApiConfigConstants.Finance.OBLIGATIONS_PATH,
+            ApiConfigConstants.Finance.OBLIGATION_PATH,
+            ApiConfigConstants.Finance.CANCEL_OBLIGATION_PATH,
+            ApiConfigConstants.Finance.RESERVES_PATH,
+            ApiConfigConstants.Finance.RESERVE_PATH,
+            ApiConfigConstants.Finance.CANCEL_RESERVE_PATH
         },
         method = {
             RequestMethod.POST,

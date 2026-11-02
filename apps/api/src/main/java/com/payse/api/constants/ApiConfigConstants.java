@@ -51,6 +51,10 @@ public final class ApiConfigConstants {
         public static final String JOB_PATH = "/analysis-jobs/{id}";
         public static final String MEMORY_PATH = "/analysis-memories/{id}";
 
+        // 기간 조회·기억 관리
+        public static final String MEMORIES_PATH = "/analysis-memories";
+        public static final String MEMORIES_PURPOSE = "analysis-memories";
+
         /**
          * 분석 상수 구간의 인스턴스 생성을 막는다.
          * @created 2026-11-02
@@ -220,6 +224,9 @@ public final class ApiConfigConstants {
         public static final String KEY_ALGORITHM = "AES";
         public static final String CIPHER_ALGORITHM = "AES/GCM/NoPadding";
         public static final String DIGEST_ALGORITHM = "SHA-256";
+
+        // 기간 조회·기억 관리
+        public static final String PERIOD_PURPOSE = "financial-transactions-period";
 
         /**
          * 금융 상수 구간의 인스턴스 생성을 막는다.

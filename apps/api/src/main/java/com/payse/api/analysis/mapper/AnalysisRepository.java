@@ -1,9 +1,13 @@
 package com.payse.api.analysis.mapper;
 
 import com.payse.api.analysis.service.AnalysisJson;
+import com.payse.api.constants.ApiConfigConstants;
 import com.payse.api.constants.ApiFieldConstants.AnalysisDb;
 import com.payse.api.constants.ApiMessageConstants.Analysis;
+import com.payse.api.constants.ApiMessageConstants;
 import jakarta.persistence.EntityManager;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -86,6 +90,123 @@ public class AnalysisRepository {
         }
 
         return rows.stream().findFirst();
+    }
+
+    /**
+     * 요청 저장기간의 메타만 집계해 목록 변경을 감지한다. 암호문·키·전체 본문은 읽지 않는다.
+     * @created 2026-11-01
+     * @usedBy MemoryCatalog.select
+     * @param start 포함 시작 시각이며 null이면 시작 제한이 없다.
+     * @param end 제외 끝 시각이며 null이면 끝 제한이 없다.
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
+     */
+    public String memoryContext(UUID owner, Instant start, Instant end, Instant now) {
+        requireOwner(owner);
+        if (now == null || (start != null && end != null && !start.isBefore(end))) {
+            throw new IllegalArgumentException(ApiMessageConstants.Analysis.INVALID_MEMORY_PERIOD);
+        }
+
+        String sql = """
+            SELECT encode(sha256(convert_to(COALESCE(string_agg(
+              jsonb_build_array(
+                id, metadata_version, result_id, semantic_kind, memory_key, evidence_hash,
+                stored_at, normal_expires_at, active, is_reference, important, reference_policy,
+                deleted_at, purge_requested_at, source_refs, source_hash,
+                ciphertext IS NOT NULL, crypto_meta IS NOT NULL,
+                (NOT important AND normal_expires_at <= CAST(?2 AS timestamptz))
+              )::text, E'\\n' ORDER BY id
+            ), ''), 'UTF8')), 'hex')
+            FROM payse.analysis_items
+            WHERE user_id = ?1
+            """ + memoryPeriod(start, end, 3);
+        var query = entityManager.createNativeQuery(sql)
+            .setParameter(1, owner)
+            .setParameter(2, now.atOffset(ZoneOffset.UTC));
+        int parameter = 3;
+        if (start != null) {
+            query.setParameter(parameter++, start.atOffset(ZoneOffset.UTC));
+        }
+        if (end != null) {
+            query.setParameter(parameter, end.atOffset(ZoneOffset.UTC));
+        }
+        return ApiConfigConstants.Analysis.SHA256_PREFIX + query.getSingleResult();
+    }
+
+    /**
+     * 사용자·기간·마지막 ID 뒤에서 최대 limit+1개만 읽는다. 금융 원천과 플래그를 바꾸지 않는다.
+     * @created 2026-11-01
+     * @usedBy MemoryCatalog.select
+     * @param limit 공개 페이지 크기이며 추가 한 행은 다음 페이지 존재 확인용이다.
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
+     */
+    public List<ObjectNode> memoryPage(
+        UUID owner,
+        Instant start,
+        Instant end,
+        UUID afterId,
+        int limit
+    ) {
+        requireOwner(owner);
+        if (limit < 1 || limit > 100 || (start != null && end != null && !start.isBefore(end))) {
+            throw new IllegalArgumentException(ApiMessageConstants.Analysis.INVALID_MEMORY_PAGE);
+        }
+
+        String sql = """
+            SELECT to_jsonb(memory)::text
+            FROM payse.analysis_items memory
+            WHERE user_id = ?1
+            """ + memoryPeriod(start, end, 2);
+        int parameter = 2;
+        if (start != null) {
+            parameter++;
+        }
+        if (end != null) {
+            parameter++;
+        }
+        if (afterId != null) {
+            sql += " AND id > ?" + parameter++;
+        }
+        sql += " ORDER BY id LIMIT ?" + parameter;
+        var query = entityManager.createNativeQuery(sql).setParameter(1, owner);
+        int value = 2;
+        if (start != null) {
+            query.setParameter(value++, start.atOffset(ZoneOffset.UTC));
+        }
+        if (end != null) {
+            query.setParameter(value++, end.atOffset(ZoneOffset.UTC));
+        }
+        if (afterId != null) {
+            query.setParameter(value++, afterId);
+        }
+        query.setParameter(value, limit + 1);
+        List<ObjectNode> rows = new ArrayList<>();
+        for (Object record : query.getResultList()) {
+            rows.add((ObjectNode) AnalysisJson.JSON.readTree((String) record));
+        }
+
+        return List.copyOf(rows);
+    }
+
+    /**
+     * 선택한 기간 경계만 바인딩 조건으로 만든다. 클라이언트 문자열을 SQL에 삽입하지 않는다.
+     * @created 2026-11-01
+     * @usedBy memoryContext, memoryPage
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
+     */
+    private String memoryPeriod(Instant start, Instant end, int firstParameter) {
+        StringBuilder predicate = new StringBuilder();
+        int parameter = firstParameter;
+        if (start != null) {
+            predicate.append(" AND stored_at >= CAST(?")
+                .append(parameter++)
+                .append(" AS timestamptz)");
+        }
+        if (end != null) {
+            predicate.append(" AND stored_at < CAST(?")
+                .append(parameter)
+                .append(" AS timestamptz)");
+        }
+        return predicate.toString();
     }
 
     /**
@@ -291,6 +412,7 @@ public class AnalysisRepository {
      * 동적 SQL 식별자는 이 내부 목록으로만 생성하며 값은 항상 바인딩한다.
      * @created 2026-11-01
      * @usedBy AnalysisRepository, AnalysisJobs, AnalysisResults
+     * @modified 2026-11-02 - 기억 관리의 불변 원천 참조·지문 저장 열을 보존
      */
     public enum Table {
         JOBS(
@@ -311,7 +433,7 @@ public class AnalysisRepository {
         ),
         ITEMS(
             "analysis_items",
-            "id user_id result_id item_key semantic_kind memory_key evidence_hash stored_at normal_expires_at ciphertext crypto_meta active is_reference important reference_policy metadata_version policy_version policy_actor deleted_at purge_requested_at"
+            "id user_id result_id item_key semantic_kind memory_key evidence_hash stored_at normal_expires_at ciphertext crypto_meta active is_reference important reference_policy metadata_version policy_version policy_actor deleted_at purge_requested_at source_refs source_hash"
         ),
         SUPPRESSIONS(
             "analysis_suppressions",

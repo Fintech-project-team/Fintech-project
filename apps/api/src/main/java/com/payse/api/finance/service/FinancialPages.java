@@ -40,31 +40,31 @@ final class FinancialPages {
 
     private static final int PAGE_SIZE = 100;
     private static final Set<String> PAGE_KEYS = Set.of(
-        "userId",
-        "schemaVersion",
-        "currency",
-        "dataVersion",
-        "sourceVersion",
-        "ruleVersion",
-        "asOf",
-        "transactions",
-        "relatedTransactions",
-        "referenceResolutions",
-        "transactionRelations",
-        "occurrenceLinks",
-        "coverage",
-        "page",
-        "accessRestrictions"
+        ApiFieldConstants.Finance.USER_ID,
+        ApiFieldConstants.Finance.SCHEMA_VERSION,
+        ApiFieldConstants.Finance.CURRENCY,
+        ApiFieldConstants.Finance.DATA_VERSION,
+        ApiFieldConstants.Finance.SOURCE_VERSION,
+        ApiFieldConstants.Finance.RULE_VERSION,
+        ApiFieldConstants.Finance.AS_OF,
+        ApiFieldConstants.Finance.TRANSACTIONS,
+        ApiFieldConstants.Finance.RELATED_TRANSACTIONS,
+        ApiFieldConstants.Finance.REFERENCE_RESOLUTIONS,
+        ApiFieldConstants.Finance.TRANSACTION_RELATIONS,
+        ApiFieldConstants.Finance.OCCURRENCE_LINKS,
+        ApiFieldConstants.Finance.COVERAGE,
+        ApiFieldConstants.Finance.PAGE,
+        ApiFieldConstants.Finance.ACCESS_RESTRICTIONS
     );
     private static final Set<String> PAGE_ARRAYS = Set.of(
-        "transactions",
-        "relatedTransactions",
-        "referenceResolutions",
-        "transactionRelations",
-        "occurrenceLinks",
-        "coverage"
+        ApiFieldConstants.Finance.TRANSACTIONS,
+        ApiFieldConstants.Finance.RELATED_TRANSACTIONS,
+        ApiFieldConstants.Finance.REFERENCE_RESOLUTIONS,
+        ApiFieldConstants.Finance.TRANSACTION_RELATIONS,
+        ApiFieldConstants.Finance.OCCURRENCE_LINKS,
+        ApiFieldConstants.Finance.COVERAGE
     );
-    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+    private static final ZoneId SEOUL = ZoneId.of(ApiConfigConstants.Finance.SEOUL_ZONE);
 
     /**
      * 검증된 공개 원천을 한 페이지로 제한한다. cursor 값은 호출자가 별도로 서명한다.
@@ -77,8 +77,15 @@ final class FinancialPages {
      * @modified 2026-11-02 - 긴 식 지역변수 분리
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-02 - 요청 기간을 원천 확보 범위와 별도로 적용
      */
-    static PageSlice slice(ObjectNode snapshot, UUID after, boolean pageOnly) {
+    static PageSlice slice(
+        ObjectNode snapshot,
+        UUID after,
+        boolean pageOnly,
+        LocalDate startDate,
+        LocalDate endDate
+    ) {
         Map<String, ObjectNode> transactions = new LinkedHashMap<>();
         Map<String, ObjectNode> coverage = new HashMap<>();
         for (ObjectNode row : rows(snapshot, ApiFieldConstants.Finance.COVERAGE)) {
@@ -94,7 +101,11 @@ final class FinancialPages {
         for (ObjectNode transaction : rows(snapshot, ApiFieldConstants.Finance.TRANSACTIONS)) {
             String transactionId = id(transaction, ApiFieldConstants.Finance.TRANSACTION_ID);
             transactions.put(transactionId, transaction);
-            if (inPeriod(transaction, coverage, asOf)) {
+            LocalDate day = eventDate(transaction, asOf);
+            boolean sourcePeriod = inPeriod(transaction, coverage, day);
+            boolean requestedPeriod = startDate == null ? sourcePeriod
+                : !day.isBefore(startDate) && !day.isAfter(endDate);
+            if (requestedPeriod) {
                 withinPeriod.add(transactionId);
             }
         }
@@ -185,20 +196,16 @@ final class FinancialPages {
     }
 
     /**
-     * 원천 종류에 맞는 업무일을 coverage의 명시 구간과 비교한다. 급여 예상일을 만들지 않는다.
+     * 원천 종류에 맞는 업무일만 선택한다. 다른 종류의 날짜나 임의 자정으로 대체하지 않는다.
      * 날짜·시각이 모두 미확인이라 소속 기간을 판정할 수 없으면 임의 생략 대신 503을 반환한다.
-     * @created 2026-10-29
+     * @created 2026-11-01
      * @usedBy FinancialPages.slice
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-02 - 원천 업무일 선택과 확보 범위 검증을 분리
      */
-    private static boolean inPeriod(
-        ObjectNode transaction,
-        Map<String, ObjectNode> coverage,
-        OffsetDateTime asOf
-    ) {
+    private static LocalDate eventDate(ObjectNode transaction, OffsetDateTime asOf) {
         String kind = text(transaction, ApiFieldConstants.Finance.RECORD_KIND);
-        boolean account = kind.equals(ApiCodeConstants.Finance.ACCOUNT_ENTRY);
         String basis = switch (kind) {
         case ApiCodeConstants.Finance.ACCOUNT_ENTRY -> ApiCodeConstants.Finance.BOOKING;
         case ApiCodeConstants.Finance.CARD_PURCHASE -> ApiCodeConstants.Finance.PURCHASE;
@@ -231,6 +238,22 @@ final class FinancialPages {
             throw unavailable();
         }
 
+        return day;
+    }
+
+    /**
+     * 기존 확보 범위의 모순을 검증한다. 범위 밖에 보유한 관계 거래의 날짜를 바꾸지 않는다.
+     * @created 2026-10-29
+     * @usedBy FinancialPages.slice
+     * @modified 2026-11-02 - 날짜 선택과 기존 coverage 검증을 분리해 명시 조회 범위를 보존
+     */
+    private static boolean inPeriod(
+        ObjectNode transaction,
+        Map<String, ObjectNode> coverage,
+        LocalDate day
+    ) {
+        boolean account = text(transaction, ApiFieldConstants.Finance.RECORD_KIND)
+            .equals(ApiCodeConstants.Finance.ACCOUNT_ENTRY);
         String target = (account ? ApiConfigConstants.Finance.ACCOUNT_REF_PREFIX
             : ApiConfigConstants.Finance.CARD_REF_PREFIX)
             + text(

@@ -5,6 +5,7 @@ import com.payse.api.constants.ApiConfigConstants.Auth;
 import com.payse.api.constants.ApiConfigConstants.Finance;
 import com.payse.api.constants.ApiConfigConstants.Salary;
 import com.payse.api.constants.ApiConfigConstants.Server;
+import com.payse.api.constants.ApiConfigConstants;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -38,6 +39,7 @@ public class BootstrapSecurityConfiguration {
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리
      * @modified 2026-11-02 - 같은 보안 구성기 호출을 람다로 명시하여 null 수신자 추론 경고 해소
+     * @modified 2026-11-02 - 기존 인증 경계에 AI 기억 관리 목록 GET 추가
      */
     @Bean
     public SecurityFilterChain bootstrapSecurity(HttpSecurity http, Environment environment)
@@ -77,7 +79,12 @@ public class BootstrapSecurityConfiguration {
                                     Analysis.RESULT_QUERY_PATH
                                 )
                                 .permitAll();
-                            authorize.requestMatchers(HttpMethod.GET, Analysis.JOB_PATH)
+                            authorize
+                                .requestMatchers(
+                                    HttpMethod.GET,
+                                    Analysis.JOB_PATH,
+                                    ApiConfigConstants.Analysis.MEMORIES_PATH
+                                )
                                 .permitAll();
                             authorize.requestMatchers(HttpMethod.DELETE, Analysis.MEMORY_PATH)
                                 .permitAll();

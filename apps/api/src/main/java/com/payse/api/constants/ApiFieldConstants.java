@@ -65,6 +65,10 @@ public final class ApiFieldConstants {
         public static final String PURGE_REQUESTED_AT = "purge_requested_at";
         public static final String BLOCKED_AT = "blocked_at";
 
+        // 기간 조회·기억 관리
+        public static final String SOURCE_REFS = "source_refs";
+        public static final String SOURCE_HASH = "source_hash";
+
         /**
          * 분석 DB 상수 구간의 인스턴스 생성을 막는다.
          * @created 2026-11-02
@@ -191,6 +195,18 @@ public final class ApiFieldConstants {
         public static final String PROMPT = "prompt";
         public static final String RESPONSE = "response";
         public static final String POLICY = "policy";
+
+        // 기간 조회·기억 관리
+        public static final String PURPOSE = "purpose";
+        public static final String FINANCE = "finance";
+        public static final String MEMORIES = "memories";
+        public static final String START_DATE = "startDate";
+        public static final String END_DATE = "endDate";
+        public static final String CONTENT_AVAILABILITY = "contentAvailability";
+        public static final String METADATA_VERSION = "metadataVersion";
+        public static final String SOURCE_CHANGED = "sourceChanged";
+        public static final String PAGE_INFO = "pageInfo";
+        public static final String HAS_MORE = "hasMore";
 
         /**
          * 분석 상수 구간의 인스턴스 생성을 막는다.
@@ -413,6 +429,12 @@ public final class ApiFieldConstants {
             "itemId userId sourceRef sourceVersion transactionId label merchantName purchaseDate originalUsedAmountKRW billedPrincipalKRW feeOrAdjustmentAmountKRW billedAmountKRW installmentMonths installmentRound";
         public static final String TRANSACTION_FIELDS =
             "accountId amountKRW balanceReflected bookingDate cancellationDate cardId description direction installmentCurrent installmentTotal merchantName occurredAt occurredAtBasis originalTransactionId payseTransactionType purchaseDate recordKind reflectionReason refundDate sourceRef sourceVersion status transactionId userId withdrawalDate";
+
+        // 기간 조회·기억 관리
+        public static final String PURPOSE = "purpose";
+        public static final String SOURCE_CONTEXT = "sourceContext";
+        public static final String START_DATE = "startDate";
+        public static final String END_DATE = "endDate";
 
         /**
          * 금융 상수 구간의 인스턴스 생성을 막는다.

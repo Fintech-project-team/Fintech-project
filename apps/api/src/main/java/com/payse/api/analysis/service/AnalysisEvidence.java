@@ -4,6 +4,7 @@ import com.payse.ai.analysis.validation.AnalysisContract;
 import com.payse.ai.analysis.validation.ContractFailure;
 import com.payse.api.constants.ApiCodeConstants;
 import com.payse.api.constants.ApiConfigConstants;
+import com.payse.api.constants.ApiFieldConstants.Analysis;
 import com.payse.api.constants.ApiFieldConstants;
 import com.payse.api.finance.error.FinancialException;
 import java.util.HashSet;
@@ -23,16 +24,36 @@ import tools.jackson.databind.node.ObjectNode;
 public final class AnalysisEvidence {
 
     private static final List<String> TRANSACTION_FIELDS = List.of(
-        "transactionId",
-        "recordKind",
+        ApiFieldConstants.Analysis.TRANSACTION_ID,
+        ApiFieldConstants.Analysis.RECORD_KIND,
         "direction",
-        "status",
+        ApiFieldConstants.Analysis.STATUS,
         "reflectionReason",
         "merchantName",
         "description",
-        "originalTransactionId"
+        ApiFieldConstants.Analysis.ORIGINAL_TRANSACTION_ID
     );
     private final AnalysisContract contract = new AnalysisContract();
+
+    /**
+     * 저장 당시 전체 근거의 현재 소유권·금융사 공개 권한을 확인한다. 입력 재사용 검사는 별도다.
+     * @created 2026-11-01
+     * @usedBy MemoryCatalog.entry
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
+     */
+    public void references(UUID owner, ObjectNode source, List<UUID> refs) {
+        if (owner == null || !owner.toString().equals(source.path(Analysis.USER_ID).asString())) {
+            throw forbidden();
+        }
+        if (refs.isEmpty()) {
+            throw unavailable();
+        }
+
+        SourceView view = new SourceView(owner, source);
+        for (UUID id : refs) {
+            view.transaction(id.toString());
+        }
+    }
 
     /**
      * 본문 없는 접수도 현재 문맥·선택 계좌·근거 거래의 공개 권한을 확인한다.
@@ -248,6 +269,7 @@ public final class AnalysisEvidence {
         }
 
         // 현재 저장된 미확보 표식에는 원거래의 소유·기관 권한 근거가 없다.
+
         throw unavailable();
     }
 
