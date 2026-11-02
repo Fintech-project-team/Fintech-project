@@ -112,9 +112,11 @@ def validate_fragment(fragment):
     for mark in fragment['accessRestrictions']:
         require(isinstance(mark, dict) and set(mark) == {
             'ownerType', 'ownerId', 'field', 'targetKind', 'reason'}, 'billing restriction keys')
-        require(all(isinstance(mark[key], str) for key in ('ownerType', 'field', 'targetKind', 'reason'))
-                and (mark['ownerId'] is None or isinstance(mark['ownerId'], str)),
-                'billing restriction types')
+        valid_mark_types = (
+            all(isinstance(mark[key], str) for key in ('ownerType', 'field', 'targetKind', 'reason'))
+            and (mark['ownerId'] is None or isinstance(mark['ownerId'], str))
+        )
+        require(valid_mark_types, 'billing restriction types')
         registered = (mark['ownerType'], mark['field'], mark['targetKind'])
         require(registered in RESTRICTIONS and mark['reason'] == 'not_connected',
                 'unregistered billing restriction')

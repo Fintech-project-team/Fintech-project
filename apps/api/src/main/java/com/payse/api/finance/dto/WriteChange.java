@@ -9,4 +9,5 @@ import tools.jackson.databind.node.ObjectNode;
  * @usedBy FinancialService, FinancialReceipts
  * @modified 2026-10-29 - JPA 관리 엔티티와 같은 영속성 문맥으로 저장 경계 유지
  */
-public record WriteChange(ArrayNode changedRefs, ObjectNode beforeAfter) { }
+public record WriteChange(ArrayNode changedRefs, ObjectNode beforeAfter) {
+}

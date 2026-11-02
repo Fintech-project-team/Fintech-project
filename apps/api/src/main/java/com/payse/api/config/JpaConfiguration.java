@@ -1,5 +1,6 @@
 package com.payse.api.config;
 
+import com.payse.api.constants.ApiConfigConstants.Server;
 import com.payse.api.finance.entity.AccountEntity;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -22,17 +23,20 @@ import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 @Configuration(proxyBeanMethods = false)
 @Profile("database")
 public class JpaConfiguration {
+
     /**
      * 검토한 엔티티만 등록한다. DDL·공유 캐시·SQL/바인딩 로그를 활성화하지 않는다.
      * @created 2026-10-29
      * @usedBy Spring, JpaTestContext
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리
      */
     @Bean
     public LocalContainerEntityManagerFactoryBean entityManagerFactory(DataSource dataSource) {
         var factory = new LocalContainerEntityManagerFactoryBean();
         factory.setDataSource(dataSource);
         factory.setPackagesToScan(AccountEntity.class.getPackageName());
-        factory.setPersistenceUnitName("payse");
+        factory.setPersistenceUnitName(Server.PAYSE);
         factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
         factory.setJpaPropertyMap(properties());
         return factory;
@@ -55,7 +59,10 @@ public class JpaConfiguration {
      * @usedBy AuthTransactions, JpaTestContext
      */
     @Bean
-    public JpaTransactionManager transactionManager(EntityManagerFactory factory, DataSource dataSource) {
+    public JpaTransactionManager transactionManager(
+        EntityManagerFactory factory,
+        DataSource dataSource
+    ) {
         var manager = new JpaTransactionManager(factory);
         manager.setDataSource(dataSource);
         manager.setNestedTransactionAllowed(false);
@@ -66,22 +73,24 @@ public class JpaConfiguration {
      * SQL 원천 변경·공유 캐시 재사용을 막고 연결은 트랜잭션 종료까지 유지한다.
      * @created 2026-10-29
      * @usedBy entityManagerFactory
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리
      */
     public Map<String, Object> properties() {
         return Map.ofEntries(
-            Map.entry("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect"),
-            Map.entry("hibernate.boot.allow_jdbc_metadata_access", false),
-            Map.entry("hibernate.hbm2ddl.auto", "none"),
-            Map.entry("jakarta.persistence.schema-generation.database.action", "none"),
-            Map.entry("jakarta.persistence.schema-generation.scripts.action", "none"),
-            Map.entry("jakarta.persistence.sharedCache.mode", "NONE"),
-            Map.entry("hibernate.cache.use_second_level_cache", false),
-            Map.entry("hibernate.cache.use_query_cache", false),
-            Map.entry("hibernate.connection.handling_mode", "DELAYED_ACQUISITION_AND_HOLD"),
-            Map.entry("hibernate.show_sql", false),
-            Map.entry("hibernate.format_sql", false),
-            Map.entry("hibernate.use_sql_comments", false),
-            Map.entry("hibernate.jdbc.time_zone", "UTC")
+            Map.entry(Server.DIALECT_SETTING, Server.POSTGRES_DIALECT),
+            Map.entry(Server.METADATA_ACCESS, false),
+            Map.entry(Server.DDL_ACTION, Server.NONE),
+            Map.entry(Server.DATABASE_ACTION, Server.NONE),
+            Map.entry(Server.SCRIPTS_ACTION, Server.NONE),
+            Map.entry(Server.SHARED_CACHE_MODE, Server.NO_SHARED_CACHE),
+            Map.entry(Server.SECOND_LEVEL_CACHE, false),
+            Map.entry(Server.QUERY_CACHE, false),
+            Map.entry(Server.CONNECTION_MODE, Server.DELAYED_ACQUISITION_AND_HOLD),
+            Map.entry(Server.SHOW_SQL, false),
+            Map.entry(Server.FORMAT_SQL, false),
+            Map.entry(Server.SQL_COMMENTS, false),
+            Map.entry(Server.TIME_ZONE, Server.UTC)
         );
     }
 }

@@ -1,5 +1,6 @@
 package com.payse.api.auth.dto;
 
+import com.payse.api.constants.ApiMessageConstants.Auth;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -9,19 +10,23 @@ import java.util.UUID;
  * @usedBy AuthService, SessionJdbcTest
  */
 public sealed interface AuthResult {
+
     /**
      * 최초 로그인 응답에 필요한 저장 결과와 토큰이다. 로그에 원문을 출력하지 않는다.
      * @created 2026-10-26
      * @usedBy AuthService.signIn, AuthHttpResponse.reply
      */
-    record Login(UUID userId, String name, UUID sessionId, String accessToken, Instant issuedAt) implements AuthResult {
+    record Login(UUID userId, String name, UUID sessionId, String accessToken, Instant issuedAt)
+        implements AuthResult {
         /**
          * 자동 문자열 표현에서 자격·토큰·사용자 식별자를 숨긴다.
          * @created 2026-10-26
          * @usedBy Java 문자열 변환, AuthServiceTest
          */
         @Override
-        public String toString() { return "Login[REDACTED]"; }
+        public String toString() {
+            return "Login[REDACTED]";
+        }
     }
 
     /**
@@ -29,14 +34,17 @@ public sealed interface AuthResult {
      * @created 2026-10-26
      * @usedBy AuthService.confirm, AuthHttpResponse.reply
      */
-    record Verified(UUID userId, UUID sessionId) implements AuthResult {}
+    record Verified(UUID userId, UUID sessionId) implements AuthResult {
+    }
 
     /**
      * 현재 세션 종료가 커밋된 결과다. 무효 토큰은 이 성공으로 변환하지 않는다.
      * @created 2026-10-26
      * @usedBy AuthService.logout
      */
-    enum LoggedOut implements AuthResult { INSTANCE }
+    enum LoggedOut implements AuthResult {
+        INSTANCE
+    }
 
     /**
      * 기존 인증 오류 의미만 표현한다. 비활성·기존 세션·자격 불일치는 구분하지 않는다.
@@ -44,7 +52,9 @@ public sealed interface AuthResult {
      * @usedBy AuthResult.Failure, AuthService
      * @modified 2026-10-28 - JSON 구문·본문 상한 오류를 자격 실패와 구분
      */
-    enum Reason { INVALID_INPUT, INVALID_JSON, REQUEST_TOO_LARGE, AUTH_REJECTED, SESSION_INVALID, RATE_LIMITED }
+    enum Reason {
+        INVALID_INPUT, INVALID_JSON, REQUEST_TOO_LARGE, AUTH_REJECTED, SESSION_INVALID, RATE_LIMITED
+    }
 
     /**
      * 실패 제한 기록까지 커밋된 업무 결과다. 저장 장애는 AuthStoreException으로 구분한다.
@@ -56,10 +66,12 @@ public sealed interface AuthResult {
          * 제한 오류에만 재시도 시각이 있도록 내부 결과의 모순을 거절한다.
          * @created 2026-10-26
          * @usedBy AuthService, AuthServiceTest
+         * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+         * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리
          */
         public Failure {
             if (reason == null || (reason == Reason.RATE_LIMITED) != (retryAt != null)) {
-                throw new IllegalArgumentException("Invalid authentication failure result");
+                throw new IllegalArgumentException(Auth.INVALID_FAILURE);
             }
         }
     }

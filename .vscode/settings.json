@@ -14,5 +14,13 @@
   "[dart]": {
     "editor.defaultFormatter": "Dart-Code.dart-code",
     "editor.formatOnSave": false
-  }
+  },
+  "dart.analysisExcludedFolders": ["node_modules", ".harness"],
+  "java.import.exclusions": [
+    "**/node_modules/**",
+    "**/.metadata/**",
+    "**/archetype-resources/**",
+    "**/META-INF/maven/**",
+    "**/.harness/**"
+  ]
 }

@@ -1,11 +1,15 @@
 package com.payse.api.config;
 
+import com.payse.api.constants.ApiConfigConstants.Analysis;
+import com.payse.api.constants.ApiConfigConstants.Auth;
+import com.payse.api.constants.ApiConfigConstants.Finance;
+import com.payse.api.constants.ApiConfigConstants.Salary;
+import com.payse.api.constants.ApiConfigConstants.Server;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -18,6 +22,7 @@ import org.springframework.security.web.SecurityFilterChain;
  */
 @Configuration(proxyBeanMethods = false)
 public class BootstrapSecurityConfiguration {
+
     /**
      * 기본 계정·폼 로그인·HTTP 세션 없이 차단 정책을 구성한다.
      * @created 2026-10-20
@@ -30,46 +35,104 @@ public class BootstrapSecurityConfiguration {
      * @param environment DB/인증 프로필 활성 여부
      * @return 인증의 자격 검사는 서비스에 위임하고 다른 경로는 차단하는 필터 체인
      * @throws Exception 필터 구성 실패
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리
+     * @modified 2026-11-02 - 같은 보안 구성기 호출을 람다로 명시하여 null 수신자 추론 경고 해소
      */
     @Bean
-    public SecurityFilterChain bootstrapSecurity(HttpSecurity http, Environment environment) throws Exception {
+    public SecurityFilterChain bootstrapSecurity(HttpSecurity http, Environment environment)
+        throws Exception {
         return http
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .requestCache(AbstractHttpConfigurer::disable)
-            .formLogin(AbstractHttpConfigurer::disable)
-            .httpBasic(AbstractHttpConfigurer::disable)
-            .logout(AbstractHttpConfigurer::disable)
+            .sessionManagement(
+                session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            .requestCache(configurer -> configurer.disable())
+            .formLogin(configurer -> configurer.disable())
+            .httpBasic(configurer -> configurer.disable())
+            .logout(configurer -> configurer.disable())
             // 인증은 Bearer만 사용하며 쿠키/Basic 세션을 만들지 않는다.
-            .csrf(AbstractHttpConfigurer::disable)
-            .authorizeHttpRequests(authorize -> {
-                authorize.requestMatchers(HttpMethod.GET, "/internal/health/live").permitAll();
-                if (environment.matchesProfiles("database & auth")) {
-                    authorize.requestMatchers(HttpMethod.POST, "/demo-sessions", "/demo-sessions/current/reverify").permitAll();
-                    authorize.requestMatchers(HttpMethod.DELETE, "/demo-sessions/current").permitAll();
-                }
-                if (environment.matchesProfiles("database & auth & finance")) {
-                    if (environment.matchesProfiles("analysis")) {
-                        authorize.requestMatchers(HttpMethod.POST, "/analysis-jobs", "/analysis-jobs/{id}/input",
-                            "/analysis-jobs/{id}/retry", "/analysis-results/query").permitAll();
-                        authorize.requestMatchers(HttpMethod.GET, "/analysis-jobs/{id}").permitAll();
-                        authorize.requestMatchers(HttpMethod.DELETE, "/analysis-memories/{id}").permitAll();
+            .csrf(configurer -> configurer.disable())
+            .authorizeHttpRequests(
+                authorize -> {
+                    authorize.requestMatchers(HttpMethod.GET, Server.HEALTH_PATH).permitAll();
+                    if (environment.matchesProfiles(Server.AUTH_PROFILE)) {
+                        authorize
+                            .requestMatchers(
+                                HttpMethod.POST,
+                                Auth.SESSIONS_PATH,
+                                Auth.REVERIFY_PATH
+                            )
+                            .permitAll();
+                        authorize.requestMatchers(HttpMethod.DELETE, Auth.CURRENT_SESSION_PATH)
+                            .permitAll();
                     }
-                    authorize.requestMatchers(HttpMethod.GET, "/snapshot", "/transactions").permitAll();
-                    authorize.requestMatchers(HttpMethod.POST, "/institution-links", "/obligations", "/reserves",
-                        "/obligations/{id}/cancel", "/reserves/{id}/cancel").permitAll();
-                    authorize.requestMatchers(HttpMethod.PATCH, "/account-selection", "/accounts/{id}", "/settings",
-                        "/obligations/{id}", "/reserves/{id}").permitAll();
-                    authorize.requestMatchers(HttpMethod.DELETE, "/obligations/{id}", "/reserves/{id}").permitAll();
-                    if (environment.matchesProfiles("salary-notices")) {
-                        authorize.requestMatchers(HttpMethod.GET, "/salary-notices/{payMonth}").permitAll();
-                        authorize.requestMatchers(HttpMethod.PUT, "/salary-notices/{payMonth}/dismissal").permitAll();
+                    if (environment.matchesProfiles(Server.FINANCE_PROFILE)) {
+                        if (environment.matchesProfiles(Server.ANALYSIS)) {
+                            authorize
+                                .requestMatchers(
+                                    HttpMethod.POST,
+                                    Analysis.JOBS_PATH,
+                                    Analysis.JOB_INPUT_PATH,
+                                    Analysis.JOB_RETRY_PATH,
+                                    Analysis.RESULT_QUERY_PATH
+                                )
+                                .permitAll();
+                            authorize.requestMatchers(HttpMethod.GET, Analysis.JOB_PATH)
+                                .permitAll();
+                            authorize.requestMatchers(HttpMethod.DELETE, Analysis.MEMORY_PATH)
+                                .permitAll();
+                        }
+                        authorize
+                            .requestMatchers(
+                                HttpMethod.GET,
+                                Finance.SNAPSHOT_PATH,
+                                Finance.TRANSACTIONS_PATH
+                            )
+                            .permitAll();
+                        authorize
+                            .requestMatchers(
+                                HttpMethod.POST,
+                                Finance.LINKS_PATH,
+                                Finance.OBLIGATIONS_PATH,
+                                Finance.RESERVES_PATH,
+                                Finance.CANCEL_OBLIGATION_PATH,
+                                Finance.CANCEL_RESERVE_PATH
+                            )
+                            .permitAll();
+                        authorize
+                            .requestMatchers(
+                                HttpMethod.PATCH,
+                                Finance.SELECTION_PATH,
+                                Finance.ACCOUNT_PATH,
+                                Finance.SETTINGS_PATH,
+                                Finance.OBLIGATION_PATH,
+                                Finance.RESERVE_PATH
+                            )
+                            .permitAll();
+                        authorize
+                            .requestMatchers(
+                                HttpMethod.DELETE,
+                                Finance.OBLIGATION_PATH,
+                                Finance.RESERVE_PATH
+                            )
+                            .permitAll();
+                        if (environment.matchesProfiles(Server.SALARY_NOTICES)) {
+                            authorize.requestMatchers(HttpMethod.GET, Salary.SALARY_NOTICE_PATH)
+                                .permitAll();
+                            authorize.requestMatchers(HttpMethod.PUT, Salary.DISMISSAL_PATH)
+                                .permitAll();
+                        }
                     }
+                    authorize.anyRequest().denyAll();
                 }
-                authorize.anyRequest().denyAll();
-            })
-            .exceptionHandling(errors -> errors
-                .authenticationEntryPoint((request, response, failure) -> response.setStatus(401))
-                .accessDeniedHandler((request, response, failure) -> response.setStatus(403)))
+            )
+            .exceptionHandling(
+                errors -> errors
+                    .authenticationEntryPoint(
+                        (request, response, failure) -> response.setStatus(401)
+                    )
+                    .accessDeniedHandler((request, response, failure) -> response.setStatus(403))
+            )
             .build();
     }
 }

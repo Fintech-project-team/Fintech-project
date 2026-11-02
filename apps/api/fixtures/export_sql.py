@@ -43,15 +43,59 @@ def financial_rows(snapshot, seed, connected=False):
     def add_row(table,row):
         rows.append((table,row))
     owner=snapshot['userId']
-    add_row('users',{'id':owner,'name':seed['name'],'phone':seed['phone'],'code_verifier':seed['codeVerifier'],'data_version':int(snapshot['dataVersion']),'created_at':seed['createdAt']})
-    add_row('source_contexts',{'user_id':owner,'source_version':snapshot['sourceVersion'],'schema_version':snapshot['schemaVersion'],'rule_version':snapshot['ruleVersion'],'as_of':snapshot['asOf'],'coverage':snapshot['coverage'],'salary_evidence':snapshot['settings']['salary']['receiptEvidence'],'occurrence_links':snapshot['occurrenceLinks'] if connected else []})
+    user_row = {
+        'id': owner,
+        'name': seed['name'],
+        'phone': seed['phone'],
+        'code_verifier': seed['codeVerifier'],
+        'data_version': int(snapshot['dataVersion']),
+        'created_at': seed['createdAt']
+    }
+    add_row('users', user_row)
+    source_context = {
+        'user_id': owner,
+        'source_version': snapshot['sourceVersion'],
+        'schema_version': snapshot['schemaVersion'],
+        'rule_version': snapshot['ruleVersion'],
+        'as_of': snapshot['asOf'],
+        'coverage': snapshot['coverage'],
+        'salary_evidence': snapshot['settings']['salary']['receiptEvidence'],
+        'occurrence_links': snapshot['occurrenceLinks'] if connected else []
+    }
+    add_row('source_contexts', source_context)
     if connected:
         for link in snapshot['institutionLinks']:
             add_row('institution_links',{'id':link['linkId'],'user_id':owner,'institution_code':link['institutionCode'],'consented_at':link['consentedAt'],'disconnected_at':link['disconnectedAt']})
     for account in snapshot['accounts']:
-        add_row('financial_accounts',{'id':account['accountId'],'user_id':owner,'institution_code':account['institutionCode'],'source_ref':account['sourceRef'],'source_version':account['sourceVersion'],'product_type':account['productType'],'product_name':account['productName'],'masked_number':account['maskedNumber'],'balance_krw':account['balanceKRW'],'as_of':account['asOf'],'included':account['included'] if connected else False,'nickname':account['nickname']})
+        account_row = {
+            'id': account['accountId'],
+            'user_id': owner,
+            'institution_code': account['institutionCode'],
+            'source_ref': account['sourceRef'],
+            'source_version': account['sourceVersion'],
+            'product_type': account['productType'],
+            'product_name': account['productName'],
+            'masked_number': account['maskedNumber'],
+            'balance_krw': account['balanceKRW'],
+            'as_of': account['asOf'],
+            'included': account['included'] if connected else False,
+            'nickname': account['nickname']
+        }
+        add_row('financial_accounts', account_row)
     for card in snapshot['cards']:
-        add_row('financial_cards',{'id':card['cardId'],'user_id':owner,'institution_code':card['institutionCode'],'source_ref':card['sourceRef'],'source_version':card['sourceVersion'],'product_name':card['productName'],'masked_number':card['maskedNumber'],'card_type':card['cardType'],'withdrawal_account_id':card['withdrawalAccountId'],'schedule_evidence':card['scheduleEvidence']})
+        card_row = {
+            'id': card['cardId'],
+            'user_id': owner,
+            'institution_code': card['institutionCode'],
+            'source_ref': card['sourceRef'],
+            'source_version': card['sourceVersion'],
+            'product_name': card['productName'],
+            'masked_number': card['maskedNumber'],
+            'card_type': card['cardType'],
+            'withdrawal_account_id': card['withdrawalAccountId'],
+            'schedule_evidence': card['scheduleEvidence']
+        }
+        add_row('financial_cards', card_row)
     transactions=snapshot['transactions']+snapshot['relatedTransactions']
     for transaction in transactions:
         add_row('transaction_references',{'user_id':owner,'transaction_id':transaction['transactionId'],'resolution':'resolved','reason':None})
@@ -62,7 +106,19 @@ def financial_rows(snapshot, seed, connected=False):
     for transaction in transactions:
         add_row('financial_transactions',{'user_id':owner,**{column:transaction[field] for column,field in transaction_fields.items()},'cancellation_date':transaction.get('cancellationDate')})
     for statement in snapshot['statements']:
-        add_row('card_statements',{'id':statement['statementId'],'user_id':owner,'source_ref':statement['sourceRef'],'source_version':statement['sourceVersion'],'card_id':statement['cardId'],'amount_krw':statement['amountKRW'],'due_date':statement['dueDate'],'period_start':statement['periodStart'],'period_end':statement['periodEnd'],'detail_completeness':statement['detailCompleteness']})
+        statement_row = {
+            'id': statement['statementId'],
+            'user_id': owner,
+            'source_ref': statement['sourceRef'],
+            'source_version': statement['sourceVersion'],
+            'card_id': statement['cardId'],
+            'amount_krw': statement['amountKRW'],
+            'due_date': statement['dueDate'],
+            'period_start': statement['periodStart'],
+            'period_end': statement['periodEnd'],
+            'detail_completeness': statement['detailCompleteness']
+        }
+        add_row('card_statements', statement_row)
         # v3는 명시적인 저장 어댑터로 식별만 전환한다. 미상 청구 금액은 계산하지 않는다.
         items = statement['items'] if snapshot['schemaVersion'] == 'PAYSE-DRAFT-4' else legacy_items(statement)
         item_fields = {'id': 'itemId', 'source_ref': 'sourceRef', 'source_version': 'sourceVersion',

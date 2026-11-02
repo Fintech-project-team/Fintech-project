@@ -214,31 +214,79 @@ def build_from_snapshots(cases, seed_users):
         for a in snapshot['accounts']:
             row('financial_accounts', {'id': a['accountId'], 'user_id': uid, 'source_version': a['sourceVersion'], 'included': a['included'], 'product_name': a['productName']})
     for t in [partial_transaction, bill_transaction, income, other_income, *purchases, *transfer_transactions]:
-        row('financial_transactions', {'id': t['transactionId'], 'user_id': t['userId'], 'source_version': t['sourceVersion'],
-            'record_kind': t['recordKind'], 'direction': t['direction'], 'status': t['status'],
-            'reflection_reason': t['reflectionReason'], 'account_id': t['accountId'], 'card_id': t['cardId'],
-            'amount_krw': t['amountKRW'], 'booking_date': t['bookingDate']})
+        transaction_row = {
+            'id': t['transactionId'],
+            'user_id': t['userId'],
+            'source_version': t['sourceVersion'],
+            'record_kind': t['recordKind'],
+            'direction': t['direction'],
+            'status': t['status'],
+            'reflection_reason': t['reflectionReason'],
+            'account_id': t['accountId'],
+            'card_id': t['cardId'],
+            'amount_krw': t['amountKRW'],
+            'booking_date': t['bookingDate']
+        }
+        row('financial_transactions', transaction_row)
     for o in [partial, manual, bill, recurring, pinned, initial_obligation]:
-        row('obligations', {'id': o['obligationId'], 'user_id': o['userId'], 'withdrawal_account_id': o['withdrawalAccountId'],
-            'amount_krw': o['amountKRW'], 'status': o['status'], 'statement_id': o['statementId'], 'plan_id': o['recurringPlanId'],
-            'plan_revision_id': o['planRevisionId'], 'occurrence_month': o['recurrenceKey'][-7:] + '-01' if o['recurrenceKey'] else None})
+        obligation_row = {
+            'id': o['obligationId'],
+            'user_id': o['userId'],
+            'withdrawal_account_id': o['withdrawalAccountId'],
+            'amount_krw': o['amountKRW'],
+            'status': o['status'],
+            'statement_id': o['statementId'],
+            'plan_id': o['recurringPlanId'],
+            'plan_revision_id': o['planRevisionId'],
+            'occurrence_month': o['recurrenceKey'][-7:] + '-01' if o['recurrenceKey'] else None
+        }
+        row('obligations', obligation_row)
     row('reserves', {'id': reserve['reserveId'], 'user_id': owner['userId'], 'account_id': reserve['accountId'], 'amount_krw': reserve['amountKRW'], 'cancelled_at': None})
-    row('reserve_allocations', {'id': allocation['allocationId'], 'user_id': owner['userId'], 'reserve_id': allocation['reserveId'],
-        'obligation_id': allocation['obligationId'], 'amount_krw': allocation['amountKRW'], 'released_krw': allocation['releasedKRW'], 'release_evidence': allocation['releaseEvidence']})
+    allocation_row = {
+        'id': allocation['allocationId'],
+        'user_id': owner['userId'],
+        'reserve_id': allocation['reserveId'],
+        'obligation_id': allocation['obligationId'],
+        'amount_krw': allocation['amountKRW'],
+        'released_krw': allocation['releasedKRW'],
+        'release_evidence': allocation['releaseEvidence']
+    }
+    row('reserve_allocations', allocation_row)
     for link in [settlement, bill_link]:
-        row('settlement_links', {'id': link['linkId'], 'user_id': owner['userId'], 'obligation_id': link['obligationId'],
-            'transaction_id': link['transactionId'], 'allocated_krw': link['allocatedKRW'], 'invalidated_at': None})
+        settlement_row = {
+            'id': link['linkId'],
+            'user_id': owner['userId'],
+            'obligation_id': link['obligationId'],
+            'transaction_id': link['transactionId'],
+            'allocated_krw': link['allocatedKRW'],
+            'invalidated_at': None
+        }
+        row('settlement_links', settlement_row)
     row('write_receipts', {'id': evidence['writeReceiptId'], 'user_id': owner['userId'], 'action': 'import_user_state'})
     row('financial_cards', {'id': card['cardId'], 'user_id': owner['userId'], 'withdrawal_account_id': card['withdrawalAccountId']})
     row('card_statements', {'id': statement['statementId'], 'user_id': owner['userId'], 'card_id': card['cardId'], 'amount_krw': statement['amountKRW']})
     for purchase in purchases:
-        row('statement_items', {'id': legacy_item_id(owner['userId'], statement['statementId'], purchase['transactionId']), 'user_id': owner['userId'], 'statement_id': statement['statementId'], 'card_id': card['cardId'], 'transaction_id': purchase['transactionId']})
+        item_row = {
+            'id': legacy_item_id(owner['userId'], statement['statementId'], purchase['transactionId']),
+            'user_id': owner['userId'],
+            'statement_id': statement['statementId'],
+            'card_id': card['cardId'],
+            'transaction_id': purchase['transactionId']
+        }
+        row('statement_items', item_row)
     row('transaction_relations', {'user_id': owner['userId'], 'kind': transfer['kind'], 'from_id': transfer['fromId'], 'to_id': transfer['toId']})
     for p in [plan, future_plan]:
         row('recurring_plans', {'id': p['planId'], 'user_id': p['userId'], 'first_occurrence_month': p['firstOccurrenceMonth'] + '-01'})
     for r in [revision, initial_revision, future_revision]:
-        row('recurring_plan_revisions', {'id': r['revisionId'], 'user_id': r['userId'], 'plan_id': r['planId'],
-            'effective_from_month': r['effectiveFromMonth'] + '-01', 'amount_krw': r['amountKRW'], 'is_current': r['isCurrent']})
+        revision_row = {
+            'id': r['revisionId'],
+            'user_id': r['userId'],
+            'plan_id': r['planId'],
+            'effective_from_month': r['effectiveFromMonth'] + '-01',
+            'amount_krw': r['amountKRW'],
+            'is_current': r['isCurrent']
+        }
+        row('recurring_plan_revisions', revision_row)
     row('occurrence_overrides', {'user_id': future['userId'], 'plan_id': future_plan['planId'],
         'occurrence_month': override['recurrenceKey'][-7:] + '-01', 'plan_revision_id': override['planRevisionId'], 'amount_krw': override['amountKRW']})
     validate_context(context)

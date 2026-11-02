@@ -35,14 +35,18 @@ public final class JpaTestContext implements AutoCloseable {
      * @created 2026-10-29
      * @usedBy AuthRepository, AuthTransactions, TransactionRepository 테스트 구성
      */
-    public EntityManager entityManager() { return entityManager; }
+    public EntityManager entityManager() {
+        return entityManager;
+    }
 
     /**
      * 운영과 같은 JPA 트랜잭션 관리자를 제공한다.
      * @created 2026-10-29
      * @usedBy AuthTransactions 테스트 구성
      */
-    public JpaTransactionManager manager() { return manager; }
+    public JpaTransactionManager manager() {
+        return manager;
+    }
 
     /**
      * 이 helper가 만든 factory만 닫고 호출자가 소유한 DataSource는 유지한다.
@@ -50,5 +54,7 @@ public final class JpaTestContext implements AutoCloseable {
      * @usedBy 테스트 종료 및 try-with-resources
      */
     @Override
-    public void close() { factory.destroy(); }
+    public void close() {
+        factory.destroy();
+    }
 }

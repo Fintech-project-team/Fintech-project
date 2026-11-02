@@ -11,7 +11,7 @@
 | 제품 범위·확정 정책                    | [제품 기준](../product-baseline.md)                                                                                 |
 | 로컬 계산·서버 저장·의존성·상태 수명   | [앱 구조](../app-architecture.md), [계산](../calculation-rules.md)                                                  |
 | 공통 필드·HTTP·DB 기준                 | [데이터 계약 색인](../data-contracts.md)                                                                            |
-| 코드 구조·설정·주석                    | [코드 명세](CODE_SPEC.md), API 전용 [필수 규칙](../../apps/api/src/AGENTS.md)                                       |
+| 코드 구조·설정·주석                    | [코드 명세](CODE_SPEC.md), API 전용 [필수 규칙](../../apps/api/AGENTS.md)                                           |
 | 후속 기능 경계                         | [확장 경계](../EXTENSION_POINTS.md)                                                                                 |
 | 버전·도구·플랫폼 준비                  | [도구](../toolchain.md), [Flutter](FLUTTER_TRANSITION.md), [Spring 초기화](../../apps/api/docs/spring-bootstrap.md) |
 | 필수 검사·상태·재사용·결과 기록        | [검사 기준](GATE_MATRIX.md), [자기검증](AGENT_REVIEW.md)                                                            |

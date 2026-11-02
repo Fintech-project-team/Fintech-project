@@ -7,4 +7,5 @@ import tools.jackson.databind.node.ObjectNode;
  * @created 2026-10-29
  * @usedBy FinancialService.write
  */
-public record StoredReceipt(ObjectNode receipt, ObjectNode audit) {}
+public record StoredReceipt(ObjectNode receipt, ObjectNode audit) {
+}

@@ -1,5 +1,6 @@
 package com.payse.api.finance.entity;
 
+import com.payse.api.constants.ApiCodeConstants.Finance;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -17,6 +18,7 @@ import org.hibernate.annotations.DynamicUpdate;
 @Table(schema = "payse", name = "obligations")
 @DynamicUpdate
 public class ObligationEntity implements OwnedEntity {
+
     @Id
     @Column(name = "id", updatable = false)
     private UUID id;
@@ -44,7 +46,8 @@ public class ObligationEntity implements OwnedEntity {
      * @created 2026-10-29
      * @usedBy Hibernate 엔티티 복원
      */
-    protected ObligationEntity() { }
+    protected ObligationEntity() {
+    }
 
     /**
      * 같은 인증 사용자 소유인지 검증할 내부 소유자 ID를 반환한다.
@@ -59,15 +62,24 @@ public class ObligationEntity implements OwnedEntity {
      * 새 단건 사용자 의무만 생성한다. 원천·계획 참조는 DB의 null 상태로 둔다.
      * @created 2026-10-29
      * @usedBy PlanWrites
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리
      */
-    public ObligationEntity(UUID id, UUID userId, String label, UUID accountId, long amount, LocalDate dueDate) {
+    public ObligationEntity(
+        UUID id,
+        UUID userId,
+        String label,
+        UUID accountId,
+        long amount,
+        LocalDate dueDate
+    ) {
         this.id = id;
         this.userId = userId;
         this.label = label;
         this.accountId = accountId;
         this.amount = amount;
         this.dueDate = dueDate;
-        status = "active";
+        status = Finance.ACTIVE;
     }
 
     /**
@@ -95,8 +107,10 @@ public class ObligationEntity implements OwnedEntity {
      * 검증된 사용자 의무를 논리 취소한다.
      * @created 2026-10-29
      * @usedBy PlanWrites
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리
      */
     public void cancel() {
-        status = "cancelled";
+        status = Finance.CANCELLED;
     }
 }

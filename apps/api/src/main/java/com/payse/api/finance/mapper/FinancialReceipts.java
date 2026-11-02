@@ -1,5 +1,7 @@
 package com.payse.api.finance.mapper;
 
+import com.payse.api.constants.ApiCodeConstants;
+import com.payse.api.constants.ApiFieldConstants;
 import com.payse.api.finance.dto.StoredReceipt;
 import com.payse.api.finance.entity.WriteReceiptEntity;
 import com.payse.api.finance.error.FinancialException;
@@ -25,6 +27,7 @@ import tools.jackson.databind.node.ObjectNode;
 @Repository
 @Profile("database & auth & finance")
 public class FinancialReceipts {
+
     private final EntityManager entityManager;
     private final WriteStore store;
     private final JsonMapper json = JsonMapper.builder().build();
@@ -45,21 +48,41 @@ public class FinancialReceipts {
      * @created 2026-10-29
      * @usedBy FinancialService.write
      * @modified 2026-10-29 - JPQL 소유자 조회와 관리 엔티티 복원 사용
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조; 단일 제어문 본문 중괄호 명시
      */
     public Optional<StoredReceipt> find(UUID user, String key, String digest) {
         store.requireOwner(user);
         try {
-            List<WriteReceiptEntity> found = entityManager.createQuery("""
+            List<WriteReceiptEntity> found = entityManager.createQuery(
+                """
                 SELECT receipt FROM WriteReceiptEntity receipt
                 WHERE receipt.userId = :user AND receipt.operationKey = :key
-                """, WriteReceiptEntity.class).setParameter("user", user).setParameter("key", key).getResultList();
-            if (found.size() > 1) throw WriteStore.unavailable();
-            if (found.isEmpty()) return Optional.empty();
+                """,
+                WriteReceiptEntity.class
+            )
+                .setParameter(ApiFieldConstants.Finance.USER, user)
+                .setParameter(ApiFieldConstants.Finance.KEY, key)
+                .getResultList();
+            if (found.size() > 1) {
+                throw WriteStore.unavailable();
+            }
+            if (found.isEmpty()) {
+                return Optional.empty();
+            }
+
             WriteReceiptEntity receipt = found.getFirst();
-            if (!user.equals(receipt.userId())) throw WriteStore.unavailable();
-            if (!digest.equals(receipt.requestDigest())) throw new FinancialException(409, "IDEMPOTENCY_CONFLICT");
+            if (!user.equals(receipt.userId())) {
+                throw WriteStore.unavailable();
+            }
+            if (!digest.equals(receipt.requestDigest())) {
+                throw new FinancialException(409, ApiCodeConstants.Finance.IDEMPOTENCY_CONFLICT);
+            }
+
             return Optional.of(stored(receipt));
-        } catch (PersistenceException failure) { throw store.storageFailure(failure); }
+        } catch (PersistenceException failure) {
+            throw store.storageFailure(failure);
+        }
     }
 
     /**
@@ -67,26 +90,53 @@ public class FinancialReceipts {
      * @created 2026-10-29
      * @usedBy FinancialService.write
      * @modified 2026-10-29 - 설정·영수증 엔티티와 기존 native 버전 계약의 원자성 유지
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
-    public StoredReceipt save(UUID user, String key, String digest, String action,
-            ArrayNode changedRefs, ObjectNode beforeAfter) {
+    public StoredReceipt save(
+        UUID user,
+        String key,
+        String digest,
+        String action,
+        ArrayNode changedRefs,
+        ObjectNode beforeAfter
+    ) {
         store.requireOwner(user);
+
         store.flush();
         try {
             // 사용자 잠금 아래의 계약 버전이다. JPA @Version으로 의미를 바꾸지 않는다.
-            String version = (String) entityManager.createNativeQuery("""
+            String version = (String) entityManager.createNativeQuery(
+                """
                 UPDATE payse.users
                 SET data_version = data_version + 1
                 WHERE id = ?1 AND data_version < 9223372036854775807
                 RETURNING data_version::text
-                """, String.class).setParameter(1, user).getSingleResult();
-            if (version == null) throw WriteStore.unavailable();
+                """,
+                String.class
+            )
+                .setParameter(1, user)
+                .getSingleResult();
+            if (version == null) {
+                throw WriteStore.unavailable();
+            }
+
             OffsetDateTime time = store.scalar("SELECT clock_timestamp()", OffsetDateTime.class);
-            WriteReceiptEntity receipt = new WriteReceiptEntity(UUID.randomUUID(), user, key, digest, action,
-                changedRefs.toString(), beforeAfter.toString(), Long.parseLong(version), time);
+            WriteReceiptEntity receipt = new WriteReceiptEntity(
+                UUID.randomUUID(),
+                user,
+                key,
+                digest,
+                action,
+                changedRefs.toString(),
+                beforeAfter.toString(),
+                Long.parseLong(version),
+                time
+            );
             store.persist(receipt);
             return stored(receipt);
-        } catch (PersistenceException failure) { throw store.storageFailure(failure); }
+        } catch (PersistenceException failure) {
+            throw store.storageFailure(failure);
+        }
     }
 
     /**
@@ -97,23 +147,38 @@ public class FinancialReceipts {
      */
     public void checkConstraints() {
         store.flush();
-        try { entityManager.createNativeQuery("SET CONSTRAINTS ALL IMMEDIATE").executeUpdate(); }
-        catch (PersistenceException failure) { throw store.storageFailure(failure); }
+        try {
+            entityManager.createNativeQuery("SET CONSTRAINTS ALL IMMEDIATE").executeUpdate();
+        } catch (PersistenceException failure) {
+            throw store.storageFailure(failure);
+        }
     }
 
     /**
      * 엔티티를 외부에 노출하지 않고 기존 공개 요약과 내부 감사 객체로 분리한다.
      * @created 2026-10-29
      * @usedBy FinancialReceipts.find, save
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조; 단일 제어문 본문 중괄호 명시
      */
     private StoredReceipt stored(WriteReceiptEntity receipt) {
         JsonNode changes = json.readTree(receipt.changedRefs());
         JsonNode audit = json.readTree(receipt.beforeAfter());
-        if (!changes.isArray() || !(audit instanceof ObjectNode object)) throw WriteStore.unavailable();
-        ObjectNode result = json.createObjectNode().put("receiptId", receipt.id().toString())
-            .put("operationKey", receipt.operationKey()).put("resultVersion", Long.toString(receipt.resultVersion()))
-            .put("createdAt", receipt.createdAt().toInstant().toString());
-        result.set("changedRefs", changes);
+        if (!changes.isArray() || !(audit instanceof ObjectNode object)) {
+            throw WriteStore.unavailable();
+        }
+
+        ObjectNode result = json.createObjectNode()
+            .put(ApiFieldConstants.Finance.RECEIPT_ID, receipt.id().toString())
+            .put(ApiFieldConstants.Finance.OPERATION_KEY, receipt.operationKey())
+            .put(ApiFieldConstants.Finance.RESULT_VERSION, Long.toString(receipt.resultVersion()))
+            .put(
+                ApiFieldConstants.Finance.CREATED_AT,
+                receipt.createdAt()
+                    .toInstant()
+                    .toString()
+            );
+        result.set(ApiFieldConstants.Finance.CHANGED_REFS, changes);
         return new StoredReceipt(result, object);
     }
 }

@@ -1,5 +1,7 @@
 package com.payse.api.architecture;
 
+import com.payse.api.ApiTestConstants.DocTool;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.charset.StandardCharsets;
@@ -16,7 +18,8 @@ import org.junit.jupiter.api.Test;
  * @modified 2026-10-20 - 생성일 불명·빈 수정 태그·익명 선언의 검사 경계 검증 추가
  */
 class ApiDocRulesTest {
-    private static final String DOC = "/** 목적 설명.\n * @created 2026-10-20\n * @usedBy JUnit test\n */\n";
+    private static final String DOC =
+        "/** 목적 설명.\n * @created 2026-10-20\n * @usedBy JUnit test\n */\n";
 
     /**
      * record 자동 메서드에 중복 주석을 요구하지 않고 명시적 메서드는 확인한다.
@@ -26,7 +29,10 @@ class ApiDocRulesTest {
      */
     @Test
     void acceptsDocumentedMembers() throws Exception {
-        assertEquals(0, check(DOC + "record Example(int value) { " + DOC + "int next() { return value; } }"));
+        assertEquals(
+            0,
+            check(DOC + "record Example(int value) { " + DOC + "int next() { return value; } }")
+        );
     }
 
     /**
@@ -50,8 +56,14 @@ class ApiDocRulesTest {
     @Test
     void rejectsInvalidDates() throws Exception {
         assertEquals(1, check(DOC.replace("2026-10-20", "2026-02-30") + "class Example {}"));
-        assertEquals(1, check(DOC.replace(" */", " * @modified 2026-10-19 - 과거 수정\n */") + "class Example {}"));
-        assertEquals(1, check(DOC.replace(" */", " * @modified 2026-10-21\n */") + "class Example {}"));
+        assertEquals(
+            1,
+            check(DOC.replace(" */", " * @modified 2026-10-19 - 과거 수정\n */") + "class Example {}")
+        );
+        assertEquals(
+            1,
+            check(DOC.replace(" */", " * @modified 2026-10-21\n */") + "class Example {}")
+        );
     }
 
     /**
@@ -62,7 +74,12 @@ class ApiDocRulesTest {
      */
     @Test
     void acceptsModificationReason() throws Exception {
-        assertEquals(0, check(DOC.replace(" */", " * @modified 2026-10-21 - 검증 조건 보완\n */") + "class Example {}"));
+        assertEquals(
+            0,
+            check(
+                DOC.replace(" */", " * @modified 2026-10-21 - 검증 조건 보완\n */") + "class Example {}"
+            )
+        );
     }
 
     /**
@@ -73,11 +90,19 @@ class ApiDocRulesTest {
      */
     @Test
     void requiresUnknownDateReason() throws Exception {
-        assertEquals(0, check(DOC.replace("2026-10-20", "unknown - 이전 저장소 이력 확인 불가") + "class Example {}"));
+        assertEquals(
+            0,
+            check(DOC.replace("2026-10-20", "unknown - 이전 저장소 이력 확인 불가") + "class Example {}")
+        );
         assertEquals(1, check(DOC.replace("2026-10-20", "unknown") + "class Example {}"));
         assertEquals(1, check(DOC.replace("2026-10-20", "unknown -   ") + "class Example {}"));
-        assertEquals(0, check(DOC.replace("2026-10-20", "unknown - 이력 확인 불가")
-            .replace(" */", " * @modified 2026-10-20 - 현재 수정 목적\n */") + "class Example {}"));
+        assertEquals(
+            0,
+            check(
+                DOC.replace("2026-10-20", "unknown - 이력 확인 불가")
+                    .replace(" */", " * @modified 2026-10-20 - 현재 수정 목적\n */") + "class Example {}"
+            )
+        );
     }
 
     /**
@@ -88,9 +113,15 @@ class ApiDocRulesTest {
      */
     @Test
     void rejectsEmptyModificationTags() throws Exception {
-        assertEquals(1, check(DOC.replace(" * @usedBy", " * @modified\n * @usedBy") + "class Example {}"));
+        assertEquals(
+            1,
+            check(DOC.replace(" * @usedBy", " * @modified\n * @usedBy") + "class Example {}")
+        );
         assertEquals(1, check(DOC.replace(" */", " * @modified\n */") + "class Example {}"));
-        assertEquals(1, check(DOC.replace(" */", " * @modified   \n *    \n */") + "class Example {}"));
+        assertEquals(
+            1,
+            check(DOC.replace(" */", " * @modified   \n *    \n */") + "class Example {}")
+        );
     }
 
     /**
@@ -102,9 +133,21 @@ class ApiDocRulesTest {
     @Test
     void checksEveryModificationTag() throws Exception {
         String first = " * @modified 2026-10-20 - 첫 목적\n";
-        assertEquals(0, check(DOC.replace(" */", first + " * @modified 2026-10-21 - 다음 목적\n */") + "class Example {}"));
-        assertEquals(1, check(DOC.replace(" */", first + " * @modified\n */") + "class Example {}"));
-        assertEquals(1, check(DOC.replace(" */", " * @modified\n" + first + " */") + "class Example {}"));
+        assertEquals(
+            0,
+            check(
+                DOC.replace(" */", first + " * @modified 2026-10-21 - 다음 목적\n */")
+                    + "class Example {}"
+            )
+        );
+        assertEquals(
+            1,
+            check(DOC.replace(" */", first + " * @modified\n */") + "class Example {}")
+        );
+        assertEquals(
+            1,
+            check(DOC.replace(" */", " * @modified\n" + first + " */") + "class Example {}")
+        );
     }
 
     /**
@@ -116,9 +159,19 @@ class ApiDocRulesTest {
     @Test
     void checksAnonymousMethodDocs() throws Exception {
         assertEquals(0, check(DOC + "class Example { Runnable action = () -> {}; }"));
-        assertEquals(1, check(DOC + "class Example { Runnable action = new Runnable() { public void run() {} }; }"));
-        assertEquals(0, check(DOC + "class Example { Runnable action = new Runnable() { "
-            + DOC + "@Override public void run() {} }; }"));
+        assertEquals(
+            1,
+            check(
+                DOC + "class Example { Runnable action = new Runnable() { public void run() {} }; }"
+            )
+        );
+        assertEquals(
+            0,
+            check(
+                DOC + "class Example { Runnable action = new Runnable() { "
+                    + DOC + "@Override public void run() {} }; }"
+            )
+        );
     }
 
     /**
@@ -159,8 +212,14 @@ class ApiDocRulesTest {
     @Test
     void rejectsInvalidRequiredTags() throws Exception {
         assertEquals(1, check(DOC.replace("목적 설명.", "") + "class Example {}"));
-        assertEquals(1, check(DOC.replace(" */", " * @created 2026-10-20\n */") + "class Example {}"));
-        assertEquals(1, check(DOC.replace(" * @usedBy JUnit test", " * @usedBy   ") + "class Example {}"));
+        assertEquals(
+            1,
+            check(DOC.replace(" */", " * @created 2026-10-20\n */") + "class Example {}")
+        );
+        assertEquals(
+            1,
+            check(DOC.replace(" * @usedBy JUnit test", " * @usedBy   ") + "class Example {}")
+        );
     }
 
     /**
@@ -169,6 +228,9 @@ class ApiDocRulesTest {
      * @usedBy 이 클래스의 주석 계약 테스트 메서드
      * @param source 검사할 예제 Java 소스
      * @return 검사기의 종료 코드
+     * @modified 2026-11-02 - 긴 식 지역변수 분리
+     * @modified 2026-11-02 - 분리한 도구 상수를 포함한 검사기 클래스 경로 사용
+     * @modified 2026-11-02 - 테스트 전용 통합 상수 파일 참조; 단일 제어문 본문 중괄호 명시
      */
     private int check(String source) throws Exception {
         Path parent = Files.createDirectories(Path.of("build", "doc-rule-tests"));
@@ -176,16 +238,34 @@ class ApiDocRulesTest {
         Process process = null;
         try {
             Files.writeString(directory.resolve("Example.java"), source, StandardCharsets.UTF_8);
-            String java = Path.of(System.getProperty("java.home"), "bin",
-                System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java").toString();
-            process = new ProcessBuilder(java, "tools/VerifyApiDocs.java", directory.toString())
-                .redirectErrorStream(true).redirectOutput(directory.resolve("output.txt").toFile()).start();
+            String java = Path.of(
+                System.getProperty("java.home"),
+                "bin",
+                System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java"
+            ).toString();
+            String toolClasspath = System.getProperty(DocTool.TOOL_CLASSPATH_PROPERTY);
+            assertNotNull(toolClasspath, "documentation checker classpath");
+            process = new ProcessBuilder(
+                java,
+                "-cp",
+                toolClasspath,
+                DocTool.CHECKER_CLASS,
+                directory.toString()
+            )
+                .redirectErrorStream(true)
+                .redirectOutput(directory.resolve("output.txt").toFile())
+                .start();
             assertTrue(process.waitFor(30, TimeUnit.SECONDS), "documentation checker timeout");
             return process.exitValue();
         } finally {
-            if (process != null && process.isAlive()) process.destroyForcibly().waitFor();
+            if (process != null && process.isAlive()) {
+                process.destroyForcibly().waitFor();
+            }
             try (var paths = Files.walk(directory)) {
-                for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) Files.delete(path);
+                var deletionOrder = paths.sorted(Comparator.reverseOrder()).toList();
+                for (Path path : deletionOrder) {
+                    Files.delete(path);
+                }
             }
         }
     }

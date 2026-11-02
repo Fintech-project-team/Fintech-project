@@ -53,7 +53,8 @@ public class WriteReceiptEntity implements OwnedEntity {
      * @created 2026-10-29
      * @usedBy Hibernate 엔티티 복원
      */
-    protected WriteReceiptEntity() { }
+    protected WriteReceiptEntity() {
+    }
 
     /**
      * 같은 인증 사용자 소유인지 검증할 내부 소유자 ID를 반환한다.
@@ -69,7 +70,17 @@ public class WriteReceiptEntity implements OwnedEntity {
      * @created 2026-10-29
      * @usedBy FinancialReceipts.save
      */
-    public WriteReceiptEntity(UUID id, UUID userId, String operationKey, String requestDigest, String action, String changedRefs, String beforeAfter, long resultVersion, OffsetDateTime createdAt) {
+    public WriteReceiptEntity(
+        UUID id,
+        UUID userId,
+        String operationKey,
+        String requestDigest,
+        String action,
+        String changedRefs,
+        String beforeAfter,
+        long resultVersion,
+        OffsetDateTime createdAt
+    ) {
         this.id = id;
         this.userId = userId;
         this.operationKey = operationKey;

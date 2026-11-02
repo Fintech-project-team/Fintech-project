@@ -1,5 +1,7 @@
 package com.payse.api.auth.mapper;
 
+import com.payse.api.ApiTestConstants.AuthColumns;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -56,11 +58,15 @@ class AuthRepositoryTest {
      * @created 2026-10-25
      * @usedBy JUnit BeforeEach
      * @modified 2026-10-29 - JPA 생성자·Tuple·실제 EntityTransaction 롤백 및 연결 문맥 검사
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     @BeforeEach
     void prepare() {
         dataSource = mock(DataSource.class);
-        factory = mock(EntityManagerFactory.class, withSettings().extraInterfaces(EntityManagerFactoryInfo.class));
+        factory = mock(
+            EntityManagerFactory.class,
+            withSettings().extraInterfaces(EntityManagerFactoryInfo.class)
+        );
         when(((EntityManagerFactoryInfo) factory).getDataSource()).thenReturn(dataSource);
         entityManager = mock(EntityManager.class);
         transaction = mock(EntityTransaction.class);
@@ -70,31 +76,49 @@ class AuthRepositoryTest {
         when(entityManager.getTransaction()).thenReturn(transaction);
         when(transaction.isActive()).thenReturn(true);
         AtomicBoolean rollback = new AtomicBoolean();
-        doAnswer(call -> { rollback.set(true); return null; }).when(transaction).setRollbackOnly();
+        doAnswer(
+            call -> {
+                rollback.set(true);
+                return null;
+            }
+        )
+            .when(transaction)
+            .setRollbackOnly();
         when(transaction.getRollbackOnly()).thenAnswer(call -> rollback.get());
         repository = new AuthRepository(entityManager);
         holder = new EntityManagerHolder(entityManager);
         TransactionSynchronizationManager.bindResource(factory, holder);
         TransactionSynchronizationManager.setActualTransactionActive(true);
         TransactionSynchronizationManager.setCurrentTransactionReadOnly(false);
-        TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        TransactionSynchronizationManager
+            .setCurrentTransactionIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         rows = List.of();
         statements = new ArrayList<>();
         bindings = new ArrayList<>();
-        when(entityManager.createNativeQuery(anyString(), eq(Tuple.class))).thenAnswer(call -> {
-            statements.add(call.getArgument(0));
-            List<Object> values = new ArrayList<>();
-            bindings.add(values);
-            Query query = mock(Query.class);
-            when(query.setParameter(anyInt(), any())).thenAnswer(binding -> {
-                int index = binding.getArgument(0);
-                while (values.size() < index) values.add(null);
-                values.set(index - 1, binding.getArgument(1));
+        when(entityManager.createNativeQuery(anyString(), eq(Tuple.class))).thenAnswer(
+            call -> {
+                statements.add(call.getArgument(0));
+                List<Object> values = new ArrayList<>();
+                bindings.add(values);
+                Query query = mock(Query.class);
+                when(query.setParameter(anyInt(), any())).thenAnswer(
+                    binding -> {
+                        int index = binding.getArgument(0);
+                        while (values.size() < index) {
+                            values.add(null);
+                        }
+                        values.set(index - 1, binding.getArgument(1));
+                        return query;
+                    }
+                );
+                when(query.getResultList()).thenAnswer(
+                    result -> rows.stream()
+                        .map(this::result)
+                        .toList()
+                );
                 return query;
-            });
-            when(query.getResultList()).thenAnswer(result -> rows.stream().map(this::result).toList());
-            return query;
-        });
+            }
+        );
     }
 
     /**
@@ -120,10 +144,12 @@ class AuthRepositoryTest {
     @SuppressWarnings("unchecked")
     private Tuple result(Map<String, Object> values) {
         Tuple row = mock(Tuple.class);
-        when(row.get(anyString(), any(Class.class))).thenAnswer(call -> {
-            Class<?> type = call.getArgument(1);
-            return type.cast(values.get(call.getArgument(0)));
-        });
+        when(row.get(anyString(), any(Class.class))).thenAnswer(
+            call -> {
+                Class<?> type = call.getArgument(1);
+                return type.cast(values.get(call.getArgument(0)));
+            }
+        );
         when(row.get(anyString())).thenAnswer(call -> values.get(call.getArgument(0)));
         return row;
     }
@@ -134,10 +160,11 @@ class AuthRepositoryTest {
      * @usedBy 제한 결과 매핑 검사
      * @param retryAt 명시된 DB 시각 또는 SQL null
      * @return 단일 시각 행
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     private Map<String, Object> timeRow(OffsetDateTime retryAt) {
         Map<String, Object> row = new HashMap<>();
-        row.put("retry_at", retryAt);
+        row.put(AuthColumns.RETRY_AT, retryAt);
         return row;
     }
 
@@ -154,9 +181,13 @@ class AuthRepositoryTest {
         assertNull(repository.retryAt(key));
         assertEquals(List.of(key), bindings.getFirst());
         assertFalse(statements.getFirst().contains(key));
-        OffsetDateTime stored = OffsetDateTime.of(2026, 10, 25, 12, 34, 56, 123456000, ZoneOffset.ofHours(9));
+        OffsetDateTime stored = OffsetDateTime
+            .of(2026, 10, 25, 12, 34, 56, 123456000, ZoneOffset.ofHours(9));
         rows = List.of(timeRow(stored));
-        assertEquals(Instant.parse("2026-10-25T03:34:56.123456Z"), repository.recordFailure("f".repeat(64)));
+        assertEquals(
+            Instant.parse("2026-10-25T03:34:56.123456Z"),
+            repository.recordFailure("f".repeat(64))
+        );
         assertFalse(transaction.getRollbackOnly());
     }
 
@@ -164,22 +195,40 @@ class AuthRepositoryTest {
      * IP 허용/재시도 조합과 0~1행 후보의 필드를 검증한다.
      * @created 2026-10-25
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void mapsValidRowsAndEmptyCandidates() {
         Map<String, Object> allowed = timeRow(null);
-        allowed.put("allowed", true);
+        allowed.put(AuthColumns.ALLOWED, true);
         rows = List.of(allowed);
         assertTrue(repository.recordIp("a".repeat(64)).allowed());
         UUID user = UUID.randomUUID();
-        rows = List.of(Map.of("user_id", user, "code_verifier", "DISABLED:private-marker"));
+        rows = List.of(
+            Map.of(
+                AuthColumns.USER_ID,
+                user,
+                AuthColumns.CODE_VERIFIER,
+                "DISABLED:private-marker"
+            )
+        );
         var candidate = repository.findCode(" 데모알파 ", "010-1234-5678").orElseThrow();
         assertEquals(user, candidate.userId());
         assertFalse(candidate.toString().contains("private-marker"));
         assertEquals(List.of("데모알파", "01012345678"), bindings.getLast());
         UUID session = UUID.randomUUID();
-        rows = List.of(Map.of("user_id", user, "session_id", session));
-        assertEquals(new AuthRows.Session(user, session), repository.authorize("sha256:" + "b".repeat(64)).orElseThrow());
+        rows = List.of(
+            Map.of(
+                AuthColumns.USER_ID,
+                user,
+                AuthColumns.SESSION_ID,
+                session
+            )
+        );
+        assertEquals(
+            new AuthRows.Session(user, session),
+            repository.authorize("sha256:" + "b".repeat(64)).orElseThrow()
+        );
         rows = List.of();
         assertTrue(repository.findCode("데모알파", "01012345678").isEmpty());
         assertTrue(repository.authorize(null).isEmpty());
@@ -192,6 +241,7 @@ class AuthRepositoryTest {
      * @created 2026-10-25
      * @usedBy JUnit test
      * @modified 2026-10-29 - JPA 생성자·Tuple·실제 EntityTransaction 롤백 및 연결 문맥 검사
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void rejectsMissingOrDuplicateRows() {
@@ -200,29 +250,60 @@ class AuthRepositoryTest {
         rows = List.of(timeRow(null), timeRow(null));
         assertThrows(AuthStoreException.class, () -> repository.recordFailure("b".repeat(64)));
         UUID user = UUID.randomUUID();
-        Map<String, Object> stored = Map.of("user_id", user, "code_verifier", "DISABLED:unit");
+        Map<String, Object> stored = Map.of(
+            AuthColumns.USER_ID,
+            user,
+            AuthColumns.CODE_VERIFIER,
+            "DISABLED:unit"
+        );
         rows = List.of(stored, stored);
         assertThrows(AuthStoreException.class, () -> repository.findCode("데모알파", "01012345678"));
-        rows = List.of(Map.of("user_id", user, "session_id", UUID.randomUUID()),
-            Map.of("user_id", user, "session_id", UUID.randomUUID()));
-        assertThrows(AuthStoreException.class, () -> repository.authorize("sha256:" + "c".repeat(64)));
+        rows = List.of(
+            Map.of(
+                AuthColumns.USER_ID,
+                user,
+                AuthColumns.SESSION_ID,
+                UUID.randomUUID()
+            ),
+            Map.of(
+                AuthColumns.USER_ID,
+                user,
+                AuthColumns.SESSION_ID,
+                UUID.randomUUID()
+            )
+        );
+        assertThrows(
+            AuthStoreException.class,
+            () -> repository.authorize("sha256:" + "c".repeat(64))
+        );
     }
 
     /**
      * null 식별자·verifier·모순된 IP 결과를 저장 장애로 거절한다.
      * @created 2026-10-25
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void rejectsIncompleteOrContradictoryResults() {
-        rows = List.of(Map.of("code_verifier", "DISABLED:unit"));
+        rows = List.of(Map.of(AuthColumns.CODE_VERIFIER, "DISABLED:unit"));
         assertThrows(AuthStoreException.class, () -> repository.findCode("데모알파", "01012345678"));
-        rows = List.of(Map.of("user_id", UUID.randomUUID()));
+        rows = List.of(Map.of(AuthColumns.USER_ID, UUID.randomUUID()));
         assertThrows(AuthStoreException.class, () -> repository.findCode("데모알파", "01012345678"));
-        assertThrows(AuthStoreException.class, () -> repository.authorize("sha256:" + "d".repeat(64)));
-        rows = List.of(Map.of("allowed", true, "retry_at", OffsetDateTime.now()));
+        assertThrows(
+            AuthStoreException.class,
+            () -> repository.authorize("sha256:" + "d".repeat(64))
+        );
+        rows = List.of(
+            Map.of(
+                AuthColumns.ALLOWED,
+                true,
+                AuthColumns.RETRY_AT,
+                OffsetDateTime.now()
+            )
+        );
         assertThrows(AuthStoreException.class, () -> repository.recordIp("e".repeat(64)));
-        rows = List.of(Map.of("allowed", false));
+        rows = List.of(Map.of(AuthColumns.ALLOWED, false));
         assertThrows(AuthStoreException.class, () -> repository.recordIp("f".repeat(64)));
         rows = List.of(timeRow(null));
         assertThrows(AuthStoreException.class, () -> repository.recordIp("a".repeat(64)));
@@ -233,14 +314,22 @@ class AuthRepositoryTest {
      * @created 2026-10-25
      * @usedBy JUnit test
      * @modified 2026-10-29 - JPA 생성자·Tuple·실제 EntityTransaction 롤백 및 연결 문맥 검사
+     * @modified 2026-11-02 - 불필요한 unchecked 경고 억제 제거
      */
     @Test
-    @SuppressWarnings("unchecked")
     void sanitizesDatabaseFailureAndMarksRollback() {
-        doThrow(new PersistenceException("SELECT credential=private-input",
-            new IllegalStateException("secret-value")))
-            .when(entityManager).createNativeQuery(anyString(), eq(Tuple.class));
-        AuthStoreException failure = assertThrows(AuthStoreException.class, () -> repository.retryAt("a".repeat(64)));
+        doThrow(
+            new PersistenceException(
+                "SELECT credential=private-input",
+                new IllegalStateException("secret-value")
+            )
+        )
+            .when(entityManager)
+            .createNativeQuery(anyString(), eq(Tuple.class));
+        AuthStoreException failure = assertThrows(
+            AuthStoreException.class,
+            () -> repository.retryAt("a".repeat(64))
+        );
         assertNull(failure.getCause());
         assertFalse(failure.toString().contains("private-input"));
         assertFalse(failure.toString().contains("secret-value"));
@@ -261,9 +350,11 @@ class AuthRepositoryTest {
         TransactionSynchronizationManager.setCurrentTransactionReadOnly(true);
         assertThrows(IllegalStateException.class, () -> repository.retryAt("a".repeat(64)));
         TransactionSynchronizationManager.setCurrentTransactionReadOnly(false);
-        TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(TransactionDefinition.ISOLATION_SERIALIZABLE);
+        TransactionSynchronizationManager
+            .setCurrentTransactionIsolationLevel(TransactionDefinition.ISOLATION_SERIALIZABLE);
         assertThrows(IllegalStateException.class, () -> repository.retryAt("a".repeat(64)));
-        TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        TransactionSynchronizationManager
+            .setCurrentTransactionIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         when(entityManager.isJoinedToTransaction()).thenReturn(false);
         assertThrows(IllegalStateException.class, () -> repository.retryAt("a".repeat(64)));
         when(entityManager.isJoinedToTransaction()).thenReturn(true);
@@ -286,13 +377,24 @@ class AuthRepositoryTest {
     @Test
     void rejectsInvalidConfigurationAndNestedWork() {
         assertThrows(IllegalArgumentException.class, () -> new AuthRepository(null));
-        assertThrows(IllegalArgumentException.class, () -> new AuthRepository(mock(EntityManager.class)));
-        assertThrows(IllegalArgumentException.class, () -> new AuthTransactions(entityManager, mock(PlatformTransactionManager.class)));
-        assertThrows(IllegalArgumentException.class,
-            () -> new AuthTransactions(entityManager, manager(mock(EntityManagerFactory.class))));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new AuthRepository(mock(EntityManager.class))
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new AuthTransactions(entityManager, mock(PlatformTransactionManager.class))
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new AuthTransactions(entityManager, manager(mock(EntityManagerFactory.class)))
+        );
         JpaTransactionManager wrongSource = manager(factory);
         when(wrongSource.getDataSource()).thenReturn(mock(DataSource.class));
-        assertThrows(IllegalArgumentException.class, () -> new AuthTransactions(entityManager, wrongSource));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new AuthTransactions(entityManager, wrongSource)
+        );
         AuthTransactions transactions = new AuthTransactions(entityManager, manager(factory));
         assertThrows(IllegalArgumentException.class, () -> transactions.run(null));
         assertThrows(IllegalStateException.class, () -> transactions.run(() -> 1));
@@ -313,13 +415,15 @@ class AuthRepositoryTest {
     @Test
     void registersOnlyWithDatabaseProfile() {
         clearContext();
-        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+        try (
+            AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             context.register(AuthRepository.class, AuthTransactions.class);
             context.refresh();
             assertTrue(context.getBeansOfType(AuthRepository.class).isEmpty());
             assertTrue(context.getBeansOfType(AuthTransactions.class).isEmpty());
         }
-        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+        try (
+            AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             context.getEnvironment().setActiveProfiles("database");
             context.registerBean(EntityManager.class, () -> entityManager);
             context.registerBean(PlatformTransactionManager.class, () -> manager(factory));
@@ -327,7 +431,10 @@ class AuthRepositoryTest {
             context.register(AuthRepository.class, AuthTransactions.class);
             context.refresh();
             AuthRepository bean = context.getBean(AuthRepository.class);
-            assertTrue(AopUtils.isAopProxy(bean), "Repository must work through Spring's actual exception-translation proxy");
+            assertTrue(
+                AopUtils.isAopProxy(bean),
+                "Repository must work through Spring's actual exception-translation proxy"
+            );
             assertNotNull(context.getBean(AuthTransactions.class));
             assertThrows(IllegalStateException.class, () -> bean.retryAt("a".repeat(64)));
         }

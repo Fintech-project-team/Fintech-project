@@ -11,5 +11,8 @@ public record AuthInput(String name, String phone, String code) {
      * @created 2026-10-28
      * @usedBy Java 문자열 변환
      */
-    @Override public String toString() { return "AuthInput[REDACTED]"; }
+    @Override
+    public String toString() {
+        return "AuthInput[REDACTED]";
+    }
 }

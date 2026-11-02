@@ -1,5 +1,8 @@
 package com.payse.api.auth.controller;
 
+import com.payse.api.ApiTestConstants.AuthConfig;
+import com.payse.api.ApiTestConstants.AuthHttp;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.payse.api.auth.error.AuthStoreException;
@@ -18,30 +21,37 @@ class AuthHttpInputTest {
      * 테스트별 접속 모드와 자동 전달 헤더 비활성 설정을 준비한다.
      * @created 2026-10-30
      * @usedBy 모든 테스트
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     private MockEnvironment environment(String mode) {
-        return new MockEnvironment().withProperty("PAYSE_AUTH_PEER_MODE", mode)
-            .withProperty("server.forward-headers-strategy", "none");
+        return new MockEnvironment().withProperty(AuthConfig.PAYSE_AUTH_PEER_MODE, mode)
+            .withProperty(AuthConfig.FORWARD_HEADERS_STRATEGY, "none");
     }
 
     /**
      * 프록시 모드는 지정한 loopback 바인딩을 포함해 구성한다.
      * @created 2026-10-30
      * @usedBy 프록시 IP 테스트
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     private AuthHttpInput proxyInput() {
-        return new AuthHttpInput(environment("loopback-proxy").withProperty("server.address", "127.0.0.1"));
+        return new AuthHttpInput(
+            environment("loopback-proxy").withProperty(AuthConfig.SERVER_ADDRESS, "127.0.0.1")
+        );
     }
 
     /**
      * DNS나 네트워크 없이 원격지와 전달 헤더를 구성한다.
      * @created 2026-10-30
      * @usedBy 모든 peer 테스트
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조; 단일 제어문 본문 중괄호 명시
      */
     private MockHttpServletRequest request(String remote, String forwarded) {
         var request = new MockHttpServletRequest();
         request.setRemoteAddr(remote);
-        if (forwarded != null) request.addHeader("X-Payse-Client-IP", forwarded);
+        if (forwarded != null) {
+            request.addHeader(AuthHttp.CLIENT_IP_HEADER, forwarded);
+        }
         return request;
     }
 
@@ -49,14 +59,15 @@ class AuthHttpInputTest {
      * 기존 direct는 바인딩 추가 설정 없이 연결 IP를 쓰고 모든 전달 헤더를 무시한다.
      * @created 2026-10-30
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void directIgnoresSpoofedHeaders() throws Exception {
         var input = new AuthHttpInput(environment("direct"));
         var request = request("192.0.2.8", "198.51.100.6");
-        request.addHeader("X-Payse-Client-IP", "203.0.113.5");
-        request.addHeader("X-Forwarded-For", "198.51.100.7");
-        request.addHeader("Forwarded", "for=203.0.113.9");
+        request.addHeader(AuthHttp.CLIENT_IP_HEADER, "203.0.113.5");
+        request.addHeader(AuthHttp.FORWARDED_FOR, "198.51.100.7");
+        request.addHeader(AuthHttp.FORWARDED, "for=203.0.113.9");
         assertEquals(InetAddress.getByName("192.0.2.8"), input.peer(request));
     }
 
@@ -68,9 +79,17 @@ class AuthHttpInputTest {
     @Test
     void directKeepsNumericAddressRules() throws Exception {
         var input = new AuthHttpInput(environment("direct"));
-        assertEquals(InetAddress.getByName("2001:db8::8"), input.peer(request("2001:db8::8", null)));
-        for (String remote : new String[]{"example.invalid", "127.0.0.1:80", "192.0.2.8,198.51.100.1",
-                "::ffff:192.0.2.8", "999.0.0.1"}) {
+        assertEquals(
+            InetAddress.getByName("2001:db8::8"),
+            input.peer(request("2001:db8::8", null))
+        );
+        for (String remote : new String[] {
+            "example.invalid",
+            "127.0.0.1:80",
+            "192.0.2.8,198.51.100.1",
+            "::ffff:192.0.2.8",
+            "999.0.0.1"
+        }) {
             assertThrows(AuthStoreException.class, () -> input.peer(request(remote, null)), remote);
         }
     }
@@ -79,17 +98,38 @@ class AuthHttpInputTest {
      * opt-in proxy는 loopback 바인딩과 전달 헤더 자동 변환 금지를 동시에 요구한다.
      * @created 2026-10-30
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void proxyRequiresSafeBinding() {
-        assertThrows(IllegalStateException.class, () -> new AuthHttpInput(environment("loopback-proxy")));
-        for (String address : new String[]{"0.0.0.0", "::", "::1", "localhost", "127.0.0.1 "}) {
-            assertThrows(IllegalStateException.class,
-                () -> new AuthHttpInput(environment("loopback-proxy").withProperty("server.address", address)), address);
+        assertThrows(
+            IllegalStateException.class,
+            () -> new AuthHttpInput(environment("loopback-proxy"))
+        );
+        for (String address : new String[] {
+            "0.0.0.0",
+            "::",
+            "::1",
+            "localhost",
+            "127.0.0.1 "
+        }) {
+            assertThrows(
+                IllegalStateException.class,
+                () -> new AuthHttpInput(
+                    environment("loopback-proxy").withProperty(AuthConfig.SERVER_ADDRESS, address)
+                ),
+                address
+            );
         }
-        for (String forwarding : new String[]{"native", "framework"}) {
-            assertThrows(IllegalStateException.class, () -> new AuthHttpInput(environment("loopback-proxy")
-                .withProperty("server.address", "127.0.0.1").withProperty("server.forward-headers-strategy", forwarding)));
+        for (String forwarding : new String[] { "native", "framework" }) {
+            assertThrows(
+                IllegalStateException.class,
+                () -> new AuthHttpInput(
+                    environment("loopback-proxy")
+                        .withProperty(AuthConfig.SERVER_ADDRESS, "127.0.0.1")
+                        .withProperty(AuthConfig.FORWARD_HEADERS_STRATEGY, forwarding)
+                )
+            );
         }
         assertDoesNotThrow(this::proxyInput);
     }
@@ -101,7 +141,12 @@ class AuthHttpInputTest {
      */
     @Test
     void rejectsUnknownModes() {
-        for (String mode : new String[]{"proxy", "", "direct ", "LOOPBACK-PROXY"}) {
+        for (String mode : new String[] {
+            "proxy",
+            "",
+            "direct ",
+            "LOOPBACK-PROXY"
+        }) {
             assertThrows(IllegalStateException.class, () -> new AuthHttpInput(environment(mode)));
         }
     }
@@ -114,7 +159,11 @@ class AuthHttpInputTest {
     @Test
     void proxyAcceptsNumericAddresses() throws Exception {
         var input = proxyInput();
-        for (String address : new String[]{"192.0.2.8", "2001:db8::8", "::ffff:192.0.2.8"}) {
+        for (String address : new String[] {
+            "192.0.2.8",
+            "2001:db8::8",
+            "::ffff:192.0.2.8"
+        }) {
             assertEquals(InetAddress.getByName(address), input.peer(request("127.0.0.1", address)));
         }
         assertEquals(InetAddress.getByName("192.0.2.8"), input.peer(request("::1", "192.0.2.8")));
@@ -128,8 +177,16 @@ class AuthHttpInputTest {
     @Test
     void proxyRejectsExternalPeers() {
         var input = proxyInput();
-        for (String remote : new String[]{"192.0.2.8", "10.0.0.1", "2001:db8::8", "example.invalid"}) {
-            assertThrows(AuthStoreException.class, () -> input.peer(request(remote, "198.51.100.4")));
+        for (String remote : new String[] {
+            "192.0.2.8",
+            "10.0.0.1",
+            "2001:db8::8",
+            "example.invalid"
+        }) {
+            assertThrows(
+                AuthStoreException.class,
+                () -> input.peer(request(remote, "198.51.100.4"))
+            );
         }
     }
 
@@ -137,19 +194,36 @@ class AuthHttpInputTest {
      * 헤더 누락·중복·목록·hostname·port·공백·zone은 원격 loopback 주소로 대체하지 않고 거절한다.
      * @created 2026-10-30
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void proxyRejectsAmbiguousHeaders() {
         var input = proxyInput();
         assertThrows(AuthStoreException.class, () -> input.peer(request("127.0.0.1", null)));
         var duplicate = request("127.0.0.1", "192.0.2.8");
-        duplicate.addHeader("X-Payse-Client-IP", "192.0.2.8");
+        duplicate.addHeader(AuthHttp.CLIENT_IP_HEADER, "192.0.2.8");
         assertThrows(AuthStoreException.class, () -> input.peer(duplicate));
-        for (String address : new String[]{"", " ", "192.0.2.8 ", "192.0.2.8,198.51.100.4",
-                "192.0.2.8:443", "[2001:db8::8]:443", "[2001:db8::8]", "example.invalid",
-                "999.1.1.1", "192.0.2", "1234", "2001:db8:::8", "fe80::1%3", "0".repeat(46)}) {
-            var failure = assertThrows(AuthStoreException.class,
-                () -> input.peer(request("127.0.0.1", address)), address);
+        for (String address : new String[] {
+            "",
+            " ",
+            "192.0.2.8 ",
+            "192.0.2.8,198.51.100.4",
+            "192.0.2.8:443",
+            "[2001:db8::8]:443",
+            "[2001:db8::8]",
+            "example.invalid",
+            "999.1.1.1",
+            "192.0.2",
+            "1234",
+            "2001:db8:::8",
+            "fe80::1%3",
+            "0".repeat(46)
+        }) {
+            var failure = assertThrows(
+                AuthStoreException.class,
+                () -> input.peer(request("127.0.0.1", address)),
+                address
+            );
             assertEquals("Authentication storage failed", failure.getMessage());
         }
     }

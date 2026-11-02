@@ -1,5 +1,7 @@
 package com.payse.api.finance.mapper;
 
+import com.payse.api.constants.ApiFieldConstants.FinanceDb;
+import com.payse.api.constants.ApiMessageConstants.Finance;
 import com.payse.api.finance.error.TransactionStoreException;
 import com.payse.api.finance.vo.OriginalState;
 import com.payse.api.finance.vo.OriginalTransaction;
@@ -28,6 +30,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Repository
 @Profile("database")
 public class TransactionRepository {
+
     private static final String LINK_SQL = """
         WITH owned AS NOT MATERIALIZED (
             SELECT tx.id, tx.user_id, tx.card_id, tx.record_kind, tx.purchase_date,
@@ -80,11 +83,14 @@ public class TransactionRepository {
      * @usedBy Spring 생성자 주입, AuthJdbcTest
      * @param entityManager 인증 문맥과 RLS를 공유할 EntityManager
      * @modified 2026-10-29 - 동일 JPA 트랜잭션에서 기존 원거래 SQL·권한·롤백 보존
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리
      */
     public TransactionRepository(EntityManager entityManager) {
         if (entityManager == null || entityManager.getEntityManagerFactory() == null) {
-            throw new IllegalArgumentException("Transaction EntityManagerFactory is required");
+            throw new IllegalArgumentException(Finance.ENTITY_FACTORY_REQUIRED);
         }
+
         this.entityManager = entityManager;
         this.factory = entityManager.getEntityManagerFactory();
     }
@@ -99,17 +105,29 @@ public class TransactionRepository {
      * @return 연결 기관의 소유 거래; 없거나 다른 소유자/미연결 기관이면 empty
      * @modified 2026-10-29 - 동일 JPA 트랜잭션에서 기존 원거래 SQL·권한·롤백 보존
      * @modified 2026-10-29 - 분리한 DTO·VO를 사용하고 기존 처리·응답 계약 유지
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
      */
     public Optional<TransactionLink> findLink(UUID transactionId) {
-        if (transactionId == null) throw new IllegalArgumentException("Transaction ID is required");
+        if (transactionId == null) {
+            throw new IllegalArgumentException(Finance.TRANSACTION_ID_REQUIRED);
+        }
+
         requireTransaction();
         try {
             UUID owner = owner();
             Query query = entityManager.createNativeQuery(LINK_SQL, Tuple.class)
-                .setParameter(1, owner).setParameter(2, transactionId);
+                .setParameter(1, owner)
+                .setParameter(2, transactionId);
             List<?> values = query.getResultList();
-            List<TransactionLink> rows = values.stream().map(Tuple.class::cast).map(this::mapLink).toList();
-            if (rows.size() > 1) throw new TransactionStoreException();
+            List<TransactionLink> rows = values.stream()
+                .map(Tuple.class::cast)
+                .map(this::mapLink)
+                .toList();
+            if (rows.size() > 1) {
+                throw new TransactionStoreException();
+            }
+
             return rows.stream().findFirst();
         } catch (IllegalStateException failure) {
             rollbackOnly();
@@ -125,17 +143,21 @@ public class TransactionRepository {
      * @created 2026-10-29
      * @usedBy TransactionRepository.findLink
      * @modified 2026-10-29 - 동일 JPA 트랜잭션에서 기존 원거래 SQL·권한·롤백 보존
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리
      */
     private void requireTransaction() {
         Object resource = TransactionSynchronizationManager.getResource(factory);
         if (!TransactionSynchronizationManager.isActualTransactionActive()
-                || !(resource instanceof EntityManagerHolder holder)
-                || !entityManager.isJoinedToTransaction()
-                || entityManager.getDelegate() != holder.getEntityManager().getDelegate()
-                || TransactionSynchronizationManager.isCurrentTransactionReadOnly()
-                || !Integer.valueOf(TransactionDefinition.ISOLATION_READ_COMMITTED).equals(
-                    TransactionSynchronizationManager.getCurrentTransactionIsolationLevel())) {
-            throw new IllegalStateException("Transaction read requires the authenticated READ COMMITTED transaction");
+            || !(resource instanceof EntityManagerHolder holder)
+            || !entityManager.isJoinedToTransaction()
+            || entityManager.getDelegate() != holder.getEntityManager().getDelegate()
+            || TransactionSynchronizationManager.isCurrentTransactionReadOnly()
+            || !Integer.valueOf(TransactionDefinition.ISOLATION_READ_COMMITTED)
+                .equals(
+                    TransactionSynchronizationManager.getCurrentTransactionIsolationLevel()
+                )) {
+            throw new IllegalStateException(Finance.READ_COMMITTED_REQUIRED);
         }
     }
 
@@ -145,14 +167,22 @@ public class TransactionRepository {
      * @usedBy TransactionRepository.findLink
      * @return 요청 본문이 아닌 인증 DB 문맥의 소유자
      * @modified 2026-10-29 - 동일 JPA 트랜잭션에서 기존 원거래 SQL·권한·롤백 보존
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
      */
     private UUID owner() {
-        UUID userId = (UUID) entityManager.createNativeQuery("""
+        UUID userId = (UUID) entityManager.createNativeQuery(
+            """
             SELECT CASE WHEN current_user = 'payse_runtime'
                         THEN NULLIF(current_setting('payse.user_id', true), '')::uuid
                    END
-            """, UUID.class).getSingleResult();
-        if (userId == null) throw new IllegalStateException("Transaction read requires an authorized user context");
+            """,
+            UUID.class
+        ).getSingleResult();
+        if (userId == null) {
+            throw new IllegalStateException(Finance.OWNER_CONTEXT_REQUIRED);
+        }
+
         return userId;
     }
 
@@ -164,29 +194,48 @@ public class TransactionRepository {
      * @return 공개 직렬화를 금지한 원거래 연결 자료
      * @modified 2026-10-29 - 동일 JPA 트랜잭션에서 기존 원거래 SQL·권한·롤백 보존
      * @modified 2026-10-29 - 분리한 DTO·VO를 사용하고 기존 처리·응답 계약 유지
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리
      */
     private TransactionLink mapLink(Tuple row) {
-        UUID originalId = row.get("original_id", UUID.class);
-        Number amount = row.get("original_amount_krw", Number.class);
-        OriginalTransaction original = originalId == null ? null : new OriginalTransaction(originalId,
-            row.get("original_card_id", UUID.class), row.get("original_kind", String.class),
-            date(row, "original_purchase_date"),
-            amount.longValue(), row.get("original_source_version", String.class));
-        return new TransactionLink(row.get("id", UUID.class),
-            date(row, "cancellation_date"), row.get("original_transaction_id", UUID.class),
-            OriginalState.valueOf(row.get("original_state", String.class)), original);
+        UUID originalId = row.get(FinanceDb.ORIGINAL_ID, UUID.class);
+        Number amount = row.get(FinanceDb.ORIGINAL_AMOUNT_KRW, Number.class);
+        OriginalTransaction original = originalId == null ? null
+            : new OriginalTransaction(
+                originalId,
+                row.get(FinanceDb.ORIGINAL_CARD_ID, UUID.class),
+                row.get(FinanceDb.ORIGINAL_KIND, String.class),
+                date(row, FinanceDb.ORIGINAL_PURCHASE_DATE),
+                amount.longValue(),
+                row.get(FinanceDb.ORIGINAL_SOURCE_VERSION, String.class)
+            );
+        return new TransactionLink(
+            row.get(FinanceDb.ID, UUID.class),
+            date(row, FinanceDb.CANCELLATION_DATE),
+            row.get(FinanceDb.ORIGINAL_TRANSACTION_ID, UUID.class),
+            OriginalState.valueOf(row.get(FinanceDb.ORIGINAL_STATE, String.class)),
+            original
+        );
     }
 
     /**
      * 원천 DATE만 날짜로 옮기며 시각·추정 일자를 만들지 않는다.
      * @created 2026-10-29
      * @usedBy mapLink
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     private LocalDate date(Tuple row, String field) {
         Object value = row.get(field);
-        if (value == null) return null;
-        if (value instanceof LocalDate day) return day;
-        if (value instanceof Date day) return day.toLocalDate();
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof LocalDate day) {
+            return day;
+        }
+        if (value instanceof Date day) {
+            return day.toLocalDate();
+        }
+
         throw new TransactionStoreException();
     }
 
@@ -195,12 +244,15 @@ public class TransactionRepository {
      * @created 2026-10-29
      * @usedBy TransactionRepository.findLink
      * @modified 2026-10-29 - 동일 JPA 트랜잭션에서 기존 원거래 SQL·권한·롤백 보존
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     private void rollbackOnly() {
         Object resource = TransactionSynchronizationManager.getResource(factory);
         if (resource instanceof EntityManagerHolder holder) {
             var transaction = holder.getEntityManager().getTransaction();
-            if (transaction.isActive()) transaction.setRollbackOnly();
+            if (transaction.isActive()) {
+                transaction.setRollbackOnly();
+            }
         }
     }
 

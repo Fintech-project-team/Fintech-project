@@ -1,8 +1,9 @@
 package com.payse.api.config;
 
+import com.payse.api.ApiTestConstants.DatabaseConfig;
+
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.payse.api.config.DatabaseConfiguration;
 import com.zaxxer.hikari.HikariConfig;
 import java.util.Map;
 import javax.sql.DataSource;
@@ -24,8 +25,10 @@ class DatabaseConfigurationTest {
      */
     @Test
     void requiresDatabaseSettings() {
-        assertThrows(IllegalStateException.class,
-            () -> new DatabaseConfiguration().dataSource(new MockEnvironment()));
+        assertThrows(
+            IllegalStateException.class,
+            () -> new DatabaseConfiguration().dataSource(new MockEnvironment())
+        );
     }
 
     /**
@@ -33,12 +36,17 @@ class DatabaseConfigurationTest {
      * @created 2026-10-20
      * @usedBy JUnit test
      * @modified 2026-10-25 - 이름을 역할에 맞게 정리
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void rejectsOtherDrivers() {
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(
+            IllegalArgumentException.class,
             () -> new DatabaseConfiguration().dataSource(
-                new MockEnvironment().withProperty("PAYSE_JDBC_URL", "jdbc:h2:mem:test")));
+                new MockEnvironment()
+                    .withProperty(DatabaseConfig.PAYSE_JDBC_URL, "jdbc:h2:mem:test")
+            )
+        );
     }
 
     /**
@@ -84,17 +92,25 @@ class DatabaseConfigurationTest {
     void requiresEverySetting() {
         for (String name : validSettings().keySet()) {
             var missing = new MockEnvironment();
-            validSettings().forEach((key, value) -> {
-                if (!key.equals(name)) {
-                    missing.setProperty(key, value);
+            validSettings().forEach(
+                (key, value) -> {
+                    if (!key.equals(name)) {
+                        missing.setProperty(key, value);
+                    }
                 }
-            });
-            assertThrows(IllegalStateException.class,
-                () -> new DatabaseConfiguration().poolConfig(missing), name);
-            for (String blank : new String[] {"", " \t\n"}) {
+            );
+            assertThrows(
+                IllegalStateException.class,
+                () -> new DatabaseConfiguration().poolConfig(missing),
+                name
+            );
+            for (String blank : new String[] { "", " \t\n" }) {
                 var environment = validEnvironment().withProperty(name, blank);
-                assertThrows(IllegalStateException.class,
-                    () -> new DatabaseConfiguration().poolConfig(environment), name);
+                assertThrows(
+                    IllegalStateException.class,
+                    () -> new DatabaseConfiguration().poolConfig(environment),
+                    name
+                );
             }
         }
     }
@@ -104,6 +120,7 @@ class DatabaseConfigurationTest {
      * @created 2026-10-25
      * @usedBy JUnit test
      * @modified 2026-10-25 - 이름을 역할에 맞게 정리
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void usesExplicitPoolSettings() {
@@ -114,9 +131,9 @@ class DatabaseConfigurationTest {
         assertEquals(1, config.getInitializationFailTimeout());
 
         var environment = validEnvironment()
-            .withProperty("PAYSE_DB_MAX_POOL_SIZE", "1")
-            .withProperty("PAYSE_DB_CONNECTION_TIMEOUT_MS", "251")
-            .withProperty("PAYSE_DB_VALIDATION_TIMEOUT_MS", "250");
+            .withProperty(DatabaseConfig.PAYSE_DB_MAX_POOL_SIZE, "1")
+            .withProperty(DatabaseConfig.PAYSE_DB_CONNECTION_TIMEOUT_MS, "251")
+            .withProperty(DatabaseConfig.PAYSE_DB_VALIDATION_TIMEOUT_MS, "250");
         HikariConfig minimumConfig = new DatabaseConfiguration().poolConfig(environment);
         assertEquals(1, minimumConfig.getMaximumPoolSize());
         assertEquals(251, minimumConfig.getConnectionTimeout());
@@ -130,16 +147,32 @@ class DatabaseConfigurationTest {
      * @created 2026-10-25
      * @usedBy JUnit test
      * @modified 2026-10-25 - 이름을 역할에 맞게 정리
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void rejectsInvalidNumbers() {
-        String[] names = {"PAYSE_DB_MAX_POOL_SIZE", "PAYSE_DB_CONNECTION_TIMEOUT_MS",
-            "PAYSE_DB_VALIDATION_TIMEOUT_MS"};
+        String[] names = {
+            DatabaseConfig.PAYSE_DB_MAX_POOL_SIZE,
+            DatabaseConfig.PAYSE_DB_CONNECTION_TIMEOUT_MS,
+            DatabaseConfig.PAYSE_DB_VALIDATION_TIMEOUT_MS
+        };
         for (String name : names) {
-            for (String invalid : new String[] {"-1", "0", "1.5", "+2", " 2", "2 ", "２", "2147483648"}) {
+            for (String invalid : new String[] {
+                "-1",
+                "0",
+                "1.5",
+                "+2",
+                " 2",
+                "2 ",
+                "２",
+                "2147483648"
+            }) {
                 var environment = validEnvironment().withProperty(name, invalid);
-                assertThrows(IllegalArgumentException.class,
-                    () -> new DatabaseConfiguration().poolConfig(environment), name);
+                assertThrows(
+                    IllegalArgumentException.class,
+                    () -> new DatabaseConfiguration().poolConfig(environment),
+                    name
+                );
             }
         }
     }
@@ -149,13 +182,21 @@ class DatabaseConfigurationTest {
      * @created 2026-10-25
      * @usedBy JUnit test
      * @modified 2026-10-25 - 이름을 역할에 맞게 정리
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void checksTimeoutBounds() {
-        for (String invalid : new String[] {"249", "3000", "3001"}) {
-            var environment = validEnvironment().withProperty("PAYSE_DB_VALIDATION_TIMEOUT_MS", invalid);
-            assertThrows(IllegalArgumentException.class,
-                () -> new DatabaseConfiguration().poolConfig(environment));
+        for (String invalid : new String[] {
+            "249",
+            "3000",
+            "3001"
+        }) {
+            var environment = validEnvironment()
+                .withProperty(DatabaseConfig.PAYSE_DB_VALIDATION_TIMEOUT_MS, invalid);
+            assertThrows(
+                IllegalArgumentException.class,
+                () -> new DatabaseConfiguration().poolConfig(environment)
+            );
         }
     }
 
@@ -164,13 +205,17 @@ class DatabaseConfigurationTest {
      * @created 2026-10-25
      * @usedBy JUnit test
      * @modified 2026-10-25 - 이름을 역할에 맞게 정리
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void redactsInvalidSettings() {
         String secretMarker = "private-value-do-not-log";
-        var environment = validEnvironment().withProperty("PAYSE_DB_MAX_POOL_SIZE", secretMarker);
-        var failure = assertThrows(IllegalArgumentException.class,
-            () -> new DatabaseConfiguration().poolConfig(environment));
+        var environment = validEnvironment()
+            .withProperty(DatabaseConfig.PAYSE_DB_MAX_POOL_SIZE, secretMarker);
+        var failure = assertThrows(
+            IllegalArgumentException.class,
+            () -> new DatabaseConfiguration().poolConfig(environment)
+        );
         assertFalse(failure.toString().contains(secretMarker));
         assertNull(failure.getCause());
     }
@@ -181,15 +226,23 @@ class DatabaseConfigurationTest {
      * @usedBy DatabaseConfigurationTest.validEnvironment, requiresEverySetting
      * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      * @return 운영 기본값이 아닌 테스트 입력
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     private Map<String, String> validSettings() {
         return Map.of(
-            "PAYSE_JDBC_URL", "jdbc:postgresql://localhost/unused_configuration_test",
-            "PAYSE_DB_USER", "fixture-user",
-            "PAYSE_DB_PASSWORD", "fixture-password",
-            "PAYSE_DB_MAX_POOL_SIZE", "3",
-            "PAYSE_DB_CONNECTION_TIMEOUT_MS", "3000",
-            "PAYSE_DB_VALIDATION_TIMEOUT_MS", "1000");
+            DatabaseConfig.PAYSE_JDBC_URL,
+            "jdbc:postgresql://localhost/unused_configuration_test",
+            DatabaseConfig.PAYSE_DB_USER,
+            "fixture-user",
+            DatabaseConfig.PAYSE_DB_PASSWORD,
+            "fixture-password",
+            DatabaseConfig.PAYSE_DB_MAX_POOL_SIZE,
+            "3",
+            DatabaseConfig.PAYSE_DB_CONNECTION_TIMEOUT_MS,
+            "3000",
+            DatabaseConfig.PAYSE_DB_VALIDATION_TIMEOUT_MS,
+            "1000"
+        );
     }
 
     /**

@@ -2,6 +2,7 @@ package com.payse.ai.provider;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.payse.ai.AiTestConstants.ProviderCodes;
 import com.payse.ai.provider.dto.ModelReply;
 import com.payse.ai.provider.dto.TokenUsage;
 import org.junit.jupiter.api.Test;
@@ -12,17 +13,22 @@ import org.junit.jupiter.api.Test;
  * @usedBy JUnit
  */
 class ModelContractTest {
+
     /**
      * 미확인 사용량과 확인된 0을 구별하고 정수 상한까지 임의 합산하지 않는다.
      * @created 2026-11-01
      * @usedBy JUnit
+     * @modified 2026-11-02 - 계약 문자열 상수 분리; 독립 테스트 상수 통합; 상수 타입 명시 참조
      */
     @Test
     void preservesUnknownUsage() {
-        assertNull(new ModelReply(null, null, "MODEL_REFUSAL").usage());
+        assertNull(new ModelReply(null, null, ProviderCodes.MODEL_REFUSAL).usage());
         assertNull(new TokenUsage(10, null, 5).cachedTokens());
         assertEquals(0L, new TokenUsage(10, 0L, 5).cachedTokens());
-        assertEquals(Long.MAX_VALUE, new TokenUsage(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE).inputTokens());
+        assertEquals(
+            Long.MAX_VALUE,
+            new TokenUsage(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE).inputTokens()
+        );
     }
 
     /**
@@ -46,10 +52,14 @@ class ModelContractTest {
     @Test
     void rejectsRawFailureDetails() {
         String secret = "provider-private-response";
-        var callFailure = assertThrows(IllegalArgumentException.class,
-            () -> new ModelFailure(secret, ModelFailure.Stage.GENERATION, true));
-        var replyFailure = assertThrows(IllegalArgumentException.class,
-            () -> new ModelReply(null, null, secret));
+        var callFailure = assertThrows(
+            IllegalArgumentException.class,
+            () -> new ModelFailure(secret, ModelFailure.Stage.GENERATION, true)
+        );
+        var replyFailure = assertThrows(
+            IllegalArgumentException.class,
+            () -> new ModelReply(null, null, secret)
+        );
         for (var failure : java.util.List.of(callFailure, replyFailure)) {
             assertFalse(failure.toString().contains(secret));
             assertNull(failure.getCause());

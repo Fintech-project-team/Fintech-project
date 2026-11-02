@@ -1,6 +1,7 @@
 package com.payse.api.auth.mapper;
 
 import com.payse.api.auth.error.AuthStoreException;
+import com.payse.api.constants.ApiMessageConstants.Auth;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.PersistenceException;
@@ -26,6 +27,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Component
 @Profile("database")
 public final class AuthTransactions {
+
     private final EntityManager entityManager;
     private final EntityManagerFactory factory;
     private final DataSource dataSource;
@@ -38,15 +40,18 @@ public final class AuthTransactions {
      * @param entityManager 인증 Repository와 같은 factory의 공유 EntityManager
      * @param manager 해당 factory·DataSource를 관리하는 로컬 JPA 트랜잭션 관리자
      * @modified 2026-10-29 - JPA 트랜잭션의 역할·flush·커밋/롤백과 중첩 차단 유지
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리
      */
     public AuthTransactions(EntityManager entityManager, PlatformTransactionManager manager) {
         if (entityManager == null || entityManager.getEntityManagerFactory() == null
-                || !(manager instanceof JpaTransactionManager local)
-                || local.getEntityManagerFactory() != entityManager.getEntityManagerFactory()
-                || !(entityManager.getEntityManagerFactory() instanceof EntityManagerFactoryInfo info)
-                || info.getDataSource() == null || local.getDataSource() != info.getDataSource()) {
-            throw new IllegalArgumentException("Authentication storage must use one EntityManagerFactory and DataSource");
+            || !(manager instanceof JpaTransactionManager local)
+            || local.getEntityManagerFactory() != entityManager.getEntityManagerFactory()
+            || !(entityManager.getEntityManagerFactory() instanceof EntityManagerFactoryInfo info)
+            || info.getDataSource() == null || local.getDataSource() != info.getDataSource()) {
+            throw new IllegalArgumentException(Auth.SHARED_STORE_REQUIRED);
         }
+
         this.entityManager = entityManager;
         this.factory = entityManager.getEntityManagerFactory();
         this.dataSource = local.getDataSource();
@@ -65,31 +70,39 @@ public final class AuthTransactions {
      * @return 커밋된 작업 결과; null 자체는 업무 성공을 의미하지 않음
      * @throws AuthStoreException DB 접근 또는 커밋/롤백 장애
      * @modified 2026-10-29 - JPA 트랜잭션의 역할·flush·커밋/롤백과 중첩 차단 유지
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
      */
     public <T> T run(Supplier<T> work) {
-        if (work == null) throw new IllegalArgumentException("Authentication work is required");
-        if (TransactionSynchronizationManager.isActualTransactionActive()
-                || TransactionSynchronizationManager.isSynchronizationActive()
-                || TransactionSynchronizationManager.hasResource(factory)
-                || TransactionSynchronizationManager.hasResource(dataSource)) {
-            throw new IllegalStateException("Authentication transactions cannot be nested");
+        if (work == null) {
+            throw new IllegalArgumentException(Auth.WORK_REQUIRED);
         }
+        if (TransactionSynchronizationManager.isActualTransactionActive()
+            || TransactionSynchronizationManager.isSynchronizationActive()
+            || TransactionSynchronizationManager.hasResource(factory)
+            || TransactionSynchronizationManager.hasResource(dataSource)) {
+            throw new IllegalStateException(Auth.NESTED_TRANSACTION);
+        }
+
         try {
-            return transaction.execute(status -> {
-                // 역할은 트랜잭션에만 적용한다. 연결 풀에 세션 단위 역할을 남기지 않는다.
-                Object resource = TransactionSynchronizationManager.getResource(factory);
-                if (!(resource instanceof EntityManagerHolder holder)
+            return transaction.execute(
+                status -> {
+                    // 역할은 트랜잭션에만 적용한다. 연결 풀에 세션 단위 역할을 남기지 않는다.
+                    Object resource = TransactionSynchronizationManager.getResource(factory);
+                    if (!(resource instanceof EntityManagerHolder holder)
                         || !entityManager.isJoinedToTransaction()
                         || entityManager.getDelegate() != holder.getEntityManager().getDelegate()) {
-                    throw new AuthStoreException();
+                        throw new AuthStoreException();
+                    }
+
+                    entityManager.createNativeQuery("SET LOCAL ROLE payse_runtime").executeUpdate();
+                    T result = work.get();
+                    // 다른 호출부가 SQL 오류를 삼켜도 aborted COMMIT을 성공 결과로 반환하지 않는다.
+                    entityManager.flush();
+                    entityManager.createNativeQuery("SELECT 1").getSingleResult();
+                    return result;
                 }
-                entityManager.createNativeQuery("SET LOCAL ROLE payse_runtime").executeUpdate();
-                T result = work.get();
-                // 다른 호출부가 SQL 오류를 삼켜도 aborted COMMIT을 성공 결과로 반환하지 않는다.
-                entityManager.flush();
-                entityManager.createNativeQuery("SELECT 1").getSingleResult();
-                return result;
-            });
+            );
         } catch (DataAccessException | TransactionException | PersistenceException failure) {
             throw new AuthStoreException();
         }

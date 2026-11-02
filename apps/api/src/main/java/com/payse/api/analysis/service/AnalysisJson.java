@@ -1,5 +1,7 @@
 package com.payse.api.analysis.service;
 
+import com.payse.api.constants.ApiConfigConstants;
+import com.payse.api.constants.ApiMessageConstants;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -14,6 +16,7 @@ import tools.jackson.databind.node.ObjectNode;
  * @usedBy AnalysisIdentity, AnalysisJobs, AnalysisRepository
  */
 public final class AnalysisJson {
+
     public static final JsonMapper JSON = JsonMapper.builder().build();
 
     /**
@@ -21,7 +24,8 @@ public final class AnalysisJson {
      * @created 2026-11-01
      * @usedBy 클래스 초기화
      */
-    private AnalysisJson() {}
+    private AnalysisJson() {
+    }
 
     /**
      * 값·배열 순서는 유지하고 객체 키만 재귀 정렬한다. 집합 정렬은 업무 호출부가 수행한다.
@@ -31,7 +35,10 @@ public final class AnalysisJson {
     public static JsonNode canonical(JsonNode value) {
         if (value.isObject()) {
             ObjectNode sorted = JSON.createObjectNode();
-            value.propertyNames().stream().sorted().forEach(key -> sorted.set(key, canonical(value.get(key))));
+            value.propertyNames()
+                .stream()
+                .sorted()
+                .forEach(key -> sorted.set(key, canonical(value.get(key))));
             return sorted;
         }
         if (value.isArray()) {
@@ -46,13 +53,20 @@ public final class AnalysisJson {
      * 정수·문자열·null의 구분을 보존한 정규 JSON을 SHA-256으로 식별한다.
      * @created 2026-11-01
      * @usedBy AnalysisIdentity, AnalysisJobs
+     * @modified 2026-11-02 - 긴 식 지역변수 분리
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조
      */
     public static String digest(JsonNode value) {
         try {
-            byte[] bytes = canonical(value).toString().getBytes(StandardCharsets.UTF_8);
-            return "sha256:" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+            byte[] bytes = canonical(value)
+                .toString()
+                .getBytes(StandardCharsets.UTF_8);
+            byte[] digest = MessageDigest.getInstance(ApiConfigConstants.Analysis.DIGEST_ALGORITHM)
+                .digest(bytes);
+            return ApiConfigConstants.Analysis.SHA256_PREFIX + HexFormat.of().formatHex(digest);
         } catch (NoSuchAlgorithmException failure) {
-            throw new IllegalStateException("Required digest unavailable");
+            throw new IllegalStateException(ApiMessageConstants.Analysis.DIGEST_UNAVAILABLE);
         }
     }
 }

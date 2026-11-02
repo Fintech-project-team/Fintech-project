@@ -2,18 +2,18 @@
 
 공통 의미는 상위 `docs/`에 한 번 정의하고, 구현 상세는 담당 앱·기능의 `docs/`에 둔다.
 
-| 내용                          | 단일 기준 문서                                                                                               | 하위 문서에 남길 내용                                                |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| 제품 범위·버전·인증 수명      | [product-baseline.md](product-baseline.md)                                                                   | 해당 기능의 구현/미구현 범위                                         |
-| 필드·타입·필수 여부·수정 권한 | [data-model.md](data-model.md)                                                                               | 실제 mapper·구현 경계·검사                                           |
-| HTTP 요청·응답·오류·멱등      | [api-contract.md](api-contract.md)                                                                           | Controller/service/adapter의 구현 연결                               |
-| 공개 투영·연결·페이지         | [api-response-models.md](api-response-models.md)                                                             | API/FakeRepository의 처리·검사                                       |
-| 실제 DB 사전·공통 저장 제약   | [database-schema.md](database-schema.md)                                                                     | 운영 실행·이행·검증 결과                                             |
-| 계산·기간·정정                | [calculation-rules.md](calculation-rules.md)                                                                 | 실제 Dart 입출력/테스트 벡터                                         |
-| 구조·상태 수명                | [app-architecture.md](app-architecture.md)                                                                   | 기능의 실제 파일/생성/호출 연결                                      |
-| 코드 구조·설정·주석           | [CODE_SPEC.md](harness/CODE_SPEC.md)                                                                         | API Java 필수 진입 규칙은 [src/AGENTS.md](../apps/api/src/AGENTS.md) |
-| 담당·허용 경로·문서 위치      | [team-plan.md](team-plan.md), [ownership.md](ownership.md)                                                   | 작업 명세의 좁은 허용 범위                                           |
-| Git·검사·작업 기록            | [Git 정책](harness/COMMIT_PR_POLICY.md), [검사](harness/GATE_MATRIX.md), [자기검증](harness/AGENT_REVIEW.md) | 해당 작업 명령/결과/미검증                                           |
+| 내용                          | 단일 기준 문서                                                                                               | 하위 문서에 남길 내용                                        |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| 제품 범위·버전·인증 수명      | [product-baseline.md](product-baseline.md)                                                                   | 해당 기능의 구현/미구현 범위                                 |
+| 필드·타입·필수 여부·수정 권한 | [data-model.md](data-model.md)                                                                               | 실제 mapper·구현 경계·검사                                   |
+| HTTP 요청·응답·오류·멱등      | [api-contract.md](api-contract.md)                                                                           | Controller/service/adapter의 구현 연결                       |
+| 공개 투영·연결·페이지         | [api-response-models.md](api-response-models.md)                                                             | API/FakeRepository의 처리·검사                               |
+| 실제 DB 사전·공통 저장 제약   | [database-schema.md](database-schema.md)                                                                     | 운영 실행·이행·검증 결과                                     |
+| 계산·기간·정정                | [calculation-rules.md](calculation-rules.md)                                                                 | 실제 Dart 입출력/테스트 벡터                                 |
+| 구조·상태 수명                | [app-architecture.md](app-architecture.md)                                                                   | 기능의 실제 파일/생성/호출 연결                              |
+| 코드 구조·설정·주석           | [CODE_SPEC.md](harness/CODE_SPEC.md)                                                                         | API Java 필수 진입 규칙은 [AGENTS.md](../apps/api/AGENTS.md) |
+| 담당·허용 경로·문서 위치      | [team-plan.md](team-plan.md), [ownership.md](ownership.md)                                                   | 작업 명세의 좁은 허용 범위                                   |
+| Git·검사·작업 기록            | [Git 정책](harness/COMMIT_PR_POLICY.md), [검사](harness/GATE_MATRIX.md), [자기검증](harness/AGENT_REVIEW.md) | 해당 작업 명령/결과/미검증                                   |
 
 ## 문서 위치와 변경
 

@@ -6,4 +6,5 @@ package com.payse.api.health.dto;
  * @usedBy HealthController.live
  * @param status 프로세스 응답 가능 상태 UP
  */
-public record HealthResponse(String status) {}
+public record HealthResponse(String status) {
+}

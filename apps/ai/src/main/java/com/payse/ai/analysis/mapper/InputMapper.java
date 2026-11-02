@@ -2,10 +2,14 @@ package com.payse.ai.analysis.mapper;
 
 import static com.payse.ai.analysis.validation.SchemaRules.require;
 
+import com.payse.ai.analysis.dto.AnalysisResult;
 import com.payse.ai.analysis.validation.AnalysisContract;
 import com.payse.ai.analysis.validation.SchemaRules;
 import com.payse.ai.analysis.validation.StorageContract;
-import com.payse.ai.analysis.dto.AnalysisResult;
+import com.payse.ai.constants.AiCodeConstants;
+import com.payse.ai.constants.AiConfigConstants;
+import com.payse.ai.constants.AiFieldConstants.Schema;
+import com.payse.ai.constants.AiFieldConstants;
 import com.payse.ai.provider.dto.TokenUsage;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,26 +40,50 @@ public final class InputMapper {
      * 호출 입력의 사본을 검증하고 모델용 최소 필드와 요청 내부 ID만 준비한다.
      * @created 2026-11-01
      * @usedBy AnalysisService.analyze, 계약 테스트
+     * @modified 2026-11-02 - 긴 식 지역변수 분리
+     * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조
      */
     public InputMapper(ObjectNode payload, AnalysisContract contract) {
         this.contract = contract;
-        require(payload != null, "INVALID_INPUT");
+        require(payload != null, AiCodeConstants.Analysis.INVALID_INPUT);
         original = payload.deepCopy();
         contract.input(original);
+
         ObjectNode projected = JSON.createObjectNode();
-        for (String key : new String[] {"semanticTaskKind", "items", "transactions", "relations", "unavailableReferences"}) {
+        String[] projectedFields = {
+            AiFieldConstants.Analysis.SEMANTIC_TASK_KIND,
+            AiFieldConstants.Analysis.ITEMS,
+            AiFieldConstants.Analysis.TRANSACTIONS,
+            AiFieldConstants.Analysis.RELATIONS,
+            AiFieldConstants.Analysis.UNAVAILABLE_REFERENCES
+        };
+        for (String key : projectedFields) {
             projected.set(key, original.get(key).deepCopy());
         }
-        projected.set("existingClassifications", original.get("currentClassifications").deepCopy());
-        var candidates = projected.putArray("candidates");
-        for (JsonNode candidate : original.get("candidates")) {
+        projected.set(
+            AiFieldConstants.Analysis.EXISTING_CLASSIFICATIONS,
+            original.get(AiFieldConstants.Analysis.CURRENT_CLASSIFICATIONS)
+                .deepCopy()
+        );
+
+        var candidates = projected.putArray(AiFieldConstants.Analysis.CANDIDATES);
+        for (JsonNode candidate : original.get(AiFieldConstants.Analysis.CANDIDATES)) {
             ObjectNode row = candidates.addObject();
-            for (String key : new String[] {"candidateKey", "evidenceTransactionIds", "normalizedName", "features"}) {
+            String[] candidateFields = {
+                AiFieldConstants.Analysis.CANDIDATE_KEY,
+                AiFieldConstants.Analysis.EVIDENCE_TRANSACTION_IDS,
+                AiFieldConstants.Analysis.NORMALIZED_NAME,
+                AiFieldConstants.Analysis.FEATURES
+            };
+            for (String key : candidateFields) {
                 row.set(key, candidate.get(key).deepCopy());
             }
         }
+
         input = (ObjectNode) transform(projected, null, this::shorten);
-        schema = (ObjectNode) aliasSchema(contract.outputSchema(original.get("semanticTaskKind").asString()), null);
+        String task = original.get(AiFieldConstants.Analysis.SEMANTIC_TASK_KIND).asString();
+        ObjectNode outputSchema = contract.outputSchema(task);
+        schema = (ObjectNode) aliasSchema(outputSchema, null);
     }
 
     /**
@@ -63,14 +91,18 @@ public final class InputMapper {
      * @created 2026-11-01
      * @usedBy AnalysisService.analyze
      */
-    public ObjectNode input() { return input.deepCopy(); }
+    public ObjectNode input() {
+        return input.deepCopy();
+    }
 
     /**
      * 공급자 전용 별칭 규격이며 공개 UUID 계약을 바꾸지 않는다.
      * @created 2026-11-01
      * @usedBy AnalysisService.analyze
      */
-    public ObjectNode schema() { return schema.deepCopy(); }
+    public ObjectNode schema() {
+        return schema.deepCopy();
+    }
 
     /**
      * 현재 요청의 별칭만 복원하고 공개 계약으로 재검증한다. 불완전 배치는 반환하지 않는다.
@@ -88,23 +120,37 @@ public final class InputMapper {
      * 같은 요청의 의미 출력과 개별 보존 메타데이터를 감싼 공급자 전용 규격을 만든다.
      * @created 2026-11-01
      * @usedBy AnalysisService.analyzeForStorage
+     * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조
      */
     public ObjectNode storageSchema() {
-        return StorageContract.schema(schema, original.get("items").size());
+        return StorageContract.schema(schema, original.get(AiFieldConstants.Analysis.ITEMS).size());
     }
 
     /**
      * 의미와 보존 목록을 모두 검증하고 동일한 요청별 ID 대응으로 복원한다.
      * @created 2026-11-01
      * @usedBy AnalysisService.analyzeForStorage
+     * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조; 제어문 본문 구분
      */
     public AnalysisResult restoreStorage(ObjectNode response, TokenUsage usage) {
         SchemaRules.check(storageSchema(), response);
-        ObjectNode output = restore((ObjectNode) response.get("output"));
-        JsonNode memories = transform(response.get("memories"), null, this::restoreId);
+        ObjectNode output = restore((ObjectNode) response.get(AiFieldConstants.Analysis.OUTPUT));
+        JsonNode memories = transform(
+            response.get(AiFieldConstants.Analysis.MEMORIES),
+            null,
+            this::restoreId
+        );
+
         Set<String> expected = new HashSet<>();
-        for (JsonNode item : original.get("items")) expected.add(item.get("itemKey").asString());
-        return new AnalysisResult(output, StorageContract.decisions(memories, expected), usage, null);
+        for (JsonNode item : original.get(AiFieldConstants.Analysis.ITEMS)) {
+            expected.add(item.get(AiFieldConstants.Analysis.ITEM_KEY).asString());
+        }
+        return new AnalysisResult(
+            output,
+            StorageContract.decisions(memories, expected),
+            usage,
+            null
+        );
     }
 
     /**
@@ -126,9 +172,13 @@ public final class InputMapper {
      * 미발급 별칭·다른 ID 종류·원래 UUID 직접 반환을 거절한다.
      * @created 2026-11-01
      * @usedBy restore
+     * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조
      */
     private String restoreId(String kind, String alias) {
-        require(originals.containsKey(alias) && alias.startsWith(kind), "UNKNOWN_RESPONSE_ID");
+        require(
+            originals.containsKey(alias) && alias.startsWith(kind),
+            AiCodeConstants.Analysis.UNKNOWN_RESPONSE_ID
+        );
         return originals.get(alias);
     }
 
@@ -136,48 +186,78 @@ public final class InputMapper {
      * 허용된 식별 필드만 변환하며 상호·적요 안의 같은 문자열은 변경하지 않는다.
      * @created 2026-11-01
      * @usedBy InputMapper 생성자, restore
+     * @modified 2026-11-02 - 긴 식 지역변수 분리
      */
-    private JsonNode transform(JsonNode value, String field, BiFunction<String, String, String> convert) {
+    private JsonNode transform(
+        JsonNode value,
+        String field,
+        BiFunction<String, String, String> convert
+    ) {
         if (value.isObject()) {
             ObjectNode result = JSON.createObjectNode();
-            for (String key : value.propertyNames()) result.set(key, transform(value.get(key), key, convert));
+            for (String key : value.propertyNames()) {
+                JsonNode transformed = transform(value.get(key), key, convert);
+                result.set(key, transformed);
+            }
             return result;
         }
+
         if (value.isArray()) {
             var result = JSON.createArrayNode();
-            for (JsonNode row : value) result.add(transform(row, field, convert));
+            for (JsonNode row : value) {
+                JsonNode transformed = transform(row, field, convert);
+                result.add(transformed);
+            }
             return result;
         }
+
         String kind = kind(field);
-        return kind != null && !value.isNull() ? JSON.getNodeFactory().stringNode(convert.apply(kind, value.asString())) : value.deepCopy();
+        if (kind != null && !value.isNull()) {
+            var nodes = JSON.getNodeFactory();
+            String converted = convert.apply(kind, value.asString());
+            return nodes.stringNode(converted);
+        }
+
+        return value.deepCopy();
     }
 
     /**
      * 응답의 식별 필드에는 현재 요청에서 발급한 별칭만 허용한다.
      * @created 2026-11-01
      * @usedBy InputMapper 생성자
+     * @modified 2026-11-02 - 긴 식 지역변수 분리; 상수 타입 명시 참조; 제어문 본문 구분
+     * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조
      */
     private JsonNode aliasSchema(JsonNode originalSchema, String field) {
         String kind = kind(field);
         if (kind != null) {
-            ObjectNode value = JSON.createObjectNode().put("type", "string");
-            var allowed = value.putArray("enum");
-            originals.keySet().stream().filter(alias -> alias.startsWith(kind)).sorted().forEach(allowed::add);
-            if ("array".equals(originalSchema.path("type").asString(""))) {
+            ObjectNode value = JSON.createObjectNode().put(Schema.TYPE_KEY, Schema.STRING_TYPE);
+            var allowed = value.putArray(Schema.ENUM);
+            originals.keySet()
+                .stream()
+                .filter(alias -> alias.startsWith(kind))
+                .sorted()
+                .forEach(allowed::add);
+            if (Schema.ARRAY_TYPE.equals(originalSchema.path(Schema.TYPE_KEY).asString(""))) {
                 ObjectNode array = (ObjectNode) originalSchema.deepCopy();
-                array.set("items", value);
+                array.set(Schema.ITEMS, value);
                 return array;
             }
             return value;
         }
+
         ObjectNode result = (ObjectNode) originalSchema.deepCopy();
-        if (result.has("properties")) {
-            ObjectNode properties = result.putObject("properties");
-            for (String key : originalSchema.get("properties").propertyNames()) {
-                properties.set(key, aliasSchema(originalSchema.get("properties").get(key), key));
+        if (result.has(Schema.PROPERTIES)) {
+            ObjectNode properties = result.putObject(Schema.PROPERTIES);
+            JsonNode sourceProperties = originalSchema.get(Schema.PROPERTIES);
+            for (String key : sourceProperties.propertyNames()) {
+                JsonNode aliased = aliasSchema(sourceProperties.get(key), key);
+                properties.set(key, aliased);
             }
         }
-        if (result.has("items")) result.set("items", aliasSchema(originalSchema.get("items"), null));
+        if (result.has(Schema.ITEMS)) {
+            result.set(Schema.ITEMS, aliasSchema(originalSchema.get(Schema.ITEMS), null));
+        }
         return result;
     }
 
@@ -185,14 +265,22 @@ public final class InputMapper {
      * ID의 명목 종류를 구분하며 임의의 이름을 식별자로 해석하지 않는다.
      * @created 2026-11-01
      * @usedBy transform, aliasSchema
+     * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조; 제어문 본문 구분
      */
     private String kind(String field) {
-        if (field == null) return null;
+        if (field == null) {
+            return null;
+        }
         return switch (field) {
-            case "transactionId", "targetTransactionId", "originalTransactionId", "fromId", "toId", "evidenceTransactionIds" -> "t";
-            case "itemKey" -> "i";
-            case "candidateKey" -> "c";
-            default -> null;
+        case AiFieldConstants.Analysis.TRANSACTION_ID,
+            AiFieldConstants.Analysis.TARGET_TRANSACTION_ID,
+            AiFieldConstants.Analysis.ORIGINAL_TRANSACTION_ID, AiFieldConstants.Analysis.FROM_ID,
+            AiFieldConstants.Analysis.TO_ID,
+            AiFieldConstants.Analysis.EVIDENCE_TRANSACTION_IDS ->
+            AiConfigConstants.Analysis.TRANSACTION_PREFIX;
+        case AiFieldConstants.Analysis.ITEM_KEY -> AiConfigConstants.Analysis.ITEM_PREFIX;
+        case AiFieldConstants.Analysis.CANDIDATE_KEY -> AiConfigConstants.Analysis.CANDIDATE_PREFIX;
+        default -> null;
         };
     }
 }

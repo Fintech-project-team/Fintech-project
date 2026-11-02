@@ -38,7 +38,11 @@ public final class AuthService {
      * @created 2026-10-26
      * @usedBy Spring 생성자 주입, AuthServiceTest, SessionJdbcTest
      */
-    public AuthService(AuthRepository repository, AuthTransactions transactions, AuthCrypto crypto) {
+    public AuthService(
+        AuthRepository repository,
+        AuthTransactions transactions,
+        AuthCrypto crypto
+    ) {
         this.repository = Objects.requireNonNull(repository);
         this.transactions = Objects.requireNonNull(transactions);
         this.crypto = Objects.requireNonNull(crypto);
@@ -75,7 +79,13 @@ public final class AuthService {
      * @param token 현재 클라이언트 토큰 원문; 로그/DB에 저장하지 않음
      * @return 동일 세션 재확인 또는 기존 오류 의미의 실패
      */
-    public AuthResult reverify(InetAddress peer, String token, String name, String phone, String code) {
+    public AuthResult reverify(
+        InetAddress peer,
+        String token,
+        String name,
+        String phone,
+        String code
+    ) {
         return reverify(peer, () -> token, () -> new AuthInput(name, phone, code));
     }
 
@@ -85,12 +95,21 @@ public final class AuthService {
      * @created 2026-10-28
      * @usedBy AuthController.reverify, AuthService.reverify
      * @modified 2026-10-29 - 분리한 DTO·VO를 사용하고 기존 처리·응답 계약 유지
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
-    public AuthResult reverify(InetAddress peer, Supplier<String> tokenInput, Supplier<AuthInput> input) {
+    public AuthResult reverify(
+        InetAddress peer,
+        Supplier<String> tokenInput,
+        Supplier<AuthInput> input
+    ) {
         AuthRows.IpLimit ip = recordIp(peer);
         String token = tokenInput.get();
         boolean active = transactions.run(() -> repository.authorize(digest(token)).isPresent());
-        if (!active) return ip.allowed() ? failure(AuthResult.Reason.SESSION_INVALID) : limited(ip.retryAt());
+        if (!active) {
+            return ip.allowed() ? failure(AuthResult.Reason.SESSION_INVALID)
+                : limited(ip.retryAt());
+        }
+
         return read(ip, input, credentials -> confirm(token, credentials));
     }
 
@@ -100,14 +119,18 @@ public final class AuthService {
      * @usedBy AuthService.login, reverify
      * @modified 2026-10-29 - 분리한 DTO·VO를 사용하고 기존 처리·응답 계약 유지
      */
-    private AuthResult read(AuthRows.IpLimit ip, Supplier<AuthInput> source,
-            Function<AuthCredentials, AuthResult> action) {
+    private AuthResult read(
+        AuthRows.IpLimit ip,
+        Supplier<AuthInput> source,
+        Function<AuthCredentials, AuthResult> action
+    ) {
         AuthInput input;
         try {
             input = source.get();
         } catch (AuthInputException invalid) {
             return ip.allowed() ? failure(invalid.reason()) : limited(ip.retryAt());
         }
+
         return attempt(ip, input.name(), input.phone(), input.code(), action);
     }
 
@@ -118,8 +141,11 @@ public final class AuthService {
      * @return 종료 커밋 결과 또는 SESSION_INVALID
      */
     public AuthResult logout(String token) {
-        return transactions.run(() -> repository.endSession(digest(token))
-            ? AuthResult.LoggedOut.INSTANCE : failure(AuthResult.Reason.SESSION_INVALID));
+        return transactions.run(
+            () -> repository.endSession(digest(token))
+                ? AuthResult.LoggedOut.INSTANCE
+                : failure(AuthResult.Reason.SESSION_INVALID)
+        );
     }
 
     /**
@@ -141,9 +167,15 @@ public final class AuthService {
      * @modified 2026-10-28 - 이미 커밋한 IP 결과를 받아 중복 집계를 방지
      * @return 제한 기록과 업무 처리가 커밋된 결과; DB 장애는 성공으로 바꾸지 않음
      * @modified 2026-10-29 - 분리한 DTO·VO를 사용하고 기존 처리·응답 계약 유지
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
-    private AuthResult attempt(AuthRows.IpLimit ip, String name, String phone, String code,
-            Function<AuthCredentials, AuthResult> action) {
+    private AuthResult attempt(
+        AuthRows.IpLimit ip,
+        String name,
+        String phone,
+        String code,
+        Function<AuthCredentials, AuthResult> action
+    ) {
         String normalizedName;
         String normalizedPhone;
         try {
@@ -152,20 +184,27 @@ public final class AuthService {
         } catch (IllegalArgumentException invalid) {
             return ip.allowed() ? failure(AuthResult.Reason.INVALID_INPUT) : limited(ip.retryAt());
         }
+
         String key = crypto.combinationLimitKey(normalizedName, normalizedPhone);
-        return transactions.run(() -> {
-            Instant blockedUntil = repository.retryAt(key);
-            Instant retryAt = later(ip.retryAt(), blockedUntil);
-            if (retryAt != null) return limited(retryAt);
-            AuthCredentials credentials;
-            try {
-                credentials = new AuthCredentials(normalizedName, normalizedPhone, code);
-            } catch (IllegalArgumentException invalid) {
-                // 코드 형식을 바꿔도 이름·전화번호 조합의 기존 차단을 우회하지 못한다.
-                return failure(AuthResult.Reason.INVALID_INPUT);
+        return transactions.run(
+            () -> {
+                Instant blockedUntil = repository.retryAt(key);
+                Instant retryAt = later(ip.retryAt(), blockedUntil);
+                if (retryAt != null) {
+                    return limited(retryAt);
+                }
+
+                AuthCredentials credentials;
+                try {
+                    credentials = new AuthCredentials(normalizedName, normalizedPhone, code);
+                } catch (IllegalArgumentException invalid) {
+                    // 코드 형식을 바꿔도 이름·전화번호 조합의 기존 차단을 우회하지 못한다.
+                    return failure(AuthResult.Reason.INVALID_INPUT);
+                }
+
+                return action.apply(credentials);
             }
-            return action.apply(credentials);
-        });
+        );
     }
 
     /**
@@ -173,9 +212,11 @@ public final class AuthService {
      * @created 2026-10-26
      * @usedBy AuthService.login의 조합 트랜잭션
      * @modified 2026-10-29 - 분리한 DTO·VO를 사용하고 기존 처리·응답 계약 유지
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     private AuthResult signIn(AuthCredentials credentials) {
-        Optional<AuthRows.LoginAccount> account = repository.lockCode(credentials.name(), credentials.phone());
+        Optional<AuthRows.LoginAccount> account = repository
+            .lockCode(credentials.name(), credentials.phone());
         if (account.isEmpty()) {
             compareMissing(credentials.code());
             return rejectCredentials(credentials);
@@ -184,11 +225,22 @@ public final class AuthService {
         if (!crypto.verifyCode(stored.userId(), credentials.code(), stored.verifier())) {
             return rejectCredentials(credentials);
         }
+
         IssuedToken token = crypto.issueToken();
-        Optional<AuthRows.OpenedSession> opened = repository.openSession(stored.userId(), token.digest());
-        if (opened.isEmpty()) return failure(AuthResult.Reason.AUTH_REJECTED);
+        Optional<AuthRows.OpenedSession> opened = repository
+            .openSession(stored.userId(), token.digest());
+        if (opened.isEmpty()) {
+            return failure(AuthResult.Reason.AUTH_REJECTED);
+        }
+
         AuthRows.OpenedSession session = opened.get();
-        return new AuthResult.Login(session.userId(), session.name(), session.sessionId(), token.value(), session.issuedAt());
+        return new AuthResult.Login(
+            session.userId(),
+            session.name(),
+            session.sessionId(),
+            token.value(),
+            session.issuedAt()
+        );
     }
 
     /**
@@ -196,18 +248,26 @@ public final class AuthService {
      * @created 2026-10-26
      * @usedBy AuthService.reverify의 조합 트랜잭션
      * @modified 2026-10-29 - 분리한 DTO·VO를 사용하고 기존 처리·응답 계약 유지
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     private AuthResult confirm(String token, AuthCredentials credentials) {
         Optional<AuthRows.Session> current = repository.authorize(digest(token));
-        if (current.isEmpty()) return failure(AuthResult.Reason.SESSION_INVALID);
-        Optional<AuthRows.StoredCode> account = repository.findCode(credentials.name(), credentials.phone());
+        if (current.isEmpty()) {
+            return failure(AuthResult.Reason.SESSION_INVALID);
+        }
+
+        Optional<AuthRows.StoredCode> account = repository
+            .findCode(credentials.name(), credentials.phone());
         if (account.isEmpty()) {
             compareMissing(credentials.code());
             return rejectCredentials(credentials);
         }
         AuthRows.StoredCode stored = account.get();
         boolean matches = crypto.verifyCode(stored.userId(), credentials.code(), stored.verifier());
-        if (!matches || !stored.userId().equals(current.get().userId())) return rejectCredentials(credentials);
+        if (!matches || !stored.userId().equals(current.get().userId())) {
+            return rejectCredentials(credentials);
+        }
+
         return new AuthResult.Verified(current.get().userId(), current.get().sessionId());
     }
 
@@ -227,7 +287,9 @@ public final class AuthService {
      * @created 2026-10-26
      * @usedBy AuthService.signIn, confirm
      */
-    private void compareMissing(String code) { crypto.codeVerifier(UUID.randomUUID(), code); }
+    private void compareMissing(String code) {
+        crypto.codeVerifier(UUID.randomUUID(), code);
+    }
 
     /**
      * 토큰 형식 오류도 DB authorize의 문맥 제거 경로로 전달한다.
@@ -257,9 +319,13 @@ public final class AuthService {
      * 두 제한의 해제 시각 중 늦은 값을 선택하며 금융 날짜 계산과는 무관하다.
      * @created 2026-10-26
      * @usedBy AuthService.attempt
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     private static Instant later(Instant first, Instant second) {
-        if (first == null) return second;
+        if (first == null) {
+            return second;
+        }
+
         return second == null || first.isAfter(second) ? first : second;
     }
 
@@ -268,12 +334,16 @@ public final class AuthService {
      * @created 2026-10-26
      * @usedBy AuthService 인증 거절 처리
      */
-    private static AuthResult.Failure failure(AuthResult.Reason reason) { return new AuthResult.Failure(reason, null); }
+    private static AuthResult.Failure failure(AuthResult.Reason reason) {
+        return new AuthResult.Failure(reason, null);
+    }
 
     /**
      * DB 제한 시각을 보존한다. HTTP Retry-After 초 변환은 응답 어댑터의 책임이다.
      * @created 2026-10-26
      * @usedBy AuthService.attempt, rejectCredentials, rejectMalformed
      */
-    private static AuthResult.Failure limited(Instant retryAt) { return new AuthResult.Failure(AuthResult.Reason.RATE_LIMITED, retryAt); }
+    private static AuthResult.Failure limited(Instant retryAt) {
+        return new AuthResult.Failure(AuthResult.Reason.RATE_LIMITED, retryAt);
+    }
 }

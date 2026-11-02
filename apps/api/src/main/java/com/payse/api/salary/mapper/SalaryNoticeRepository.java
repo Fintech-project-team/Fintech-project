@@ -1,5 +1,6 @@
 package com.payse.api.salary.mapper;
 
+import com.payse.api.constants.ApiMessageConstants.Salary;
 import com.payse.api.salary.vo.SalaryMonth;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -24,6 +25,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Repository
 @Profile("database & auth & finance & salary-notices")
 public class SalaryNoticeRepository {
+
     private final EntityManager entityManager;
     private final EntityManagerFactory factory;
 
@@ -41,32 +43,54 @@ public class SalaryNoticeRepository {
      * 조회는 행을 만들지 않으며 기록이 없으면 접지 않은 상태로 반환한다.
      * @created 2026-10-30
      * @usedBy SalaryNoticeService.read, dismiss
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
      */
     public Optional<Instant> find(UUID owner, SalaryMonth month) {
         requireOwner(owner);
-        List<?> rows = entityManager.createNativeQuery("""
+        List<?> rows = entityManager.createNativeQuery(
+            """
             SELECT dismissed_at
             FROM payse.salary_notice_dismissals
             WHERE user_id = ?1
               AND pay_month = ?2
-            """).setParameter(1, owner).setParameter(2, month.value()).getResultList();
-        if (rows.size() > 1) throw new IllegalStateException("Salary notice identity is not unique");
-        if (rows.isEmpty()) return Optional.empty();
+            """
+        )
+            .setParameter(1, owner)
+            .setParameter(2, month.value())
+            .getResultList();
+        if (rows.size() > 1) {
+            throw new IllegalStateException(Salary.DUPLICATE_NOTICE);
+        }
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
+
         Object value = rows.getFirst();
-        if (value instanceof Instant time) return Optional.of(time);
-        if (value instanceof OffsetDateTime time) return Optional.of(time.toInstant());
-        if (value instanceof Timestamp time) return Optional.of(time.toInstant());
-        throw new IllegalStateException("Salary notice time is invalid");
+        if (value instanceof Instant time) {
+            return Optional.of(time);
+        }
+        if (value instanceof OffsetDateTime time) {
+            return Optional.of(time.toInstant());
+        }
+        if (value instanceof Timestamp time) {
+            return Optional.of(time.toInstant());
+        }
+
+        throw new IllegalStateException(Salary.INVALID_NOTICE_TIME);
     }
 
     /**
      * 최초 기록만 삽입한다. 반복 요청은 최초 시각을 유지하고 금융 버전을 올리지 않는다.
      * @created 2026-10-30
      * @usedBy SalaryNoticeService.dismiss
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
      */
     public Instant dismiss(UUID owner, SalaryMonth month) {
         requireOwner(owner);
-        int changed = entityManager.createNativeQuery("""
+        int changed = entityManager.createNativeQuery(
+            """
             INSERT INTO payse.salary_notice_dismissals (
               user_id,
               pay_month
@@ -76,18 +100,29 @@ public class SalaryNoticeRepository {
               ?2
             )
             ON CONFLICT (user_id, pay_month) DO NOTHING
-            """).setParameter(1, owner).setParameter(2, month.value()).executeUpdate();
-        if (changed < 0 || changed > 1) throw new IllegalStateException("Unexpected salary notice write count");
-        return find(owner, month).orElseThrow(() -> new IllegalStateException("Salary notice was not stored"));
+            """
+        )
+            .setParameter(1, owner)
+            .setParameter(2, month.value())
+            .executeUpdate();
+        if (changed < 0 || changed > 1) {
+            throw new IllegalStateException(Salary.INVALID_WRITE_COUNT);
+        }
+
+        return find(owner, month)
+            .orElseThrow(() -> new IllegalStateException(Salary.NOTICE_NOT_STORED));
     }
 
     /**
      * 기능 활성화 시 SQL 이행·강제 사용자 격리·최소 권한을 확인하고 미준비 서버는 시작하지 않는다.
      * @created 2026-10-30
      * @usedBy SalaryNoticeService 생성자
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
      */
     public void verifySchema() {
-        Object valid = entityManager.createNativeQuery("""
+        Object valid = entityManager.createNativeQuery(
+            """
             SELECT EXISTS (
               SELECT 1
               FROM pg_class c
@@ -104,32 +139,48 @@ public class SalaryNoticeRepository {
                 AND NOT has_table_privilege(current_user, c.oid, 'DELETE')
                 AND NOT has_table_privilege(current_user, c.oid, 'TRUNCATE')
             )
-            """).getSingleResult();
-        if (!Boolean.TRUE.equals(valid)) throw new IllegalStateException("Salary notice migration and permissions are required");
+            """
+        ).getSingleResult();
+        if (!Boolean.TRUE.equals(valid)) {
+            throw new IllegalStateException(Salary.NOTICE_SETUP_REQUIRED);
+        }
     }
 
     /**
      * 다른 연결·읽기 전용 문맥·가짜 사용자 식별로 기록에 접근하지 못하게 한다.
      * @created 2026-10-30
      * @usedBy find, dismiss
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
      */
     private void requireOwner(UUID owner) {
         if (owner == null || !TransactionSynchronizationManager.isActualTransactionActive()
-                || !(TransactionSynchronizationManager.getResource(factory) instanceof EntityManagerHolder holder)
-                || TransactionSynchronizationManager.isCurrentTransactionReadOnly()
-                || !Integer.valueOf(TransactionDefinition.ISOLATION_READ_COMMITTED).equals(
-                    TransactionSynchronizationManager.getCurrentTransactionIsolationLevel())
-                || !entityManager.isJoinedToTransaction()) {
-            throw new IllegalStateException("Salary notices require an authenticated transaction");
+            || !(TransactionSynchronizationManager
+                .getResource(factory) instanceof EntityManagerHolder holder)
+            || TransactionSynchronizationManager.isCurrentTransactionReadOnly()
+            || !Integer.valueOf(TransactionDefinition.ISOLATION_READ_COMMITTED)
+                .equals(
+                    TransactionSynchronizationManager.getCurrentTransactionIsolationLevel()
+                )
+            || !entityManager.isJoinedToTransaction()) {
+            throw new IllegalStateException(Salary.AUTH_TRANSACTION_REQUIRED);
         }
+
         EntityManager current = entityManager instanceof EntityManagerProxy proxy
-            ? proxy.getTargetEntityManager() : entityManager;
-        if (current != holder.getEntityManager()) throw new IllegalStateException("Salary notice transaction differs");
-        Object identity = entityManager.createNativeQuery("""
+            ? proxy.getTargetEntityManager()
+            : entityManager;
+        if (current != holder.getEntityManager()) {
+            throw new IllegalStateException(Salary.TRANSACTION_MISMATCH);
+        }
+
+        Object identity = entityManager.createNativeQuery(
+            """
             SELECT CASE WHEN current_user = 'payse_runtime'
               THEN NULLIF(current_setting('payse.user_id', true), '')::uuid END
-            """).getSingleResult();
-        if (!owner.equals(identity)) throw new IllegalStateException("Salary notice owner differs");
+            """
+        ).getSingleResult();
+        if (!owner.equals(identity)) {
+            throw new IllegalStateException(Salary.OWNER_MISMATCH);
+        }
     }
 }
-

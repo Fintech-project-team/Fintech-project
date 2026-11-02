@@ -1,6 +1,7 @@
 package com.payse.api.auth.error;
 
 import com.payse.api.auth.dto.AuthResult;
+import com.payse.api.constants.ApiMessageConstants.Auth;
 
 /**
  * 요청 파싱 실패의 종류만 전달하며 입력·파서 예외를 보존하지 않는다.
@@ -8,19 +9,23 @@ import com.payse.api.auth.dto.AuthResult;
  * @usedBy AuthHttpInput, AuthService.read
  */
 public final class AuthInputException extends RuntimeException {
+
     private final AuthResult.Reason reason;
 
     /**
      * 입력 오류 세 종류만 허용한다. 원문과 원인 예외는 받지 않는다.
      * @created 2026-10-28
      * @usedBy AuthHttpInput
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리
      */
     public AuthInputException(AuthResult.Reason reason) {
-        super("Authentication input rejected");
+        super(Auth.INPUT_REJECTED);
         if (reason != AuthResult.Reason.INVALID_INPUT && reason != AuthResult.Reason.INVALID_JSON
-                && reason != AuthResult.Reason.REQUEST_TOO_LARGE) {
-            throw new IllegalArgumentException("Unexpected input failure kind");
+            && reason != AuthResult.Reason.REQUEST_TOO_LARGE) {
+            throw new IllegalArgumentException(Auth.UNKNOWN_FAILURE);
         }
+
         this.reason = reason;
     }
 
@@ -29,5 +34,7 @@ public final class AuthInputException extends RuntimeException {
      * @created 2026-10-28
      * @usedBy AuthService.read, AuthController.logout
      */
-    public AuthResult.Reason reason() { return reason; }
+    public AuthResult.Reason reason() {
+        return reason;
+    }
 }
