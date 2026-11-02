@@ -17,11 +17,16 @@ from expansion import prepare_expanded
 
 
 def write_cases(folder):
-    """2026-11-01: 개발 전건·입력 반례를 Python 판정과 함께 내보낸다. 사용: CLI."""
+    """2026-11-01: 개발 전건·입력 반례를 Python 판정과 함께 내보낸다. 사용: CLI.
+
+    2026-11-02 수정: 직렬화·파일 쓰기와 날짜 사례 목록을 분리한다.
+    """
     folder.mkdir(parents=True, exist_ok=True)
     inputs, expected = prepare_expanded()
     first = next(iter(inputs.values()))
-    (folder / 'service-input.json').write_text(json.dumps(first, ensure_ascii=False), encoding='utf-8')
+    service_file = folder / 'service-input.json'
+    service_json = json.dumps(first, ensure_ascii=False)
+    service_file.write_text(service_json, encoding='utf-8')
     with (folder / 'parity.jsonl').open('w', encoding='utf-8') as stream:
         for case_id, payload in inputs.items():
             truth = expected[case_id]['items'][0]
@@ -33,7 +38,8 @@ def write_cases(folder):
             response = transform_ids(output, lambda kind, value: aliases[(kind, value)])
             row = {'caseId': case_id, 'input': payload, 'projected': packed.input,
                    'schema': packed.output_schema, 'output': output, 'response': response}
-            stream.write(json.dumps(row, ensure_ascii=False, separators=(',', ':')) + '\n')
+            encoded_row = json.dumps(row, ensure_ascii=False, separators=(',', ':')) + '\n'
+            stream.write(encoded_row)
     invalid = []
     mutations = [
         ('context', 'dataVersion', '9223372036854775808'),
@@ -65,15 +71,21 @@ def write_cases(folder):
             invalid.append(payload)
         else:
             raise AssertionError('Duplicate fixture was accepted')
-    (folder / 'invalid-inputs.json').write_text(json.dumps(invalid, ensure_ascii=False), encoding='utf-8')
+    invalid_file = folder / 'invalid-inputs.json'
+    invalid_json = json.dumps(invalid, ensure_ascii=False)
+    invalid_file.write_text(invalid_json, encoding='utf-8')
     date_inputs = []
-    for date in ('2026-11-01T12:00:00.1234567891Z', '2026-11-01T12Z',
-                 '2026-11-01T1230Z', '2026-11-01T12:30,2Z', '2026-11-01T12:00:00+23:59'):
+    timestamp_cases = (
+        '2026-11-01T12:00:00.1234567891Z', '2026-11-01T12Z',
+        '2026-11-01T1230Z', '2026-11-01T12:30,2Z', '2026-11-01T12:00:00+23:59')
+    for date in timestamp_cases:
         precision = copy.deepcopy(first)
         precision['context']['asOf'] = date
         validate_input(precision)
         date_inputs.append(precision)
-    (folder / 'date-inputs.json').write_text(json.dumps(date_inputs, ensure_ascii=False), encoding='utf-8')
+    dates_file = folder / 'date-inputs.json'
+    dates_json = json.dumps(date_inputs, ensure_ascii=False)
+    dates_file.write_text(dates_json, encoding='utf-8')
     print(f'Contract parity fixtures: {len(inputs)} valid, {len(invalid)} invalid; model calls 0')
 
 

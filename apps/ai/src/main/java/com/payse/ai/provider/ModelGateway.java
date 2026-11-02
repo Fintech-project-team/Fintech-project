@@ -1,7 +1,7 @@
 package com.payse.ai.provider;
 
-import tools.jackson.databind.JsonNode;
 import com.payse.ai.provider.dto.ModelReply;
+import tools.jackson.databind.JsonNode;
 
 /**
  * 업무 실행이 사용하는 공급자 경계다. 테스트도 이 경계만 대역으로 교체한다.

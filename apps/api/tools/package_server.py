@@ -16,10 +16,13 @@ def check_jar(path):
     with ZipFile(path) as archive:
         manifest = archive.read('META-INF/MANIFEST.MF').decode('utf-8')
         values = dict(line.split(': ', 1) for line in manifest.splitlines() if ': ' in line)
-        if values.get('Start-Class') != 'com.payse.api.PayseApiApplication' \
-                or values.get('Main-Class') != 'org.springframework.boot.loader.launch.JarLauncher' \
-                or values.get('Build-Jdk-Spec') != '21' \
-                or 'BOOT-INF/classes/com/payse/api/PayseApiApplication.class' not in archive.namelist():
+        manifest_differs = (
+            values.get('Start-Class') != 'com.payse.api.PayseApiApplication'
+            or values.get('Main-Class') != 'org.springframework.boot.loader.launch.JarLauncher'
+            or values.get('Build-Jdk-Spec') != '21'
+            or 'BOOT-INF/classes/com/payse/api/PayseApiApplication.class' not in archive.namelist()
+        )
+        if manifest_differs:
             raise ValueError('A PAYSE executable JAR built with Java 21 is required')
 
 

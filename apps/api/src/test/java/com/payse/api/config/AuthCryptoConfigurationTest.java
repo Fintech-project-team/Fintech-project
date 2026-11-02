@@ -1,5 +1,9 @@
 package com.payse.api.config;
 
+import com.payse.api.ApiTestConstants.AuthConfig;
+import com.payse.api.ApiTestConstants.AuthHttp;
+import com.payse.api.ApiTestConstants.AuthPaths;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.payse.api.PayseApiApplication;
@@ -46,6 +50,7 @@ class AuthCryptoConfigurationTest {
      * @created 2026-10-22
      * @usedBy JUnit test
      * @modified 2026-10-25 - 이름을 역할에 맞게 정리
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조; 순회 대상 지역변수 분리
      */
     @Test
     void requiresActiveProfileKeys() {
@@ -56,10 +61,18 @@ class AuthCryptoConfigurationTest {
             context.register(AuthCryptoConfiguration.class);
             assertThrows(RuntimeException.class, context::refresh);
         }
-        for (String required : new String[]{"PAYSE_AUTH_CODE_KEY_ID", "PAYSE_AUTH_CODE_KEY_BASE64", "PAYSE_AUTH_LIMIT_KEY_BASE64"}) {
+        var requiredKeys = new String[] {
+            AuthConfig.PAYSE_AUTH_CODE_KEY_ID,
+            AuthConfig.PAYSE_AUTH_CODE_KEY_BASE64,
+            AuthConfig.PAYSE_AUTH_LIMIT_KEY_BASE64
+        };
+        for (String required : requiredKeys) {
             var environment = validEnvironment();
             environment.setProperty(required, "");
-            assertThrows(IllegalArgumentException.class, () -> new AuthCryptoConfiguration().authSecrets(environment));
+            assertThrows(
+                IllegalArgumentException.class,
+                () -> new AuthCryptoConfiguration().authSecrets(environment)
+            );
         }
     }
 
@@ -90,32 +103,66 @@ class AuthCryptoConfigurationTest {
      * @usedBy JUnit test
      * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      * @throws Exception 로컬 테스트 서버 요청 실패
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조; 순회 대상 지역변수 분리
      */
     @Test
     void blocksBusinessRoutes() throws Exception {
         var environment = validEnvironment();
         var application = new SpringApplication(PayseApiApplication.class);
-        application.setDefaultProperties(Map.of(
-            "PAYSE_AUTH_CODE_KEY_ID", environment.getProperty("PAYSE_AUTH_CODE_KEY_ID"),
-            "PAYSE_AUTH_CODE_KEY_BASE64", environment.getProperty("PAYSE_AUTH_CODE_KEY_BASE64"),
-            "PAYSE_AUTH_LIMIT_KEY_BASE64", environment.getProperty("PAYSE_AUTH_LIMIT_KEY_BASE64")));
-        try (var context = application.run("--spring.profiles.active=auth", "--server.address=127.0.0.1", "--server.port=0");
-             var client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()) {
+        application.setDefaultProperties(
+            Map.of(
+                AuthConfig.PAYSE_AUTH_CODE_KEY_ID,
+                environment.getProperty(AuthConfig.PAYSE_AUTH_CODE_KEY_ID),
+                AuthConfig.PAYSE_AUTH_CODE_KEY_BASE64,
+                environment.getProperty(AuthConfig.PAYSE_AUTH_CODE_KEY_BASE64),
+                AuthConfig.PAYSE_AUTH_LIMIT_KEY_BASE64,
+                environment.getProperty(AuthConfig.PAYSE_AUTH_LIMIT_KEY_BASE64)
+            )
+        );
+        try (var context = application
+            .run("--spring.profiles.active=auth", "--server.address=127.0.0.1", "--server.port=0");
+            var client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(5))
+                .build()) {
             int port = ((WebServerApplicationContext) context).getWebServer().getPort();
             String origin = "http://127.0.0.1:" + port;
             assertNotNull(context.getBean(AuthCrypto.class));
-            var health = HttpRequest.newBuilder(URI.create(origin + "/internal/health/live"))
-                .timeout(Duration.ofSeconds(5)).GET().build();
-            assertEquals(200, client.send(health, HttpResponse.BodyHandlers.ofString()).statusCode());
-            String token = context.getBean(AuthCrypto.class).issueToken().value();
-            for (String route : new String[]{"/snapshot", "/transactions", "/demo-sessions", "/institution-links"}) {
-                var request = HttpRequest.newBuilder(URI.create(origin + route)).timeout(Duration.ofSeconds(5))
-                    .header("Authorization", "Bearer " + token).header("Content-Type", "application/json")
-                    .method(route.equals("/demo-sessions") || route.equals("/institution-links") ? "POST" : "GET",
-                        HttpRequest.BodyPublishers.noBody()).build();
+            var health = HttpRequest.newBuilder(URI.create(origin + AuthPaths.LIVE_PATH))
+                .timeout(Duration.ofSeconds(5))
+                .GET()
+                .build();
+            assertEquals(
+                200,
+                client.send(health, HttpResponse.BodyHandlers.ofString()).statusCode()
+            );
+            String token = context.getBean(AuthCrypto.class)
+                .issueToken()
+                .value();
+            var businessRoutes = new String[] {
+                AuthPaths.SNAPSHOT_PATH,
+                AuthPaths.TRANSACTIONS_PATH,
+                AuthPaths.SESSIONS_PATH,
+                AuthPaths.INSTITUTION_LINKS_PATH
+            };
+            for (String route : businessRoutes) {
+                var request = HttpRequest.newBuilder(URI.create(origin + route))
+                    .timeout(Duration.ofSeconds(5))
+                    .header(AuthHttp.AUTHORIZATION, AuthHttp.BEARER_PREFIX + token)
+                    .header(AuthHttp.CONTENT_TYPE, AuthHttp.JSON_TYPE)
+                    .method(
+                        route.equals(AuthPaths.SESSIONS_PATH)
+                            || route.equals(AuthPaths.INSTITUTION_LINKS_PATH) ? AuthHttp.POST
+                                : AuthHttp.GET,
+                        HttpRequest.BodyPublishers.noBody()
+                    )
+                    .build();
                 var response = client.send(request, HttpResponse.BodyHandlers.ofString());
                 assertEquals(401, response.statusCode(), route);
-                assertTrue(response.headers().allValues("set-cookie").isEmpty());
+                assertTrue(
+                    response.headers()
+                        .allValues(AuthHttp.LOWER_SET_COOKIE)
+                        .isEmpty()
+                );
                 assertFalse(response.body().contains(token));
             }
         }
@@ -126,25 +173,49 @@ class AuthCryptoConfigurationTest {
      * @created 2026-10-22
      * @usedBy JUnit test
      * @modified 2026-10-25 - 이름을 역할에 맞게 정리
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조; 순회 대상 지역변수 분리; 단일 제어문 본문 중괄호 명시
      */
     @Test
     void redactsInvalidSecrets() {
         var configuration = new AuthCryptoConfiguration();
-        for (String invalid : new String[]{"private-secret!", "", " ", "A".repeat(44),
-                Base64.getEncoder().encodeToString(new byte[31]), Base64.getEncoder().encodeToString(new byte[33]),
-                Base64.getEncoder().encodeToString(new byte[32]).replace("=", "")}) {
-            for (String property : new String[]{"PAYSE_AUTH_CODE_KEY_BASE64", "PAYSE_AUTH_LIMIT_KEY_BASE64"}) {
+        var invalidKeys = new String[] {
+            "private-secret!",
+            "",
+            " ",
+            "A".repeat(44),
+            Base64.getEncoder().encodeToString(new byte[31]),
+            Base64.getEncoder().encodeToString(new byte[33]),
+            Base64.getEncoder()
+                .encodeToString(new byte[32])
+                .replace("=", "")
+        };
+        for (String invalid : invalidKeys) {
+            for (String property : new String[] {
+                AuthConfig.PAYSE_AUTH_CODE_KEY_BASE64,
+                AuthConfig.PAYSE_AUTH_LIMIT_KEY_BASE64 }) {
                 var environment = validEnvironment().withProperty(property, invalid);
-                var failure = assertThrows(IllegalArgumentException.class, () -> configuration.authSecrets(environment));
-                if (!invalid.isBlank()) assertFalse(failure.toString().contains(invalid));
+                var failure = assertThrows(
+                    IllegalArgumentException.class,
+                    () -> configuration.authSecrets(environment)
+                );
+                if (!invalid.isBlank()) {
+                    assertFalse(failure.toString().contains(invalid));
+                }
                 assertNull(failure.getCause());
             }
         }
         var sameKey = validEnvironment();
-        sameKey.setProperty("PAYSE_AUTH_LIMIT_KEY_BASE64", sameKey.getProperty("PAYSE_AUTH_CODE_KEY_BASE64"));
+        sameKey.setProperty(
+            AuthConfig.PAYSE_AUTH_LIMIT_KEY_BASE64,
+            sameKey.getProperty(AuthConfig.PAYSE_AUTH_CODE_KEY_BASE64)
+        );
         assertThrows(IllegalArgumentException.class, () -> configuration.authSecrets(sameKey));
-        var badId = validEnvironment().withProperty("PAYSE_AUTH_CODE_KEY_ID", "private:id");
-        var failure = assertThrows(IllegalArgumentException.class, () -> configuration.authSecrets(badId));
+        var badId = validEnvironment()
+            .withProperty(AuthConfig.PAYSE_AUTH_CODE_KEY_ID, "private:id");
+        var failure = assertThrows(
+            IllegalArgumentException.class,
+            () -> configuration.authSecrets(badId)
+        );
         assertFalse(failure.toString().contains("private:id"));
     }
 
@@ -153,6 +224,7 @@ class AuthCryptoConfigurationTest {
      * @created 2026-10-22
      * @usedBy AuthCryptoConfigurationTest 각 검사
      * @return 기본 운영 설정에 영향을 주지 않는 테스트 환경
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     private static MockEnvironment validEnvironment() {
         byte[] code = new byte[32];
@@ -161,8 +233,14 @@ class AuthCryptoConfigurationTest {
             code[index] = (byte) index;
             limit[index] = (byte) (index + 32);
         }
-        return new MockEnvironment().withProperty("PAYSE_AUTH_CODE_KEY_ID", "test_code")
-            .withProperty("PAYSE_AUTH_CODE_KEY_BASE64", Base64.getEncoder().encodeToString(code))
-            .withProperty("PAYSE_AUTH_LIMIT_KEY_BASE64", Base64.getEncoder().encodeToString(limit));
+        return new MockEnvironment().withProperty(AuthConfig.PAYSE_AUTH_CODE_KEY_ID, "test_code")
+            .withProperty(
+                AuthConfig.PAYSE_AUTH_CODE_KEY_BASE64,
+                Base64.getEncoder().encodeToString(code)
+            )
+            .withProperty(
+                AuthConfig.PAYSE_AUTH_LIMIT_KEY_BASE64,
+                Base64.getEncoder().encodeToString(limit)
+            );
     }
 }

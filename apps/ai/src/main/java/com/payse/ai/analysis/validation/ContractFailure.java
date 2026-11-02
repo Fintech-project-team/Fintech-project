@@ -11,5 +11,7 @@ public final class ContractFailure extends IllegalArgumentException {
      * @created 2026-11-01
      * @usedBy 계약 검증 메서드
      */
-    public ContractFailure(String reason) { super(reason); }
+    public ContractFailure(String reason) {
+        super(reason);
+    }
 }

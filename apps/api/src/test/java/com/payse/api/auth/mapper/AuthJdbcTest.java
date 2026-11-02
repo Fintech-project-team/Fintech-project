@@ -1,5 +1,7 @@
 package com.payse.api.auth.mapper;
 
+import com.payse.api.ApiTestConstants.AuthColumns;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
@@ -51,33 +53,56 @@ class AuthJdbcTest {
      * @usedBy AuthJdbcTest.loadFixture, 인증 조회·소유권 검사
      * @modified 2026-10-29 - 검증된 원거래 관계 입력 연결
      */
-    private record Fixture(UUID userId, UUID sessionId, UUID accountId, String name,
-            String phone, String tokenDigest, String verifier, LinkInputs links) {
+    private record Fixture(
+        UUID userId,
+        UUID sessionId,
+        UUID accountId,
+        String name,
+        String phone,
+        String tokenDigest,
+        String verifier,
+        LinkInputs links
+    ) {
         /**
          * 테스트 실패 출력에서도 토큰·verifier·합성 자격 원문을 숨긴다.
          * @created 2026-10-25
          * @usedBy JUnit 객체 표현
          * @return 원문이 없는 고정 설명
          */
-        @Override public String toString() { return "Fixture[REDACTED]"; }
+        @Override
+        public String toString() {
+            return "Fixture[REDACTED]";
+        }
     }
 
     /**
      * 전용 환경이 없으면 건너뛰고 일부만 제공되거나 격리 주소 형식이 아니면 실패한다.
      * @created 2026-10-25
      * @usedBy JUnit BeforeAll
+     * @modified 2026-11-02 - 긴 식 지역변수 분리
      */
     @BeforeAll
     static void readEnvironment() {
         String prefix = "PAYSE_AUTH_TEST_";
-        assumeFalse(System.getenv().keySet().stream().noneMatch(key -> key.startsWith(prefix)),
-            "Run test_auth_jdbc.py with PostgreSQL binaries and a new work directory");
+        boolean missingEnvironment = System.getenv()
+            .keySet()
+            .stream()
+            .noneMatch(key -> key.startsWith(prefix));
+        assumeFalse(
+            missingEnvironment,
+            "Run test_auth_jdbc.py with PostgreSQL binaries and a new work directory"
+        );
         url = required("JDBC_URL");
         login = required("DB_USER");
         password = required("DB_PASSWORD");
-        assertTrue(url.matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/payse_auth_test_jdbc"),
-            "Only the explicit loopback test database is accepted");
-        assertTrue(login.matches("payse_jdbc_[0-9a-f]{32}"), "Use the generated non-admin test login");
+        assertTrue(
+            url.matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/payse_auth_test_jdbc"),
+            "Only the explicit loopback test database is accepted"
+        );
+        assertTrue(
+            login.matches("payse_jdbc_[0-9a-f]{32}"),
+            "Use the generated non-admin test login"
+        );
         fixtures = List.of(loadFixture(0), loadFixture(1));
         assertNotEquals(fixtures.get(0).userId(), fixtures.get(1).userId());
         assertNotEquals(fixtures.get(0).sessionId(), fixtures.get(1).sessionId());
@@ -106,10 +131,16 @@ class AuthJdbcTest {
      * @modified 2026-10-29 - 원거래 준비 ID를 입력으로 전달
      */
     private static Fixture loadFixture(int index) {
-        return new Fixture(UUID.fromString(required("USER_" + index)),
-            UUID.fromString(required("SESSION_" + index)), UUID.fromString(required("ACCOUNT_" + index)),
-            required("NAME_" + index), required("PHONE_" + index),
-            required("TOKEN_" + index), required("VERIFIER_" + index), loadLinks(index));
+        return new Fixture(
+            UUID.fromString(required("USER_" + index)),
+            UUID.fromString(required("SESSION_" + index)),
+            UUID.fromString(required("ACCOUNT_" + index)),
+            required("NAME_" + index),
+            required("PHONE_" + index),
+            required("TOKEN_" + index),
+            required("VERIFIER_" + index),
+            loadLinks(index)
+        );
     }
 
     /**
@@ -129,9 +160,13 @@ class AuthJdbcTest {
         transactions = new AuthTransactions(jpa.entityManager(), jpa.manager());
         assertEquals(login, jdbc.queryForObject("SELECT session_user", String.class));
         // 테스트 로그인 자체의 관리자·RLS 우회 권한이 없는지 실제 서버에서 확인한다.
-        assertEquals(Boolean.TRUE, jdbc.queryForObject(
-            "SELECT NOT rolsuper AND NOT rolbypassrls AND NOT rolinherit FROM pg_roles WHERE rolname=session_user",
-            Boolean.class));
+        assertEquals(
+            Boolean.TRUE,
+            jdbc.queryForObject(
+                "SELECT NOT rolsuper AND NOT rolbypassrls AND NOT rolinherit FROM pg_roles WHERE rolname=session_user",
+                Boolean.class
+            )
+        );
     }
 
     /**
@@ -139,11 +174,16 @@ class AuthJdbcTest {
      * @created 2026-10-25
      * @usedBy JUnit AfterEach
      * @modified 2026-10-29 - JPA 저장소·트랜잭션으로 기존 PostgreSQL 검증 유지
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     @AfterEach
     void closePool() {
-        if (jpa != null) jpa.close();
-        if (pool != null) pool.close();
+        if (jpa != null) {
+            jpa.close();
+        }
+        if (pool != null) {
+            pool.close();
+        }
     }
 
     /**
@@ -171,7 +211,12 @@ class AuthJdbcTest {
      * @usedBy 제한·롤백·동시성 검사
      * @return 64자리 소문자 hex
      */
-    private String newKey() { return UUID.randomUUID().toString().replace("-", "").repeat(2); }
+    private String newKey() {
+        return UUID.randomUUID()
+            .toString()
+            .replace("-", "")
+            .repeat(2);
+    }
 
     /**
      * 명시 트랜잭션·역할이 같은 연결에서 적용되고 커밋 후 모두 제거되는지 확인한다.
@@ -182,18 +227,37 @@ class AuthJdbcTest {
     void scopesRoleAndConnection() {
         int backend = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
         String key = newKey();
-        AuthRows.IpLimit result = transactions.run(() -> {
-            assertEquals(backend, jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
-            assertEquals("payse_runtime", jdbc.queryForObject("SELECT current_user", String.class));
-            assertEquals("read committed", jdbc.queryForObject("SHOW transaction_isolation", String.class));
-            assertEquals("off", jdbc.queryForObject("SHOW transaction_read_only", String.class));
-            return repository.recordIp(key);
-        });
+        AuthRows.IpLimit result = transactions.run(
+            () -> {
+                assertEquals(
+                    backend,
+                    jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)
+                );
+                assertEquals(
+                    "payse_runtime",
+                    jdbc.queryForObject("SELECT current_user", String.class)
+                );
+                assertEquals(
+                    "read committed",
+                    jdbc.queryForObject("SHOW transaction_isolation", String.class)
+                );
+                assertEquals(
+                    "off",
+                    jdbc.queryForObject("SHOW transaction_read_only", String.class)
+                );
+                return repository.recordIp(key);
+            }
+        );
         assertTrue(result.allowed());
         assertNull(result.retryAt());
         assertEquals(backend, jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
         assertEquals(login, jdbc.queryForObject("SELECT current_user", String.class));
-        assertNull(jdbc.queryForObject("SELECT NULLIF(current_setting('payse.user_id',true),'')", String.class));
+        assertNull(
+            jdbc.queryForObject(
+                "SELECT NULLIF(current_setting('payse.user_id',true),'')",
+                String.class
+            )
+        );
         assertEquals(0, pool.getHikariPoolMXBean().getActiveConnections());
     }
 
@@ -205,15 +269,26 @@ class AuthJdbcTest {
     @Test
     void mapsStoredCandidates() {
         Fixture fixture = fixtures.get(0);
-        AuthRows.StoredCode candidate = transactions.run(() -> repository.findCode(
-            " " + fixture.name() + " ", fixture.phone().substring(0, 3) + "-" + fixture.phone().substring(3))).orElseThrow();
+        AuthRows.StoredCode candidate = transactions.run(
+            () -> repository.findCode(
+                " " + fixture.name() + " ",
+                fixture.phone().substring(0, 3) + "-" + fixture.phone().substring(3)
+            )
+        ).orElseThrow();
         assertEquals(fixture.userId(), candidate.userId());
-        assertTrue(fixture.verifier().equals(candidate.verifier()), "Stored verifier mapping differs");
+        assertTrue(
+            fixture.verifier().equals(candidate.verifier()),
+            "Stored verifier mapping differs"
+        );
         assertFalse(candidate.toString().contains(fixture.verifier()));
         assertFalse(candidate.toString().contains(fixture.phone()));
-        assertTrue(transactions.run(() -> repository.findCode("미등록사용자", fixture.phone())).isEmpty());
-        assertThrows(IllegalArgumentException.class,
-            () -> transactions.run(() -> repository.findCode("' OR 1=1 --", fixture.phone())));
+        assertTrue(
+            transactions.run(() -> repository.findCode("미등록사용자", fixture.phone())).isEmpty()
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> transactions.run(() -> repository.findCode("' OR 1=1 --", fixture.phone()))
+        );
     }
 
     /**
@@ -224,18 +299,40 @@ class AuthJdbcTest {
     @Test
     void isolatesOwnersAndClearsInvalidToken() {
         for (Fixture fixture : fixtures) {
-            transactions.run(() -> {
-                AuthRows.Session session = repository.authorize(fixture.tokenDigest()).orElseThrow();
-                assertEquals(fixture.userId(), session.userId());
-                assertEquals(fixture.sessionId(), session.sessionId());
-                // 전체 조회도 소유한 한 계좌로 제한되어야 하며 입력 ID로 필터를 대신하지 않는다.
-                assertEquals(List.of(fixture.accountId()), jdbc.queryForList("SELECT id FROM payse.financial_accounts", UUID.class));
-                assertTrue(repository.authorize("'; DROP TABLE payse.users; --").isEmpty());
-                assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM payse.financial_accounts", Integer.class));
-                assertNull(jdbc.queryForObject("SELECT NULLIF(current_setting('payse.user_id',true),'')", String.class));
-                return null;
-            });
-            assertNull(jdbc.queryForObject("SELECT NULLIF(current_setting('payse.user_id',true),'')", String.class));
+            transactions.run(
+                () -> {
+                    AuthRows.Session session = repository.authorize(fixture.tokenDigest())
+                        .orElseThrow();
+                    assertEquals(fixture.userId(), session.userId());
+                    assertEquals(fixture.sessionId(), session.sessionId());
+                    // 전체 조회도 소유한 한 계좌로 제한되어야 하며 입력 ID로 필터를 대신하지 않는다.
+                    assertEquals(
+                        List.of(fixture.accountId()),
+                        jdbc.queryForList("SELECT id FROM payse.financial_accounts", UUID.class)
+                    );
+                    assertTrue(repository.authorize("'; DROP TABLE payse.users; --").isEmpty());
+                    assertEquals(
+                        0,
+                        jdbc.queryForObject(
+                            "SELECT count(*) FROM payse.financial_accounts",
+                            Integer.class
+                        )
+                    );
+                    assertNull(
+                        jdbc.queryForObject(
+                            "SELECT NULLIF(current_setting('payse.user_id',true),'')",
+                            String.class
+                        )
+                    );
+                    return null;
+                }
+            );
+            assertNull(
+                jdbc.queryForObject(
+                    "SELECT NULLIF(current_setting('payse.user_id',true),'')",
+                    String.class
+                )
+            );
         }
         assertTrue(transactions.run(() -> repository.authorize(null)).isEmpty());
     }
@@ -244,12 +341,15 @@ class AuthJdbcTest {
      * 허용된 실패 5회를 별도 트랜잭션으로 커밋하고 차단 종료 시각의 JDBC 변환·유지를 확인한다.
      * @created 2026-10-25
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     @Test
     void commitsFailuresAndPreservesDeadline() {
         String key = newKey();
         assertNull(transactions.run(() -> repository.retryAt(key)));
-        for (int index = 0; index < 4; index++) assertNull(transactions.run(() -> repository.recordFailure(key)));
+        for (int index = 0; index < 4; index++) {
+            assertNull(transactions.run(() -> repository.recordFailure(key)));
+        }
         Instant deadline = transactions.run(() -> repository.recordFailure(key));
         assertNotNull(deadline);
         assertTrue(deadline.isAfter(Instant.now()));
@@ -261,19 +361,29 @@ class AuthJdbcTest {
      * 크기 1 풀에서 IP 선행 기록을 커밋한 뒤 후속 조합 실패만 롤백되는지 확인한다.
      * @created 2026-10-25
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     @Test
     void preservesIpWhenFollowingWorkRollsBack() {
         String ip = newKey();
         String combination = newKey();
         assertTrue(transactions.run(() -> repository.recordIp(ip)).allowed());
-        assertThrows(IllegalStateException.class, () -> transactions.run(() -> {
-            repository.recordFailure(combination);
-            throw new IllegalStateException("Rollback test operation");
-        }));
-        for (int index = 0; index < 4; index++) assertNull(transactions.run(() -> repository.recordFailure(combination)));
+        assertThrows(
+            IllegalStateException.class,
+            () -> transactions.run(
+                () -> {
+                    repository.recordFailure(combination);
+                    throw new IllegalStateException("Rollback test operation");
+                }
+            )
+        );
+        for (int index = 0; index < 4; index++) {
+            assertNull(transactions.run(() -> repository.recordFailure(combination)));
+        }
         assertNotNull(transactions.run(() -> repository.recordFailure(combination)));
-        for (int index = 1; index < 60; index++) assertTrue(transactions.run(() -> repository.recordIp(ip)).allowed());
+        for (int index = 1; index < 60; index++) {
+            assertTrue(transactions.run(() -> repository.recordIp(ip)).allowed());
+        }
         AuthRows.IpLimit blocked = transactions.run(() -> repository.recordIp(ip));
         assertFalse(blocked.allowed());
         assertNotNull(blocked.retryAt());
@@ -284,25 +394,38 @@ class AuthJdbcTest {
      * DB 권한 거절을 안전한 장애로 전달하고 앞선 제한 기록·사용자 문맥을 롤백한다.
      * @created 2026-10-25
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조; 단일 제어문 본문 중괄호 명시
      */
     @Test
     void rollsBackDatabaseFailureWithoutDetails() {
         String key = newKey();
         int backend = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
-        AuthStoreException failure = assertThrows(AuthStoreException.class, () -> transactions.run(() -> {
-            repository.recordFailure(key);
-            repository.authorize(fixtures.get(0).tokenDigest()).orElseThrow();
-            // runtime이 직접 읽을 수 없는 verifier 열을 요청해 실제 PostgreSQL 권한 오류를 유발한다.
-            jdbc.queryForList("SELECT code_verifier FROM payse.users");
-            return null;
-        }));
+        AuthStoreException failure = assertThrows(
+            AuthStoreException.class,
+            () -> transactions.run(
+                () -> {
+                    repository.recordFailure(key);
+                    repository.authorize(fixtures.get(0).tokenDigest()).orElseThrow();
+                    // runtime이 직접 읽을 수 없는 verifier 열을 요청해 실제 PostgreSQL 권한 오류를 유발한다.
+                    jdbc.queryForList("SELECT code_verifier FROM payse.users");
+                    return null;
+                }
+            )
+        );
         assertNull(failure.getCause());
-        assertFalse(failure.toString().contains("code_verifier"));
+        assertFalse(failure.toString().contains(AuthColumns.CODE_VERIFIER));
         assertFalse(failure.toString().contains("SELECT"));
         assertEquals(backend, jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
-        assertNull(jdbc.queryForObject("SELECT NULLIF(current_setting('payse.user_id',true),'')", String.class));
+        assertNull(
+            jdbc.queryForObject(
+                "SELECT NULLIF(current_setting('payse.user_id',true),'')",
+                String.class
+            )
+        );
         assertEquals(login, jdbc.queryForObject("SELECT current_user", String.class));
-        for (int index = 0; index < 4; index++) assertNull(transactions.run(() -> repository.recordFailure(key)));
+        for (int index = 0; index < 4; index++) {
+            assertNull(transactions.run(() -> repository.recordFailure(key)));
+        }
         assertNotNull(transactions.run(() -> repository.recordFailure(key)));
     }
 
@@ -310,22 +433,30 @@ class AuthJdbcTest {
      * 콜백이 DB 예외를 잡아 정상 반환해도 중단된 트랜잭션을 성공으로 반환하지 않는지 확인한다.
      * @created 2026-10-25
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     @Test
     void rejectsCommitAfterCaughtDatabaseFailure() {
         String key = newKey();
-        assertThrows(AuthStoreException.class, () -> transactions.run(() -> {
-            repository.recordFailure(key);
-            try {
-                // PostgreSQL 트랜잭션을 실제 오류 상태로 만들고 호출자 예외 삼킴을 재현한다.
-                jdbc.queryForObject("SELECT 1/0", Integer.class);
-                fail("Division by zero must fail in PostgreSQL");
-            } catch (DataAccessException expected) {
-                // 상위 코드의 잘못된 정상 반환을 재현하며 상세 오류는 기록하지 않는다.
-            }
-            return "uncommitted-result";
-        }));
-        for (int index = 0; index < 4; index++) assertNull(transactions.run(() -> repository.recordFailure(key)));
+        assertThrows(
+            AuthStoreException.class,
+            () -> transactions.run(
+                () -> {
+                    repository.recordFailure(key);
+                    try {
+                        // PostgreSQL 트랜잭션을 실제 오류 상태로 만들고 호출자 예외 삼킴을 재현한다.
+                        jdbc.queryForObject("SELECT 1/0", Integer.class);
+                        fail("Division by zero must fail in PostgreSQL");
+                    } catch (DataAccessException expected) {
+                        // 상위 코드의 잘못된 정상 반환을 재현하며 상세 오류는 기록하지 않는다.
+                    }
+                    return "uncommitted-result";
+                }
+            )
+        );
+        for (int index = 0; index < 4; index++) {
+            assertNull(transactions.run(() -> repository.recordFailure(key)));
+        }
         assertNotNull(transactions.run(() -> repository.recordFailure(key)));
         assertEquals(0, pool.getHikariPoolMXBean().getActiveConnections());
     }
@@ -334,31 +465,58 @@ class AuthJdbcTest {
      * 콜백이 정상 종료된 후 COMMIT에서 지연 제약이 실패해도 결과·제한 기록이 확정되지 않는지 확인한다.
      * @created 2026-10-25
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     @Test
     void rollsBackDeferredCommitFailure() {
         String key = newKey();
-        String table = "payse_commit_probe_" + UUID.randomUUID().toString().replace("-", "");
+        String table = "payse_commit_probe_" + UUID.randomUUID()
+            .toString()
+            .replace("-", "");
         UUID duplicate = UUID.randomUUID();
         int backend = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
-        AuthStoreException failure = assertThrows(AuthStoreException.class, () -> transactions.run(() -> {
-            repository.recordFailure(key);
-            repository.authorize(fixtures.get(0).tokenDigest()).orElseThrow();
-            // 이 트랜잭션에서만 만든 임시 테이블이며 중복 제약을 COMMIT 시점까지 연기한다.
-            jdbc.execute("CREATE TEMP TABLE " + table
-                + " (id uuid UNIQUE DEFERRABLE INITIALLY DEFERRED) ON COMMIT DROP");
-            assertEquals(2, jdbc.update("INSERT INTO pg_temp." + table + "(id) VALUES (?),(?)", duplicate, duplicate));
-            assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM pg_temp." + table, Integer.class));
-            return "must-not-be-committed";
-        }));
+        AuthStoreException failure = assertThrows(
+            AuthStoreException.class,
+            () -> transactions.run(
+                () -> {
+                    repository.recordFailure(key);
+                    repository.authorize(fixtures.get(0).tokenDigest()).orElseThrow();
+                    // 이 트랜잭션에서만 만든 임시 테이블이며 중복 제약을 COMMIT 시점까지 연기한다.
+                    jdbc.execute(
+                        "CREATE TEMP TABLE " + table
+                            + " (id uuid UNIQUE DEFERRABLE INITIALLY DEFERRED) ON COMMIT DROP"
+                    );
+                    assertEquals(
+                        2,
+                        jdbc.update(
+                            "INSERT INTO pg_temp." + table + "(id) VALUES (?),(?)",
+                            duplicate,
+                            duplicate
+                        )
+                    );
+                    assertEquals(
+                        2,
+                        jdbc.queryForObject("SELECT count(*) FROM pg_temp." + table, Integer.class)
+                    );
+                    return "must-not-be-committed";
+                }
+            )
+        );
         assertNull(failure.getCause());
         assertFalse(failure.toString().contains(table));
         assertFalse(failure.toString().contains(duplicate.toString()));
         assertEquals(backend, jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
         assertEquals(login, jdbc.queryForObject("SELECT current_user", String.class));
-        assertNull(jdbc.queryForObject("SELECT NULLIF(current_setting('payse.user_id',true),'')", String.class));
+        assertNull(
+            jdbc.queryForObject(
+                "SELECT NULLIF(current_setting('payse.user_id',true),'')",
+                String.class
+            )
+        );
         assertNull(jdbc.queryForObject("SELECT to_regclass(?)", String.class, "pg_temp." + table));
-        for (int index = 0; index < 4; index++) assertNull(transactions.run(() -> repository.recordFailure(key)));
+        for (int index = 0; index < 4; index++) {
+            assertNull(transactions.run(() -> repository.recordFailure(key)));
+        }
         assertNotNull(transactions.run(() -> repository.recordFailure(key)));
         assertEquals(0, pool.getHikariPoolMXBean().getActiveConnections());
     }
@@ -375,11 +533,20 @@ class AuthJdbcTest {
         TransactionTemplate readOnly = new TransactionTemplate(jpa.manager());
         readOnly.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         readOnly.setReadOnly(true);
-        assertThrows(IllegalStateException.class, () -> readOnly.execute(status -> repository.retryAt(newKey())));
+        assertThrows(
+            IllegalStateException.class,
+            () -> readOnly.execute(status -> repository.retryAt(newKey()))
+        );
         TransactionTemplate repeatedRead = new TransactionTemplate(jpa.manager());
         repeatedRead.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
-        assertThrows(IllegalStateException.class, () -> repeatedRead.execute(status -> repository.retryAt(newKey())));
-        assertThrows(IllegalStateException.class, () -> transactions.run(() -> transactions.run(() -> 1)));
+        assertThrows(
+            IllegalStateException.class,
+            () -> repeatedRead.execute(status -> repository.retryAt(newKey()))
+        );
+        assertThrows(
+            IllegalStateException.class,
+            () -> transactions.run(() -> transactions.run(() -> 1))
+        );
         assertEquals(0, pool.getHikariPoolMXBean().getActiveConnections());
     }
 
@@ -389,30 +556,51 @@ class AuthJdbcTest {
      * @usedBy JUnit test
      * @throws Exception 검사 작업이 시간 안에 완료하지 못하거나 실패한 경우
      * @modified 2026-10-29 - JPA 저장소·트랜잭션으로 기존 PostgreSQL 검증 유지
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     @Test
     void serializesConcurrentLimits() throws Exception {
-        try (HikariDataSource concurrentPool = newPool(4); JpaTestContext concurrentJpa = new JpaTestContext(concurrentPool);
-                var executor = Executors.newFixedThreadPool(4)) {
+        try (HikariDataSource concurrentPool = newPool(4);
+            JpaTestContext concurrentJpa = new JpaTestContext(concurrentPool);
+            var executor = Executors.newFixedThreadPool(4)) {
             AuthRepository concurrentRepo = new AuthRepository(concurrentJpa.entityManager());
-            AuthTransactions concurrentTx = new AuthTransactions(concurrentJpa.entityManager(), concurrentJpa.manager());
+            AuthTransactions concurrentTx = new AuthTransactions(
+                concurrentJpa.entityManager(),
+                concurrentJpa.manager()
+            );
             String key = newKey();
             CountDownLatch start = new CountDownLatch(1);
             List<Callable<Boolean>> failures = new ArrayList<>();
-            for (int index = 0; index < 6; index++) failures.add(() -> {
-                assertTrue(start.await(5, TimeUnit.SECONDS));
-                return concurrentTx.run(() -> concurrentRepo.recordFailure(key)) != null;
-            });
-            var failureFutures = failures.stream().map(executor::submit).toList();
+            for (int index = 0; index < 6; index++) {
+                failures.add(
+                    () -> {
+                        assertTrue(start.await(5, TimeUnit.SECONDS));
+                        return concurrentTx.run(() -> concurrentRepo.recordFailure(key)) != null;
+                    }
+                );
+            }
+            var failureFutures = failures.stream()
+                .map(executor::submit)
+                .toList();
             start.countDown();
             int blockedFailures = 0;
-            for (var future : failureFutures) if (future.get(15, TimeUnit.SECONDS)) blockedFailures++;
+            for (var future : failureFutures) {
+                if (future.get(15, TimeUnit.SECONDS)) {
+                    blockedFailures++;
+                }
+            }
             assertEquals(2, blockedFailures);
             String ip = newKey();
             List<Callable<Boolean>> requests = new ArrayList<>();
-            for (int index = 0; index < 65; index++) requests.add(() -> concurrentTx.run(() -> concurrentRepo.recordIp(ip)).allowed());
+            for (int index = 0; index < 65; index++) {
+                requests.add(() -> concurrentTx.run(() -> concurrentRepo.recordIp(ip)).allowed());
+            }
             int allowed = 0;
-            for (var future : executor.invokeAll(requests)) if (future.get(15, TimeUnit.SECONDS)) allowed++;
+            for (var future : executor.invokeAll(requests)) {
+                if (future.get(15, TimeUnit.SECONDS)) {
+                    allowed++;
+                }
+            }
             assertEquals(60, allowed);
         }
     }
@@ -422,15 +610,25 @@ class AuthJdbcTest {
      * @created 2026-10-29
      * @usedBy AuthJdbcTest.loadLinks, 원거래 JOIN 검사
      */
-    private record LinkInputs(UUID cardId, UUID purchaseId, UUID cancellationId,
-            UUID unavailableId, UUID missingId, UUID unreferencedId, UUID hiddenPurchaseId) {
+    private record LinkInputs(
+        UUID cardId,
+        UUID purchaseId,
+        UUID cancellationId,
+        UUID unavailableId,
+        UUID missingId,
+        UUID unreferencedId,
+        UUID hiddenPurchaseId
+    ) {
         /**
          * 테스트 실패 메시지에 금융 식별자를 남기지 않는다.
          * @created 2026-10-29
          * @usedBy JUnit 객체 표현
          * @return 원문 없는 고정 설명
          */
-        @Override public String toString() { return "LinkInputs[REDACTED]"; }
+        @Override
+        public String toString() {
+            return "LinkInputs[REDACTED]";
+        }
     }
 
     /**
@@ -441,69 +639,84 @@ class AuthJdbcTest {
      * @return 검증된 관계 ID 입력
      */
     private static LinkInputs loadLinks(int index) {
-        return new LinkInputs(UUID.fromString(required("CARD_" + index)),
+        return new LinkInputs(
+            UUID.fromString(required("CARD_" + index)),
             UUID.fromString(required("PURCHASE_" + index)),
             UUID.fromString(required("CANCELLATION_" + index)),
             UUID.fromString(required("UNAVAILABLE_" + index)),
             UUID.fromString(required("MISSING_" + index)),
             UUID.fromString(required("UNREFERENCED_" + index)),
-            UUID.fromString(required("HIDDEN_PURCHASE_" + index)));
+            UUID.fromString(required("HIDDEN_PURCHASE_" + index))
+        );
     }
 
     /**
      * 날짜만 있는 취소도 인증과 같은 연결에서 원결제 날짜·금액·버전에 연결한다.
      * @created 2026-10-29
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     @Test
     void joinsOriginalPurchase() {
-        for (Fixture fixture : fixtures) transactions.run(() -> {
-            assertTrue(repository.authorize(fixture.tokenDigest()).isPresent());
-            int backend = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
-            var result = links.findLink(fixture.links().cancellationId()).orElseThrow();
-            assertEquals(fixture.links().cancellationId(), result.id());
-            assertEquals(LocalDate.of(2026, 10, 13), result.cancellationDate());
-            assertEquals(fixture.links().purchaseId(), result.originalTransactionId());
-            assertEquals(OriginalState.AVAILABLE, result.originalState());
-            assertEquals(fixture.links().purchaseId(), result.original().id());
-            assertEquals(fixture.links().cardId(), result.original().cardId());
-            assertEquals("card_purchase", result.original().recordKind());
-            assertEquals(LocalDate.of(2026, 10, 12), result.original().purchaseDate());
-            assertEquals(30000L, result.original().amountKRW());
-            assertEquals("jdbc-source", result.original().sourceVersion());
-            assertEquals("TransactionLink[REDACTED]", result.toString());
-            assertEquals("Original[REDACTED]", result.original().toString());
-            assertEquals(backend, jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
-            return null;
-        });
+        for (Fixture fixture : fixtures) {
+            transactions.run(
+                () -> {
+                    assertTrue(repository.authorize(fixture.tokenDigest()).isPresent());
+                    int backend = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
+                    var result = links.findLink(fixture.links().cancellationId()).orElseThrow();
+                    assertEquals(fixture.links().cancellationId(), result.id());
+                    assertEquals(LocalDate.of(2026, 10, 13), result.cancellationDate());
+                    assertEquals(fixture.links().purchaseId(), result.originalTransactionId());
+                    assertEquals(OriginalState.AVAILABLE, result.originalState());
+                    assertEquals(fixture.links().purchaseId(), result.original().id());
+                    assertEquals(fixture.links().cardId(), result.original().cardId());
+                    assertEquals("card_purchase", result.original().recordKind());
+                    assertEquals(LocalDate.of(2026, 10, 12), result.original().purchaseDate());
+                    assertEquals(30000L, result.original().amountKRW());
+                    assertEquals("jdbc-source", result.original().sourceVersion());
+                    assertEquals("TransactionLink[REDACTED]", result.toString());
+                    assertEquals("Original[REDACTED]", result.original().toString());
+                    assertEquals(
+                        backend,
+                        jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)
+                    );
+                    return null;
+                }
+            );
+        }
     }
 
     /**
      * 원거래 행 미확보와 참조 미상을 구분하고 두 경우 모두 현재 취소행을 보존한다.
      * @created 2026-10-29
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
      */
     @Test
     void preservesMissingOriginals() {
-        for (Fixture fixture : fixtures) transactions.run(() -> {
-            assertTrue(repository.authorize(fixture.tokenDigest()).isPresent());
-            var unavailable = links.findLink(fixture.links().unavailableId()).orElseThrow();
-            assertEquals(fixture.links().unavailableId(), unavailable.id());
-            assertEquals(LocalDate.of(2026, 10, 14), unavailable.cancellationDate());
-            assertEquals(fixture.links().missingId(), unavailable.originalTransactionId());
-            assertEquals(OriginalState.UNAVAILABLE, unavailable.originalState());
-            assertNull(unavailable.original());
-            var absent = links.findLink(fixture.links().unreferencedId()).orElseThrow();
-            assertEquals(fixture.links().unreferencedId(), absent.id());
-            assertEquals(LocalDate.of(2026, 10, 15), absent.cancellationDate());
-            assertEquals(OriginalState.ABSENT, absent.originalState());
-            assertNull(absent.originalTransactionId());
-            assertNull(absent.original());
-            var purchase = links.findLink(fixture.links().purchaseId()).orElseThrow();
-            assertNull(purchase.cancellationDate());
-            assertEquals(OriginalState.ABSENT, purchase.originalState());
-            return null;
-        });
+        for (Fixture fixture : fixtures) {
+            transactions.run(
+                () -> {
+                    assertTrue(repository.authorize(fixture.tokenDigest()).isPresent());
+                    var unavailable = links.findLink(fixture.links().unavailableId()).orElseThrow();
+                    assertEquals(fixture.links().unavailableId(), unavailable.id());
+                    assertEquals(LocalDate.of(2026, 10, 14), unavailable.cancellationDate());
+                    assertEquals(fixture.links().missingId(), unavailable.originalTransactionId());
+                    assertEquals(OriginalState.UNAVAILABLE, unavailable.originalState());
+                    assertNull(unavailable.original());
+                    var absent = links.findLink(fixture.links().unreferencedId()).orElseThrow();
+                    assertEquals(fixture.links().unreferencedId(), absent.id());
+                    assertEquals(LocalDate.of(2026, 10, 15), absent.cancellationDate());
+                    assertEquals(OriginalState.ABSENT, absent.originalState());
+                    assertNull(absent.originalTransactionId());
+                    assertNull(absent.original());
+                    var purchase = links.findLink(fixture.links().purchaseId()).orElseThrow();
+                    assertNull(purchase.cancellationDate());
+                    assertEquals(OriginalState.ABSENT, purchase.originalState());
+                    return null;
+                }
+            );
+        }
     }
 
     /**
@@ -516,14 +729,16 @@ class AuthJdbcTest {
         for (int index = 0; index < fixtures.size(); index++) {
             Fixture fixture = fixtures.get(index);
             Fixture other = fixtures.get(1 - index);
-            transactions.run(() -> {
-                assertTrue(repository.authorize(fixture.tokenDigest()).isPresent());
-                assertTrue(links.findLink(other.links().cancellationId()).isEmpty());
-                assertTrue(links.findLink(other.links().purchaseId()).isEmpty());
-                assertTrue(links.findLink(fixture.links().hiddenPurchaseId()).isEmpty());
-                assertTrue(links.findLink(UUID.randomUUID()).isEmpty());
-                return null;
-            });
+            transactions.run(
+                () -> {
+                    assertTrue(repository.authorize(fixture.tokenDigest()).isPresent());
+                    assertTrue(links.findLink(other.links().cancellationId()).isEmpty());
+                    assertTrue(links.findLink(other.links().purchaseId()).isEmpty());
+                    assertTrue(links.findLink(fixture.links().hiddenPurchaseId()).isEmpty());
+                    assertTrue(links.findLink(UUID.randomUUID()).isEmpty());
+                    return null;
+                }
+            );
         }
     }
 
@@ -536,22 +751,37 @@ class AuthJdbcTest {
     @Test
     void requiresAuthenticatedTransaction() {
         Fixture fixture = fixtures.get(0);
-        assertThrows(IllegalStateException.class, () -> links.findLink(fixture.links().cancellationId()));
-        assertThrows(IllegalStateException.class,
-            () -> transactions.run(() -> links.findLink(fixture.links().cancellationId())));
-        try (HikariDataSource separatePool = newPool(1); JpaTestContext separateJpa = new JpaTestContext(separatePool)) {
+        assertThrows(
+            IllegalStateException.class,
+            () -> links.findLink(fixture.links().cancellationId())
+        );
+        assertThrows(
+            IllegalStateException.class,
+            () -> transactions.run(() -> links.findLink(fixture.links().cancellationId()))
+        );
+        try (HikariDataSource separatePool = newPool(1);
+            JpaTestContext separateJpa = new JpaTestContext(separatePool)) {
             var separate = new TransactionRepository(separateJpa.entityManager());
-            assertThrows(IllegalStateException.class, () -> transactions.run(() -> {
-                assertTrue(repository.authorize(fixture.tokenDigest()).isPresent());
-                return separate.findLink(fixture.links().cancellationId());
-            }));
+            assertThrows(
+                IllegalStateException.class,
+                () -> transactions.run(
+                    () -> {
+                        assertTrue(repository.authorize(fixture.tokenDigest()).isPresent());
+                        return separate.findLink(fixture.links().cancellationId());
+                    }
+                )
+            );
         }
-        transactions.run(() -> {
-            assertTrue(repository.authorize(fixture.tokenDigest()).isPresent());
-            assertTrue(links.findLink(fixture.links().cancellationId()).isPresent());
-            return null;
-        });
-        assertThrows(IllegalStateException.class,
-            () -> transactions.run(() -> links.findLink(fixture.links().cancellationId())));
+        transactions.run(
+            () -> {
+                assertTrue(repository.authorize(fixture.tokenDigest()).isPresent());
+                assertTrue(links.findLink(fixture.links().cancellationId()).isPresent());
+                return null;
+            }
+        );
+        assertThrows(
+            IllegalStateException.class,
+            () -> transactions.run(() -> links.findLink(fixture.links().cancellationId()))
+        );
     }
 }

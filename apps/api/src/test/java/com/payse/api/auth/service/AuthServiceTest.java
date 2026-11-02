@@ -1,5 +1,8 @@
 package com.payse.api.auth.service;
 
+import com.payse.api.ApiTestConstants.AuthConfig;
+import com.payse.api.ApiTestConstants.AuthHttp;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -49,11 +52,17 @@ class AuthServiceTest {
      */
     @Test
     void recordsIpBeforeParsing() {
-        AuthResult.Failure result = assertInstanceOf(AuthResult.Failure.class, service.login(peer, () -> {
-            verify(repository).recordIp(anyString());
-            verify(transactions).run(any());
-            throw new AuthInputException(AuthResult.Reason.INVALID_JSON);
-        }));
+        AuthResult.Failure result = assertInstanceOf(
+            AuthResult.Failure.class,
+            service.login(
+                peer,
+                () -> {
+                    verify(repository).recordIp(anyString());
+                    verify(transactions).run(any());
+                    throw new AuthInputException(AuthResult.Reason.INVALID_JSON);
+                }
+            )
+        );
         assertEquals(AuthResult.Reason.INVALID_JSON, result.reason());
         verify(repository).recordIp(anyString());
         verify(repository, never()).lockCode(any(), any());
@@ -66,13 +75,25 @@ class AuthServiceTest {
      */
     @Test
     void rejectsTokenBeforeReadingBody() {
-        Supplier<AuthInput> unread = () -> { throw new AssertionError("Body must not be read"); };
-        assertEquals(AuthResult.Reason.SESSION_INVALID, assertInstanceOf(AuthResult.Failure.class,
-            service.reverify(peer, () -> "invalid", unread)).reason());
+        Supplier<AuthInput> unread = () -> {
+            throw new AssertionError("Body must not be read");
+        };
+        assertEquals(
+            AuthResult.Reason.SESSION_INVALID,
+            assertInstanceOf(
+                AuthResult.Failure.class,
+                service.reverify(peer, () -> "invalid", unread)
+            ).reason()
+        );
         Instant retryAt = Instant.now().plusSeconds(60);
         when(repository.recordIp(anyString())).thenReturn(new AuthRows.IpLimit(false, retryAt));
-        assertEquals(AuthResult.Reason.RATE_LIMITED, assertInstanceOf(AuthResult.Failure.class,
-            service.reverify(peer, () -> "invalid", unread)).reason());
+        assertEquals(
+            AuthResult.Reason.RATE_LIMITED,
+            assertInstanceOf(
+                AuthResult.Failure.class,
+                service.reverify(peer, () -> "invalid", unread)
+            ).reason()
+        );
         verify(repository, times(2)).recordIp(anyString());
     }
 
@@ -80,27 +101,43 @@ class AuthServiceTest {
      * Retry-After를 초 경계에서 올림하고 만료 직후에도 음수를 반환하지 않는다.
      * @created 2026-10-28
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void roundsRetrySeconds() {
         Instant now = Instant.parse("2026-10-28T00:00:00Z");
-        var result = new AuthResult.Failure(AuthResult.Reason.RATE_LIMITED, now.plusSeconds(1).plusNanos(1));
-        assertEquals("2", AuthHttpResponse.reply(result, now).getHeaders().getFirst("Retry-After"));
-        assertEquals("1", AuthHttpResponse.reply(result, now.plusSeconds(5)).getHeaders().getFirst("Retry-After"));
+        var result = new AuthResult.Failure(
+            AuthResult.Reason.RATE_LIMITED,
+            now.plusSeconds(1).plusNanos(1)
+        );
+        assertEquals(
+            "2",
+            AuthHttpResponse.reply(result, now)
+                .getHeaders()
+                .getFirst(AuthHttp.RETRY_AFTER)
+        );
+        assertEquals(
+            "1",
+            AuthHttpResponse.reply(result, now.plusSeconds(5))
+                .getHeaders()
+                .getFirst(AuthHttp.RETRY_AFTER)
+        );
     }
 
     /**
      * 직접 접속 모드 누락·프록시 자동 신뢰는 인증 시작 시 실패한다.
      * @created 2026-10-28
      * @usedBy JUnit test
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
     void requiresExplicitPeerMode() {
         var environment = new org.springframework.mock.env.MockEnvironment();
         assertThrows(IllegalStateException.class, () -> new AuthHttpInput(environment));
-        environment.withProperty("PAYSE_AUTH_PEER_MODE", "direct").withProperty("server.forward-headers-strategy", "native");
+        environment.withProperty(AuthConfig.PAYSE_AUTH_PEER_MODE, "direct")
+            .withProperty(AuthConfig.FORWARD_HEADERS_STRATEGY, "native");
         assertThrows(IllegalStateException.class, () -> new AuthHttpInput(environment));
-        environment.withProperty("server.forward-headers-strategy", "none");
+        environment.withProperty(AuthConfig.FORWARD_HEADERS_STRATEGY, "none");
         assertDoesNotThrow(() -> new AuthHttpInput(environment));
     }
 
@@ -120,7 +157,14 @@ class AuthServiceTest {
         random.nextBytes(limitKey);
         crypto = new AuthCrypto(new AuthSecrets("service-tests", codeKey, limitKey));
         service = new AuthService(repository, transactions, crypto);
-        peer = InetAddress.getByAddress(new byte[] {127, 0, 0, 1});
+        peer = InetAddress.getByAddress(
+            new byte[] {
+                127,
+                0,
+                0,
+                1
+            }
+        );
         userId = UUID.randomUUID();
         credentials = new AuthCredentials("검증사용자", "01000000000", "012345");
         when(transactions.run(any())).thenAnswer(call -> ((Supplier<?>) call.getArgument(0)).get());
@@ -136,8 +180,15 @@ class AuthServiceTest {
      * @usedBy 로그인 분기 검사
      */
     private void allowCode() {
-        when(repository.lockCode(credentials.name(), credentials.phone())).thenReturn(Optional.of(
-            new AuthRows.LoginAccount(userId, credentials.name(), crypto.codeVerifier(userId, credentials.code()))));
+        when(repository.lockCode(credentials.name(), credentials.phone())).thenReturn(
+            Optional.of(
+                new AuthRows.LoginAccount(
+                    userId,
+                    credentials.name(),
+                    crypto.codeVerifier(userId, credentials.code())
+                )
+            )
+        );
     }
 
     /**
@@ -150,10 +201,20 @@ class AuthServiceTest {
         allowCode();
         UUID sessionId = UUID.randomUUID();
         Instant issuedAt = Instant.parse("2026-10-26T01:02:03Z");
-        when(repository.openSession(eq(userId), anyString())).thenReturn(Optional.of(
-            new AuthRows.OpenedSession(userId, sessionId, credentials.name(), issuedAt)));
-        AuthResult.Login result = assertInstanceOf(AuthResult.Login.class,
-            service.login(peer, " " + credentials.name() + " ", credentials.phone(), credentials.code()));
+        when(repository.openSession(eq(userId), anyString())).thenReturn(
+            Optional.of(
+                new AuthRows.OpenedSession(userId, sessionId, credentials.name(), issuedAt)
+            )
+        );
+        AuthResult.Login result = assertInstanceOf(
+            AuthResult.Login.class,
+            service.login(
+                peer,
+                " " + credentials.name() + " ",
+                credentials.phone(),
+                credentials.code()
+            )
+        );
         assertEquals(userId, result.userId());
         assertEquals(sessionId, result.sessionId());
         assertEquals(credentials.name(), result.name());
@@ -178,8 +239,13 @@ class AuthServiceTest {
     void keepsStateRejectionSeparate() {
         allowCode();
         when(repository.openSession(eq(userId), anyString())).thenReturn(Optional.empty());
-        assertEquals(AuthResult.Reason.AUTH_REJECTED, assertInstanceOf(AuthResult.Failure.class,
-            service.login(peer, credentials.name(), credentials.phone(), credentials.code())).reason());
+        assertEquals(
+            AuthResult.Reason.AUTH_REJECTED,
+            assertInstanceOf(
+                AuthResult.Failure.class,
+                service.login(peer, credentials.name(), credentials.phone(), credentials.code())
+            ).reason()
+        );
         verify(repository, never()).recordFailure(anyString());
     }
 
@@ -192,11 +258,14 @@ class AuthServiceTest {
     void commitsFailureAsResult() {
         Instant blocked = Instant.parse("2026-10-26T01:05:00Z");
         when(repository.recordFailure(anyString())).thenReturn(blocked);
-        AuthResult.Failure result = assertInstanceOf(AuthResult.Failure.class,
-            service.login(peer, credentials.name(), credentials.phone(), credentials.code()));
+        AuthResult.Failure result = assertInstanceOf(
+            AuthResult.Failure.class,
+            service.login(peer, credentials.name(), credentials.phone(), credentials.code())
+        );
         assertEquals(AuthResult.Reason.RATE_LIMITED, result.reason());
         assertEquals(blocked, result.retryAt());
-        verify(repository).recordFailure(crypto.combinationLimitKey(credentials.name(), credentials.phone()));
+        verify(repository)
+            .recordFailure(crypto.combinationLimitKey(credentials.name(), credentials.phone()));
         verify(repository, never()).openSession(any(), any());
     }
 
@@ -211,8 +280,13 @@ class AuthServiceTest {
         Instant combination = Instant.parse("2026-10-26T01:05:00Z");
         when(repository.recordIp(anyString())).thenReturn(new AuthRows.IpLimit(false, ip));
         when(repository.retryAt(anyString())).thenReturn(combination);
-        assertEquals(combination, assertInstanceOf(AuthResult.Failure.class,
-            service.login(peer, credentials.name(), credentials.phone(), credentials.code())).retryAt());
+        assertEquals(
+            combination,
+            assertInstanceOf(
+                AuthResult.Failure.class,
+                service.login(peer, credentials.name(), credentials.phone(), credentials.code())
+            ).retryAt()
+        );
         verify(repository, never()).lockCode(any(), any());
         verify(repository, never()).recordFailure(anyString());
     }
@@ -226,15 +300,28 @@ class AuthServiceTest {
     void checksBlockedCombinationBeforeCodeFormat() {
         Instant blocked = Instant.parse("2026-10-26T01:05:00Z");
         when(repository.retryAt(anyString())).thenReturn(blocked);
-        for (String code : new String[] {null, "bad", "12345", "000001 "}) {
-            AuthResult.Failure result = assertInstanceOf(AuthResult.Failure.class,
-                service.login(peer, credentials.name(), credentials.phone(), code));
+        for (String code : new String[] {
+            null,
+            "bad",
+            "12345",
+            "000001 "
+        }) {
+            AuthResult.Failure result = assertInstanceOf(
+                AuthResult.Failure.class,
+                service.login(peer, credentials.name(), credentials.phone(), code)
+            );
             assertEquals(AuthResult.Reason.RATE_LIMITED, result.reason());
             assertEquals(blocked, result.retryAt());
         }
-        when(repository.recordIp(anyString())).thenReturn(new AuthRows.IpLimit(false, blocked.minusSeconds(200)));
-        assertEquals(blocked, assertInstanceOf(AuthResult.Failure.class,
-            service.login(peer, credentials.name(), credentials.phone(), "bad")).retryAt());
+        when(repository.recordIp(anyString()))
+            .thenReturn(new AuthRows.IpLimit(false, blocked.minusSeconds(200)));
+        assertEquals(
+            blocked,
+            assertInstanceOf(
+                AuthResult.Failure.class,
+                service.login(peer, credentials.name(), credentials.phone(), "bad")
+            ).retryAt()
+        );
         verify(repository, never()).lockCode(any(), any());
         verify(repository, never()).recordFailure(anyString());
     }
@@ -246,8 +333,13 @@ class AuthServiceTest {
      */
     @Test
     void countsInvalidInput() {
-        assertEquals(AuthResult.Reason.INVALID_INPUT, assertInstanceOf(AuthResult.Failure.class,
-            service.login(peer, null, credentials.phone(), credentials.code())).reason());
+        assertEquals(
+            AuthResult.Reason.INVALID_INPUT,
+            assertInstanceOf(
+                AuthResult.Failure.class,
+                service.login(peer, null, credentials.phone(), credentials.code())
+            ).reason()
+        );
         verify(repository).recordIp(anyString());
         verify(repository, never()).retryAt(anyString());
         verify(repository, never()).recordFailure(anyString());
@@ -261,8 +353,13 @@ class AuthServiceTest {
      */
     @Test
     void countsMalformedRequest() {
-        assertEquals(AuthResult.Reason.INVALID_INPUT, assertInstanceOf(AuthResult.Failure.class,
-            service.rejectMalformed(peer)).reason());
+        assertEquals(
+            AuthResult.Reason.INVALID_INPUT,
+            assertInstanceOf(
+                AuthResult.Failure.class,
+                service.rejectMalformed(peer)
+            ).reason()
+        );
         verify(repository).recordIp(anyString());
         verify(repository, never()).retryAt(anyString());
     }
@@ -275,8 +372,10 @@ class AuthServiceTest {
     @Test
     void failsClosedOnStoreError() {
         when(repository.recordIp(anyString())).thenThrow(new AuthStoreException());
-        assertThrows(AuthStoreException.class,
-            () -> service.login(peer, credentials.name(), credentials.phone(), credentials.code()));
+        assertThrows(
+            AuthStoreException.class,
+            () -> service.login(peer, credentials.name(), credentials.phone(), credentials.code())
+        );
         verify(repository, never()).retryAt(anyString());
         verify(repository, never()).lockCode(any(), any());
     }
@@ -288,8 +387,19 @@ class AuthServiceTest {
      */
     @Test
     void rejectsInvalidSession() {
-        assertEquals(AuthResult.Reason.SESSION_INVALID, assertInstanceOf(AuthResult.Failure.class,
-            service.reverify(peer, "invalid", credentials.name(), credentials.phone(), credentials.code())).reason());
+        assertEquals(
+            AuthResult.Reason.SESSION_INVALID,
+            assertInstanceOf(
+                AuthResult.Failure.class,
+                service.reverify(
+                    peer,
+                    "invalid",
+                    credentials.name(),
+                    credentials.phone(),
+                    credentials.code()
+                )
+            ).reason()
+        );
         verify(repository).authorize(null);
         verify(repository, never()).findCode(any(), any());
         verify(repository, never()).recordFailure(anyString());
@@ -304,11 +414,26 @@ class AuthServiceTest {
     void rejectsOtherOwner() {
         IssuedToken token = crypto.issueToken();
         UUID other = UUID.randomUUID();
-        when(repository.authorize(token.digest())).thenReturn(Optional.of(new AuthRows.Session(userId, UUID.randomUUID())));
-        when(repository.findCode(credentials.name(), credentials.phone())).thenReturn(Optional.of(
-            new AuthRows.StoredCode(other, crypto.codeVerifier(other, credentials.code()))));
-        assertEquals(AuthResult.Reason.AUTH_REJECTED, assertInstanceOf(AuthResult.Failure.class,
-            service.reverify(peer, token.value(), credentials.name(), credentials.phone(), credentials.code())).reason());
+        when(repository.authorize(token.digest()))
+            .thenReturn(Optional.of(new AuthRows.Session(userId, UUID.randomUUID())));
+        when(repository.findCode(credentials.name(), credentials.phone())).thenReturn(
+            Optional.of(
+                new AuthRows.StoredCode(other, crypto.codeVerifier(other, credentials.code()))
+            )
+        );
+        assertEquals(
+            AuthResult.Reason.AUTH_REJECTED,
+            assertInstanceOf(
+                AuthResult.Failure.class,
+                service.reverify(
+                    peer,
+                    token.value(),
+                    credentials.name(),
+                    credentials.phone(),
+                    credentials.code()
+                )
+            ).reason()
+        );
         verify(repository).recordFailure(anyString());
         verify(repository, never()).lockCode(any(), any());
         verify(repository, never()).endSession(any());
@@ -337,10 +462,19 @@ class AuthServiceTest {
      */
     @Test
     void protectsInternalResults() {
-        assertThrows(IllegalArgumentException.class, () -> new AuthResult.Failure(AuthResult.Reason.RATE_LIMITED, null));
-        assertThrows(IllegalArgumentException.class,
-            () -> new AuthResult.Failure(AuthResult.Reason.AUTH_REJECTED, Instant.now()));
-        AuthRows.LoginAccount account = new AuthRows.LoginAccount(userId, credentials.name(), "private-verifier");
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new AuthResult.Failure(AuthResult.Reason.RATE_LIMITED, null)
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new AuthResult.Failure(AuthResult.Reason.AUTH_REJECTED, Instant.now())
+        );
+        AuthRows.LoginAccount account = new AuthRows.LoginAccount(
+            userId,
+            credentials.name(),
+            "private-verifier"
+        );
         assertFalse(account.toString().contains("private-verifier"));
         assertFalse(account.toString().contains(credentials.name()));
     }
@@ -352,15 +486,26 @@ class AuthServiceTest {
      */
     @Test
     void requiresBothProfiles() {
-        for (String[] profiles : new String[][] {{}, {"auth"}, {"database"}, {"auth", "database"}}) {
-            try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+        for (String[] profiles : new String[][] {
+            {},
+            { "auth" },
+            { "database" },
+            { "auth", "database" }
+        }) {
+            try (
+                AnnotationConfigApplicationContext context =
+                    new AnnotationConfigApplicationContext()
+            ) {
                 context.getEnvironment().setActiveProfiles(profiles);
                 context.registerBean(AuthRepository.class, () -> repository);
                 context.registerBean(AuthTransactions.class, () -> transactions);
                 context.registerBean(AuthCrypto.class, () -> crypto);
                 context.register(AuthService.class);
                 context.refresh();
-                assertEquals(profiles.length == 2 ? 1 : 0, context.getBeansOfType(AuthService.class).size());
+                assertEquals(
+                    profiles.length == 2 ? 1 : 0,
+                    context.getBeansOfType(AuthService.class).size()
+                );
             }
         }
     }

@@ -1,5 +1,7 @@
 package com.payse.api.config;
 
+import com.payse.api.constants.ApiConfigConstants;
+import com.payse.api.constants.ApiMessageConstants;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import javax.sql.DataSource;
@@ -16,6 +18,7 @@ import org.springframework.core.env.Environment;
 @Configuration(proxyBeanMethods = false)
 @Profile("database")
 public class DatabaseConfiguration {
+
     /**
      * 환경변수로 연결한다. 스키마·시드·역할을 자동 생성하거나 변경하지 않는다.
      * @created 2026-10-20
@@ -37,21 +40,33 @@ public class DatabaseConfiguration {
      * @modified 2026-10-25 - 이름을 역할에 맞게 정리
      * @param environment 값 누락을 기본값으로 대체하지 않는 서버 설정
      * @return 아직 DB에 연결하지 않은 구성; 자격을 포함하므로 직렬화·로그 금지
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조
      */
     public HikariConfig poolConfig(Environment environment) {
-        String url = requireProperty(environment, "PAYSE_JDBC_URL");
-        if (!url.startsWith("jdbc:postgresql:")) {
-            throw new IllegalArgumentException("PAYSE_JDBC_URL must use PostgreSQL");
+        String url = requireProperty(environment, ApiConfigConstants.Server.PAYSE_JDBC_URL);
+        if (!url.startsWith(ApiConfigConstants.Server.POSTGRES_URL_PREFIX)) {
+            throw new IllegalArgumentException(ApiMessageConstants.Server.INVALID_JDBC_URL);
         }
 
-        String username = requireProperty(environment, "PAYSE_DB_USER");
-        String password = requireProperty(environment, "PAYSE_DB_PASSWORD");
-        int maxPoolSize = requirePositiveInt(environment, "PAYSE_DB_MAX_POOL_SIZE");
-        int connectionTimeout = requirePositiveInt(environment, "PAYSE_DB_CONNECTION_TIMEOUT_MS");
-        int validationTimeout = requirePositiveInt(environment, "PAYSE_DB_VALIDATION_TIMEOUT_MS");
+        String username = requireProperty(environment, ApiConfigConstants.Server.PAYSE_DB_USER);
+        String password = requireProperty(environment, ApiConfigConstants.Server.PAYSE_DB_PASSWORD);
+        int maxPoolSize = requirePositiveInt(
+            environment,
+            ApiConfigConstants.Server.PAYSE_DB_MAX_POOL_SIZE
+        );
+        int connectionTimeout = requirePositiveInt(
+            environment,
+            ApiConfigConstants.Server.PAYSE_DB_CONNECTION_TIMEOUT_MS
+        );
+        int validationTimeout = requirePositiveInt(
+            environment,
+            ApiConfigConstants.Server.PAYSE_DB_VALIDATION_TIMEOUT_MS
+        );
         if (validationTimeout < 250 || validationTimeout >= connectionTimeout) {
             throw new IllegalArgumentException(
-                "PAYSE_DB_VALIDATION_TIMEOUT_MS must be at least 250 and less than PAYSE_DB_CONNECTION_TIMEOUT_MS");
+                ApiMessageConstants.Server.INVALID_VALIDATION_TIMEOUT
+            );
         }
 
         HikariConfig config = new HikariConfig();
@@ -73,17 +88,23 @@ public class DatabaseConfiguration {
      * @param environment 서버 설정 원천
      * @param name 검증할 설정 이름
      * @return 비어 있지 않은 설정 원문
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조
      */
     private String requireProperty(Environment environment, String name) {
         String value;
         try {
             value = environment.getProperty(name);
         } catch (IllegalArgumentException failure) {
-            throw new IllegalArgumentException(name + " could not be resolved");
+            throw new IllegalArgumentException(
+                name + ApiMessageConstants.Server.UNRESOLVED_SETTING
+            );
         }
+
         if (value == null || value.isBlank()) {
-            throw new IllegalStateException(name + " is required and must not be blank");
+            throw new IllegalStateException(name + ApiMessageConstants.Server.REQUIRED_SETTING);
         }
+
         return value;
     }
 
@@ -95,6 +116,8 @@ public class DatabaseConfiguration {
      * @param environment 서버 설정 원천
      * @param name 검증할 설정 이름
      * @return 1 이상 Integer.MAX_VALUE 이하의 값
+     * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
+     * @modified 2026-11-02 - 용도별 상수 파일 참조
      */
     private int requirePositiveInt(Environment environment, String name) {
         String value = requireProperty(environment, name);
@@ -102,13 +125,17 @@ public class DatabaseConfiguration {
             if (!value.matches("[0-9]+")) {
                 throw new NumberFormatException();
             }
+
             int result = Integer.parseInt(value);
             if (result < 1) {
                 throw new NumberFormatException();
             }
+
             return result;
         } catch (NumberFormatException failure) {
-            throw new IllegalArgumentException(name + " must be an ASCII integer between 1 and 2147483647");
+            throw new IllegalArgumentException(
+                name + ApiMessageConstants.Server.INVALID_INTEGER_SETTING
+            );
         }
     }
 }

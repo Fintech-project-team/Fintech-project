@@ -83,9 +83,11 @@ def check_record(payload, item, record, owner_scope, versions, now, fingerprint)
         selected = select_items(payload, [item['itemKey']])
         validate_output(selected, {'meaningPolicyVersion': versions['policy'], 'items': [result]})
         fields = ('meaning', 'classification') if payload['semanticTaskKind'] == 'transactionMeaning' else ('meaning',)
-        if record['route'] != 'reused_result' and any(
-                result[field]['value'] is None or result[field]['status'] != 'candidate' for field in fields):
-            return 'incomplete_result'
+        if record['route'] != 'reused_result':
+            incomplete_result = any(
+                result[field]['value'] is None or result[field]['status'] != 'candidate' for field in fields)
+            if incomplete_result:
+                return 'incomplete_result'
     except (ValueError, TypeError, KeyError, AttributeError):
         return 'invalid_record'
     return None
@@ -132,8 +134,10 @@ def plan(payload, owner_scope, versions, records, now):
             if len(strongest) != len(candidates):
                 reasons.append('lower_priority_result_not_used')
             candidates = strongest
-        decisions = {json.dumps({field: row['result'].get(field) for field in ('meaning', 'classification', 'name')},
-                                sort_keys=True) for row in candidates}
+        decisions = set()
+        for row in candidates:
+            decision = {field: row['result'].get(field) for field in ('meaning', 'classification', 'name')}
+            decisions.add(json.dumps(decision, sort_keys=True))
         if len(decisions) > 1:
             reasons.append('conflicting_verified_results')
             candidates = []

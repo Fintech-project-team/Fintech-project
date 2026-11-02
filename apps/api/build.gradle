@@ -29,16 +29,30 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.release = 21
 }
+def docToolOutput = layout.buildDirectory.dir('doc-tools')
+tasks.register('compileDocTools', JavaCompile) {
+    source files('tools/VerifyApiDocs.java')
+    source fileTree('src/main/java/com/payse/api/constants') { include '*.java' }
+    classpath = files()
+    destinationDirectory = docToolOutput
+    javaCompiler = javaToolchains.compilerFor {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
 tasks.named('test') {
+    dependsOn 'compileDocTools'
+    systemProperty 'payse.docToolClasspath', docToolOutput.get().asFile.absolutePath
     useJUnitPlatform()
     testLogging { events 'failed', 'skipped' }
 }
 tasks.register('apiDocsCheck', Exec) {
+    dependsOn 'compileDocTools'
     def launcher = javaToolchains.launcherFor {
         languageVersion = JavaLanguageVersion.of(21)
     }
-    commandLine launcher.get().executablePath.asFile.absolutePath,
-        'tools/VerifyApiDocs.java', 'src/main/java', 'src/test/java', 'tools',
+    def javaExecutable = launcher.get().executablePath.asFile.absolutePath
+    commandLine javaExecutable, '-cp', docToolOutput.get().asFile.absolutePath,
+        'VerifyApiDocs', 'src/main/java', 'src/test/java', 'tools',
         '../ai/src/main/java', '../ai/src/test/java'
 }
 tasks.named('check') { dependsOn 'apiDocsCheck', ':ai:check' }
@@ -59,13 +73,18 @@ tasks.register('aiArchiveCheck') {
             def aiEntries = boot.entries().toList().findAll { it.name.startsWith('BOOT-INF/lib/ai-') && it.name.endsWith('.jar') }
             if (aiEntries.size() != 1) throw new GradleException('Expected one shared AI module in Boot JAR')
             def names = []
-            new java.util.zip.ZipInputStream(boot.getInputStream(aiEntries.first())).withCloseable { nested ->
+            def aiStream = boot.getInputStream(aiEntries.first())
+            new java.util.zip.ZipInputStream(aiStream).withCloseable { nested ->
                 for (def entry = nested.nextEntry; entry != null; entry = nested.nextEntry) names.add(entry.name)
             }
             if (!names.contains('com/payse/ai/analysis/service/AnalysisService.class')) {
                 throw new GradleException('AI runtime missing from deployment')
             }
-            if (names.any { it.contains('expected.private') || it.contains('meaning-policy.json') || it.contains('/testing/') || it.contains('/cases/') || it.endsWith('Test.class') }) {
+            def containsPrivateMaterial = names.any {
+                it.contains('expected.private') || it.contains('meaning-policy.json') ||
+                    it.contains('/testing/') || it.contains('/cases/') || it.endsWith('Test.class')
+            }
+            if (containsPrivateMaterial) {
                 throw new GradleException('Private evaluation material entered AI deployment')
             }
             def publicFiles = names.findAll { it.startsWith('com/payse/ai/rules/') && !it.endsWith('/') }

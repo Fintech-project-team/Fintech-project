@@ -55,11 +55,14 @@ def decimal_total(values):
     """2026-11-01: 장부 소수 합계를 반올림하거나 미측정 0으로 바꾸지 않는다. 사용: summarize."""
     if not values:
         return None
-    whole = max(max(0, len(value.as_tuple().digits) + value.as_tuple().exponent) for value in values)
-    scale = max(max(0, -value.as_tuple().exponent) for value in values)
+    whole_lengths = (max(0, len(value.as_tuple().digits) + value.as_tuple().exponent) for value in values)
+    whole = max(whole_lengths)
+    fractional_lengths = (max(0, -value.as_tuple().exponent) for value in values)
+    scale = max(fractional_lengths)
     with localcontext() as context:
         context.prec = whole + scale + len(str(len(values))) + 2
-        return format(sum(values, Decimal(0)), 'f')
+        total = sum(values, Decimal(0))
+        return format(total, 'f')
 
 
 def validate_record(row, requested):

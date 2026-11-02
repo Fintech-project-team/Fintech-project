@@ -1,5 +1,7 @@
 package com.payse.api.analysis.provider;
 
+import com.payse.api.ApiTestConstants.KmsTransport;
+
 import com.payse.ai.transport.ProviderHttp;
 
 import com.sun.net.httpserver.HttpExchange;
@@ -48,7 +50,9 @@ final class ProviderStub implements AutoCloseable {
      * @created 2026-11-01
      * @usedBy 공급자 테스트
      */
-    ProviderHttp http() { return http(Duration.ofSeconds(2), 65536); }
+    ProviderHttp http() {
+        return http(Duration.ofSeconds(2), 65536);
+    }
 
     /**
      * 경계 테스트가 응답 시간·크기 상한을 지정한다.
@@ -56,52 +60,91 @@ final class ProviderStub implements AutoCloseable {
      * @usedBy ProviderHttpTest
      */
     ProviderHttp http(Duration timeout, int limit) {
-        return new ProviderHttp(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1))
-            .followRedirects(HttpClient.Redirect.NEVER).build(), timeout, limit);
+        return new ProviderHttp(
+            HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(1))
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .build(),
+            timeout,
+            limit
+        );
     }
 
     /**
      * 모의 공급자 전용 주소를 반환한다.
      * @created 2026-11-01
      * @usedBy 공급자 테스트
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
-    URI endpoint() { return URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v1/"); }
+    URI endpoint() {
+        return URI.create(
+            "http://127.0.0.1:" + server.getAddress().getPort() + KmsTransport.PROVIDER_API_PATH
+        );
+    }
 
     /**
      * 다음 응답의 코드·합성 본문을 지정한다.
      * @created 2026-11-01
      * @usedBy 공급자 테스트
      */
-    void reply(int code, String body) { status = code; response = body; delay = 0; }
+    void reply(int code, String body) {
+        status = code;
+        response = body;
+        delay = 0;
+    }
 
     /**
      * 헤더 전송 뒤 본문 지연을 만들어 전체 응답 timeout을 검사한다.
      * @created 2026-11-01
      * @usedBy ProviderHttpTest
      */
-    void delayBody(long milliseconds) { delay = milliseconds; }
+    void delayBody(long milliseconds) {
+        delay = milliseconds;
+    }
 
     /**
      * 합성 요청의 읽기용 스냅샷을 반환한다.
      * @created 2026-11-01
      * @usedBy 공급자 테스트
      */
-    List<Request> requests() { return List.copyOf(requests); }
+    List<Request> requests() {
+        return List.copyOf(requests);
+    }
 
     /**
      * 요청을 기록하고 지정된 응답만 전달한다. 외부 서비스에 전달하지 않는다.
      * @created 2026-11-01
      * @usedBy HttpServer
+     * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조; 단일 제어문 본문 중괄호 명시
      */
     private void handle(HttpExchange exchange) throws IOException {
         try (exchange) {
-            requests.add(new Request(exchange.getRequestURI().getPath(), exchange.getRequestHeaders().getFirst("Authorization"),
-                json.readTree(exchange.getRequestBody().readAllBytes())));
+            requests.add(
+                new Request(
+                    exchange.getRequestURI().getPath(),
+                    exchange.getRequestHeaders().getFirst(KmsTransport.AUTHORIZATION),
+                    json.readTree(exchange.getRequestBody().readAllBytes())
+                )
+            );
             byte[] body = response.getBytes(StandardCharsets.UTF_8);
-            if (status >= 300 && status < 400) exchange.getResponseHeaders().add("Location", endpoint().resolve("redirected").toString());
+            if (status >= 300 && status < 400) {
+                exchange.getResponseHeaders()
+                    .add(
+                        KmsTransport.LOCATION,
+                        endpoint()
+                            .resolve("redirected")
+                            .toString()
+                    );
+            }
             exchange.sendResponseHeaders(status, body.length);
-            try { if (delay > 0) Thread.sleep(delay); }
-            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return; }
+            try {
+                if (delay > 0) {
+                    Thread.sleep(delay);
+                }
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
+            }
             exchange.getResponseBody().write(body);
         }
     }
@@ -112,12 +155,16 @@ final class ProviderStub implements AutoCloseable {
      * @usedBy try-with-resources
      */
     @Override
-    public void close() { server.stop(0); executor.shutdownNow(); }
+    public void close() {
+        server.stop(0);
+        executor.shutdownNow();
+    }
 
     /**
      * 운영 키·금융 데이터가 없는 모의 요청이다.
      * @created 2026-11-01
      * @usedBy 공급자 테스트 assertion
      */
-    record Request(String path, String authorization, JsonNode body) {}
+    record Request(String path, String authorization, JsonNode body) {
+    }
 }

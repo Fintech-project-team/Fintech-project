@@ -1,6 +1,6 @@
 # API SQL 작성·구성 기준
 
-`apps/api/`의 직접 작성한 SQL과 SQL 생성기의 출력에 적용한다. 데이터 의미·권한·트랜잭션 순서는 [API 필수 규칙](../src/AGENTS.md), 저장 필드는 [DB 사전](../../../docs/database-schema.md)을 따른다. 이 문서는 표기와 파일 구성을 정의한다.
+`apps/api/`의 직접 작성한 SQL과 SQL 생성기의 출력에 적용한다. 데이터 의미·권한·트랜잭션 순서는 [API 필수 규칙](../AGENTS.md), 저장 필드는 [DB 사전](../../../docs/database-schema.md)을 따른다. 이 문서는 표기와 파일 구성을 정의한다.
 
 ## 줄바꿈과 주석
 

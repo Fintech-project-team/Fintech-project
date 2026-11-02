@@ -1,6 +1,6 @@
 # PAYSE AI 개발 규칙
 
-이 폴더는 API와 함께 배포하는 Java 21 라이브러리다. 작업 전에 이 문서, [입력 자료 사용 규칙](AGENT.md), [공통 코드 규칙](../../docs/harness/CODE_SPEC.md), [API 명명·가독성](../api/AGENT.md), [Java 주석 규칙](../api/src/AGENTS.md)의 3~8·19항을 필수로 읽는다. 이름·생성일·수정일·실제 호출자 규칙을 AI 코드에도 동일하게 적용한다.
+이 폴더는 API와 함께 배포하는 Java 21 라이브러리다. 작업 전에 이 문서, [입력 자료 사용 규칙](AGENT.md), [공통 코드 규칙](../../docs/harness/CODE_SPEC.md), [API 명명·가독성](../api/AGENTS.md#명명과-로직-가독성), [Java 주석 규칙](../api/AGENTS.md#java-주석)을 필수로 읽는다. 이름·생성일·수정일·실제 호출자 규칙을 AI 코드에도 동일하게 적용한다.
 
 1. 업무 안에서 `service`·`mapper`·`validation`·필요한 `dto`를 구분한다. 공급자 통신은 `provider`, 재사용 HTTP는 `transport`에 둔다. 빈 계층·거대한 공통 Manager·사용자 상태를 가진 singleton을 만들지 않는다.
 2. [실행 계약](../../docs/payse-execution-contract.md), [의미 규격](../api/docs/analysis-meaning.md), [API 실행 상세](../api/docs/llm-execution.md)의 관련 절을 필수 참조한다. AI→API 의존은 금지하며 API가 AI를 호출한다. 별도 포트·DB·서버를 만들지 않는다.
@@ -13,3 +13,6 @@
 9. API Gradle의 `check`로 AI 테스트·주석·배포 검사를 수행한다. API 기존 검사·모바일 계약을 유지하고, 모바일·계산 패키지는 읽기만 한다. 실제 외부 호출·유료 실행·서버 교체는 별도 승인 없이 하지 않는다.
 10. 공급자 교체는 [모듈 경계](docs/README.md#공급자-교체-경계)를 필수 참조한다. 업무 계층은 `ModelGateway`·`ModelFailure`·공통 DTO만 사용하며 OpenAI 요청 필드·HTTP 예외·자격·URL을 알지 못한다. 새 공급자도 같은 입력/출력 검증을 통과해야 한다.
 11. 계수·생성 실패 단계와 해당 단계의 전송 가능성을 구분한다. 계수의 외부 전송 이력을 생성 미전송으로 지우지 않는다. 계수 불가를 0으로 대체하거나 사용량 미확인을 무료 실행으로 판단하지 않는다. 공급자 원문 오류는 알려진 내부 코드로만 변환한다.
+12. Java 실행·Python 평가·테스트의 긴 호출 인수·반복 헤더·조건식은 [긴 식과 평가 순서](../api/AGENTS.md#긴-식과-평가-순서)에 따라 의미 있는 지역 변수로 분리한다. 원래 평가 순서·횟수·단락 평가·람다/지연 실행·요청별 입력 격리를 보존하며, 식을 짧게 만들기 위해 모델 입력·정답·분류 기준·공급자 호출 순서를 바꾸지 않는다.
+13. AI 운영 문자열 상수는 `src/main/java/com/payse/ai/constants/` 한 폴더의 `AiFieldConstants`·`AiCodeConstants`·`AiConfigConstants`·`AiMessageConstants` 네 파일에서 관리한다. 세부 의미는 중첩 클래스와 구간 주석으로 나누며 업무·Schema·Memory·OpenAI·HTTP·설정의 경계를 유지한다. 업무 계층은 공급자 전용 구역을 참조하지 않는다. 테스트 상수는 `src/test/java/com/payse/ai/AiTestConstants.java` 한 파일에 독립 리터럴과 용도별 구간으로 모으며 운영 JAR에 포함하지 않는다. 상수 파일명은 모두 `Constants`로 끝나게 하고 별도 테스트 상수 폴더는 만들지 않는다. [문자열 상수 기준](../api/AGENTS.md#문자열-상수)에 따라 접근·명명·예외를 적용하고 모델 입력·정답·공개 계약·비밀 관리를 바꾸지 않는다.
+14. Java 메서드의 개행·100자 폭·4칸 들여쓰기·의미 단위 빈 줄·체인/인수 배치·제어문 중괄호·중첩 상수 타입 import는 [Java 개행 기준](../api/AGENTS.md#java-개행)을 따른다. Schema와 업무 필드의 의미, builder의 자식 노드, 프롬프트·평가 원문은 개행 때문에 바꾸지 않는다.
