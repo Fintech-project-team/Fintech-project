@@ -341,18 +341,17 @@ void main() {
     );
     await tester.pumpAndSettle();
     final scopeTop = tester
-        .getTopLeft(find.byKey(const ValueKey('flow-scope')))
+        .getTopLeft(find.byKey(const ValueKey('flow-purpose')))
         .dy;
     await tester.tap(find.byKey(const ValueKey('inner-tab-all')));
     await tester.pumpAndSettle();
     expect(
-      tester.getTopLeft(find.byKey(const ValueKey('tx-scope'))).dy,
+      tester.getTopLeft(find.byKey(const ValueKey('tx-purpose'))).dy,
       scopeTop,
-      reason: '세 탭 범위 문구는 같은 높이에서 시작',
+      reason: '세 탭 목적 제목은 같은 높이에서 시작',
     );
-    final txBasis = tester
-        .getTopLeft(find.byKey(const ValueKey('tx-basis')))
-        .dy;
+    expect(find.text('모든 계좌·카드의 거래'), findsOneWidget);
+    expect(find.text('연결한 계좌·카드를 계산 포함 여부와 관계없이 보여줘요.'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('period-prev')));
     await tester.pumpAndSettle();
     void expectCentered(String month) {
@@ -415,14 +414,16 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('inner-tab-accounts')));
     await tester.pumpAndSettle();
     expect(
-      tester.getTopLeft(find.text('계산에 포함한 계좌 잔액')).dy,
+      tester.getTopLeft(find.byKey(const ValueKey('accounts-purpose'))).dy,
       scopeTop,
-      reason: '계좌 관리 범위 문구도 같은 높이',
+      reason: '계좌 관리 목적 제목도 같은 높이',
     );
+    expect(find.text('계산할 계좌 관리'), findsOneWidget);
+    expect(find.text('계산에 쓸 계좌를 바꾸고 연결 정보를 확인해요.'), findsOneWidget);
     expect(
-      tester.getTopLeft(find.byKey(const ValueKey('accounts-meta'))).dy,
-      txBasis,
-      reason: '핵심 정보 줄 높이가 같아 기준 시각도 같은 자리',
+      tester.getTopLeft(find.text('계산에 포함한 계좌 잔액')).dy,
+      greaterThan(scopeTop),
+      reason: '잔액 라벨은 목적 안내 아래에 유지',
     );
     await tester.tap(
       find.byKey(

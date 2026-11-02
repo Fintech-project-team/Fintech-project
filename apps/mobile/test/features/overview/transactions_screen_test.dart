@@ -214,7 +214,12 @@ void main() {
     testWidgets('행을 누르면 읽기 전용 상세 시트: 취소일·원래 결제, 편집 없음', (tester) async {
       await _pump(tester, s);
       final row = find.byKey(ValueKey('tx-${cancel.transactionId}'));
-      await tester.ensureVisible(row);
+      await tester.scrollUntilVisible(
+        row,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
       await tester.tap(row);
       await tester.pumpAndSettle();
       expect(_in('detail-title', cancel.merchantName), findsOneWidget);
