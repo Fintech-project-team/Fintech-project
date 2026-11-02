@@ -72,15 +72,32 @@ jobs:
       - name: PostgreSQL 15 tooling from the PostgreSQL repository
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-common ca-certificates
+          sudo apt-get install -y postgresql-common ca-certificates acl
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get update
           sudo apt-get install -y postgresql-15
+          sudo setfacl -m "u:$(id -un):rwx" /var/run/postgresql
       - name: Isolated database and HTTP regression
         run: >-
           python -B apps/api/database/test_analysis_service.py
           --pg-bin /usr/lib/postgresql/15/bin
           --work-dir "${{ runner.temp }}/payse-release-db"
+      - name: Restricted startup diagnostics
+        if: failure()
+        env:
+          CHECK_DIRECTORY: ${{ runner.temp }}/payse-release-db
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          directory = Path(os.environ['CHECK_DIRECTORY'])
+          for name in ('initialize.log', 'start.log', 'server.log'):
+              path = directory / name
+              if path.is_file():
+                  for line in path.read_text(errors='replace').splitlines():
+                      if ('FATAL:' in line or 'Permission denied' in line) and 'password' not in line.lower():
+                          print(name + ': ' + line[:240])
+          PY
       - name: Package the checked commit
         if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/sunghyun-dev')
         env:
