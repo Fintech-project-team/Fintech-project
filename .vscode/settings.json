@@ -16,11 +16,13 @@
     "editor.formatOnSave": false
   },
   "dart.analysisExcludedFolders": ["node_modules", ".harness"],
+  "gradle.nestedProjects": ["apps/api", "apps/mobile/android"],
   "java.import.exclusions": [
     "**/node_modules/**",
     "**/.metadata/**",
     "**/archetype-resources/**",
     "**/META-INF/maven/**",
-    "**/.harness/**"
+    "**/.harness/**",
+    "**/.claude/worktrees/**"
   ]
 }
