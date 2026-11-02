@@ -4,10 +4,11 @@ import '../data/connection/financial_api.dart';
 import '../data/connection/transaction_history.dart';
 import '../data/connection/user_snapshot_repository.dart';
 import '../data/first_calc_record_store.dart';
-import '../data/salary_notice_store.dart';
+import '../data/salary_notice_api.dart';
 import '../data/coachmark_record_store.dart';
 import '../data/financial_snapshot.dart';
 import '../data/financial_snapshot_repository.dart';
+import '../data/http/api_transport.dart';
 import '../features/connection/connection_flow.dart';
 import '../features/connection/connection_illustration.dart';
 import '../features/connection/connection_page.dart';
@@ -30,7 +31,8 @@ class MainEntry extends StatefulWidget {
   /// 2026-10-23: 세션 금융 저장소 [financial]과 연결 표시 정책 [policy], 진입 로딩 제목의 사용자 이름 [userName]을 받는다.
   /// 2026-10-27: [firstCalcRecords]는 01-3 첫 계산 기록 저장소다. 앱이 넘기며, 없으면 이 화면 동안만 쓰는 메모리 저장소다.
   /// 2026-10-28: [coachmarkRecords]는 02-1a 코치마크 기록 저장소다. 없으면 코치마크를 띄우지 않는다.
-  /// 2026-10-29: [salaryNotices]는 홈 월급 입금 확인 안내 접힘 기록 저장소다. 없으면 이 화면 동안만 쓰는 메모리 저장소다.
+  /// 2026-11-02: [onLogout]은 내 정보 탭의 로그아웃이다(성공이면 null, 실패면 안내 문구). 없으면 버튼을 두지 않는다.
+  /// 2026-11-01: [salaryNoticeApi]는 이 세션의 급여 안내 API다. 없으면 회차를 아는 안내도 조회·저장하지 않는다(실패로 처리).
   const MainEntry({
     super.key,
     required this.financial,
@@ -41,7 +43,8 @@ class MainEntry extends StatefulWidget {
     this.userName,
     this.firstCalcRecords,
     this.coachmarkRecords,
-    this.salaryNotices,
+    this.salaryNoticeApi,
+    this.onLogout,
   });
 
   final UserFinancialRepository financial;
@@ -52,7 +55,8 @@ class MainEntry extends StatefulWidget {
   final String? userName;
   final FirstCalcRecordStore? firstCalcRecords;
   final CoachmarkRecordStore? coachmarkRecords;
-  final SalaryNoticeStore? salaryNotices;
+  final SalaryNoticeApi? salaryNoticeApi;
+  final Future<String?> Function()? onLogout;
 
   /// 2026-10-21: 조회 상태 객체를 반환한다.
   @override
@@ -85,9 +89,7 @@ class _MainEntryState extends State<MainEntry> {
   FirstCalcRecord? _record;
   late final CoachmarkRecordStore? _coachmarks = widget.coachmarkRecords;
   CoachmarkRecord? _coachmark;
-  late final SalaryNoticeStore _salaryNotices =
-      widget.salaryNotices ?? MemorySalaryNoticeStore();
-  String? _salaryNotice;
+  SalaryNoticeController? _salaryNotices;
   late Future<SnapshotLoadResult> _result = _load();
   int _loads = 0;
   FinancialSnapshot? _refreshed;
@@ -109,7 +111,7 @@ class _MainEntryState extends State<MainEntry> {
       if (result is SnapshotLoaded) {
         _record = await _records.read(result.snapshot.userId);
         _coachmark = await _coachmarks?.read(result.snapshot.userId);
-        _salaryNotice = await _salaryNotices.read(result.snapshot.userId);
+        _salaryNoticesFor(result.snapshot.userId);
       }
       return result;
     } catch (error, stack) {
@@ -125,6 +127,8 @@ class _MainEntryState extends State<MainEntry> {
   void didUpdateWidget(covariant MainEntry oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.reloadKey != widget.reloadKey) {
+      _salaryNotices?.dispose();
+      _salaryNotices = null;
       _resetRefresh();
       _result = _load();
     }
@@ -149,13 +153,12 @@ class _MainEntryState extends State<MainEntry> {
     }
     final record = await _records.read(snapshot.userId);
     final coachmark = await _coachmarks?.read(snapshot.userId);
-    final salaryNotice = await _salaryNotices.read(snapshot.userId);
     if (!mounted) return;
+    _salaryNoticesFor(snapshot.userId);
     setState(() {
       _resetRefresh();
       _record = record;
       _coachmark = coachmark;
-      _salaryNotice = salaryNotice;
       _override = SnapshotLoaded(snapshot);
     });
   }
@@ -236,10 +239,27 @@ class _MainEntryState extends State<MainEntry> {
     }
   }
 
-  /// 2026-10-29: 월급 입금 확인 안내 접힘 [key](null이면 펼침)를 사용자 [userId]로 남긴다.
-  Future<void> _saveSalaryNotice(String userId, String? key) async {
-    _salaryNotice = key;
-    await _salaryNotices.save(userId, key);
+  /// 2026-11-01: 사용자 [userId]의 이 세션 급여 안내 상태를 준비한다. 같은 세션이면 기존 상태를 두고 새 Snapshot을 알리며,
+  /// 다른 사용자면 이전 상태를 버린다.
+  void _salaryNoticesFor(String userId) {
+    final current = _salaryNotices;
+    if (current != null && current.userId == userId) {
+      current.refresh();
+      return;
+    }
+    current?.dispose();
+    _salaryNotices = SalaryNoticeController(
+      api: widget.salaryNoticeApi ?? const UnavailableSalaryNoticeApi(),
+      userId: userId,
+      onSessionInvalid: widget.onSessionInvalid,
+    );
+  }
+
+  /// 2026-11-01: 급여 안내 상태를 폐기해 늦은 응답을 버린다.
+  @override
+  void dispose() {
+    _salaryNotices?.dispose();
+    super.dispose();
   }
 
   /// 2026-10-28: 코치마크 기록 [record]를 사용자 [userId]로 남긴다.
@@ -366,9 +386,8 @@ class _MainEntryState extends State<MainEntry> {
               onSessionInvalid: widget.onSessionInvalid,
               onSnapshot: _applySaved,
             ),
-            salaryNoticeFolded: _salaryNotice,
-            onSalaryNoticeFolded: (key) =>
-                _saveSalaryNotice(snapshot.userId, key),
+            salaryNotices: _salaryNotices,
+            onLogout: widget.onLogout,
           ),
         ),
         EntryDestination.connect || EntryDestination.chooseAccounts => Builder(
@@ -393,6 +412,14 @@ class _MainEntryState extends State<MainEntry> {
         offline:
             error is FinancialLoadError &&
             error.outcome is FinancialNetworkFailure,
+        secureConnection:
+            error is FinancialLoadError &&
+            switch (error.outcome) {
+              FinancialNetworkFailure(error: final cause) =>
+                connectionProblemOf(cause) ==
+                    ConnectionProblem.secureConnection,
+              _ => false,
+            },
       ),
       SnapshotFormatInvalid() => _LoadError(onRetry: _reload),
     };
@@ -433,14 +460,30 @@ class _SessionEndedState extends State<_SessionEnded> {
 class _LoadError extends StatelessWidget {
   /// 2026-10-21: 다시 시도 [onRetry]로 만든다.
   /// 2026-10-23: 인터넷 연결 실패면 [offline]이 true다.
-  const _LoadError({required this.onRetry, this.offline = false});
+  /// 2026-11-02: 그중 보안 연결(서버 인증서·기기 인증서 등록) 실패면 [secureConnection]도 true이며 인터넷 확인 대신 인증서 확인을 안내한다.
+  const _LoadError({
+    required this.onRetry,
+    this.offline = false,
+    this.secureConnection = false,
+  });
 
   final VoidCallback onRetry;
   final bool offline;
+  final bool secureConnection;
 
   /// 2026-10-21: 실패 안내와 다시 시도 버튼을 반환한다.
   @override
   Widget build(BuildContext context) {
+    if (secureConnection) {
+      return ConnectionPage(
+        key: const ValueKey('load-error-secure-connection'),
+        body: const ConnectionHeading(
+          '보안 연결을\n확인하지 못했어요',
+          subtitle: '서버 인증서 또는 이 기기의 인증서 등록 상태를 확인해 주세요.',
+        ),
+        bottom: PrimaryButton(label: '다시 시도', onPressed: onRetry),
+      );
+    }
     return ConnectionPage(
       key: ValueKey(offline ? 'load-error-offline' : 'load-error-unavailable'),
       body: Column(

@@ -210,6 +210,44 @@ void main() {
     });
   });
 
+  group('기준 시각(asOf) 이후 원천 날짜', () {
+    Map<String, Object?> firstTx(Map<String, Object?> json) =>
+        ((json['transactions']! as List).first as Map).cast<String, Object?>();
+
+    test('asOf 날짜(10/19)까지의 원천 날짜는 받는다', () {
+      final json = alphaWithReceipt();
+      firstTx(json)['bookingDate'] = '2026-10-19';
+      expect(() => run(json), returnsNormally);
+    });
+
+    test('asOf 뒤 날짜의 원천 거래가 있으면 계산하지 않는다', () {
+      for (final field in [
+        'purchaseDate',
+        'bookingDate',
+        'withdrawalDate',
+        'refundDate',
+        'cancellationDate',
+      ]) {
+        final json = alphaWithReceipt();
+        final tx = (json['transactions']! as List).cast<Map>().firstWhere(
+          (t) => t[field] != null,
+          orElse: () => firstTx(json),
+        );
+        tx[field] = '2026-10-20';
+        expect(() => run(json), contractError(), reason: field);
+      }
+    });
+
+    test('확인 시각(occurredAt)이 asOf보다 늦어도 계산하지 않는다', () {
+      final json = alphaWithReceipt();
+      final tx = firstTx(json);
+      tx['occurredAt'] = '2026-10-19T12:00:01+09:00';
+      tx['occurredAtBasis'] = 'booking';
+      tx['bookingDate'] = '2026-10-19';
+      expect(() => run(json), contractError());
+    });
+  });
+
   group('같은 스냅샷 원천 검증', () {
     Map<String, Object?> billTx(Map<String, Object?> json) {
       final link = rows(

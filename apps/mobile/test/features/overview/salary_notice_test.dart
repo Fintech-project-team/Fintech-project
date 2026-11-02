@@ -40,7 +40,8 @@ FinancialSnapshot _dayAfterPayday() => FinancialSnapshot.fromJson(
 HomeCalculationReady _ready(FinancialSnapshot s) =>
     computeHomeCalculation(s) as HomeCalculationReady;
 
-/// 2026-10-29: 접힘 상태를 들고 있는 시험용 홈. [folded]로 시작하고 접기·펴기를 [log]에 남긴다.
+/// 2026-10-29: 접힘 상태를 들고 있는 시험용 홈. [folded]로 시작하고 접기를 [log]에 남긴다.
+/// 2026-11-01: 작은 표시를 누르면 이 화면에서만 잠시 펼친다(접힘 기록은 그대로).
 class _Home extends StatefulWidget {
   const _Home({
     super.key,
@@ -59,6 +60,7 @@ class _Home extends StatefulWidget {
 
 class _HomeState extends State<_Home> {
   late String? _folded = widget.folded;
+  String? _peek;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -66,11 +68,15 @@ class _HomeState extends State<_Home> {
       calculation: widget.calculation,
       onReload: () {},
       salaryNotice: (
-        foldedKey: _folded,
-        onFoldedKey: (key) {
-          widget.log.add(key);
-          setState(() => _folded = key);
+        isFolded: (notice) => _folded == notice.key && _peek != notice.key,
+        onFold: (notice) {
+          widget.log.add(notice.key);
+          setState(() {
+            _folded = notice.key;
+            _peek = null;
+          });
         },
+        onOpen: (notice) => setState(() => _peek = notice.key),
         onEdit: () => widget.log.add('edit'),
       ),
     ),

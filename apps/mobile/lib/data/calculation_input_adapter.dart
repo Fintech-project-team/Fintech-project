@@ -102,6 +102,8 @@ CalculationInputs calculationInputsFromSnapshot(FinancialSnapshot snapshot) {
 class _Evidence {
   /// 2026-10-23: [snapshot]과 그 계좌 목록 [accounts]로 거래·계좌·참조 확보 상태 표를 만든다.
   /// 같은 거래 ID가 두 번 오면 계약 위반이다.
+  /// 2026-11-02: 원천 거래의 사실 날짜(이용·기장·출금·환불·취소일)가 asOf의 서울 날짜보다 늦거나 occurredAt이 asOf보다 늦으면
+  /// 계약 위반이다(docs/data-model.md 기준 시각과 원천 갱신). 원천을 갱신하면 asOf도 함께 갱신돼야 한다.
   _Evidence(this.snapshot, List<Account> accounts)
     : _accounts = {for (final a in accounts) a.accountId: a},
       _asOf = DateTime.parse(snapshot.asOf) {
@@ -115,6 +117,7 @@ class _Evidence {
           '같은 거래 ID가 두 번 옴(${t.transactionId})',
         );
       }
+      _requireFactsNotAfterAsOf(t);
       _transactions[t.transactionId] = t;
     }
     for (final r in snapshot.referenceResolutions ?? const []) {
@@ -165,13 +168,42 @@ class _Evidence {
   void requireNotAfterAsOf(SourceTransaction tx, String path) {
     final booked = tx.bookingDate;
     if (booked == null) return;
+    if (booked.compareTo(_today) > 0) {
+      throw CalculationContractException(path, '근거 거래 입금일이 스냅샷 기준 날짜보다 늦음');
+    }
+  }
+
+  /// 2026-11-02: asOf의 서울 업무 날짜(YYYY-MM-DD)를 반환한다.
+  String get _today {
     final seoul = _asOf.toUtc().add(const Duration(hours: 9));
-    final today =
-        '${seoul.year.toString().padLeft(4, '0')}-'
+    return '${seoul.year.toString().padLeft(4, '0')}-'
         '${seoul.month.toString().padLeft(2, '0')}-'
         '${seoul.day.toString().padLeft(2, '0')}';
-    if (booked.compareTo(today) > 0) {
-      throw CalculationContractException(path, '근거 거래 입금일이 스냅샷 기준 날짜보다 늦음');
+  }
+
+  /// 2026-11-02: 원천 거래 [tx]의 사실 날짜·확인 시각이 asOf보다 늦으면 계약 위반으로 던진다. 예정일은 거래 필드가 아니라 검사하지 않는다.
+  void _requireFactsNotAfterAsOf(SourceTransaction tx) {
+    final today = _today;
+    for (final (name, date) in [
+      ('purchaseDate', tx.purchaseDate),
+      ('bookingDate', tx.bookingDate),
+      ('withdrawalDate', tx.withdrawalDate),
+      ('refundDate', tx.refundDate),
+      ('cancellationDate', tx.cancellationDate),
+    ]) {
+      if (date != null && date.compareTo(today) > 0) {
+        throw CalculationContractException(
+          '\$.transactions[${tx.transactionId}].$name',
+          '원천 거래 날짜가 스냅샷 기준 시각보다 늦음',
+        );
+      }
+    }
+    final occurred = tx.occurredAt;
+    if (occurred != null && DateTime.parse(occurred).isAfter(_asOf)) {
+      throw CalculationContractException(
+        '\$.transactions[${tx.transactionId}].occurredAt',
+        '원천 거래 확인 시각이 스냅샷 기준 시각보다 늦음',
+      );
     }
   }
 }
