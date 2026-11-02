@@ -31,7 +31,9 @@ flutter:
     - assets/fixtures/salary-wait.json
     - assets/fixtures/alpha-unconnected.json
     - assets/fixtures/beta-ready.json
+    - assets/fixtures/beta-life.json
     - assets/fixtures/gamma-month-end.json
+    - assets/fixtures/gamma-life.json
   fonts:
     - family: Pretendard
       fonts:
