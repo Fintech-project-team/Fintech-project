@@ -988,6 +988,284 @@
       ]
     },
     {
+      "id": "beta-life",
+      "file": "snapshots/beta-life.json",
+      "goal": "생활 흐름 시연(B 작성): 비정기 현금 흐름. 급여·경비·상여 동시 입금, 큰 일괄 입금, 부수입·가족 입금·환불·분할 납부",
+      "expected": {
+        "transactionCount": 817,
+        "flutterExpected": {
+          "b": 4924500,
+          "e": 0,
+          "r": 0,
+          "o": 0,
+          "u": 4924500,
+          "insufficient": []
+        },
+        "edgeLabels": [
+          {
+            "id": "B03",
+            "transactionIds": ["235d9440-456e-5437-b586-4584ba0d84cb"],
+            "truth": "급여 3,120,000과 일시금 2,880,000이 합쳐진 한 건. 입력만으로 분해 불가"
+          },
+          {
+            "id": "B07",
+            "transactionIds": [
+              "a68b3ea1-263c-510a-a524-47ea2e00215b",
+              "9c48869f-111a-51ac-aacd-581ba300a58d",
+              "6f236670-ba19-510c-b920-fd38a9e6f49d"
+            ],
+            "truth": "8월 이사 후 새 월세. 10월 금액 변경, 11월 3일 출금 없음"
+          },
+          {
+            "id": "B11",
+            "transactionIds": [
+              "23603cfe-2d92-5cfc-965d-398b3813a041",
+              "bcf899eb-d526-5dee-97be-39cccfc86583",
+              "f8c1f6e2-a885-5b5b-ba3e-a587a77a94a0"
+            ],
+            "truth": "같은 통신 요금. 금액이 매달 다름"
+          },
+          {
+            "id": "B09",
+            "transactionIds": [
+              "0f8eff8f-cc18-5685-895f-e0f52518c02e",
+              "c5512e11-cc66-5f6e-91eb-86ae40c3225e",
+              "405ec0be-87e4-503b-b045-78a73123f356"
+            ],
+            "truth": "급여 직후 본인 적금 계좌로 1,000,000 이체(양쪽 연결)"
+          },
+          {
+            "id": "B02",
+            "transactionIds": [
+              "bea8d7b4-e195-5a95-8c6d-1fc2d3b282de",
+              "e15d7d5b-cd5e-5bfd-a855-6603f19d45cf",
+              "4d98fac4-30a7-5175-aed4-26bb963ee4e1"
+            ],
+            "truth": "같은 회사 입금 3건: 급여 3,084,620·경비 정산 187,400·상여 1,000,000. 급여 회차는 첫 거래만"
+          },
+          {
+            "id": "B12",
+            "transactionIds": [
+              "c6fb9649-4e17-5494-9cb0-21661463a7b4",
+              "fb98ed43-ba00-5eab-b0cd-cfb698eebe36"
+            ],
+            "truth": "개인 구독과 가족 구독 2건(중복 아님)"
+          },
+          {
+            "id": "B01",
+            "transactionIds": ["bf4c27e2-771e-54b5-89d5-c350dac7a13a"],
+            "truth": "디자인 외주 대금(부수입). 반복 월급 아님"
+          },
+          {
+            "id": "B04",
+            "transactionIds": [
+              "1ffc4b61-b94d-558a-a866-e719fc523593",
+              "4c8b1958-55e3-59d2-9194-170ed6211f3c",
+              "00a36a3d-46de-5421-897e-0f9a2f6f2f80"
+            ],
+            "truth": "어머니가 보낸 돈을 본인 비상금 통장으로 옮김. 소득·지출 아님"
+          },
+          {
+            "id": "B05",
+            "transactionIds": [
+              "8626fda5-ae20-59d8-b799-66a10cb69b83",
+              "54effe6d-cfda-5527-85e5-91f89e432e45",
+              "d9dfd323-f416-5710-bd36-959872f56573"
+            ],
+            "truth": "같은 구매의 두 번 나눈 전액 환불"
+          },
+          {
+            "id": "B06",
+            "transactionIds": [
+              "51998b4c-43b5-5831-852e-c00209516be7",
+              "ba9f0aa7-0b04-5c5b-b4e5-60700b31e5ba"
+            ],
+            "truth": "병원비와 실손 보험금. 같은 사건인지 거래만으로 모름"
+          },
+          {
+            "id": "B10",
+            "transactionIds": [
+              "02d59f4d-338b-50eb-ba65-329ce9b453fd",
+              "b9c85265-5191-5d00-9d31-426b04305a84",
+              "cb039ea0-0765-5cb8-b2c7-dd44c027839c"
+            ],
+            "truth": "친구들의 식사비 정산. 소득 아님"
+          },
+          {
+            "id": "B14",
+            "transactionIds": [
+              "d4b478b9-5e8a-5a00-87f1-faaa0b14cf7b",
+              "5c390c82-ceb5-546a-8a18-95f8aa5398cf",
+              "2f576208-fd1c-57a6-8bce-baba5fdfd78a",
+              "f1b0dc64-b287-59e4-81d2-dd629e943c3f"
+            ],
+            "truth": "같은 날 같은 금액의 별도 구매 2건"
+          },
+          {
+            "id": "B13",
+            "transactionIds": [
+              "c0e187c8-f797-516a-ac4c-987387014ca6",
+              "609300c2-02af-5bcf-a176-dcbb6653bbec"
+            ],
+            "truth": "현대카드 8월분 428,600의 분할 납부 2회"
+          },
+          {
+            "id": "B08",
+            "transactionIds": [
+              "63613b58-09df-53bc-9b6a-858a35470938",
+              "22b4df9f-768b-50e4-85b9-2d10e18c6792"
+            ],
+            "truth": "같은 소비(카드 승인 1건)와 그 대금 출금. 이중 소비 아님"
+          }
+        ],
+        "labelScope": "평가용 정답 라벨. 공개 Snapshot·거래 표시값·LLM 입력에 넣지 않음(docs/edgecase/베타_감마_데모_엣지케이스_초안.md)",
+        "expectationScope": "독립 Flutter 검사 기대값; 서버 응답·서버 계산 결과가 아님"
+      },
+      "preparedReversalIds": [],
+      "ledgerOpeningBalances": [
+        {
+          "accountId": "1d383795-5b7c-56f9-9535-ff418040183d",
+          "balanceKRW": 1800000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "193eba4d-a29e-5a1a-9087-08b3f2aa353b",
+          "balanceKRW": 1200000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "89abcc26-5a13-5031-944d-f6fa79fad474",
+          "balanceKRW": 450000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "43022b12-90c0-551a-8e22-37f5df9c1df0",
+          "balanceKRW": 500000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "bbe92aed-d8a4-5f81-b3b1-8451f7163f9f",
+          "balanceKRW": 0,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "1bc0e831-1341-5e99-8030-92b8653a0aba",
+          "balanceKRW": 3000000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        }
+      ]
+    },
+    {
+      "id": "gamma-life",
+      "file": "snapshots/gamma-life.json",
+      "goal": "생활 흐름 시연(B 작성): 급여 회차 해석. 표시값 변형·이른/늦은 입금·분할 지급·대출금을 월급처럼 보이는 이번 회차",
+      "expected": {
+        "transactionCount": 528,
+        "flutterExpected": {
+          "b": 7791550,
+          "e": null,
+          "r": 0,
+          "o": null,
+          "u": null,
+          "insufficient": ["receiptEvidenceAbsent"]
+        },
+        "edgeLabels": [
+          {
+            "id": "G13",
+            "transactionIds": [
+              "2037a607-9a31-5c43-bfb7-5e1910a10b67",
+              "ad865227-2e9d-56f9-a755-c6f6fd2a867c",
+              "4baf6517-b0ce-509b-b689-e0197bc4353c",
+              "18a41e2a-d2b2-5d90-8782-d83fe806e202",
+              "930f63d6-e31e-5dfb-891e-13c273b03c7f",
+              "8ca4cf41-a98a-5f7f-ba1d-3f46d72105c2"
+            ],
+            "truth": "같은 회사 월급(표시값 변형)"
+          },
+          {
+            "id": "G09",
+            "transactionIds": [
+              "a0c5ff42-97d6-5775-b263-fc09d4edc56f",
+              "9f9463c2-a1c3-54c8-a58f-e17abc4a2ae2"
+            ],
+            "truth": "같은 회차 월급의 분할 지급 2건"
+          },
+          {
+            "id": "G03-late",
+            "transactionIds": ["fc5c0981-55fa-5d1e-a470-5301b1e69c5e"],
+            "truth": "3월분 월급이 다음 달 2일에 늦게 입금"
+          },
+          {
+            "id": "G01",
+            "transactionIds": ["afdd39d9-2420-5e76-916a-d68fb813238e"],
+            "truth": "대표 개인 명의로 들어온 6월 월급(회사명 없음, 금액 다름)"
+          },
+          {
+            "id": "G03-early",
+            "transactionIds": ["6c3a92d5-abb5-577c-b089-58eb9837e8f9"],
+            "truth": "월급일 전날(8/14) 입금"
+          },
+          {
+            "id": "G02",
+            "transactionIds": [
+              "858cd9ea-b06e-563c-b1ec-9bd58d7349de",
+              "9363fd8d-1bb4-5d35-8657-77d4dd542aff"
+            ],
+            "truth": "첫 거래만 월급. 둘째는 지인이 갚은 돈"
+          },
+          {
+            "id": "G14",
+            "transactionIds": ["1e0ad69b-72cf-5bb6-9d85-f163d8223080"],
+            "truth": "신용대출 실행금. 10월 월급은 기준 시각까지 입금되지 않음"
+          },
+          {
+            "id": "G15",
+            "transactionIds": [
+              "8ca4cf41-a98a-5f7f-ba1d-3f46d72105c2",
+              "4b21d8d9-2d59-55a2-a941-7a32867c0ff8",
+              "42acf247-72d9-5d09-a36f-8f9c50a735e7"
+            ],
+            "truth": "같은 날 입금 1건·출금 2건. 일중 순서 정보 없음"
+          }
+        ],
+        "labelScope": "평가용 정답 라벨. 공개 Snapshot·거래 표시값·LLM 입력에 넣지 않음(docs/edgecase/베타_감마_데모_엣지케이스_초안.md)",
+        "expectationScope": "독립 Flutter 검사 기대값; 서버 응답·서버 계산 결과가 아님"
+      },
+      "preparedReversalIds": [],
+      "ledgerOpeningBalances": [
+        {
+          "accountId": "d308d10f-bb67-570f-bc55-9b15a6541546",
+          "balanceKRW": 1500000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "94f8e790-5d6f-5528-bbc5-289445ff7508",
+          "balanceKRW": 400000,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "2cc2e8e2-af87-5332-b5e1-e8e67445231f",
+          "balanceKRW": 0,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "ed52eb04-574a-51b5-8b10-1fe369b275c1",
+          "balanceKRW": 0,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "a6a4d595-126b-58fe-bb46-916145492bf9",
+          "balanceKRW": 0,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        },
+        {
+          "accountId": "5161b562-3253-5f5f-a631-d819451c3304",
+          "balanceKRW": 0,
+          "purpose": "검증 전용 기초잔액; 앱 스냅샷 계산에서 거래를 다시 재생하지 않음"
+        }
+      ]
+    },
+    {
       "id": "alpha-billing-items",
       "file": "snapshots/alpha-billing-items.json",
       "description": "독립 청구 항목: 복수 청구·할인·연회비·음수 조정·금액 미상",
