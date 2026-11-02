@@ -48,6 +48,14 @@ v1.0 논리 필드·타입·관계·수정 권한의 단일 기준이다. [#17 �
 | InstitutionLink.linkId / institutionCode                                                | ID / 문자열                         | 필수        | 서버: 사용자와 기관의 현재 연결은 최대 1개                          | institution_links.id/institution_code |
 | InstitutionLink.consentedAt / disconnectedAt                                            | 시각 / 시각                         | 필수 / null | 사용자 확정 연결·해제의 서버 기록. 미연결은 연결 행 없음으로도 표현 | consented_at/disconnected_at          |
 
+### 기준 시각(asOf)과 원천 갱신
+
+asOf는 그 원천 자료가 확보된 기준 시각이며, Flutter가 쓰는 '오늘'(업무 날짜, Asia/Seoul)은 Snapshot asOf에서 정한다. 앱은 요청에 날짜를 보내지 않고 기기 시각으로 대체하지 않는다. 홈 등의 'M월 D일 HH:mm 기준' 표시도 asOf다.
+
+- 원천에 거래·잔액을 추가·변경하면(새로고침 확인용 합성 자료 추가 포함) 새 sourceVersion으로 내려주고, 그 자료의 asOf와 계좌 잔액 asOf·balanceKRW를 함께 갱신하며 dataVersion을 올린다. 기존 asOf에 그보다 늦은 거래만 덧붙이지 않는다.
+- 원천에서 확인된 사실의 날짜(purchaseDate·withdrawalDate·refundDate·cancellationDate·bookingDate)는 asOf의 서울 날짜보다 늦을 수 없고, occurredAt은 asOf보다 늦을 수 없다. 결제 예정일(Statement·CardSchedule.dueDate)·급여 예정일처럼 예정을 뜻하는 날짜와 사용자 기록 시각(취소·정정 기록)은 이 제한의 대상이 아니다.
+- Flutter는 위 제한을 어긴 거래를 받으면 자료 계약 오류로 보고 그 Snapshot으로 정상 계산 결과를 표시하지 않는다(날짜를 잘라 내거나 asOf를 바꿔 계산하지 않음).
+
 같은 Snapshot의 잔액 asOf/sourceVersion이 맞지 않으면 전체 합계를 완전한 결과로 표시하지 않는다. 거래 페이지는 `(userId, dataVersion, sourceVersion, 조회 조건)`에 묶고 중복 transactionId를 재집계하지 않는다.
 
 기관 목록은 은행 국민·신한·하나·기업·카카오뱅크, 카드 현대·삼성·우리·국민이다. 현재 더미의 내부 코드 문자열은 [더미 구성](../apps/api/fixtures/docs/dummy-data.md)과 generated/catalog.json을 따른다. 공급자 공식 코드로 해석하지 않는다. 연결 전에는 기관 목록·종류·확인된 개수·연결 상태·버전만 노출한다. 연결과 홈 계산 계좌 선택은 별개다.
