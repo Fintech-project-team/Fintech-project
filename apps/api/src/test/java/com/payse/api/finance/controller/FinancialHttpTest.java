@@ -1,14 +1,13 @@
 package com.payse.api.finance.controller;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
+
 import com.payse.api.ApiTestConstants.FinanceCodes;
 import com.payse.api.ApiTestConstants.FinanceConfig;
 import com.payse.api.ApiTestConstants.FinanceFields;
 import com.payse.api.ApiTestConstants.FinanceHttp;
 import com.payse.api.ApiTestConstants.FinancePaths;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeFalse;
-
 import com.payse.api.PayseApiApplication;
 import com.payse.api.auth.crypto.AuthCrypto;
 import com.payse.api.auth.error.AuthStoreException;
@@ -28,6 +27,7 @@ import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -183,6 +183,7 @@ class FinancialHttpTest {
             random.nextBytes(bytes);
             properties.put(key, Base64.getEncoder().encodeToString(bytes));
         }
+
         SpringApplication app = new SpringApplication(PayseApiApplication.class);
         app.setAdditionalProfiles("database", "auth", "finance");
         app.setDefaultProperties(properties);
@@ -310,6 +311,7 @@ class FinancialHttpTest {
                 )
             );
         }
+
         return result;
     }
 
@@ -584,10 +586,12 @@ class FinancialHttpTest {
                 assertTrue(transaction.path(FinanceFields.AMOUNT_KRW).isIntegralNumber());
                 assertFalse(transaction.has(FinanceFields.ITEMS));
             }
+
             JsonNode cursor = page.path(FinanceFields.PAGE).path(FinanceFields.NEXT_CURSOR);
             if (cursor.isNull()) {
                 break;
             }
+
             assertTrue(pages < 10, "Unbounded cursor chain");
             page = ok(
                 FinanceHttp.GET,
@@ -601,6 +605,7 @@ class FinancialHttpTest {
             );
             assertFalse(page.has(FinanceFields.ACCOUNTS));
         }
+
         Set<String> expected = new HashSet<>();
         source.path(FinanceFields.TRANSACTIONS)
             .forEach(value -> expected.add(value.path(FinanceFields.TRANSACTION_ID).asString()));
@@ -609,6 +614,194 @@ class FinancialHttpTest {
         for (JsonNode statement : snapshot.path(FinanceFields.STATEMENTS)) {
             assertFalse(statement.has(FinanceFields.ITEMS));
         }
+    }
+
+    /**
+     * 기간 첫 조회와 후속 페이지는 같은 조건에 묶이며 기존 Snapshot cursor와 교차 사용하지 않는다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
+     */
+    @Test
+    void periodPagesBindDatesAndPurpose() throws Exception {
+        JsonNode snapshot = ok(FinanceHttp.GET, FinancePaths.SNAPSHOT_PATH, null);
+        LocalDate end = LocalDate.parse(
+            snapshot.path(FinanceFields.COVERAGE)
+                .get(0)
+                .path(FinanceFields.REQUESTED_END)
+                .asString()
+        );
+        LocalDate start = end.minusYears(2);
+        String period = "startDate=" + start + "&endDate=" + end;
+        JsonNode page = ok(FinanceHttp.GET, "/transactions?" + period, null);
+        assertEquals(
+            snapshot.path(FinanceFields.SCHEMA_VERSION),
+            page.path(FinanceFields.SCHEMA_VERSION)
+        );
+        assertEquals(snapshot.path(FinanceFields.COVERAGE), page.path(FinanceFields.COVERAGE));
+        assertFalse(page.has(FinanceFields.ACCOUNTS));
+        String cursor = page.path(FinanceFields.PAGE)
+            .path(FinanceFields.NEXT_CURSOR)
+            .asString();
+        assertFalse(cursor.isBlank());
+        error(
+            send(
+                FinanceHttp.GET,
+                "/transactions?" + period + "&cursor="
+                    + snapshot.path(FinanceFields.PAGE)
+                        .path(FinanceFields.NEXT_CURSOR)
+                        .asString(),
+                null
+            ),
+            409,
+            FinanceCodes.STALE_DATA
+        );
+        error(
+            send(FinanceHttp.GET, FinancePaths.TRANSACTION_CURSOR_PATH + cursor, null),
+            409,
+            FinanceCodes.STALE_DATA
+        );
+        error(
+            send(
+                FinanceHttp.GET,
+                "/transactions?startDate=" + start.plusDays(1) + "&endDate=" + end
+                    + "&cursor=" + cursor,
+                null
+            ),
+            409,
+            FinanceCodes.STALE_DATA
+        );
+        error(
+            send(FinanceHttp.GET, "/transactions?" + period + "&cursor=broken", null),
+            400,
+            FinanceCodes.INVALID_CURSOR
+        );
+        Set<String> received = new HashSet<>();
+        int pages = 0;
+        while (true) {
+            pages++;
+            assertTrue(page.path(FinanceFields.TRANSACTIONS).size() <= 100);
+            for (JsonNode row : page.path(FinanceFields.TRANSACTIONS)) {
+                assertTrue(received.add(row.path(FinanceFields.TRANSACTION_ID).asString()));
+            }
+
+            JsonNode next = page.path(FinanceFields.PAGE).path(FinanceFields.NEXT_CURSOR);
+            if (next.isNull()) {
+                break;
+            }
+
+            assertTrue(pages < 10);
+            page = ok(
+                FinanceHttp.GET,
+                "/transactions?" + period + "&cursor=" + next.asString(),
+                null
+            );
+        }
+
+        Set<String> expected = new HashSet<>();
+        for (String group : List
+            .of(FinanceFields.TRANSACTIONS, FinanceFields.RELATED_TRANSACTIONS)) {
+            source.path(group)
+                .forEach(row -> expected.add(row.path(FinanceFields.TRANSACTION_ID).asString()));
+        }
+
+        assertEquals(expected, received);
+        assertTrue(pages >= 2);
+        assertEquals(
+            204,
+            send(FinanceHttp.DELETE, FinancePaths.CURRENT_SESSION_PATH, null).statusCode()
+        );
+        token = login();
+        error(
+            send(FinanceHttp.GET, "/transactions?" + period + "&cursor=" + cursor, null),
+            403,
+            FinanceCodes.RESOURCE_FORBIDDEN
+        );
+    }
+
+    /**
+     * 단일 날짜 경계를 포함하며 없는 기간은 빈 페이지, 잘못된 입력은 오류로 구분한다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void periodDatesRemainExplicitAndReadOnly() throws Exception {
+        JsonNode snapshot = ok(FinanceHttp.GET, FinancePaths.SNAPSHOT_PATH, null);
+        LocalDate firstDay = LocalDate.parse(
+            snapshot.path(FinanceFields.COVERAGE)
+                .get(0)
+                .path(FinanceFields.REQUESTED_START)
+                .asString()
+        );
+        LocalDate emptyDay = firstDay.minusYears(2);
+        JsonNode empty = ok(
+            FinanceHttp.GET,
+            "/transactions?startDate=" + emptyDay + "&endDate=" + emptyDay,
+            null
+        );
+        assertTrue(empty.path(FinanceFields.TRANSACTIONS).isEmpty());
+        assertTrue(
+            empty.path(FinanceFields.PAGE)
+                .path(FinanceFields.NEXT_CURSOR)
+                .isNull()
+        );
+        assertEquals(snapshot.path(FinanceFields.COVERAGE), empty.path(FinanceFields.COVERAGE));
+        for (String query : List.of(
+            "startDate=2026-01-01",
+            "endDate=2026-10-19",
+            "startDate=2025-02-29&endDate=2026-10-19",
+            "startDate=2026-10-20&endDate=2026-10-19",
+            "startDate=2026-01-01&startDate=2026-01-02&endDate=2026-10-19"
+        )) {
+            error(
+                send(FinanceHttp.GET, "/transactions?" + query, null),
+                422,
+                FinanceCodes.VALIDATION_FAILED
+            );
+        }
+
+        error(
+            send(FinanceHttp.GET, "/transactions?startDate=invalid", null, "invalid", Map.of()),
+            401,
+            FinanceCodes.SESSION_INVALID
+        );
+        assertEquals(
+            snapshot.path(FinanceFields.DATA_VERSION),
+            ok(FinanceHttp.GET, FinancePaths.SNAPSHOT_PATH, null).path(FinanceFields.DATA_VERSION)
+        );
+    }
+
+    /**
+     * 금융 저장 후에는 기간이 같아도 이전 페이지 문맥을 사용하지 않는다.
+     * @created 2026-11-01
+     * @usedBy JUnit
+     */
+    @Test
+    void periodCursorRejectsChangedFinancialVersion() throws Exception {
+        LocalDate end = LocalDate.parse(
+            source.path(FinanceFields.COVERAGE)
+                .get(0)
+                .path(FinanceFields.REQUESTED_END)
+                .asString()
+        );
+        String period = "startDate=" + end.minusYears(2) + "&endDate=" + end;
+        String cursor = ok(FinanceHttp.GET, "/transactions?" + period, null)
+            .path(FinanceFields.PAGE)
+            .path(FinanceFields.NEXT_CURSOR)
+            .asString();
+        assertFalse(cursor.isBlank());
+        ok(
+            FinanceHttp.PATCH,
+            FinancePaths.ACCOUNT_PATH + account()
+                .path(FinanceFields.ACCOUNT_ID)
+                .asString(),
+            command().put(FinanceFields.NICKNAME, "기간 조회")
+        );
+        error(
+            send(FinanceHttp.GET, "/transactions?" + period + "&cursor=" + cursor, null),
+            409,
+            FinanceCodes.STALE_DATA
+        );
     }
 
     /**
@@ -1291,6 +1484,7 @@ class FinancialHttpTest {
             admin.execute("DROP TRIGGER test_receipt_failure ON payse.write_receipts");
             admin.execute("DROP FUNCTION payse.test_receipt_failure()");
         }
+
         ok(FinanceHttp.PATCH, path, body);
     }
 
@@ -1481,6 +1675,7 @@ class FinancialHttpTest {
                 () -> {
                     auth.authorize(crypto.tokenDigest(token)).orElseThrow();
                     entityManager.find(AccountEntity.class, accountId).rename("롤백 확인");
+
                     entityManager.flush();
                     throw new IllegalStateException("intentional isolated rollback");
                 }

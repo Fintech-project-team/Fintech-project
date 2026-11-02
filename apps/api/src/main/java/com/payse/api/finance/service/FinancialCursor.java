@@ -75,14 +75,29 @@ public final class FinancialCursor {
      * @usedBy FinancialService.snapshot
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조
+     * @modified 2026-11-02 - 기존 100건 경로를 보존하며 목적별 페이지 크기 경로로 위임
      */
     public String encode(UUID user, UUID session, String context, UUID lastId) {
+        return encode(user, session, context, lastId, 100);
+    }
+
+    /**
+     * 목적별 문맥과 페이지 크기를 암호화 봉투에 함께 고정한다.
+     * @created 2026-11-01
+     * @usedBy encode, MemoryCatalog.select
+     * @modified 2026-11-02 - 기존 상수·개행 기준으로 목적별 페이지 크기 경로 통합
+     */
+    public String encode(UUID user, UUID session, String context, UUID lastId, int size) {
+        if (size < 1 || size > 100) {
+            throw new IllegalArgumentException(ApiMessageConstants.Finance.INVALID_PAGE_SIZE);
+        }
+
         ObjectNode payload = json.createObjectNode()
             .put(ApiFieldConstants.Finance.USER, user.toString())
             .put(ApiFieldConstants.Finance.SESSION, session.toString())
             .put(ApiFieldConstants.Finance.CONTEXT, context)
             .put(ApiFieldConstants.Finance.LAST, lastId.toString())
-            .put(ApiFieldConstants.Finance.SIZE, 100);
+            .put(ApiFieldConstants.Finance.SIZE, size);
         byte[] nonce = new byte[12];
         random.nextBytes(nonce);
         try {
@@ -106,8 +121,23 @@ public final class FinancialCursor {
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조
      * @modified 2026-11-02 - 긴 식 지역변수 분리; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-02 - 기존 100건 경로를 보존하며 목적별 페이지 크기를 검증
      */
     public UUID decode(String encoded, UUID user, UUID session, String context) {
+        return decode(encoded, user, session, context, 100);
+    }
+
+    /**
+     * 다른 크기·목적의 페이지를 섞지 않고 소유자·세션·조회 문맥을 재검증한다.
+     * @created 2026-11-01
+     * @usedBy decode, MemoryCatalog.select
+     * @modified 2026-11-02 - 기존 암호화·오류 경계를 보존하며 페이지 크기 경로 통합
+     */
+    public UUID decode(String encoded, UUID user, UUID session, String context, int size) {
+        if (size < 1 || size > 100) {
+            throw new IllegalArgumentException(ApiMessageConstants.Finance.INVALID_PAGE_SIZE);
+        }
+
         JsonNode payload;
         UUID last;
         try {
@@ -137,7 +167,7 @@ public final class FinancialCursor {
                     )
                 )
                 || !payload.path(ApiFieldConstants.Finance.SIZE).isIntegralNumber()
-                || payload.path(ApiFieldConstants.Finance.SIZE).intValue() != 100) {
+                || payload.path(ApiFieldConstants.Finance.SIZE).intValue() != size) {
                 throw new IllegalArgumentException();
             }
 

@@ -206,6 +206,14 @@ public final class ApiTestConstants {
         public static final String TEMPORARILY_UNAVAILABLE = "TEMPORARILY_UNAVAILABLE";
         public static final String VALIDATION_FAILED = "VALIDATION_FAILED";
 
+        // 기간 조회·기억 관리
+        public static final String ACCOUNT_ENTRY = "account_entry";
+        public static final String CARD_PURCHASE = "card_purchase";
+        public static final String CARD_REFUND = "card_refund";
+        public static final String CARD_CANCELLATION = "card_cancellation";
+        public static final String BOOKING = "booking";
+        public static final String PURCHASE = "purchase";
+
         /**
          * 정적 테스트 계약만 제공하며 인스턴스 생성을 막는다.
          * @created 2026-11-02
@@ -238,6 +246,9 @@ public final class ApiTestConstants {
         public static final String PAYSE_JDBC_URL = "PAYSE_JDBC_URL";
         public static final String SERVER_ADDRESS = "server.address";
         public static final String SERVER_PORT = "server.port";
+
+        // 기간 조회·기억 관리
+        public static final String SEOUL_ZONE = "Asia/Seoul";
 
         /**
          * 정적 테스트 계약만 제공하며 인스턴스 생성을 막는다.
@@ -355,6 +366,21 @@ public final class ApiTestConstants {
         public static final String USER_ID = "userId";
         public static final String WITHDRAWAL_ACCOUNT_ID = "withdrawalAccountId";
 
+        // 기간 조회·기억 관리
+        public static final String PURPOSE = "purpose";
+        public static final String SOURCE_CONTEXT = "sourceContext";
+        public static final String START_DATE = "startDate";
+        public static final String END_DATE = "endDate";
+
+        // 기간 조회·기억 관리
+        public static final String REQUESTED_END = "requestedEnd";
+        public static final String OCCURRED_AT = "occurredAt";
+        public static final String OCCURRED_AT_BASIS = "occurredAtBasis";
+        public static final String TARGET_ID = "targetId";
+        public static final String COVERED_RANGES = "coveredRanges";
+        public static final String REFUND_DATE = "refundDate";
+        public static final String CANCELLATION_DATE = "cancellationDate";
+
         /**
          * 정적 테스트 계약만 제공하며 인스턴스 생성을 막는다.
          * @created 2026-11-02
@@ -423,6 +449,9 @@ public final class ApiTestConstants {
         public static final String TRANSACTIONS_PATH = "/transactions";
         public static final String TRANSACTION_CURSOR_PATH = "/transactions?cursor=";
 
+        // 기간 조회·기억 관리
+        public static final String SNAPSHOTS_DIRECTORY = "fixtures/generated-v4/snapshots";
+
         /**
          * 정적 테스트 계약만 제공하며 인스턴스 생성을 막는다.
          * @created 2026-11-02
@@ -453,6 +482,10 @@ public final class ApiTestConstants {
         public static final String TRANSMISSION_UNKNOWN = "TRANSMISSION_UNKNOWN";
         public static final String VALIDATION_FAILED = "VALIDATION_FAILED";
 
+        // 기간 조회·기억 관리
+        public static final String RESTRICTED = "restricted";
+        public static final String UNVERIFIED = "unverified";
+
         /**
          * 정적 테스트 계약만 제공하며 인스턴스 생성을 막는다.
          * @created 2026-11-02
@@ -473,6 +506,10 @@ public final class ApiTestConstants {
         public static final String GUARD_EXPIRES_AT = "guard_expires_at";
         public static final String NORMAL_EXPIRES_AT_FIELD = "normal_expires_at";
         public static final String STORED_AT_FIELD = "stored_at";
+
+        // 기간 조회·기억 관리
+        public static final String SOURCE_REFS = "source_refs";
+        public static final String SOURCE_HASH = "source_hash";
 
         /**
          * 정적 테스트 계약만 제공하며 인스턴스 생성을 막는다.
@@ -633,6 +670,23 @@ public final class ApiTestConstants {
         public static final String VERIFIED = "verified";
         public static final String VERSIONS = "versions";
 
+        // 기간 조회·기억 관리
+        public static final String PURPOSE = "purpose";
+        public static final String FINANCE = "finance";
+        public static final String START_DATE = "startDate";
+        public static final String END_DATE = "endDate";
+        public static final String CONTENT_AVAILABILITY = "contentAvailability";
+        public static final String METADATA_VERSION = "metadataVersion";
+        public static final String SOURCE_CHANGED = "sourceChanged";
+        public static final String PAGE_INFO = "pageInfo";
+        public static final String HAS_MORE = "hasMore";
+
+        // 기간 조회·기억 관리
+        public static final String RETENTION_REASON = "retentionReason";
+        public static final String SOURCE_REFS = "sourceRefs";
+        public static final String SOURCE_HASH = "sourceHash";
+        public static final String NEXT_CURSOR = "nextCursor";
+
         /**
          * 정적 테스트 계약만 제공하며 인스턴스 생성을 막는다.
          * @created 2026-11-02
@@ -660,6 +714,9 @@ public final class ApiTestConstants {
         public static final String POST = "POST";
         public static final String SET_COOKIE = "Set-Cookie";
 
+        // 기간 조회·기억 관리
+        public static final String REDACTED_MEMORY_QUERY = "MemoryQuery[REDACTED]";
+
         /**
          * 정적 테스트 계약만 제공하며 인스턴스 생성을 막는다.
          * @created 2026-11-02
@@ -684,6 +741,9 @@ public final class ApiTestConstants {
         public static final String RETRY_SUFFIX = "/retry";
         public static final String SESSIONS_PATH = "/demo-sessions";
         public static final String SNAPSHOT_PATH = "/snapshot";
+
+        // 기간 조회·기억 관리
+        public static final String MEMORIES_PATH = "/analysis-memories";
 
         /**
          * 정적 테스트 계약만 제공하며 인스턴스 생성을 막는다.

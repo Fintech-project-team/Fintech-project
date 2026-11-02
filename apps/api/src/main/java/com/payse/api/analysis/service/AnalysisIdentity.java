@@ -1,6 +1,7 @@
 package com.payse.api.analysis.service;
 
 import com.payse.api.constants.ApiCodeConstants;
+import com.payse.api.constants.ApiFieldConstants.Analysis;
 import com.payse.api.constants.ApiFieldConstants;
 import com.payse.api.constants.ApiMessageConstants;
 import com.payse.api.finance.error.FinancialException;
@@ -9,6 +10,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -18,6 +20,88 @@ import tools.jackson.databind.node.ObjectNode;
  * @usedBy AnalysisJobs, AnalysisResults
  */
 public final class AnalysisIdentity {
+
+    /**
+     * 모델이 선택한 일부 증거가 아닌 검증 입력의 전체 관계 연결을 항목별로 보존한다.
+     * @created 2026-11-01
+     * @usedBy AnalysisResults.save
+     * @modified 2026-11-02 - 단일 제어문 본문 중괄호 명시
+     */
+    public List<UUID> sourceRefs(ObjectNode input, String itemKey) {
+        JsonNode item = null;
+        for (JsonNode candidate : input.path(Analysis.ITEMS)) {
+            if (candidate.path(Analysis.ITEM_KEY)
+                .asString()
+                .equals(itemKey)) {
+                item = candidate;
+            }
+        }
+
+        if (item == null) {
+            throw new IllegalStateException(ApiMessageConstants.Analysis.MISSING_ITEM);
+        }
+
+        Set<String> ids = new HashSet<>();
+        item.path(Analysis.EVIDENCE_TRANSACTION_IDS).forEach(id -> ids.add(id.asString()));
+        if (item.path(Analysis.TARGET_TRANSACTION_ID).isString()) {
+            ids.add(item.path(Analysis.TARGET_TRANSACTION_ID).asString());
+        }
+        boolean expanded;
+        do {
+            expanded = false;
+            for (JsonNode transaction : input.path(Analysis.TRANSACTIONS)) {
+                if (ids.contains(transaction.path(Analysis.TRANSACTION_ID).asString())
+                    && transaction.path(Analysis.ORIGINAL_TRANSACTION_ID).isString()) {
+                    expanded |= ids
+                        .add(transaction.path(Analysis.ORIGINAL_TRANSACTION_ID).asString());
+                }
+            }
+            for (JsonNode relation : input.path(Analysis.RELATIONS)) {
+                String from = relation.path(Analysis.FROM_ID).asString();
+                String to = relation.path(Analysis.TO_ID).asString();
+                if (ids.contains(from) || ids.contains(to)) {
+                    expanded |= ids.add(from);
+                    expanded |= ids.add(to);
+                }
+            }
+        } while (expanded);
+        return ids.stream()
+            .sorted()
+            .map(UUID::fromString)
+            .toList();
+    }
+
+    /**
+     * 관리 목록에 원천 변경 사실만 표시할 지문이며 실제 재사용 적격 판정을 대신하지 않는다.
+     * @created 2026-11-01
+     * @usedBy AnalysisResults.save, MemoryCatalog.entry
+     */
+    public String referenceHash(ObjectNode source, List<UUID> refs) {
+        Set<String> ids = new HashSet<>();
+        refs.forEach(id -> ids.add(id.toString()));
+        ObjectNode facts = rawFacts(source, ids);
+        facts.set(Analysis.RULE_VERSION, source.get(Analysis.RULE_VERSION));
+        List<JsonNode> relations = new ArrayList<>();
+        for (JsonNode relation : source.path(Analysis.TRANSACTION_RELATIONS)) {
+            if (ids.contains(relation.path(Analysis.FROM_ID).asString())
+                || ids.contains(relation.path(Analysis.TO_ID).asString())) {
+                ObjectNode value = (ObjectNode) relation.deepCopy();
+                value.remove(
+                    List.of(
+                        Analysis.USER_ID,
+                        Analysis.SOURCE_VERSION,
+                        Analysis.SOURCE_REF
+                    )
+                );
+                relations.add(value);
+            }
+        }
+
+        relations.sort(Comparator.comparing(row -> AnalysisJson.canonical(row).toString()));
+        var links = facts.putArray(Analysis.RELATIONS);
+        relations.forEach(links::add);
+        return AnalysisJson.digest(facts);
+    }
 
     /**
      * 같은 의미 대상의 중복 항목을 거절하고 현재 요청의 항목 식별을 만든다.

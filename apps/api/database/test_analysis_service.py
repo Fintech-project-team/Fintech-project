@@ -26,12 +26,13 @@ BASE_MIGRATIONS = (
 
 
 def create_database(cluster, base_sql_root, database):
-    """2026-11-01: 신규 DB에 현재 공통 구조·분석·급여 안내만 적용한다. 사용: prepare_database, main."""
+    """2026-11-01: 신규 DB에 공통 구조·분석·급여 안내·기억 원천 메타를 적용한다. 사용: prepare_database, main."""
     cluster.sql('CREATE DATABASE ' + database + ';')
     for filename in BASE_MIGRATIONS:
         cluster.load(base_sql_root / filename, database)
     cluster.load(DIRECTORY / '008_analysis_storage.sql', database)
     cluster.load(base_sql_root / '009_salary_notices.sql', database)
+    cluster.load(DIRECTORY / '011_analysis_memory_refs.sql', database)
     # 005/006/010은 구 DB용이다. 신규 001에 포함된 현재 구조 위에 중복 적용하지 않는다.
     checks = cluster.sql('''
       SELECT
@@ -48,10 +49,26 @@ def create_database(cluster, base_sql_root, database):
           FROM pg_constraint
           WHERE conrelid='payse.financial_transactions'::regclass
             AND conname='account_entry_status_valid'
+        ),
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema='payse'
+            AND table_name='analysis_items'
+            AND column_name='source_refs'
+            AND data_type='ARRAY'
+        ),
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema='payse'
+            AND table_name='analysis_items'
+            AND column_name='source_hash'
+            AND data_type='text'
         );
     ''', database)
-    if checks != ['t|t|t']:
-        raise RuntimeError('Current financial storage prerequisites are missing')
+    if checks != ['t|t|t|t|t']:
+        raise RuntimeError('Current financial and memory storage prerequisites are missing')
 
 
 def prepare_database(cluster, base_sql_root):

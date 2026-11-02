@@ -77,6 +77,10 @@ public final class ApiCodeConstants {
         public static final String STALE = "stale";
         public static final String DISABLED = "disabled";
 
+        // 기간 조회·기억 관리
+        public static final String RESTRICTED = "restricted";
+        public static final String UNVERIFIED = "unverified";
+
         /**
          * 분석 상수 구간의 인스턴스 생성을 막는다.
          * @created 2026-11-02
