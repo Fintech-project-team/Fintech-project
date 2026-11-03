@@ -268,6 +268,15 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       onRefresh: widget.onRefresh,
       onDone: widget.onRefreshed,
       slivers: [
+        if (!_pinned)
+          const SliverToBoxAdapter(
+            child: TabPurpose(
+              key: ValueKey('tx-purpose'),
+              icon: Icons.receipt_long_outlined,
+              title: '모든 계좌·카드의 거래',
+              description: '연결한 계좌·카드를 계산 포함 여부와 관계없이 보여줘요.',
+            ),
+          ),
         if (_stale)
           SliverToBoxAdapter(
             child: NoticeBand(
@@ -310,8 +319,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   ),
                 )
               else ...[
-                const SizedBox(height: tabTopGap),
-                const TabScope('연결한 모든 계좌·카드', key: ValueKey('tx-scope')),
+                const SizedBox(height: PayseSpace.x2),
                 _periodHeader(bounds, month),
                 _basis(),
                 if (widget.onPickInstrument case final pick?) ...[

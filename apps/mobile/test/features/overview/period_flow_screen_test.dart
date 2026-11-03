@@ -70,8 +70,52 @@ void main() {
   testWidgets('정상: 계산 결과의 월급 주기와 계산에 포함한 계좌·카드만, 제외 계좌 거래는 없다', (tester) async {
     await _pump(tester, alphaWithReceipt());
     expect(find.text('9/25 – 10/24'), findsOneWidget);
-    expect(find.text('이번 월급 주기'), findsOneWidget);
-    expect(find.text('계산에 포함한 계좌·카드'), findsOneWidget);
+    expect(find.text('이번 월급 주기의 거래'), findsOneWidget);
+    final surfaceFinder = find.byKey(const ValueKey('tab-purpose-surface'));
+    final surface = tester.widget<Container>(surfaceFinder);
+    expect(
+      surface.color,
+      PayseColors.charcoal,
+      reason: '목적 안내는 차콜 섹션으로 아래 정보와 구분',
+    );
+    expect(surface.decoration, isNull, reason: '모서리 둥글림 없음');
+    final rect = tester.getRect(surfaceFinder);
+    expect(rect.left, 0, reason: '화면 왼쪽 끝부터');
+    expect(rect.right, 390, reason: '화면 오른쪽 끝까지');
+    expect(rect.top, 0, reason: '탭 바로 아래(화면 맨 위)에 붙음');
+    final bodyLeft = tester
+        .getTopLeft(find.byKey(const ValueKey('flow-period')))
+        .dx;
+    expect(
+      tester.getTopLeft(find.byIcon(Icons.calendar_month_outlined)).dx,
+      bodyLeft,
+      reason: '아이콘 시작점이 본문 왼쪽 선과 같음',
+    );
+    expect(
+      tester
+          .getTopLeft(find.byKey(const ValueKey('tab-purpose-description')))
+          .dx,
+      bodyLeft,
+      reason: '설명 시작점도 본문 왼쪽 선과 같음',
+    );
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('tab-purpose-title')))
+          .style!
+          .color,
+      PayseColors.onCharcoal,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('tab-purpose-surface')),
+        matching: find.byKey(const ValueKey('flow-period')),
+      ),
+      findsNothing,
+      reason: '기간은 면 밖 흰 바탕',
+    );
+    expect(find.text('계산에 쓰는 계좌와 연결 카드의 내역이에요.'), findsOneWidget);
+    expect(find.text('이번 월급 주기'), findsNothing, reason: '제목과 겹치는 기간 옆 라벨은 없음');
+    expect(find.text('계산에 포함한 계좌·카드'), findsNothing, reason: '범위 문구는 설명으로 대체');
     expect(_in('flow-pick-instrument', '계좌 2개 · 카드 3개'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('flow-pick-instrument')),
@@ -204,7 +248,9 @@ void main() {
   testWidgets('월급 입금 확인 전: 지난 계산 기간과 상태를 안내하고 전체 거래 보기를 둔다', (tester) async {
     var all = 0;
     await _pump(tester, readSource('salary-wait'), onShowAll: () => all++);
-    expect(find.text('지난 계산 기간'), findsOneWidget);
+    expect(find.text('지난 계산 기간의 거래'), findsOneWidget);
+    expect(find.text('지난 계산 기간'), findsNothing, reason: '제목과 겹치는 라벨은 없음');
+    expect(find.byKey(const ValueKey('flow-period')), findsOneWidget);
     expect(find.byKey(const ValueKey('flow-awaiting')), findsOneWidget);
     final button = find.byKey(const ValueKey('tx-action-전체 거래 보기'));
     await tester.scrollUntilVisible(
@@ -218,14 +264,25 @@ void main() {
     expect(all, 1);
   });
 
-  testWidgets('월급 주기를 알 수 없으면 기간을 만들지 않고 거래 없음과 구분한다', (tester) async {
+  testWidgets('월급 주기를 알 수 없으면 기간을 만들지 않고 상태 설명 한 번과 전체 거래 보기만 둔다', (
+    tester,
+  ) async {
     var all = 0;
     await _pump(tester, readSource('alpha-ready'), onShowAll: () => all++);
     expect(find.byKey(const ValueKey('flow-period-unknown')), findsOneWidget);
-    expect(find.text('조회 기간을 확인할 수 없어요'), findsOneWidget);
+    expect(find.text('이번 기간 내역'), findsWidgets);
+    expect(find.text('월급 주기를 알 수 없어\n이번 기간의 거래를 보여드릴 수 없어요.'), findsOneWidget);
+    expect(find.text('조회 기간을 확인해 주세요'), findsNothing);
+    expect(
+      find.text('조회 기간을 확인할 수 없어요'),
+      findsNothing,
+      reason: '같은 안내를 반복하지 않음',
+    );
+    expect(find.byKey(const ValueKey('tab-purpose-description')), findsNothing);
+    expect(find.byKey(const ValueKey('flow-period')), findsNothing);
     expect(find.byKey(const ValueKey('flow-empty')), findsNothing);
     expect(find.byKey(const ValueKey('flow-chip-kind')), findsNothing);
-    await tester.tap(find.byKey(const ValueKey('tx-action-전체 거래 보기')));
+    await tester.tap(find.byKey(const ValueKey('flow-show-all')));
     expect(all, 1);
   });
 

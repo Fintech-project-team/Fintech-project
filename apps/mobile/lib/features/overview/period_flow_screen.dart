@@ -241,6 +241,21 @@ class _PeriodFlowScreenState extends State<PeriodFlowScreen> {
       controller: _scroll,
       onRefresh: widget.links.onRefresh,
       slivers: [
+        SliverToBoxAdapter(
+          child: switch (period) {
+            FlowPeriodKnown(:final previous) => TabPurpose(
+              key: const ValueKey('flow-purpose'),
+              icon: Icons.calendar_month_outlined,
+              title: previous ? '지난 계산 기간의 거래' : '이번 월급 주기의 거래',
+              description: '계산에 쓰는 계좌와 연결 카드의 내역이에요.',
+            ),
+            FlowPeriodUnknown() => const TabPurpose(
+              key: ValueKey('flow-purpose'),
+              icon: Icons.calendar_month_outlined,
+              title: '이번 기간 내역',
+            ),
+          },
+        ),
         if (feed.stale)
           SliverToBoxAdapter(
             child: NoticeBand(
@@ -264,31 +279,32 @@ class _PeriodFlowScreenState extends State<PeriodFlowScreen> {
           ),
           sliver: SliverList.list(
             children: [
-              const SizedBox(height: tabTopGap),
-              const TabScope('계산에 포함한 계좌·카드', key: ValueKey('flow-scope')),
-              ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: tabKeyLineHeight),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: _PeriodTitle(period: period),
-                ),
-              ),
-              Text(
-                feed.load == TxLoad.loading
-                    ? '거래 내역을 불러오는 중이에요'
-                    : asOfLabel(_snap.asOf),
-                key: const ValueKey('flow-basis'),
-                style: PayseTypography.caption,
-              ),
-              const SizedBox(height: PayseSpace.x1),
-              TabLinkRow(
-                key: const ValueKey('flow-pick-instrument'),
-                label: '계좌·카드별 보기',
-                trailing:
-                    '계좌 ${scope.accounts.length}개 · 카드 ${scope.cards.length}개',
-                onTap: () => _showScope(scope, period),
-              ),
+              const SizedBox(height: PayseSpace.x2),
               if (period is FlowPeriodKnown) ...[
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: tabKeyLineHeight,
+                  ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _PeriodTitle(period: period),
+                  ),
+                ),
+                Text(
+                  feed.load == TxLoad.loading
+                      ? '거래 내역을 불러오는 중이에요'
+                      : asOfLabel(_snap.asOf),
+                  key: const ValueKey('flow-basis'),
+                  style: PayseTypography.caption,
+                ),
+                const SizedBox(height: PayseSpace.x1),
+                TabLinkRow(
+                  key: const ValueKey('flow-pick-instrument'),
+                  label: '계좌·카드별 보기',
+                  trailing:
+                      '계좌 ${scope.accounts.length}개 · 카드 ${scope.cards.length}개',
+                  onTap: () => _showScope(scope, period),
+                ),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TxChip(
@@ -320,12 +336,29 @@ class _PeriodFlowScreenState extends State<PeriodFlowScreen> {
   List<Widget> _body(FlowPeriod period, List<FlowItem> items, FlowScope scope) {
     final all = ('전체 거래 보기', widget.onShowAll);
     if (period is FlowPeriodUnknown) {
+      // 2026-11-02: 월급 주기 미상은 제목 '이번 기간 내역'과 상태 설명 한 번, 할 수 있는 행동(전체 거래 보기)만 둔다. 사용자에게
+      // 확인을 요구하거나 같은 안내를 반복하지 않는다.
       return [
-        TxEmpty(
+        Column(
           key: const ValueKey('flow-period-unknown'),
-          title: '조회 기간을 확인할 수 없어요',
-          body: '월급 주기를 확인할 수 없어 이번 기간을 정하지 못했어요.',
-          actions: [all],
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: PayseSpace.x2),
+            const Text(
+              '월급 주기를 알 수 없어\n이번 기간의 거래를 보여드릴 수 없어요.',
+              style: TextStyle(
+                fontSize: 15,
+                height: 22 / 15,
+                color: PayseColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: PayseSpace.x2),
+            TabLinkRow(
+              key: const ValueKey('flow-show-all'),
+              label: '전체 거래 보기',
+              onTap: widget.onShowAll,
+            ),
+          ],
         ),
       ];
     }
@@ -430,40 +463,25 @@ class _PeriodFlowScreenState extends State<PeriodFlowScreen> {
   }
 }
 
-/// 2026-10-31: 기간 제목. 기간을 알면 'M/D – M/D'(끝 전날까지)와 '이번 월급 주기' 또는 '지난 계산 기간'·'월급 입금 확인 전이에요',
-/// 모르면 '이번 월급 주기'만 보인다.
+/// 2026-10-31: 기간 제목 'M/D – M/D'(끝 전날까지)와 입금 확인 전이면 '월급 입금 확인 전이에요'. 2026-11-02: '이번 월급 주기'·
+/// '지난 계산 기간' 라벨은 위 목적 제목과 겹쳐 뺐고, 기간을 모르면 이 줄을 두지 않는다.
 class _PeriodTitle extends StatelessWidget {
   /// 2026-10-31: 기간 [period]로 만든다.
   const _PeriodTitle({required this.period});
 
-  final FlowPeriod period;
+  final FlowPeriodKnown period;
 
   /// 2026-10-31: 제목을 반환한다.
   @override
   Widget build(BuildContext context) {
     final p = period;
-    const strong = tabKeyStyle;
-    if (p is! FlowPeriodKnown) {
-      return const Text(
-        '이번 월급 주기',
-        key: ValueKey('flow-period'),
-        style: strong,
-      );
-    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: PayseSpace.x2,
-          children: [
-            Text(
-              '${md(p.start)} – ${md(p.end.addDays(-1))}',
-              key: const ValueKey('flow-period'),
-              style: strong,
-            ),
-            TxLabel(p.previous ? '지난 계산 기간' : '이번 월급 주기'),
-          ],
+        Text(
+          '${md(p.start)} – ${md(p.end.addDays(-1))}',
+          key: const ValueKey('flow-period'),
+          style: tabKeyStyle,
         ),
         if (p.previous)
           const Padding(
