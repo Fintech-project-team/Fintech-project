@@ -11,6 +11,7 @@ import static com.payse.api.finance.service.FinancialProjection.unavailable;
 import com.payse.api.constants.ApiCodeConstants;
 import com.payse.api.constants.ApiConfigConstants;
 import com.payse.api.constants.ApiFieldConstants;
+import com.payse.api.constants.ApiFieldConstants.Finance;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -96,6 +97,7 @@ final class FinancialShape {
      * @modified 2026-10-30 - 저장 버전별 items 필수 여부와 v4 청구 원천의 전체 제약 검증
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-02 - 잔액 기준 시각과 거래 사실의 시간 경계를 공개 전에 검사
      */
     static void validate(ObjectNode source) {
         String schema = text(source, ApiFieldConstants.Finance.SCHEMA_VERSION);
@@ -131,6 +133,7 @@ final class FinancialShape {
                 }
             }
         );
+        sourceTimes(source);
         if (v4) {
             statementItems(source);
         }
@@ -177,6 +180,57 @@ final class FinancialShape {
         );
         for (ObjectNode row : rows(source, ApiFieldConstants.Finance.SETTLEMENTS)) {
             FinancialProjection.strings(row, ApiFieldConstants.Finance.EVIDENCE_REFS);
+        }
+    }
+
+    /**
+     * 원천 묶음의 기준 시각과 잔액을 맞추고 실제 거래만 확보 시각 안으로 제한한다.
+     * 예정일·사용자 기록 시각을 현재 거래로 바꾸거나 조회 시각을 원천에 쓰지 않는다.
+     * @created 2026-11-02
+     * @usedBy validate
+     */
+    private static void sourceTimes(ObjectNode source) {
+        OffsetDateTime asOf = OffsetDateTime.parse(text(source, Finance.AS_OF));
+        LocalDate businessDate = asOf
+            .atZoneSameInstant(ZoneId.of(ApiConfigConstants.Finance.SEOUL_ZONE))
+            .toLocalDate();
+        for (ObjectNode account : rows(source, Finance.ACCOUNTS)) {
+            OffsetDateTime balanceTime = OffsetDateTime.parse(text(account, Finance.AS_OF));
+            if (!balanceTime.isEqual(asOf)) {
+                throw unavailable();
+            }
+        }
+
+        List<String> factDates = List.of(
+            Finance.PURCHASE_DATE,
+            Finance.WITHDRAWAL_DATE,
+            Finance.REFUND_DATE,
+            Finance.CANCELLATION_DATE,
+            Finance.BOOKING_DATE
+        );
+        for (String group : List.of(Finance.TRANSACTIONS, Finance.RELATED_TRANSACTIONS)) {
+            for (ObjectNode transaction : rows(source, group)) {
+                for (String field : factDates) {
+                    JsonNode value = transaction.get(field);
+                    if (value == null || value.isNull()) {
+                        continue;
+                    }
+                    String date = text(transaction, field);
+                    if (!date.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")
+                        || date.startsWith("0000")
+                        || LocalDate.parse(date).isAfter(businessDate)) {
+                        throw unavailable();
+                    }
+                }
+                if (!required(transaction, Finance.OCCURRED_AT).isNull()) {
+                    OffsetDateTime occurredAt = OffsetDateTime.parse(
+                        text(transaction, Finance.OCCURRED_AT)
+                    );
+                    if (occurredAt.isAfter(asOf)) {
+                        throw unavailable();
+                    }
+                }
+            }
         }
     }
 

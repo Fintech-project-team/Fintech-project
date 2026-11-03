@@ -20,6 +20,7 @@ def write_cases(folder):
     """2026-11-01: 개발 전건·입력 반례를 Python 판정과 함께 내보낸다. 사용: CLI.
 
     2026-11-02 수정: 직렬화·파일 쓰기와 날짜 사례 목록을 분리한다.
+    2026-11-03 수정: 감마 연간 원천의 입력·형식 예시를 평가 정답과 분리해 추가한다.
     """
     folder.mkdir(parents=True, exist_ok=True)
     inputs, expected = prepare_expanded()
@@ -86,6 +87,12 @@ def write_cases(folder):
     dates_file = folder / 'date-inputs.json'
     dates_json = json.dumps(date_inputs, ensure_ascii=False)
     dates_file.write_text(dates_json, encoding='utf-8')
+    from gamma_year_cases import prepare as gamma_cases
+    gamma_inputs, gamma_examples = gamma_cases()
+    (folder / 'gamma-year-inputs.json').write_text(
+        json.dumps(gamma_inputs, ensure_ascii=False), encoding='utf-8')
+    (folder / 'gamma-year-format-examples.json').write_text(
+        json.dumps(gamma_examples, ensure_ascii=False, indent=2), encoding='utf-8')
     print(f'Contract parity fixtures: {len(inputs)} valid, {len(invalid)} invalid; model calls 0')
 
 

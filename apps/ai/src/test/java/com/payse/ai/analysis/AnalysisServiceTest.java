@@ -379,6 +379,51 @@ class AnalysisServiceTest {
     }
 
     /**
+     * 감마 연간 거래와 반복 입력을 실제 실행 서비스로 처리하며 공급자만 대역으로 둔다.
+     * @created 2026-11-03
+     * @usedBy JUnit
+     */
+    @Test
+    void processesGammaYearWithoutGoldLabels() throws Exception {
+        Path file = Path.of(
+            System.getProperty(AiTestConstants.Files.TEST_DATA_PROPERTY),
+            AiTestConstants.Files.GAMMA_YEAR_FILE
+        );
+        JsonNode batches = JSON.readTree(Files.readString(file));
+        assertEquals(97, batches.size());
+        var seen = new java.util.HashSet<String>();
+        AtomicInteger calls = new AtomicInteger();
+        AnalysisService service = new AnalysisService(
+            (instructions, schema) -> model(
+                6000,
+                body -> {
+                    calls.incrementAndGet();
+                    assertFalse(body.toString().contains("scenarioTruth"));
+                    assertFalse(body.toString().contains("openingBalancesKRW"));
+                    assertFalse(body.toString().contains("payseTransactionType"));
+                    return unknown(body);
+                }
+            ),
+            6000
+        );
+        for (JsonNode batch : batches) {
+            assertTrue(batch.get(AnalysisFields.TRANSACTIONS).size() <= 20);
+            assertTrue(batch.get(AnalysisFields.CURRENT_CLASSIFICATIONS).isEmpty());
+            for (JsonNode transaction : batch.get(AnalysisFields.TRANSACTIONS)) {
+                seen.add(transaction.get(AnalysisFields.TRANSACTION_ID).asString());
+            }
+            ModelReply reply = service.analyze((ObjectNode) batch);
+            assertNull(reply.failure());
+            assertEquals(
+                batch.get(AnalysisFields.ITEMS).size(),
+                reply.output().get(AnalysisFields.ITEMS).size()
+            );
+        }
+        assertEquals(1825, seen.size());
+        assertEquals(97, calls.get());
+    }
+
+    /**
      * 기존 공개 합성 입력만 읽고 비공개 정답은 읽지 않는다.
      * @created 2026-11-01
      * @usedBy 서비스 테스트
@@ -399,6 +444,7 @@ class AnalysisServiceTest {
      * @created 2026-11-01
      * @usedBy 모의 ModelGateway
      * @modified 2026-11-02 - 계약 문자열 상수 분리; 독립 테스트 상수 통합; 상수 타입 명시 참조
+     * @modified 2026-11-03 - 연간 반복 후보의 정상 unknown 응답도 제공
      */
     private ModelReply unknown(JsonNode input) {
         ObjectNode result = JSON.createObjectNode()
@@ -413,9 +459,18 @@ class AnalysisServiceTest {
                 source.get(AnalysisFields.EVIDENCE_TRANSACTION_IDS)
                     .deepCopy()
             );
+            boolean recurring = input.get(AnalysisFields.SEMANTIC_TASK_KIND)
+                .asString().equals(AnalysisValues.RECURRING_MEANING);
+            if (recurring) {
+                item.set(AnalysisFields.CANDIDATE_KEY, source.get(AnalysisFields.CANDIDATE_KEY));
+                item.putNull(AnalysisFields.NAME);
+            }
             for (String name : new String[] {
                 AnalysisFields.MEANING,
                 AnalysisFields.CLASSIFICATION }) {
+                if (recurring && name.equals(AnalysisFields.CLASSIFICATION)) {
+                    continue;
+                }
                 item.putObject(name)
                     .put(AnalysisFields.STATUS, AnalysisValues.UNKNOWN)
                     .putNull(AnalysisFields.VALUE)

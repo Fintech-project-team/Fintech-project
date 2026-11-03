@@ -180,6 +180,18 @@ def main():
                               'analysisSqlPassed': sql_result.wasSuccessful()})
         if not sql_result.wasSuccessful():
             return 1
+        from test_source_refresh import run_checks as refresh_checks
+        refresh_result = refresh_checks(cluster, base_sql_root)
+        cluster.report.update({'sourceRefreshChecks': refresh_result.testsRun,
+                              'sourceRefreshPassed': refresh_result.wasSuccessful()})
+        if not refresh_result.wasSuccessful():
+            return 1
+        from test_gamma_login import run_checks as gamma_checks
+        gamma_result = gamma_checks(cluster, base_sql_root)
+        cluster.report.update({'gammaLoginChecks': gamma_result.testsRun,
+                              'gammaLoginPassed': gamma_result.wasSuccessful()})
+        if not gamma_result.wasSuccessful():
+            return 1
         environment = {key: value for key, value in os.environ.items()
                        if not key.upper().startswith(('PAYSE_', 'SPRING_', 'PG'))}
         environment.update(credentials)

@@ -116,6 +116,7 @@ class FinancialHttpTest {
      * @created 2026-10-29
      * @usedBy JUnit BeforeEach
      * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조; 순회 대상 지역변수 분리
+     * @modified 2026-11-03 - 합성 원천 준비에만 별도 제한과 통계 갱신 적용
      */
     @BeforeEach
     void start() throws Exception {
@@ -133,7 +134,7 @@ class FinancialHttpTest {
         // 전용 실행기가 만든 DB에서만 각 검사를 독립 준비한다. 기관 기준정보는 유지한다.
         admin.execute("TRUNCATE payse.users CASCADE");
         admin.execute("TRUNCATE payse.auth_rate_limits");
-        admin.execute(Files.readString(Path.of(setting("SEED_FILE"))));
+        prepareSeed();
         source = json
             .readTree(Files.readString(Path.of("fixtures/generated/snapshots/alpha-ready.json")));
         foreignSource = json
@@ -204,6 +205,39 @@ class FinancialHttpTest {
             .build();
         token = login();
         sourceBefore = fingerprint();
+    }
+
+    /**
+     * 연간 자료 준비의 통계·제약 검사를 마친 뒤 제품 요청 제한으로 복구한다.
+     * @created 2026-11-03
+     * @usedBy start
+     */
+    private void prepareSeed() throws Exception {
+        String seed = Files.readString(Path.of(setting("SEED_FILE")));
+        var boundary = java.util.regex.Pattern.compile("(?m)^SET CONSTRAINTS ALL IMMEDIATE;\\r?$");
+        assertEquals(
+            1L,
+            boundary.matcher(seed)
+                .results()
+                .count(),
+            "Expected one final seed validation boundary"
+        );
+        String prepared = boundary.matcher(seed).replaceFirst("ANALYZE;\n$0");
+        admin.execute(
+            (org.springframework.jdbc.core.ConnectionCallback<Void>) connection -> {
+                try (var statement = connection.createStatement()) {
+                    statement.execute("SET statement_timeout = '120s'");
+                    try {
+                        statement.execute(prepared);
+                    } finally {
+                        statement.execute("ROLLBACK");
+                        statement.execute("SET statement_timeout = '12s'");
+                    }
+                }
+
+                return null;
+            }
+        );
     }
 
     /**
