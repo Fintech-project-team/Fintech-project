@@ -268,6 +268,7 @@ public final class ApiFieldConstants {
      * 금융 호출부의 고정 문자열을 제공한다.
      * @created 2026-11-02
      * @usedBy AllocationWrites, FinancialCursor, FinancialHttpInput, FinancialInput
+     * @modified 2026-11-02 - 원천 갱신의 기존 거래 날짜 필드를 금융 검증에서 공유
      */
     public static final class Finance {
         // JSON 필드
@@ -419,6 +420,9 @@ public final class ApiFieldConstants {
         public static final String SOURCE_REF = "sourceRef";
         public static final String MERCHANT_NAME = "merchantName";
         public static final String PURCHASE_DATE = "purchaseDate";
+        public static final String WITHDRAWAL_DATE = "withdrawalDate";
+        public static final String REFUND_DATE = "refundDate";
+        public static final String BOOKING_DATE = "bookingDate";
         public static final String ORIGINAL_USED_AMOUNT_KRW = "originalUsedAmountKRW";
         public static final String BILLED_PRINCIPAL_KRW = "billedPrincipalKRW";
         public static final String FEE_OR_ADJUSTMENT_AMOUNT_KRW = "feeOrAdjustmentAmountKRW";
