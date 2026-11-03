@@ -451,19 +451,30 @@ void main() {
   });
 
   group('일부 출금 문구', () {
-    test('같은 확인된 날짜면 그 날짜, 여러 날짜·모르는 날짜가 섞이면 누적', () {
-      expect(withdrawalNote(['2026-10-10'], 60000), '10/10 출금 60,000원');
+    test('한 문장: 같은 확인된 날짜면 그 날짜, 날짜를 모르면 날짜 없이, 여럿이면 (누적)', () {
+      const head = '100,000원 중';
       expect(
-        withdrawalNote(['2026-10-10', '2026-10-10'], 60000),
-        '10/10 출금 60,000원',
+        withdrawalNote(['2026-10-10'], 60000, 100000),
+        '$head 10/10에 60,000원 출금됐어요',
       );
       expect(
-        withdrawalNote(['2026-10-10', '2026-10-15'], 60000),
-        '누적 출금 60,000원',
+        withdrawalNote(['2026-10-10', '2026-10-10'], 60000, 100000),
+        '$head 10/10에 60,000원 출금됐어요',
       );
-      expect(withdrawalNote(['2026-10-10', null], 60000), '누적 출금 60,000원');
-      expect(withdrawalNote([null], 60000), '출금 60,000원');
-      expect(withdrawalNote([], 60000), '출금 60,000원');
+      expect(
+        withdrawalNote(['2026-10-10', '2026-10-15'], 60000, 100000),
+        '$head 60,000원 출금됐어요 (누적)',
+      );
+      expect(
+        withdrawalNote(['2026-10-10', null], 60000, 100000),
+        '$head 60,000원 출금됐어요 (누적)',
+      );
+      expect(withdrawalNote([null], 60000, 100000), '$head 60,000원 출금됐어요');
+      expect(withdrawalNote([], 60000, 100000), '$head 60,000원 출금됐어요');
+      expect(
+        withdrawalNote(['2026-10-10'], 60000, 100000),
+        isNot(contains('만')),
+      );
     });
   });
 }

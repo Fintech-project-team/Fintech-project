@@ -62,7 +62,8 @@ void main() {
       },
     );
 
-    testWidgets('clear button only with a value; disabled shows dashed line', (
+    testWidgets('clear button always in place: dim and inert when empty, '
+        'clears and focuses when it has a value; disabled shows dashed line', (
       tester,
     ) async {
       final controller = TextEditingController();
@@ -70,15 +71,24 @@ void main() {
       await tester.pumpWidget(
         themed(PayseTextField(label: '이름', controller: controller)),
       );
+      final clear = find.byKey(const ValueKey('payse-text-field-clear'));
+      expect(clear, findsOneWidget, reason: '빈 값에도 같은 자리에 둔다');
+      expect(tester.widget<IconButton>(clear).onPressed, isNull);
       expect(
-        find.byKey(const ValueKey('payse-text-field-clear')),
-        findsNothing,
+        tester
+            .widget<Opacity>(
+              find.ancestor(of: clear, matching: find.byType(Opacity)).first,
+            )
+            .opacity,
+        lessThan(1),
       );
+      final emptyLeft = tester.getTopLeft(clear).dx;
 
       await tester.enterText(find.byType(TextField), '홍길동');
+      FocusManager.instance.primaryFocus?.unfocus();
       await tester.pump();
-      final clear = find.byKey(const ValueKey('payse-text-field-clear'));
-      expect(clear, findsOneWidget);
+      expect(tester.widget<IconButton>(clear).onPressed, isNotNull);
+      expect(tester.getTopLeft(clear).dx, emptyLeft, reason: '자리가 움직이지 않음');
       expect(tester.getSize(clear).height, greaterThanOrEqualTo(48));
       final circle = find.byKey(
         const ValueKey('payse-text-field-clear-circle'),
@@ -101,6 +111,11 @@ void main() {
       await tester.tap(clear);
       await tester.pump();
       expect(controller.text, isEmpty);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus,
+        isTrue,
+        reason: '지운 뒤 그 칸에 포커스',
+      );
 
       controller.text = '신한은행 입출금 ····1234';
       await tester.pumpWidget(

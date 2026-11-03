@@ -34,7 +34,9 @@ abstract final class PayseColors {
   static const Color error = Color(0xFFB42318);
   static const Color errorContainer = Color(0xFFFEF3F2);
   static const Color errorBorder = Color(0xFFFECDCA);
-  static const Color warning = Color(0xFFB54708);
+
+  /// 2026-11-03: 노란 주의 안내의 제목·아이콘색. 빨강(error)과 구분되게 바꿨다(29-5a, warningContainer 위 대비 4.8:1).
+  static const Color warning = Color(0xFFB45309);
   static const Color warningContainer = Color(0xFFFFFAEB);
   static const Color warningBorder = Color(0xFFFEDF89);
   static const Color info = Color(0xFF175CD3);
