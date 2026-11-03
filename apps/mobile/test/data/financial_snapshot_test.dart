@@ -241,5 +241,60 @@ void main() {
       final s = FinancialSnapshot.fromJson(json);
       expect(s.statements!.first.dueDate, isNull);
     });
+
+    test('결제 예정일 null 청구도 대표 예정 지출 연결·이용기간·금액과 함께 읽는다', () {
+      final json = readSource('demo-life');
+      final statement = rows(json, 'statements').first;
+      statement['dueDate'] = null;
+      final s = FinancialSnapshot.fromJson(json);
+      final read = s.statements!.first;
+      final linked = s.obligations!.where(
+        (o) => o.statementId == read.statementId,
+      );
+      expect(linked, hasLength(1));
+      expect(read.amountKrw, statement['amountKRW']);
+      expect(read.periodStart, statement['periodStart']);
+      expect(read.periodEnd, statement['periodEnd']);
+    });
+
+    test('청구 이용기간은 양 끝을 함께 받아야 한다', () {
+      final json = readSource('demo-life');
+      rows(json, 'statements').first['periodEnd'] = null;
+      expect(
+        () => FinancialSnapshot.fromJson(json),
+        throwsA(isA<SnapshotFormatException>()),
+      );
+    });
+  });
+
+  group('예정 지출의 청구 연결(statementId)', () {
+    test('값은 그대로, 연결이 없으면 null', () {
+      final s = FinancialSnapshot.fromJson(readSource('beta-ready'));
+      final linked = s.obligations!.where((o) => o.statementId != null);
+      expect(linked.map((o) => o.statementId), [
+        s.statements!.single.statementId,
+      ]);
+      expect(s.obligations!.where((o) => o.statementId == null), isNotEmpty);
+    });
+
+    test('청구 카드가 미연결이면 키를 생략하고 제한 표식으로 구분한다', () {
+      final s = FinancialSnapshot.fromJson(
+        _beta(_allBeta.difference({'card.hyundai'})),
+      );
+      expect(s.statements, isEmpty);
+      final hidden = s.obligations!.where(
+        (o) => s.isRestricted('obligation', o.obligationId, 'statementId'),
+      );
+      expect(hidden, hasLength(1));
+      expect(hidden.single.statementId, isNull);
+      expect(
+        s.obligations!.where(
+          (o) =>
+              o.statementId == null &&
+              !s.isRestricted('obligation', o.obligationId, 'statementId'),
+        ),
+        isNotEmpty,
+      );
+    });
   });
 }

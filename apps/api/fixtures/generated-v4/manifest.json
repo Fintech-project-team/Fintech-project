@@ -25,12 +25,12 @@
     "snapshots/gamma-ai-misread.json": "872c926e2913e41b87f0e24b8e7bbe8a76e9e9b63e02074c8c87e0149c27fe91",
     "snapshots/demo-life.json": "8795491afbafa96922e110a28ddbbbc45d8a1b6d65e137c608a9b3f68224bbea",
     "snapshots/beta-life.json": "d1aa79f76cae2b5194228a749f8015d8a802e02f3ba210c943fc86ace1ab66f7",
-    "snapshots/gamma-life.json": "af276956c398b82e6773e08bbc815acf8f6215ba83984f8b02d7d0a6f93b56ff",
+    "snapshots/gamma-life.json": "ee76b6a395fe65f4197c90f7e5c35e347b42d54d96f389598a46110ddc62c754",
     "snapshots/alpha-billing-items.json": "c3f4f425a8adfa22c8ca8545a8b3b8c3418feb3b3cd0e9e4a56e19ae6267d482",
     "snapshots/beta-billing-items.json": "87a9b82339b81b48b5af34e70813a2a9fdf5ebc7a47dc709f7036fc73a606941",
     "snapshots/gamma-billing-items.json": "441c46efe374c1567abff7572675a600acb32238d30fef223fe17274eb1679e2",
     "server-seeds.json": "7529af4d49685c921745557e685530b0922d36215860513d8d9639b2679e1946",
-    "catalog.json": "87ca1a7d4316059a7df6837127dc749d232fcffc3db4c2ae80e3b82133ce5798",
+    "catalog.json": "e097d05f2e2ffb8bae20a76ce269251d3b29b5f59511349d587a9c8d7f65a44d",
     "bank-directory.json": "097a9a5100f4d6a19c37b60f49ba5f6fc8075bb3fc00456433000294b7513640"
   }
 }

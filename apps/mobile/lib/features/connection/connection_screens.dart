@@ -1322,9 +1322,6 @@ class ConnectionReviewScreen extends StatelessWidget {
                     : '${_account(c.withdrawalAccountId!)}에서 출금',
                 unlinked: c.withdrawalAccountRestricted,
                 value: switch (cardPaymentDay(snapshot, c)) {
-                  PlannedPaymentDay(:final day) => _ReviewValue.text(
-                    '매월 $day일',
-                  ),
                   NextConfirmedDue(:final date) => _ReviewValue.text(
                     '다음 결제 ${formatBusinessDate(date, basis)}',
                   ),

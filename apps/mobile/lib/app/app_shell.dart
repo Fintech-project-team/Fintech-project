@@ -17,12 +17,15 @@ import '../features/overview/overview_links.dart';
 import '../features/overview/pull_refresh.dart';
 import '../features/overview/salary_notice.dart';
 import '../features/overview/slide_switch.dart';
+import '../features/my_info/my_info_screen.dart';
+import '../features/planning/plan_screen.dart';
 import '../shared/design/payse_tokens.dart';
 import 'logout_action.dart';
-import 'placeholder_screens.dart';
 
 /// 2026-10-20: 하단 탭(홈·계좌·계획·내 정보) 골격. 각 탭은 기능 화면이 들어갈 자리다.
 /// 2026-10-29: 계좌 탭은 02-3 계좌 관리다(29-1).
+/// 2026-11-02: 계획 탭은 예정 지출·남겨둘 돈 조회다(29-3).
+/// 2026-11-03: 내 정보 탭은 사용자 이름·월급 정보·계산에 포함할 계좌·로그아웃·앱 버전이다(29-4).
 /// 2026-10-21: PIN 확인 뒤 금융사 연결을 마친 사용자의 첫 화면으로 쓴다(main_entry.dart).
 /// 2026-10-23: 진입 조회에 성공한 [snapshot]으로 홈 계산을 한 번 수행해 탭들이 같은 결과를 쓰게 한다.
 class AppShell extends StatefulWidget {
@@ -52,6 +55,8 @@ class AppShell extends StatefulWidget {
     this.onLogout,
     this.onPullRefresh,
     this.history,
+    this.userName,
+    this.appVersion,
   });
 
   final FinancialSnapshot snapshot;
@@ -72,6 +77,10 @@ class AppShell extends StatefulWidget {
 
   /// 2026-11-02: 내 정보 탭의 로그아웃(성공이면 null, 실패면 안내 문구). 없으면 버튼을 두지 않는다.
   final Future<String?> Function()? onLogout;
+
+  /// 2026-11-03: 내 정보 탭의 로그인한 사용자 이름(없으면 이름 줄 없음)과 설치된 앱 버전 읽기(없으면 버전 줄 없음).
+  final String? userName;
+  final AppVersionReader? appVersion;
 
   static const List<String> tabTitles = ['홈', '계좌·카드', '계획', '내 정보'];
 
@@ -171,6 +180,7 @@ class _AppShellState extends State<AppShell> {
       (widget.salaryNotices?.isFolded(notice.payMonth, notice.key) ?? false);
 
   /// 2026-10-29: 홈 안내에서 월급 정보 편집 화면을 연다.
+  /// 2026-11-03: 내 정보 탭의 '월급 정보'도 이 화면을 연다.
   void _editSalary(BuildContext context, AccountsWriter writer) {
     openSalaryEditor(
       context,
@@ -347,8 +357,18 @@ class _AppShellState extends State<AppShell> {
             calculation: _calculation,
             writer: widget.accountsWriter,
           ),
-          const TabPlaceholder(title: '계획'),
-          TabPlaceholder(title: '내 정보', footer: _accountFooter()),
+          PlanScreen(links: links),
+          MyInfoScreen(
+            snapshot: widget.snapshot,
+            userName: widget.userName,
+            writer: widget.accountsWriter,
+            onEditSalary: switch (widget.accountsWriter) {
+              final writer? => () => _editSalary(context, writer),
+              null => null,
+            },
+            footer: _accountFooter(),
+            version: widget.appVersion,
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(

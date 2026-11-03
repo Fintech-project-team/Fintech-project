@@ -119,9 +119,9 @@ void main() {
       final out = alphaWithReceipt();
       txById(out, septemberSalaryTx)['direction'] = 'out';
       expect(() => run(out), contractError());
-      final approved = alphaWithReceipt();
-      txById(approved, septemberSalaryTx)['status'] = 'approved';
-      expect(() => run(approved), contractError());
+      final unknown = alphaWithReceipt();
+      txById(unknown, septemberSalaryTx)['status'] = 'unknown';
+      expect(() => run(unknown), contractError());
     });
 
     test('근거 거래가 없으면 계약 위반, 다음 페이지가 남았으면 근거 미수신', () {

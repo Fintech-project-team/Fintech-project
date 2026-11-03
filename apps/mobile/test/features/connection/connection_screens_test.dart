@@ -797,7 +797,7 @@ void main() {
       expect(find.text('연결한 계좌에서 확인되는 예정 지출이 없어요.'), findsNothing);
     });
 
-    testWidgets('unset and planned values read differently', (tester) async {
+    testWidgets('unset salary values and an ignored card plan', (tester) async {
       await showReview(
         tester,
         betaSnapshot(
@@ -819,7 +819,12 @@ void main() {
       expect(find.text('월급일 미입력'), findsOneWidget);
       expect(find.text('금액 미입력'), findsOneWidget);
       expect(find.text('월급 계좌 미선택'), findsOneWidget);
-      expect(find.text('매월 15일'), findsOneWidget);
+      expect(
+        find.text('매월 15일'),
+        findsNothing,
+        reason: '사용자 계획 결제일은 이번 범위에서 보이지 않음',
+      );
+      expect(find.text('다음 결제 11월 10일'), findsWidgets);
       expect(find.text('연결 안 함'), findsNothing, reason: '미입력은 미연결이 아님');
     });
 

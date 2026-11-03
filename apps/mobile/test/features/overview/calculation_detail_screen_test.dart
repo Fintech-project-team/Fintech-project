@@ -655,4 +655,40 @@ void main() {
     );
     expect(find.byKey(const ValueKey('home-detail-button')), findsNothing);
   });
+
+  group('실제 출금일 표시(공통 관계 조회로 옮긴 뒤 회귀)', () {
+    const repair = 'c2db3f00';
+
+    String? caption(Map<String, Object?> json) {
+      final s = FinancialSnapshot.fromJson(json);
+      final id = s.obligations!
+          .firstWhere((o) => o.obligationId.startsWith(repair))
+          .obligationId;
+      return SnapshotNames(s).settlementCaption(id);
+    }
+
+    test('같은 출금의 유효 정산 2건은 한 번만, 무효 정산은 빼고 모두 무효면 null', () {
+      final json = alphaWithReceipt();
+      final original = rows(
+        json,
+        'settlements',
+      ).firstWhere((x) => (x['obligationId']! as String).startsWith(repair));
+      json['settlements'] = [
+        ...rows(json, 'settlements'),
+        {
+          ...original,
+          'linkId': '00000000-0000-4000-8000-0000000000aa',
+          'allocatedKRW': 1000,
+        },
+      ];
+      expect(caption(json), '10/16 출금 · 국민은행 ····0001');
+
+      for (final x in rows(json, 'settlements')) {
+        if ((x['obligationId']! as String).startsWith(repair)) {
+          x['invalidatedAt'] = '2026-10-19T00:00:00+09:00';
+        }
+      }
+      expect(caption(json), isNull);
+    });
+  });
 }

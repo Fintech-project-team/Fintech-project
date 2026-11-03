@@ -1,0 +1,34 @@
+{
+  "id": "PAYSE-DEMO-GAMMA-RAW-20261102",
+  "role": "integration",
+  "baseCommit": "8799148be6c7bb8b2f4513e30ab6b8c536ca59e0",
+  "branch": "feat/integration/gamma-raw",
+  "allowedPaths": [
+    "docs/tasks/PAYSE-DEMO-GAMMA-RAW-20261102.json",
+    "apps/api/fixtures/edge_life_cases.py",
+    "apps/api/fixtures/generate.py",
+    "apps/api/fixtures/generated/",
+    "apps/api/fixtures/generated-v4/",
+    "apps/mobile/assets/fixtures/gamma-life.json",
+    "apps/mobile/test/data/edge_life_test.dart",
+    "apps/api/tests/test_fixtures.py"
+  ],
+  "acceptance": [
+    "목적: 데모감마(gamma-life)를 금융사 연결 직후 LLM 분석을 시험할 수 있게 마이데이터로 받을 수 있는 원천만 남긴 상태로 바꾼다(2026-11-02 혜연 지시: 내일 실제 서버(DB)에 LLM을 붙여 연결 → LLM 분석 → 불러온 내용 확인 → 첫 계산 흐름을 본다). 알파·베타는 바꾸지 않는다",
+    "비우는 것(PAYSE·LLM·사용자가 정하는 값): 모든 거래의 payseTransactionType(혜연 결정: 마이데이터는 내 계좌 이체 등 분류를 주지 않는다), transactionRelations(체크카드 짝·내 계좌 이체 연결), settings.salary의 월급일·금액·계좌와 receiptEvidence, 계좌 included. 예정 지출·남겨둘 돈·반복 계획·청구서는 원래 비어 있다",
+    "남기는 것(금융사 원천): 거래 일시·금액·방향·상태·거래명·적요·잔액 반영, 계좌 잔액, 카드 결제 계좌·청구 일정, 할부 회차, 환불·취소의 원거래 연결. 거래 ID·금액·날짜는 바뀌지 않는다. 정답 라벨(catalog expected.edgeLabels)과 엣지 사례 G01~G03·G09·G13~G15는 그대로다",
+    "원천 버전: 감마만 ':base:life-2'로 올린다(베타 ':base:life-1' 그대로). A 테스트는 감마 원천 버전 끝 검사만 고친다(성현이 이 정도 수정은 B가 해도 된다고 함, 2026-11-02 혜연 전달)",
+    "실제 서버: 데모감마의 기본 사례 연결(server-seeds initialCase·identity_contract.py, 현재 gamma-month-end)과 서버 DB 적재는 A 담당이다. B는 export_sql.py로 gamma-life 적재 SQL이 만들어지는지만 확인하고 A에게 전환을 요청한다",
+    "검증: 원본 검증기, 기존 사례·베타 불변, apps/api 파이썬 테스트(develop 대비 새 실패 0건), export_sql 생성, 앱 fixture_copy_test·계산 테스트(원천 그대로: 계산 포함 계좌·월급일 없음 / 주거래 통장 선택·월급 15일 2,850,000원 설정 뒤: 잔액 7,791,550원·이번 회차 입금 근거 없음 / 대출금을 잘못 확인하면 대출금이 쓸 수 있는 돈에 섞임), 하네스",
+    "범위 밖: 서버 기본 사례 연결·DB 적재(A), LLM 연동, 앱 화면 변경, 회차 확인 저장 기능"
+  ],
+  "readBefore": [
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/demo/realism/README.md",
+    "docs/edgecase/베타_감마_데모_엣지케이스_초안.md",
+    "apps/api/fixtures/docs/dummy-data.md",
+    "docs/harness/AGENT_REVIEW.md"
+  ]
+}
