@@ -1,0 +1,52 @@
+{
+  "id": "PAYSE-GAMMA-LOCAL-LLM-20261103",
+  "role": "data",
+  "baseCommit": "f72b40f1fa6a76d4c37831dba018b94f6575238b",
+  "branch": "fix/api/data-refresh-consistency",
+  "allowedPaths": [
+    "apps/ai/src/main/java/com/payse/ai/analysis/validation/AnalysisContract.java",
+    "apps/ai/src/main/java/com/payse/ai/analysis/validation/StorageContract.java",
+    "apps/ai/src/main/java/com/payse/ai/constants/AiFieldConstants.java",
+    "apps/ai/src/test/java/com/payse/ai/analysis/AnalysisServiceTest.java",
+    "apps/ai/src/test/java/com/payse/ai/AiTestConstants.java",
+    "apps/api/build.gradle",
+    "apps/api/src/main/java/com/payse/api/analysis/service/AnalysisPricing.java",
+    "apps/api/src/main/java/com/payse/api/analysis/service/AnalysisConfiguration.java",
+    "apps/api/src/test/java/com/payse/api/ApiTestConstants.java",
+    "apps/api/src/test/java/com/payse/api/analysis/service/AnalysisPricingTest.java",
+    "apps/api/src/test/java/com/payse/api/analysis/service/GammaLocalKeys.java",
+    "apps/api/src/test/java/com/payse/api/analysis/service/GammaLocalConfig.java",
+    "apps/api/src/test/java/com/payse/api/analysis/service/GammaLocalServer.java",
+    "apps/api/src/test/java/com/payse/api/analysis/service/GammaLocalTest.java",
+    "apps/api/src/test/java/com/payse/api/analysis/service/GammaLiveTest.java",
+    "apps/api/testing/analysis/gamma_local.py",
+    "apps/api/testing/analysis/test_gamma_local.py",
+    "apps/api/docs/gamma-local.md",
+    "apps/api/docs/analysis-runtime.md"
+  ],
+  "acceptance": [
+    "실제 계수에서 확인한 공통 지침의 문자 이스케이프·반복 필드명 팽창을 모든 공개 분류 기준을 복원할 수 있는 표로 줄인다. 6000토큰 한도·정답 제외를 유지하고 원문과 복원 결과를 대조한다. 활성과 사용자 승인·장기 참조를 혼동하지 않도록 지침을 명확히 하되 AI 플래그를 서버가 덮어쓰지 않는다.",
+    "사용자가 승인한 Google 결제 없는 감마 합성자료 테스트를 기존 브랜치에서 구현한다. 운영용 외부 KMS 계약은 유지하고 테스트 구성·로컬 상위 키 보호기는 src/test와 명시적 실행 도구에만 둔다.",
+    "감마의 검증된 계정·원천 버전만 인증 후 허용한다. 타 계정·미인증·다른 원천은 외부 호출과 분석 저장 전에 차단하며 원천과 다른 계정은 보존한다.",
+    "표준 AES-GCM과 기존 기억별 봉투 암호화를 유지하고 키를 DB·Git·로그·명령 인자에 저장하지 않는다. 잘못된 키·변조·소유자 불일치와 재시작 후 복호화를 검사한다.",
+    "기존 비용 예약·전송권·정산·자동 재시도 금지와 6000/1200 토큰 한도를 유지한다. 로컬 키 작업의 외부 비용 0과 Google KMS의 양수 단가 요구를 구분한다. 미확인 비용은 실제 0원으로 보고하지 않는다.",
+    "기존 승인된 OpenAI 키로 감마 연간 자료의 월급·이체·반복 후보를 소량 실제 분석하고 HTTP·DB 검증·암호화 저장·재조회를 확인한다. 모의 검사를 실제 품질과 혼동하지 않고 입력에 평가 정답을 넣지 않는다.",
+    "새 폐기용 PostgreSQL만 사용하고 제한된 Java 메모리로 순차 검증한다. 운영 서버·원격 연결·모바일을 변경하지 않는다. CI와 기본 검사에서 유료 호출은 실행되지 않는다.",
+    "설정 예시는 빈 값으로 공유하며 제거 방법과 남은 프론트 연동·운영 배포를 문서화한다. 기존 commit·push 승인을 적용하되 검증 결과와 민감자료 제외를 먼저 확인한다."
+  ],
+  "readBefore": [
+    "apps/api/AGENTS.md",
+    "apps/ai/AGENTS.md",
+    "apps/api/docs/analysis-meaning.md",
+    "docs/payse-execution-contract.md",
+    "apps/api/docs/llm-execution.md",
+    "apps/api/docs/analysis-runtime.md",
+    "apps/api/docs/database-tests.md",
+    "apps/api/docs/spring-bootstrap.md",
+    "docs/data-contracts.md",
+    "docs/database-schema.md",
+    "docs/development-workflow.md",
+    "docs/toolchain.md",
+    "docs/harness/AGENT_REVIEW.md"
+  ]
+}

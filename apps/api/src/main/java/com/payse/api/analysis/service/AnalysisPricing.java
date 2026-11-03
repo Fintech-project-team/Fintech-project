@@ -26,6 +26,7 @@ public final class AnalysisPricing {
      * 모든 단가·한도가 명시되고 선택 모델과 일치할 때만 사용한다. 1원은 100만 micros다.
      * @created 2026-11-03
      * @usedBy AnalysisConfiguration, AnalysisPricingTest
+     * @modified 2026-11-03 - 외부 키 호출이 없는 구성의 명시적 0원 단가 허용
      */
     public AnalysisPricing(ObjectNode policy, String model) {
         Set<String> expected = Set.of(
@@ -51,7 +52,7 @@ public final class AnalysisPricing {
         long inputs = number(policy, Execution.INPUT_LIMIT);
         long outputs = number(policy, Execution.OUTPUT_LIMIT);
         if (inputRate == 0 || outputRate == 0 || cachedRate > inputRate
-            || kmsMicros == 0 || inputs < 1 || inputs > 200000 || outputs < 1 || outputs > 32000) {
+            || inputs < 1 || inputs > 200000 || outputs < 1 || outputs > 32000) {
             throw invalid();
         }
         inputLimit = Math.toIntExact(inputs);

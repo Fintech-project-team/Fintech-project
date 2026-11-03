@@ -21,6 +21,9 @@ public final class AiFieldConstants {
      * @usedBy AnalysisContract, InputMapper, StorageContract
      */
     public static final class Analysis {
+        public static final String MEANINGS = "meanings";
+        public static final String COLUMNS = "columns";
+        public static final String ROWS = "rows";
         public static final String ACCOUNT_ID = "accountId";
         public static final String CARD_ID = "cardId";
         public static final String AMOUNT_KRW = "amountKRW";

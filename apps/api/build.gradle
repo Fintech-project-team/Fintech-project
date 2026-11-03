@@ -40,10 +40,36 @@ tasks.register('compileDocTools', JavaCompile) {
     }
 }
 tasks.named('test') {
+    exclude '**/GammaLiveTest*'
     dependsOn 'compileDocTools'
     systemProperty 'payse.docToolClasspath', docToolOutput.get().asFile.absolutePath
     useJUnitPlatform()
     testLogging { events 'failed', 'skipped' }
+}
+
+// Explicit, removable synthetic-gamma runner. Normal tests and CI never make paid calls.
+tasks.register('gammaLiveTest', Test) {
+    dependsOn 'testClasses'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    include '**/GammaLiveTest.class'
+    useJUnitPlatform()
+    maxHeapSize = '512m'
+    maxParallelForks = 1
+    outputs.upToDateWhen { false }
+    doFirst {
+        if (System.getenv('PAYSE_GAMMA_LIVE') != 'approved') {
+            throw new GradleException('Use the explicit gamma_local.py live runner')
+        }
+    }
+    testLogging { events 'failed'; showStandardStreams = false }
+}
+
+tasks.register('gammaLocalServer', JavaExec) {
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.payse.api.analysis.service.GammaLocalServer'
+    maxHeapSize = '512m'
 }
 tasks.register('apiDocsCheck', Exec) {
     dependsOn 'compileDocTools'
@@ -70,6 +96,9 @@ tasks.register('aiArchiveCheck') {
     doLast {
         def archive = tasks.named('bootJar').get().archiveFile.get().asFile
         new java.util.zip.ZipFile(archive).withCloseable { boot ->
+            if (boot.entries().toList().any { it.name.contains('/GammaLocal') || it.name.contains('/GammaLive') }) {
+                throw new GradleException('Gamma-only test code entered the deployment JAR')
+            }
             def aiEntries = boot.entries().toList().findAll { it.name.startsWith('BOOT-INF/lib/ai-') && it.name.endsWith('.jar') }
             if (aiEntries.size() != 1) throw new GradleException('Expected one shared AI module in Boot JAR')
             def names = []

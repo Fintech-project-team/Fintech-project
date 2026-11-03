@@ -22,6 +22,9 @@ public final class AiTestConstants {
      * OpenAiGatewayTest
      */
     public static final class AnalysisFields {
+        public static final String MEANINGS = "meanings";
+        public static final String COLUMNS = "columns";
+        public static final String ROWS = "rows";
         public static final String EXPECTED_BASIC_TYPE = "expectedBasicType";
         public static final String EXPECTED_MEANING = "expectedMeaning";
         public static final String COUNTEREXAMPLE = "counterexample";
@@ -90,6 +93,7 @@ public final class AiTestConstants {
      * @usedBy AnalysisServiceTest, AnalysisStorageTest, AnalysisSubsetTest
      */
     public static final class AnalysisValues {
+        public static final String CRITERIA_RESOURCE = "/com/payse/ai/rules/criteria.json";
         public static final String MEANING_VERSION = "PAYSE-MEANING-1";
         public static final String CANDIDATE = "candidate";
         public static final String CARD_PAYMENT = "card_payment";

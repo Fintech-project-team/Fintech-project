@@ -8,6 +8,7 @@ import com.payse.ai.AiTestConstants.ProviderCodes;
 import com.payse.ai.AiTestConstants.ProviderValues;
 import com.payse.ai.AiTestConstants;
 import com.payse.ai.analysis.service.AnalysisService;
+import com.payse.ai.analysis.validation.AnalysisContract;
 import com.payse.ai.analysis.validation.ContractFailure;
 import com.payse.ai.provider.ModelFailure.Stage;
 import com.payse.ai.provider.ModelFailure;
@@ -15,6 +16,7 @@ import com.payse.ai.provider.ModelGateway;
 import com.payse.ai.provider.dto.ModelReply;
 import com.payse.ai.provider.dto.TokenUsage;
 import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +35,35 @@ import tools.jackson.databind.node.ObjectNode;
  * @usedBy JUnit
  */
 class AnalysisServiceTest {
+    /**
+     * 한글·표 형태로 줄인 기준을 복원하면 공개 원문의 값·구조가 모두 일치한다.
+     * @created 2026-11-03
+     * @usedBy JUnit
+     */
+    @Test
+    void preservesCriteriaWithoutEscapedUnicode() throws Exception {
+        try (var stream = getClass().getResourceAsStream(AnalysisValues.CRITERIA_RESOURCE)) {
+            assertNotNull(stream);
+            String raw = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            String instructions = new AnalysisContract().instructions();
+            String criteria = instructions.substring(instructions.indexOf('{'));
+            ObjectNode restored = (ObjectNode) JSON.readTree(criteria);
+            JsonNode table = restored.get(AnalysisFields.MEANINGS);
+            JsonNode columns = table.get(AnalysisFields.COLUMNS);
+            var meanings = restored.putArray(AnalysisFields.MEANINGS);
+            for (JsonNode row : table.get(AnalysisFields.ROWS)) {
+                assertEquals(columns.size(), row.size());
+                ObjectNode meaning = meanings.addObject();
+                for (int index = 0; index < columns.size(); index++) {
+                    meaning.set(columns.get(index).asString(), row.get(index));
+                }
+            }
+            assertEquals(JSON.readTree(raw), restored);
+            assertFalse(criteria.contains("\\u"));
+            assertTrue(criteria.length() < raw.length() / 2);
+        }
+    }
+
     /**
      * 서버의 금액·날짜만 결합하고 원래 ID·원천 객체·민감 추가 필드는 외부로 내보내지 않는다.
      * @created 2026-11-03

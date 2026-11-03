@@ -33,7 +33,7 @@ public class AnalysisConfiguration {
      * 운영비·공급자·KMS 준비가 승인되기 전에는 전송 차단 경계를 사용한다.
      * @created 2026-11-01
      * @usedBy Spring 생성자 주입
-     * @modified 2026-11-03 - 명시 설정·승인 비용 장부·공급자·KMS를 운영 실행에 연결
+     * @modified 2026-11-03 - 명시 설정·비용 장부 연결 및 Google KMS 양수 단가 확인
      */
     @Bean
     @ConditionalOnMissingBean(AnalysisRuntime.class)
@@ -57,6 +57,9 @@ public class AnalysisConfiguration {
             costs.policy(settings.project(), settings.pricingVersion()),
             llm.model()
         );
+        if (pricing.kmsMicros() <= 0) {
+            throw new IllegalArgumentException(ApiMessageConstants.Execution.INVALID_PRICING);
+        }
         HttpClient client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .followRedirects(HttpClient.Redirect.NEVER)
