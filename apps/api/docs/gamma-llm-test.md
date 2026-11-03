@@ -28,13 +28,21 @@ python -B apps/api/testing/scenarios/gamma_year.py --out <새_비공개_폴더> 
 
 출력은 `source.json`, `evaluation-gold.json`, `manifest.json`이다. 정답에는 실제 생성한 이체 쌍·후보 종류와 판단 유보가 허용되는 근거 제한을 보관한다. 원천의 `payseTransactionType`은 모두 null이며 정답 관계를 `transactionRelations`에 넣지 않는다. 정답을 모델에 보내거나 기존 분류를 사용자 확인으로 가장하지 않는다. 기존 사례의 정답은 기존 파일에 그대로 보존한다.
 
-## 첫 로그인 연결
+## 감마만 수집을 대체하고 기존 계좌 가져오기 사용
 
-원천은 감마 소유로 사전 적재하고 `institution_links`는 비워 둔다. 금융 API는 기존 미연결 응답을 반환한다. `testing/scenarios/first_login_links.py`의 `install(source, database)`가 생성하는 SQL은 **선택한 테스트 DB에만 수동 설치**한다. 일반 마이그레이션·서버 시작·운영 JAR에 포함하지 않는다.
+감마의 외부 마이데이터 수집 단계만 사전 적재한 합성 원천으로 대체한다. 원천은 감마 소유로 일반 금융 테이블에 저장하고 `institution_links`는 비워 둔다. 알파·베타의 기존 자료·설정·기관 연결에는 이 테스트 대체를 적용하지 않는다. 현재 다른 계정의 원천도 합성 자료이며 실제 마이데이터 수집이 구현되었다는 뜻은 아니다.
 
-성공한 새 인증 세션 삽입 때 준비한 사용자와 원천 버전을 대조하여 기관을 한 번 연결하고 현재 `dataVersion`을 한 번 올린다. 연결 완료 시 대기 행을 제거한다. 다른 사용자·실패 로그인·기존 활성 세션 중복 로그인에는 연결하지 않는다. 재로그인 때 사용자 설정이나 원천을 다시 초기화하지 않는다. 로그인 트랜잭션이 롤백되면 연결도 롤백된다.
+```text
+테스트 준비: 감마 연간 합성 원천 → 기존 DB 테이블에 사전 적재
+앱: 감마 로그인 → 미연결 Snapshot → 기관 선택·동의
+    → POST /institution-links → DB 원천을 기존 조회 권한으로 공개
+    → 모든 거래 페이지 수신 → 계산 계좌 선택·저장
+    → 분석 요청·후보 확인 (서버 활성화와 앱 분석 연동 필요)
+```
 
-기존 감마 세션을 강제로 끊지 않는다. 이미 로그인한 기기는 로그아웃 후 다시 로그인해야 첫 연결이 실행된다. 준비 자료가 바뀌면 연결을 실패시키므로 원천을 바꿀 때 대기 설정도 다시 검토한다. 테스트 종료 후 `uninstall()` SQL로 테스트 트리거·함수·대기 테이블만 제거한다. 이미 연결한 금융 자료와 세션은 보존한다. 애플리케이션 역할에 새 쓰기 권한을 주지 않는다.
+로그인은 연결·계좌 선택·원천 교체를 실행하지 않는다. 기존 기관 연결 쓰기가 동의 상태와 `dataVersion`을 저장하며 원천 금액·날짜·분류는 변경하지 않는다. 재로그인에는 이미 저장한 상태를 복원한다. 첫 로그인 자동 연결 도구와 검사는 제거했다. 이를 설치했던 개발 DB에서는 `payse_test_first_login` 트리거와 `payse_test_login` 스키마의 `connect_once()`·`pending`을 제거한다. 금융 데이터나 현재 세션을 삭제할 필요는 없다.
+
+향후 실제 수집기는 금융기관에서 받은 자료를 기존 DB 원천 계약에 맞춰 저장한다. 현재 앱 조회는 이미 DB를 사용하며 파일을 매 로그인마다 읽거나 감마 이름을 검사해 응답을 바꾸지 않는다. 외부 수집기의 구현과 동의·수집 실패 처리는 후속 범위다.
 
 기존 DB에 초기 적재용 `export_sql.py` 결과를 그대로 재실행하지 않는다. 기존 사용자 초기화는 대상 합성 상태 대조·저장소 밖 백업·사용자 잠금·다른 사용자/인증 보존·전체 롤백 검증을 거치는 별도 운영 작업이다. 인증 키·토큰·접속 properties·실제 DB 덤프를 Git에 넣지 않는다.
 
@@ -79,4 +87,15 @@ python -B apps/api/testing/scenarios/gamma_year.py --out <새_비공개_폴더> 
 
 Java `AnalysisServiceTest`는 97묶음을 **실제 의미 실행 서비스 + 모의 공급자**로 검사한다. 원천 1,825건의 포함, 분류 정답 누출 없음, ID 복원, 정상 unknown과 응답 구조를 확인한다. 이 검사에서 외부 모델 호출은 0회다. 실제 후보 탐지 정확도·실제 토큰·외부 KMS/공급자 연결·앱 확인 UI 완료를 뜻하지 않는다. 현재 반복 features 생성·후보 화면의 프론트 연동은 별도 확인 대상이다.
 
-`database/test_gamma_login.py`는 새 폐기 PostgreSQL에서 첫 연결·중복 로그인·재로그인 설정 보존·다른 사용자·실패 원자성·테스트 기능 제거를 검사한다. `database/test_analysis_service.py`의 기존 격리 CI에 포함한다.
+`database/test_financial_service.py`와 `FinancialHttpTest.gammaImport`는 새 폐기 PostgreSQL의 실제 HTTP로 감마 로그인 후 미연결, 명시적 기관 연결, 9계좌·4카드·1,825거래 전체 페이지, 같은 데이터 버전, 재로그인 상태 복원, 다른 사용자 상태·원천 불변을 검사한다. `database/test_analysis_service.py`의 기존 격리 CI에도 같은 준비·Java 검사가 포함된다.
+
+## 테스트 종료 후 제거
+
+이 연간 대체는 영구 서비스 기능이 아니다. 테스트 종료 시 다음 테스트 파일·참조를 함께 제거한다. 날짜나 로그인 횟수로 자동 삭제하지 않으며 실제 데이터 정리는 대상 감마 자료를 확인하는 별도 작업으로 처리한다.
+
+- `testing/scenarios/gamma_year.py`, `testing/analysis/gamma_year_cases.py`와 `tests/test_fixtures.py`의 연간 사례 검사.
+- `database/test_financial_service.py`의 연간 준비·환경값과 `FinancialHttpTest`의 `gammaImport`·`otherState`. 기존 금융 회귀 검사는 보존한다.
+- `apps/ai/testing/export_contracts.py`의 감마 입력·예시 내보내기, `AnalysisServiceTest`의 감마 사례와 `AiTestConstants`의 파일 참조, `build.gradle`의 감마 생성 입력 경로.
+- 저장소 밖 생성 자료·평가 정답·DB 백업의 보관 또는 폐기 여부를 확인한다. 실행 중 DB의 감마 합성 원천은 백업·소유권 대조 후 승인한 다음 원천으로 교체하고 연결·설정의 정리 범위를 명시한다. 다른 계정은 건드리지 않는다.
+
+일반 로그인·금융 API·영구 마이그레이션·런타임 JAR에는 감마 테스트 분기를 남기지 않는다. 새 PC 설치나 일반 서버 시작에서 연간 자료를 자동 생성·적재하지 않는다.
