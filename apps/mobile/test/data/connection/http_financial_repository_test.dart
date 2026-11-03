@@ -132,6 +132,79 @@ void main() {
     }
   });
 
+  test(
+    'obligation writes: paths, body W, cancel body with exact detach list',
+    () async {
+      transport.handler = (_) => jsonResponse(200, _saved('8'));
+      await repo.createObligation(
+        const ObligationInput(
+          label: '통신비',
+          withdrawalAccountId: 'a1',
+          amountKrw: 55000,
+          dueDate: '2026-10-22',
+        ),
+        _w,
+      );
+      await repo.updateObligation(
+        'o 1',
+        const ObligationPatch(amountKrw: 62000),
+        _w,
+      );
+      await repo.cancelObligation('o1', const [
+        DetachAllocation(allocationId: 'al1', unreleasedKrw: 30000),
+      ], _w);
+      final [create, update, cancel] = transport.requests;
+      const w = {
+        'expectedDataVersion': '7',
+        'ruleVersion': 'PAYSE-CALC-1',
+        'idempotencyKey': 'key-1',
+      };
+      expect((create.method, create.uri.path), ('POST', '/api/obligations'));
+      expect(create.body, {
+        'amountKRW': 55000,
+        'dueDate': '2026-10-22',
+        'label': '통신비',
+        'withdrawalAccountId': 'a1',
+        ...w,
+      });
+      expect(
+        (update.method, update.uri.path),
+        ('PATCH', '/api/obligations/o%201'),
+      );
+      expect(update.body, {'amountKRW': 62000, ...w}, reason: '바꾼 필드만');
+      expect(
+        (cancel.method, cancel.uri.path),
+        ('POST', '/api/obligations/o1/cancel'),
+        reason: 'DELETE 대신 cancel 경로 하나',
+      );
+      expect(cancel.body, {
+        'detachAllocations': [
+          {'allocationId': 'al1', 'unreleasedKRW': 30000},
+        ],
+        ...w,
+      });
+    },
+  );
+
+  test('409·422 business codes keep their status and code', () async {
+    for (final (status, code) in const [
+      (409, 'HISTORY_LOCKED'),
+      (409, 'RELATION_CONFLICT'),
+      (422, 'LIMIT_EXCEEDED'),
+      (422, 'VALIDATION_FAILED'),
+    ]) {
+      transport.handler = (_) => errorResponse(status, code);
+      final result = await repo.updateObligation(
+        'o1',
+        const ObligationPatch(amountKrw: 1),
+        _w,
+      );
+      expect(result, isA<FinancialInvalid<WriteSuccess>>());
+      final invalid = result as FinancialInvalid<WriteSuccess>;
+      expect((invalid.status, invalid.code), (status, code));
+    }
+  });
+
   test('a TLS failure is a connection failure, not a business error', () async {
     transport.handler = (_) =>
         throw const ApiTransportException(ApiFailureKind.tls, 'handshake');

@@ -295,13 +295,15 @@ calc.BusinessDate? labelEnd(SalaryPeriods? periods) {
 }
 
 /// 2026-11-03: 일부 출금 줄의 출금 문구. [dates]는 유효 정산마다 연결 출금 거래의 출금일(거래를 못 찾았거나 날짜가 없으면 null),
-/// [settledKrw]는 홈 계산의 정산 합계다. 모든 정산이 같은 확인된 날짜일 때만 'M/D 출금 n원'이고, 정산이 하나인데 날짜를 모르면
-/// '출금 n원', 날짜가 여럿이거나 일부를 모르면 '누적 출금 n원'이다. 한 날짜에 합계 전체를 붙이지 않는다.
-String withdrawalNote(List<String?> dates, int settledKrw) {
-  final amount = formatKrw(settledKrw);
+/// [settledKrw]는 홈 계산의 정산 합계, [amountKrw]는 예정 금액이다. 모든 정산이 같은 확인된 날짜일 때만 'n원 중 M/D에 m원
+/// 출금됐어요'이고, 정산이 하나인데 날짜를 모르면 'n원 중 m원 출금됐어요', 날짜가 여럿이거나 일부를 모르면 끝에 '(누적)'을 붙인다.
+/// 한 날짜에 합계 전체를 붙이지 않는다. 2026-11-03 혜연 결정으로 '예정 n원 · M/D 출금 m원'에서 한 문장으로 바꿨고 '만'은 쓰지 않는다.
+String withdrawalNote(List<String?> dates, int settledKrw, int amountKrw) {
+  final head = '${formatKrw(amountKrw)} 중';
+  final paid = formatKrw(settledKrw);
   final known = {for (final d in dates) ?d};
   if (dates.isNotEmpty && !dates.contains(null) && known.length == 1) {
-    return '${mdText(known.single)} 출금 $amount';
+    return '$head ${mdText(known.single)}에 $paid 출금됐어요';
   }
-  return dates.length <= 1 ? '출금 $amount' : '누적 출금 $amount';
+  return dates.length <= 1 ? '$head $paid 출금됐어요' : '$head $paid 출금됐어요 (누적)';
 }

@@ -81,6 +81,41 @@ class HttpUserFinancialRepository implements UserFinancialRepository {
     'nickname': nickname,
   }, write);
 
+  /// 2026-11-03: POST /obligations.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> createObligation(
+    ObligationInput obligation,
+    WriteContext write,
+  ) => _write('POST', '/obligations', obligation.toJson(), write);
+
+  /// 2026-11-03: PATCH /obligations/{id}.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> updateObligation(
+    String obligationId,
+    ObligationPatch patch,
+    WriteContext write,
+  ) => _write(
+    'PATCH',
+    '/obligations/${Uri.encodeComponent(obligationId)}',
+    patch.toJson(),
+    write,
+  );
+
+  /// 2026-11-03: POST /obligations/{id}/cancel. 취소는 DELETE 대신 이 경로 하나로 보낸다(W는 본문).
+  @override
+  Future<FinancialOutcome<WriteSuccess>> cancelObligation(
+    String obligationId,
+    List<DetachAllocation> detach,
+    WriteContext write,
+  ) => _write(
+    'POST',
+    '/obligations/${Uri.encodeComponent(obligationId)}/cancel',
+    {
+      'detachAllocations': [for (final d in detach) d.toJson()],
+    },
+    write,
+  );
+
   /// 2026-11-01: 금융 쓰기. W는 본문 최상위에 둔다(§1). 재시도는 호출부가 같은 [write]로 다시 부른다(자동 재시도 없음).
   Future<FinancialOutcome<WriteSuccess>> _write(
     String method,
@@ -156,7 +191,10 @@ class HttpUserFinancialRepository implements UserFinancialRepository {
       (409, 'STALE_DATA') => FinancialStaleData<T>(),
       (409, 'RULE_VERSION_MISMATCH') => FinancialRuleVersionMismatch<T>(),
       (409, 'IDEMPOTENCY_CONFLICT') => FinancialIdempotencyConflict<T>(),
-      (400 || 409 || 413 || 422, _) => FinancialInvalid<T>(),
+      (400 || 409 || 413 || 422, _) => FinancialInvalid<T>(
+        status: response.status,
+        code: code,
+      ),
       _ => FinancialUnavailable<T>(),
     };
   }

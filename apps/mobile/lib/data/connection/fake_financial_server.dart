@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/widgets.dart' show StringCharacters;
+
 import '../auth/auth_repository.dart';
 import '../auth/random_id.dart';
 import '../financial_snapshot.dart' show maxAbsKrw;
@@ -11,7 +13,7 @@ import 'snapshot_projector.dart';
 typedef UserSourceLoader = Future<Map<String, Object?>> Function(String userId);
 
 /// 2026-10-22: 금융 조회·연결 쓰기를 흉내 내는 앱 수명 가짜 서버(서버 장부 역할). 사용자별 불변 원본과 가변 상태
-/// (연결 기록·계좌 선택·월급 설정·계좌 이름·자료 버전·작업 영수증)를 분리해 재로그인까지 상태를 유지한다. 메모리 구현이며 실제 서버 영속화가 아니다.
+/// (연결 기록·계좌 선택·월급 설정·계좌 이름·예정 지출·배정·자료 버전·작업 영수증)를 분리해 재로그인까지 상태를 유지한다. 메모리 구현이며 실제 서버 영속화가 아니다.
 class FakeFinancialServer {
   /// 2026-10-22: 토큰→사용자 [sessions], 원본 [loadSource], 시각 [now], 난수 [random]으로 만든다.
   FakeFinancialServer({
@@ -221,6 +223,7 @@ class FakeFinancialServer {
         selectedAccountIds: keptSelection,
         salarySettings: state.salarySettings,
         accountNicknames: state.accountNicknames,
+        plan: null,
         changed: [
           for (final l in links)
             ChangedRef(resource: 'institutionLink', id: l['linkId'] as String),
@@ -261,6 +264,7 @@ class FakeFinancialServer {
         selectedAccountIds: next,
         salarySettings: state.salarySettings,
         accountNicknames: state.accountNicknames,
+        plan: null,
         changed: [
           for (final id in {...next, ...before})
             if (next.contains(id) != before.contains(id))
@@ -311,6 +315,7 @@ class FakeFinancialServer {
           selectedAccountIds: state.selectedAccountIds,
           salarySettings: {...state.salarySettings, ...fields},
           accountNicknames: state.accountNicknames,
+          plan: null,
           changed: [
             ChangedRef(resource: 'settings', id: source['userId'] as String),
           ],
@@ -350,10 +355,320 @@ class FakeFinancialServer {
           ...state.accountNicknames,
           accountId: nickname?.trim(),
         },
+        plan: null,
         changed: [ChangedRef(resource: 'account', id: accountId)],
       ));
     },
   );
+
+  /// 2026-11-03: POST /obligations. 이름(앞뒤 공백 제외 1~80자)·금액(0~상한)·날짜 형식이 틀리면 422, 연결 밖·없는 계좌는
+  /// 403이다. 사용자 단건 예정 지출(status=active, 청구·반복 연결 없음)을 만든다.
+  Future<FinancialOutcome<WriteSuccess>> postObligation(
+    String accessToken,
+    ObligationInput obligation,
+    WriteContext write,
+  ) => _write(
+    accessToken: accessToken,
+    method: 'POST',
+    path: '/obligations',
+    body: obligation.toJson(),
+    write: write,
+    apply: (source, state) {
+      if (!_validLabel(obligation.label) ||
+          !_validMoney(obligation.amountKrw) ||
+          !_validDate(obligation.dueDate)) {
+        return const FinancialInvalid(status: 422, code: 'VALIDATION_FAILED');
+      }
+      if (!_reachable(source, state).contains(obligation.withdrawalAccountId)) {
+        return const FinancialForbidden();
+      }
+      final id = randomUuidV4(_random);
+      final obligations = [
+        ..._rows(source, 'obligations'),
+        {
+          'userId': source['userId'],
+          'obligationId': id,
+          'label': obligation.label.trim(),
+          'withdrawalAccountId': obligation.withdrawalAccountId,
+          'amountKRW': obligation.amountKrw,
+          'dueDate': obligation.dueDate,
+          'status': 'active',
+          'statementId': null,
+          'recurringPlanId': null,
+          'recurrenceKey': null,
+          'planRevisionId': null,
+        },
+      ];
+      return _planChange(
+        source,
+        state,
+        obligations,
+        _rows(source, 'allocations'),
+        [ChangedRef(resource: 'obligation', id: id)],
+      );
+    },
+  );
+
+  /// 2026-11-03: PATCH /obligations/{id}. 보이지 않거나 없는 예정 지출·계좌는 403, 빈 patch·형식 오류는 422다. 카드 청구 예정
+  /// 지출의 금액·날짜·계좌, 정산액보다 작은 금액, 정산이 있는데 계좌 변경은 409 HISTORY_LOCKED, 취소된 예정 지출은 409
+  /// RELATION_CONFLICT, 바꾼 뒤 미해제 배정이 한도를 넘으면 422 LIMIT_EXCEEDED다(apps/api PlanWrites.obligation과 같은 순서).
+  Future<FinancialOutcome<WriteSuccess>> patchObligation(
+    String accessToken,
+    String obligationId,
+    ObligationPatch patch,
+    WriteContext write,
+  ) => _write(
+    accessToken: accessToken,
+    method: 'PATCH',
+    path: '/obligations/$obligationId',
+    body: patch.toJson(),
+    write: write,
+    apply: (source, state) {
+      if (patch.isEmpty ||
+          (patch.label != null && !_validLabel(patch.label!)) ||
+          (patch.amountKrw != null && !_validMoney(patch.amountKrw!)) ||
+          (patch.dueDate != null && !_validDate(patch.dueDate!))) {
+        return const FinancialInvalid(status: 422, code: 'VALIDATION_FAILED');
+      }
+      final reachable = _reachable(source, state);
+      final obligations = _rows(source, 'obligations');
+      final index = obligations.indexWhere(
+        (o) =>
+            o['obligationId'] == obligationId &&
+            reachable.contains(o['withdrawalAccountId']),
+      );
+      if (index < 0) return const FinancialForbidden();
+      final before = obligations[index];
+      if (before['statementId'] != null &&
+          (patch.amountKrw != null ||
+              patch.dueDate != null ||
+              patch.withdrawalAccountId != null)) {
+        return _historyLocked;
+      }
+      if (before['status'] != 'active') return _relationConflict;
+      final account =
+          patch.withdrawalAccountId ?? before['withdrawalAccountId']! as String;
+      if (!reachable.contains(account)) return const FinancialForbidden();
+      final amount = patch.amountKrw ?? before['amountKRW']! as int;
+      final paid = _paid(source, obligationId);
+      if (amount < paid ||
+          (paid > 0 && account != before['withdrawalAccountId'])) {
+        return _historyLocked;
+      }
+      final next = [...obligations];
+      next[index] = {
+        ...before,
+        if (patch.label != null) 'label': patch.label!.trim(),
+        if (before['statementId'] == null) ...{
+          'withdrawalAccountId': account,
+          'amountKRW': amount,
+          'dueDate': patch.dueDate ?? before['dueDate'],
+        },
+      };
+      return _planChange(source, state, next, _rows(source, 'allocations'), [
+        ChangedRef(resource: 'obligation', id: obligationId),
+      ]);
+    },
+  );
+
+  /// 2026-11-03: POST /obligations/{id}/cancel. 지금 미해제 배정을 [detach]에 정확한 ID·금액으로 모두 담아야 한다. 중복 ID는 422,
+  /// 없거나 보이지 않는 배정·예정 지출은 403, 카드 청구 또는 정산이 있는 예정 지출은 409 HISTORY_LOCKED, 다른 대상의 배정·누락·
+  /// 금액 불일치는 409 RELATION_CONFLICT다. 해제 이력 없는 배정은 지우고, 있으면 금액을 해제 누계까지 줄인다(보호 설정액은 그대로).
+  Future<FinancialOutcome<WriteSuccess>> postObligationCancel(
+    String accessToken,
+    String obligationId,
+    List<DetachAllocation> detach,
+    WriteContext write,
+  ) => _write(
+    accessToken: accessToken,
+    method: 'POST',
+    path: '/obligations/$obligationId/cancel',
+    body: {
+      'detachAllocations': [for (final d in detach) d.toJson()],
+    },
+    write: write,
+    apply: (source, state) {
+      final ids = [for (final d in detach) d.allocationId];
+      if (ids.toSet().length != ids.length ||
+          detach.any(
+            (d) => !_validMoney(d.unreleasedKrw) || d.unreleasedKrw < 1,
+          )) {
+        return const FinancialInvalid(status: 422, code: 'VALIDATION_FAILED');
+      }
+      final reachable = _reachable(source, state);
+      final obligations = _rows(source, 'obligations');
+      final index = obligations.indexWhere(
+        (o) =>
+            o['obligationId'] == obligationId &&
+            reachable.contains(o['withdrawalAccountId']),
+      );
+      if (index < 0) return const FinancialForbidden();
+      final before = obligations[index];
+      if (before['statementId'] != null || _paid(source, obligationId) > 0) {
+        return _historyLocked;
+      }
+      final allocations = _rows(source, 'allocations');
+      final visible = {
+        for (final a in allocations)
+          if (_allocationVisible(source, reachable, a))
+            a['allocationId']! as String: a,
+      };
+      if (ids.any((id) => !visible.containsKey(id))) {
+        return const FinancialForbidden();
+      }
+      final open = {
+        for (final a in allocations)
+          if (a['obligationId'] == obligationId &&
+              (a['amountKRW']! as int) > (a['releasedKRW']! as int))
+            a['allocationId']! as String:
+                (a['amountKRW']! as int) - (a['releasedKRW']! as int),
+      };
+      final asked = {for (final d in detach) d.allocationId: d.unreleasedKrw};
+      if (asked.length != open.length ||
+          asked.entries.any((e) => open[e.key] != e.value)) {
+        return _relationConflict;
+      }
+      final nextAllocations = [
+        for (final a in allocations)
+          if (!asked.containsKey(a['allocationId']))
+            a
+          else if ((a['releasedKRW']! as int) > 0)
+            {...a, 'amountKRW': a['releasedKRW']},
+      ];
+      final next = [...obligations];
+      next[index] = {...before, 'status': 'cancelled'};
+      return _planChange(source, state, next, nextAllocations, [
+        ChangedRef(resource: 'obligation', id: obligationId),
+        for (final id in asked.keys) ChangedRef(resource: 'allocation', id: id),
+      ]);
+    },
+  );
+
+  static const FinancialOutcome<_Change> _historyLocked = FinancialInvalid(
+    status: 409,
+    code: 'HISTORY_LOCKED',
+  );
+  static const FinancialOutcome<_Change> _relationConflict = FinancialInvalid(
+    status: 409,
+    code: 'RELATION_CONFLICT',
+  );
+
+  /// 2026-11-03: 예정 지출·배정을 [obligations]·[allocations]로 바꾸는 변경을 만든다. 바꾼 뒤 미해제 배정이 예정 지출 잔여(금액 −
+  /// 유효 정산)나 보호 설정액을 넘거나, 활성이 아닌 대상에 남으면 422 LIMIT_EXCEEDED다(apps/api AllocationWrites.limits).
+  FinancialOutcome<_Change> _planChange(
+    Map<String, Object?> source,
+    ProjectionState state,
+    List<Map<String, Object?>> obligations,
+    List<Map<String, Object?>> allocations,
+    List<ChangedRef> changed,
+  ) {
+    final byObligation = <String, int>{};
+    final byReserve = <String, int>{};
+    for (final a in allocations) {
+      final open = (a['amountKRW']! as int) - (a['releasedKRW']! as int);
+      byObligation.update(
+        a['obligationId']! as String,
+        (v) => v + open,
+        ifAbsent: () => open,
+      );
+      byReserve.update(
+        a['reserveId']! as String,
+        (v) => v + open,
+        ifAbsent: () => open,
+      );
+    }
+    for (final o in obligations) {
+      final open = byObligation[o['obligationId']] ?? 0;
+      final room = o['status'] == 'active'
+          ? (o['amountKRW']! as int) -
+                _paid(source, o['obligationId']! as String)
+          : 0;
+      if (open > room) {
+        return const FinancialInvalid(status: 422, code: 'LIMIT_EXCEEDED');
+      }
+    }
+    for (final r in _rows(source, 'reserves')) {
+      final open = byReserve[r['reserveId']] ?? 0;
+      final room = r['cancelledAt'] == null ? r['amountKRW']! as int : 0;
+      if (open > room) {
+        return const FinancialInvalid(status: 422, code: 'LIMIT_EXCEEDED');
+      }
+    }
+    return FinancialOk((
+      institutionLinks: state.institutionLinks,
+      selectedAccountIds: state.selectedAccountIds,
+      salarySettings: state.salarySettings,
+      accountNicknames: state.accountNicknames,
+      plan: (obligations: obligations, allocations: allocations),
+      changed: changed,
+    ));
+  }
+
+  /// 2026-11-03: [source]의 [key] 묶음을 행 목록으로 반환한다. 없으면 빈 목록이다.
+  static List<Map<String, Object?>> _rows(
+    Map<String, Object?> source,
+    String key,
+  ) => [
+    for (final r in (source[key] as List?) ?? const [])
+      (r as Map).cast<String, Object?>(),
+  ];
+
+  /// 2026-11-03: 연결 범위의 계좌 ID 집합을 반환한다.
+  static Set<String> _reachable(
+    Map<String, Object?> source,
+    ProjectionState state,
+  ) => {
+    for (final a in (source['accounts'] as List?) ?? const [])
+      if (state.connectedCodes.contains((a as Map)['institutionCode']))
+        a['accountId'] as String,
+  };
+
+  /// 2026-11-03: 배정 [a]의 예정 지출과 보호 설정이 모두 연결 범위 계좌이면 true다.
+  static bool _allocationVisible(
+    Map<String, Object?> source,
+    Set<String> reachable,
+    Map<String, Object?> a,
+  ) {
+    final obligation = _rows(
+      source,
+      'obligations',
+    ).where((o) => o['obligationId'] == a['obligationId']).firstOrNull;
+    final reserve = _rows(
+      source,
+      'reserves',
+    ).where((r) => r['reserveId'] == a['reserveId']).firstOrNull;
+    return obligation != null &&
+        reserve != null &&
+        reachable.contains(obligation['withdrawalAccountId']) &&
+        reachable.contains(reserve['accountId']);
+  }
+
+  /// 2026-11-03: 예정 지출 [obligationId]의 유효 정산(invalidatedAt 없음) 합계를 반환한다.
+  static int _paid(Map<String, Object?> source, String obligationId) {
+    var sum = 0;
+    for (final s in _rows(source, 'settlements')) {
+      if (s['obligationId'] == obligationId && s['invalidatedAt'] == null) {
+        sum += s['allocatedKRW']! as int;
+      }
+    }
+    return sum;
+  }
+
+  /// 2026-11-03: 계약 Label(앞뒤 공백을 지운 1~80자)이면 true다.
+  static bool _validLabel(String label) {
+    final n = label.trim().characters.length;
+    return n >= 1 && n <= 80;
+  }
+
+  /// 2026-11-03: 계약 Money(0 이상 상한 이하 원)이면 true다.
+  static bool _validMoney(int amount) => amount >= 0 && amount <= maxAbsKrw;
+
+  /// 2026-11-03: 실제 있는 날짜의 YYYY-MM-DD이면 true다.
+  static bool _validDate(String date) {
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(date)) return false;
+    final parsed = DateTime.tryParse(date);
+    return parsed != null && parsed.toIso8601String().substring(0, 10) == date;
+  }
 
   /// 2026-10-22: 금융 쓰기 공통 절차(§5). 형식 → 같은 키 replay/충돌 → 규칙·자료 버전 → 소유권·제약 → 상태·영수증·버전을
   /// 한 번에 확정한다. 중간 실패는 아무것도 바꾸지 않는다.
@@ -423,6 +738,10 @@ class FakeFinancialServer {
     if (change is! FinancialOk<_Change>) {
       return switch (change) {
         FinancialForbidden() => const FinancialForbidden(),
+        FinancialInvalid(:final status, :final code) => FinancialInvalid(
+          status: status,
+          code: code,
+        ),
         _ => const FinancialInvalid(),
       };
     }
@@ -436,7 +755,8 @@ class FakeFinancialServer {
       salarySettings: change.value.salarySettings,
       accountNicknames: change.value.accountNicknames,
     );
-    final projected = _project(source, nextState);
+    final plan = change.value.plan;
+    final projected = _project(_withPlan(source, plan), nextState);
     if (projected is! FinancialOk<Map<String, Object?>>) {
       return const FinancialUnavailable();
     }
@@ -448,6 +768,7 @@ class FakeFinancialServer {
       changedRefs: change.value.changed,
     );
     ledger.state = nextState;
+    if (plan != null) ledger.plan = plan;
     ledger.receipts[write.idempotencyKey] = _StoredReceipt(
       fingerprint,
       receipt,
@@ -484,11 +805,45 @@ class FakeFinancialServer {
         for (final ref in receipt.changedRefs)
           if ((ref.resource == 'institutionLink' && links.contains(ref.id)) ||
               (ref.resource == 'account' && accounts.contains(ref.id)) ||
-              (ref.resource == 'settings' && ref.id == snapshot['userId']))
+              (ref.resource == 'settings' && ref.id == snapshot['userId']) ||
+              (ref.resource == 'obligation' &&
+                  _ids(
+                    snapshot,
+                    'obligations',
+                    'obligationId',
+                  ).contains(ref.id)) ||
+              (ref.resource == 'allocation' &&
+                  _ids(
+                    snapshot,
+                    'allocations',
+                    'allocationId',
+                  ).contains(ref.id)))
             ref,
       ],
     );
   }
+
+  /// 2026-11-03: [snapshot]의 [key] 묶음에 보이는 [idKey] 값 집합.
+  static Set<String> _ids(
+    Map<String, Object?> snapshot,
+    String key,
+    String idKey,
+  ) => {
+    for (final r in (snapshot[key] as List?) ?? const [])
+      (r as Map)[idKey] as String,
+  };
+
+  /// 2026-11-03: 원본 [source]의 예정 지출·배정을 장부의 [plan]으로 바꾼 투영 입력을 반환한다. [plan]이 없으면 원본 그대로다.
+  static Map<String, Object?> _withPlan(
+    Map<String, Object?> source,
+    _Plan? plan,
+  ) => plan == null
+      ? source
+      : {
+          ...source,
+          'obligations': plan.obligations,
+          'allocations': plan.allocations,
+        };
 
   /// 2026-10-22: 영수증 [receipt]와 현재 상태의 최신 Snapshot으로 성공 결과를 만든다(replay도 최신 상태).
   FinancialOutcome<WriteSuccess> _success(
@@ -552,16 +907,24 @@ class FakeFinancialServer {
         ),
       ),
     );
-    return (source, ledger);
+    return (_withPlan(source, ledger.plan), ledger);
   }
 }
 
+/// 2026-11-03: 사용자가 바꾼 예정 지출·배정 전체. 원본은 그대로 두고 투영 때 이 목록으로 덮는다.
+typedef _Plan = ({
+  List<Map<String, Object?>> obligations,
+  List<Map<String, Object?>> allocations,
+});
+
 /// 2026-10-22: 쓰기 한 건이 만들 다음 상태와 바뀐 자원.
+/// 2026-11-03: [plan]은 예정 지출·배정을 바꾸는 쓰기만 담고, 그 밖에는 null이다.
 typedef _Change = ({
   List<Map<String, Object?>> institutionLinks,
   Set<String>? selectedAccountIds,
   Map<String, Object?> salarySettings,
   Map<String, String?> accountNicknames,
+  _Plan? plan,
   List<ChangedRef> changed,
 });
 
@@ -571,6 +934,9 @@ class _UserLedger {
   _UserLedger(this.state);
 
   ProjectionState state;
+
+  /// 2026-11-03: 바꾼 예정 지출·배정. 아직 바꾼 적이 없으면 null이다.
+  _Plan? plan;
   final Map<String, _StoredReceipt> receipts = {};
 }
 
@@ -676,6 +1042,44 @@ class FakeUserFinancialRepository implements UserFinancialRepository {
       ? const FinancialSessionInvalid()
       : _accepted(
           await server.patchAccount(accessToken, accountId, nickname, write),
+        );
+
+  /// 2026-11-03: 예정 지출을 만든다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> createObligation(
+    ObligationInput obligation,
+    WriteContext write,
+  ) async => _closed
+      ? const FinancialSessionInvalid()
+      : _accepted(await server.postObligation(accessToken, obligation, write));
+
+  /// 2026-11-03: 예정 지출을 고친다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> updateObligation(
+    String obligationId,
+    ObligationPatch patch,
+    WriteContext write,
+  ) async => _closed
+      ? const FinancialSessionInvalid()
+      : _accepted(
+          await server.patchObligation(accessToken, obligationId, patch, write),
+        );
+
+  /// 2026-11-03: 예정 지출을 취소한다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> cancelObligation(
+    String obligationId,
+    List<DetachAllocation> detach,
+    WriteContext write,
+  ) async => _closed
+      ? const FinancialSessionInvalid()
+      : _accepted(
+          await server.postObligationCancel(
+            accessToken,
+            obligationId,
+            detach,
+            write,
+          ),
         );
 
   /// 2026-10-22: 쓰기 성공의 Snapshot 버전을 기록한다. 닫힌 세션의 늦은 응답은 세션 무효, 낮은 버전 응답은 서비스 불가로 바꿔 반영하지 않게 한다.
