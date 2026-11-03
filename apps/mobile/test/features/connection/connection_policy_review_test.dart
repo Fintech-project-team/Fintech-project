@@ -82,7 +82,8 @@ void main() {
   });
 
   group('card payment day on 01-2', () {
-    test('a user planned day wins over card schedules', () {
+    test('a user planned day is not shown; card schedules are used', () {
+      final plain = betaSnapshot({...betaBanks, ...betaCards});
       final snapshot = betaSnapshot(
         {...betaBanks, ...betaCards},
         mutate: (source) {
@@ -94,9 +95,12 @@ void main() {
           });
         },
       );
-      final card = snapshot.cards!.first;
-      expect(cardPaymentDay(snapshot, card), isA<PlannedPaymentDay>());
-      expect((cardPaymentDay(snapshot, card) as PlannedPaymentDay).day, 15);
+      final due = cardPaymentDay(snapshot, snapshot.cards!.first);
+      expect(due, isA<NextConfirmedDue>());
+      expect(
+        (due as NextConfirmedDue).date,
+        (cardPaymentDay(plain, plain.cards!.first) as NextConfirmedDue).date,
+      );
     });
 
     test(
