@@ -231,6 +231,7 @@ public final class AiTestConstants {
         public static final String PROVIDER = "provider";
         public static final String MODEL = "model";
         public static final String API_KEY = "apiKey";
+        public static final String API_KEY_ENV_FILE = "apiKeyEnvFile";
         public static final String REASONING_EFFORT = "reasoningEffort";
         public static final String REDACTED_SETTINGS = "LlmSettings[REDACTED]";
         public static final String INVALID_CONFIGURATION =

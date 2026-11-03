@@ -8,11 +8,15 @@
 2. 기존 모든 API 사용액과 미확정 청구를 확인하고 비용 정책을 준비한다. 구독 크레딧은 결제 수단이며 PAYSE 총예산을 초기화하지 않는다.
 3. Google Cloud KMS 키와 해당 키의 암호화·복호화 권한을 준비한다. OpenAI 구독 혜택에 KMS 비용이 포함된 것으로 간주하지 않는다.
 4. 기존 DB에 `003_auth_access.sql`이 적용된 것을 확인하고 `012_analysis_costs.sql`을 psql 파일 실행으로 한 번 적용한다. 이행은 단일 트랜잭션이다. JAR 시작 시 자동 실행하지 않는다.
-5. 저장소 밖에 `analysis.properties`, 기존 형식의 `llm.properties`, KMS 액세스 토큰 파일을 두고 서비스 계정만 읽도록 제한한다. Git에는 빈 예시만 둔다.
+5. 비공개 위치에 `analysis.properties`, `llm.properties`, KMS 액세스 토큰 파일을 두고 서비스 계정만 읽도록 제한한다. Git에는 빈 예시만 둔다. LLM 키는 `llm.properties`의 `apiKey` 또는 `apiKeyEnvFile`로 명시한 Git 제외 env 파일 중 하나에서만 읽는다.
 6. `database,auth,finance,analysis` 프로필과 `payse.analysis.settings-file`의 절대 경로를 명시한다. 환경 변수 `PAYSE_ANALYSIS_SETTINGS_FILE`로 경로를 전달할 수도 있다.
 7. CI 검증 후 수동 배포한다. 기존 설정·인증서·DB를 JAR로 덮어쓰지 않는다.
 
 `deploy/analysis.properties.example`의 값을 실제 비공개 파일에서 채운다. Windows 경로도 `C:/.../analysis.properties`처럼 슬래시를 쓰면 properties 이스케이프 혼동을 피할 수 있다. 새 PC에서는 그 PC의 비공개 경로·DB·KMS·프로젝트 자격을 지정한다. 컴퓨터 IP를 API 키나 조직 식별자로 사용하지 않는다.
+
+OpenAI Developers에서 이미 승인한 `.env.local`에 키를 저장했다면 `llm.properties`의 `apiKey`는 비우고 `apiKeyEnvFile`에 그 파일의 절대 경로를 지정할 수 있다. 키를 복사하거나 프로세스 환경에 등록하지 않는다. 참조 파일의 `OPENAI_API_KEY`만 읽고 중복·누락·빈 값·잘못된 형식은 원문 없는 시작 오류로 처리한다. 비활성 구성에서는 키 파일을 읽지 않는다. 서비스 실행 계정의 파일 읽기 권한과 키 유효기간은 별도로 관리한다. PC 이동·파일 교체 후에는 경로를 확인하고 새 구성을 로드한다.
+
+SDK 설치, KMS 어댑터 검사 통과, OpenAI 연결 검증은 각각 별도 준비 상태다. KMS 활성화 완료는 실제 클라우드 프로젝트·키·권한, 토큰 갱신, 서버 설정과 암호화/복호화 검증을 확인한 뒤에만 보고한다. SDK가 기본 명령 경로에 없으면 기존 설치 경로도 확인하되 로그인 자격을 임의로 다른 계정에서 가져오지 않는다.
 
 `enabled=false`는 명시 비활성이다. 빈 예시는 복사만으로 활성화되지 않으며, 활성 설정의 누락·중복 키·미등록 키·모델/단가 불일치는 시작 오류로 처리한다. 별도 모의 응답으로 바꾸지 않는다.
 

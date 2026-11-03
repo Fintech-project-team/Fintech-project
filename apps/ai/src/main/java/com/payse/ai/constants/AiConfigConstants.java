@@ -86,6 +86,8 @@ public final class AiConfigConstants {
         public static final String PROVIDER = "provider";
         public static final String MODEL = "model";
         public static final String API_KEY = "apiKey";
+        public static final String API_KEY_ENV_FILE = "apiKeyEnvFile";
+        public static final String API_KEY_ENV_NAME = "OPENAI_API_KEY";
         public static final String REASONING_EFFORT = "reasoningEffort";
         public static final String EFFORT_NONE = "none";
         public static final String EFFORT_LOW = "low";

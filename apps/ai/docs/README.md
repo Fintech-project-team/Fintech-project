@@ -32,15 +32,17 @@ API의 `GoogleKms`, `EnvelopeCipher`, `MemoryPolicy`, 인증·DB·예산 책임�
 
 Git에 공유하는 [llm.properties.example](../config/llm.properties.example)은 `enabled=false`이며 `provider`·`model`·`apiKey`·`reasoningEffort` 값은 비어 있다. 이 예시를 `apps/ai/config/llm.properties` 또는 서버의 비공개 설정 폴더에 복사한 뒤 사용한다. 저장소의 실제 파일은 Git·포맷 검사에서 제외하며 JAR 리소스로 포함하지 않는다. 서버 파일은 실행 계정만 읽도록 권한을 제한하고 Git에 강제로 추가하지 않는다. 키를 Git에 올렸다가 지우는 방식으로 관리하지 않는다.
 
-`LlmSettings.read(Path)`에 해당 파일 경로를 명시한다. `settings.factory(http, inputLimit, outputLimit)`는 기존 `ModelFactory`를 생성하며 입력/출력 상한은 기존 API 정책에서 받는다. OpenAI 사용 시 공급자 값은 `openai`이고 모델·추론 설정·키는 운영자가 직접 지정한다. 파일이 없거나 활성 구성의 필수 값이 비어 있으면 실패하며 `OPENAI_API_KEY`·Codex 로그인·다른 계정으로 자동 대체하지 않는다. 미구현 로컬 공급자나 임의 전송 주소도 허용하지 않는다.
+`LlmSettings.read(Path)`에 해당 파일 경로를 명시한다. `settings.factory(http, inputLimit, outputLimit)`는 기존 `ModelFactory`를 생성하며 입력/출력 상한은 기존 API 정책에서 받는다. OpenAI 사용 시 공급자 값은 `openai`이고 모델·추론 설정·키는 운영자가 직접 지정한다. 파일이 없거나 활성 구성의 필수 값이 비어 있으면 실패하며 프로세스 환경·Codex 로그인·다른 계정으로 자동 대체하지 않는다. 미구현 로컬 공급자나 임의 전송 주소도 허용하지 않는다.
+
+키는 기존 `apiKey`에 지정하거나, `apiKey`를 비우고 선택적 `apiKeyEnvFile`에 승인한 env 파일의 **절대 경로**를 지정한다. 두 자격 출처를 동시에 지정하면 실패한다. 참조 파일의 `OPENAI_API_KEY` 리터럴 한 개만 읽으며 같은 키의 중복·누락·빈 값·상대 경로·파일 심볼릭 링크를 거절한다. `export`와 값을 감싼 한 쌍의 따옴표는 허용하지만 쉘 실행·환경 변수 보간은 하지 않는다. 다른 변수는 사용하지 않는다. 참조 파일도 최대 16 KiB의 UTF-8이며 비활성 구성에서는 읽지 않는다. 키를 다른 설정 파일에 복제하거나 Git에 올릴 필요가 없다.
 
 파일은 최대 16 KiB의 UTF-8 properties이며 중복·알 수 없는 키를 거절한다. 구성은 명시 로드 시 고정되므로 키 교체 후 새 구성을 로드해야 한다. 원문·키는 문자열 출력·예외에 포함하지 않는다. 파일 자체의 저장 암호화를 구현한 것은 아니므로 비공개 파일 권한이 필요하다.
 
-파일 읽기·팩토리 생성에는 통신이 없다. `enabled=true`는 설정 사용 조건이며 실제 유료 호출 승인·예산 검사·운영 활성화를 대신하지 않는다. **비공개 파일을 읽어 운영 공급자·KMS를 활성화하는 Spring 구성은 미연결**이다. 분석 HTTP·DB 실행 서비스와 AI 모듈 사이의 호출 경계는 구현되어 있으며 기본 `AnalysisRuntime`은 전송을 거절한다. 운영 연결 시 서버 설정에서 비공개 파일의 경로만 전달한다. 테스트의 `test-key`·`test-model`은 합성 값이며 개인 계정 정보가 아니다.
+파일 읽기·팩토리 생성에는 통신이 없다. `enabled=true`는 설정 사용 조건이며 실제 유료 호출 승인·예산 검사·운영 활성화를 대신하지 않는다. 비공개 설정과 비용 장부를 연결하는 `AnalysisConfiguration`은 구현되어 있으며 기본 `AnalysisRuntime`은 전송을 거절한다. 실제 활성화에는 [분석 실행 설정](../../api/docs/analysis-runtime.md)의 공급자·KMS·비용 정책이 필요하다. 운영 연결 시 서버 설정에서 비공개 파일의 경로만 전달한다. 테스트의 `test-key`·`test-model`은 합성 값이며 개인 계정 정보가 아니다.
 
 ## 사용과 검증
 
-분석 HTTP는 `AnalysisJobs` → `AnalysisRuntime` → `AnalysisService.analyzeForStorage`로 연결된다. API는 인증·소유권·현재 원천·재사용·동시성을 확인하고 DB 트랜잭션 밖에서 실행한 뒤 다시 권한·원천·삭제 상태를 검증해 암호화 저장한다. 저장용 AI 응답은 의미 출력과 개별 보존 정보를 함께 검증한다. 유료 활성화 전에는 미구현인 비용 예약·정산 장부와 운영 설정 승인을 연결해야 한다. `ModelFactory`는 승인된 공급자 구현을 요청별 지침·스키마와 조합한다. OpenAI 구성에서는 고정 모델·키 공급자·추론 설정·상한으로 `provider.openai.OpenAiGateway`를 만든다. **서비스 생성만으로 외부 통신은 발생하지 않는다.** OpenAI의 입력 토큰 계수는 외부 전송이다. 다른 구현은 해당 모델의 로컬 계수를 사용할 수 있다.
+분석 HTTP는 `AnalysisJobs` → `AnalysisRuntime` → `AnalysisService.analyzeForStorage`로 연결된다. API는 인증·소유권·현재 원천·재사용·동시성을 확인하고 DB 트랜잭션 밖에서 실행한 뒤 다시 권한·원천·삭제 상태를 검증해 암호화 저장한다. 저장용 AI 응답은 의미 출력과 개별 보존 정보를 함께 검증한다. 비용 예약·정산 장부는 구현되어 있으며 운영 활성화에는 실제 사용액·단가 확인과 비공개 설정이 필요하다. `ModelFactory`는 승인된 공급자 구현을 요청별 지침·스키마와 조합한다. OpenAI 구성에서는 고정 모델·키 공급자·추론 설정·상한으로 `provider.openai.OpenAiGateway`를 만든다. **서비스 생성만으로 외부 통신은 발생하지 않는다.** OpenAI의 입력 토큰 계수는 외부 전송이다. 다른 구현은 해당 모델의 로컬 계수를 사용할 수 있다.
 
 저장한 응답만 필요할 때는 이 서비스에 다시 보내지 않는다. 기존 결과 반환·시도 합류는 API에서 처리한다. 원천으로 확인된 사실이나 사용자 정정은 모델로 다시 판정하지 않으며 유효 재사용 자격은 API에서 확인한다. 이 모듈에 합성 `verified=true`만 믿는 우회 경로는 없다.
 
@@ -52,7 +54,7 @@ Git에 공유하는 [llm.properties.example](../config/llm.properties.example)�
 
 다음은 미완료다.
 
-- 운영 예산 예약·정산 장부와 이를 통과한 공급자/KMS 활성화 구성.
+- 구현된 비용 장부의 운영 DB 적용과 실제 단가·사용액·공급자/KMS 설정.
 - 보관기한에 따른 자동 정리와 백업·키 파쇄. 기억의 기간별 확인·삭제용 목록은 별도 API이며 실제 재사용 자격은 최신 입력으로 검증한다([관리 조회 계약](../../api/docs/analysis-api.md#6-보존-정보의-사용자-확인삭제)). 금융 원천 기간 조회는 AI 보존·참조 플래그와 독립적이다.
 - 실제 OpenAI/KMS 자격·요금·활성화, 실제 품질·토큰·지연 측정.
 - 로컬 모델 어댑터·모델/토크나이저/템플릿·실행기·자격/통신·실측 사용량 구성. 교체 경계가 있다는 이유로 연결 완료로 취급하지 않음.
