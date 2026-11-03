@@ -21,7 +21,7 @@ lib/data/connection/financial_api.dart          UserFinancialRepository 계약 �
 lib/data/connection/snapshot_projector.dart     원본(PAYSE-DRAFT-3) + 사용자 상태 → HTTP Snapshot(PAYSE-API-0.6-3) 순수 변환
 lib/data/connection/fake_financial_server.dart  FakeFinancialServer(앱 수명 장부) · FakeUserFinancialRepository(세션 단위)
 lib/data/connection/user_snapshot_repository.dart  Snapshot JSON → FinancialSnapshot 어댑터(첫 화면용)
-lib/app/dev/dev_user_fixtures.dart              개발 데모 계정 userId → 불변 원본(알파 demo-ready·베타 beta-ready·감마 gamma-month-end, 서버 initialCase와 같음)
+lib/app/dev/dev_user_fixtures.dart              개발 데모 계정 userId → 불변 원본(알파 demo-life·베타 beta-life·감마 gamma-life, 아래 '시연 데이터와 실행 데이터')
 ```
 
 | 수명    | 대상                                                                                                                                                                                                                                               | 처리                                                          |
@@ -54,6 +54,20 @@ lib/app/dev/dev_user_fixtures.dart              개발 데모 계정 userId → 
 | `FakeFinancialServer`         | 실제 서버로 대체(앱에서 제거). 투영 규칙 테스트는 서버·Fake 공통 검증 벡터로 유지    |
 | `dev_user_fixtures.dart`      | 서버가 userId로 원본을 정하므로 앱에서는 제거                                        |
 
+### 시연 데이터와 실행 데이터 (2026-11-03 기록)
+
+시연 데이터(데모알파·베타·감마)는 혜연(B)이 준비한다. 앱이 어느 서버에 붙느냐에 따라 같은 계정이라도 다른 원본을 쓴다.
+
+| 계정     | 앱 가짜 서버(서버 주소 없음, `dev_user_fixtures.dart`) | 개발 서버 DB(`apps/api/fixtures/generated-v4/server-seeds.json` initialCase)                |
+| -------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| 데모알파 | `demo-life`                                            | `demo-life`                                                                                 |
+| 데모베타 | `beta-life`                                            | `beta-ready`                                                                                |
+| 데모감마 | `gamma-life`                                           | `gamma-month-end` (`gamma-life`로 바꾸고 DB 재적재하는 일은 A에게 요청 중, develop PR #196) |
+
+- 데모감마(`gamma-life`)는 LLM 시험용이다. 마이데이터가 주는 원천만 남기려고 거래 분류·거래 관계·월급 설정·계산 포함 계좌를 비웠다. 일반 시연용 데이터(알파·베타)와 목적이 다르며, 첫 계산이 정보 부족으로 나오는 것은 의도된 상태이며 이 상태를 유지한다. 서버 시드를 gamma-life로 바꾸는 요청(#196)은 별도로 유지한다.
+- 데모베타(`beta-life`, 기준 11/5)에는 카드 청구서(statements)와 예정 지출이 없다. 카드사 결제 일정(scheduleEvidence: 10월 이용분 결제일 2026-11-10 등)과 지난 카드대금 출금 기록만 있어, 11/10 카드대금은 확정 청구가 아니며 홈 계산에서 빼지 않는다. 현재는 청구·예정 지출을 추가하지 않으며, 별도 시연이 필요하면 검토한다.
+- 카드대금 정산 점검(2026-11-03, 위 세 원본과 서버 시드 beta-ready·gamma-month-end): 청구 대표 예정 지출이 있는데 잔액에 반영된 그 출금의 유효 정산이 빠진 사례는 점검한 데이터에서 없었다. 이후 데이터에 대한 보장은 아니며, 데이터를 바꿀 때 다시 확인한다.
+
 빌드 설정에 서버 주소가 있으면 `HttpUserFinancialRepository`(실제 서버)를, 없으면 기존 Fake를 쓴다. 어느 쪽이든 `AssembledFinancialRepository`가 거래 페이지를 끝까지 받아 합친 Snapshot만 화면에 넘긴다. 주입 규칙·검증 상태는 [실제 서버 연결 계획](server-connection-plan.md)을 따른다.
 
 ## 5. 미확정·후속
@@ -84,9 +98,9 @@ lib/shared/design/institution_mark.dart                     금융사 표시(통
 | 저장 실패 안내 | 다시 시도 가능(저장 실패 띠) / 409 자료·규칙 버전(버전 충돌 띠 + 다시 불러오기) / 422·403(저장 실패 띠 + 금융사 다시 고르기) / 401은 세션 무효 처리로 넘김                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 01-1           | (2026-10-27 #28 4단계 추가) 처음 들어오면 모두 미선택(저장된 포함 계좌가 있으면 복원)이고, 같은 흐름에서 12-3으로 돌아갔다 와도 진행 중 선택을 유지한다. 입출금·예금·적금 묶음 제목 오른쪽에 '모두 선택'/'모두 해제'와 '· N개 선택'. 0개는 허용하되 저장 불가('계산에 사용할 계좌를 1개 이상 골라주세요.'). 모아둘 돈이 있는 계좌를 하나씩 해제하면 09-10 경고 띠, 묶음으로 해제하면 확인 창 한 번(2026-10-28: '입출금 계좌 N개를 모두 선택 해제할까요?'/'이 중 M개 계좌에는 모아둘 돈이 있어요. …', 취소/모두 선택 해제. 취소하면 유지). 모아둘 돈이 있는 계좌가 미선택이면 '선택하지 않은 계좌의 잔액과 모아둘 돈은 계산에서 제외해요.'. 부제 '쓸 수 있는 돈 계산에 넣을 계좌를 골라주세요. 선택하지 않아도 금융사 연결은 유지돼요.' |
 | 01-2           | 저장 응답 Snapshot을 형식만 바꿔 읽기 전용으로 표시(2026-10-27 #28 4단계: 제목 '다음 월급일까지 쓸 수 있는 돈을 알아볼까요?', 01-2 전용 묶음 머리). 미입력·미연결(제한 표식)·일정 없음·받지 못함을 다른 문장으로. 같은 스냅샷의 홈 계산 결과로 하단 버튼을 정한다: U가 있으면 '쓸 수 있는 돈 계산하기'(01-3), 없으면 비활성 + 이유 + '나중에 확인하고 홈으로 가기'(보완 미룸 기록). 받지 못한 정보가 계산을 막으면 '다시 불러오기' 띠(성공하면 새 스냅샷으로 갱신, 실패하면 이전 화면 유지)                                                                                                                                                                                                                                            |
-| 카드 결제일    | 사용자 계획(plannedPaymentDay)이 있으면 "매월 N일", 없으면 Snapshot asOf 날짜 이상인 확인 dueDate 중 가장 이른 날짜, 없으면 "예정된 결제일 정보 없음". 반복 주기 추정·지난 날짜 대체 없음                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 카드 결제일    | (2026-11-03 범위 변경) 카드사 확인 일정만 읽기 전용: Snapshot asOf 날짜 이상인 확인 dueDate 중 가장 이른 날짜, 없으면 "결제일 확인 불가". 사용자 계획(plannedPaymentDay)은 이번 앱 범위에서 표시·저장하지 않는다(코드 정리는 PAYSE-MOBILE-MY-INFO-29-4-20261103 명세). 반복 주기 추정·지난 날짜 대체 없음                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
-앱 데이터 모델(`FinancialSnapshot`)은 settings(월급·카드 계획)·reserves·obligations·카드 scheduleEvidence를 읽는다. 생략된 급여 계좌·급여 근거에는 settings 제한 표식이 있어야 하고, 참조 대상이 응답에 없으면 형식 오류다. 계약의 결제 일정에는 결제 완료 표시가 없어 완료 일정 제외는 적용할 정보가 없다.
+앱 데이터 모델(`FinancialSnapshot`)은 settings(월급·카드 계획, 카드 계획은 읽기만 하고 이번 범위에서 화면에 쓰지 않음)·reserves·obligations·카드 scheduleEvidence를 읽는다. 생략된 급여 계좌·급여 근거에는 settings 제한 표식이 있어야 하고, 참조 대상이 응답에 없으면 형식 오류다. 계약의 결제 일정에는 결제 완료 표시가 없어 완료 일정 제외는 적용할 정보가 없다.
 
 ### 월급 설정(03-7, #28 4b-1, 2026-10-28)
 

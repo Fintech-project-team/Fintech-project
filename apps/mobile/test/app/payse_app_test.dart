@@ -1,14 +1,21 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:payse/app/dev/dev_demo_accounts.dart';
 import 'package:payse/app/payse_app.dart';
 import 'package:payse/data/auth/credential_stores.dart';
+import 'package:payse/features/my_info/my_info_screen.dart';
 
 import 'app_test_utils.dart';
 
 /// 2026-10-21: 세션·PIN이 있는 기기로 앱을 띄우고 11-1에서 PIN을 넣어 하단 탭 홈까지 연다.
 /// 2026-10-23: 연결 전 사용자이므로 연결 흐름을 마쳐야 홈이 열린다.
-Future<void> openSignedIn(WidgetTester tester, {bool devTools = false}) async {
+/// 2026-11-03: [appVersion]은 내 정보 탭의 버전 읽기다.
+Future<void> openSignedIn(
+  WidgetTester tester, {
+  bool devTools = false,
+  AppVersionReader? appVersion,
+}) async {
   final (sessions, pins, auth) = await signedInStores();
   await tester.pumpWidget(
     PayseApp(
@@ -18,6 +25,7 @@ Future<void> openSignedIn(WidgetTester tester, {bool devTools = false}) async {
       sessionStore: sessions,
       pinStore: pins,
       presentationPolicy: instantPresentation(),
+      appVersion: appVersion,
     ),
   );
   await tester.pumpAndSettle();
@@ -130,6 +138,21 @@ void main() {
 
     expect(find.byKey(const ValueKey('dev-entry')), findsNothing);
     expect(find.textContaining('개발 설정'), findsNothing);
+  });
+
+  testWidgets('my info tab shows the signed-in name and installed version', (
+    tester,
+  ) async {
+    await openSignedIn(
+      tester,
+      appVersion: () async => (version: '0.1.0', buildNumber: '1'),
+    );
+    await tester.tap(find.text('내 정보').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('${devDemoAccounts.first.name}님'), findsOneWidget);
+    expect(find.text('PAYSE 0.1.0 (1)'), findsOneWidget);
+    expect(find.text('이 화면은 준비 중이에요.'), findsNothing);
   });
 
   testWidgets('dev settings preview shows demo-life counts and switches', (
