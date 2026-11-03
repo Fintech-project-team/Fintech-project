@@ -225,12 +225,12 @@ class _ObligationEditScreenState extends State<ObligationEditScreen> {
         actionLabel: reason == EditRejection.validation ? null : '최신 정보 불러오기',
         onAction: reason == EditRejection.validation ? null : _c.reload,
       ),
-      EditReloaded() => const _InfoBand(
+      EditReloaded() => const PlanInfoBand(
         key: ValueKey('edit-band-reloaded'),
         title: '최신 정보로 다시 계산했어요',
         body: '그사이 바뀐 내용을 반영했어요. 아래 금액을 확인하고 다시 저장해 주세요.',
       ),
-      _ when _c.facts?.recurring ?? false => _InfoBand(
+      _ when _c.facts?.recurring ?? false => PlanInfoBand(
         key: const ValueKey('edit-band-recurring'),
         title: '이 회차만 바뀌어요',
         body:
@@ -683,10 +683,10 @@ class PreviewLine extends StatelessWidget {
   }
 }
 
-/// 2026-11-03: 회색 상태 설명 띠(정보 아이콘, 제목 14/600 + 설명 13). 위 막대 바로 아래에 붙는다.
-class _InfoBand extends StatelessWidget {
+/// 2026-11-03: 회색 상태 설명 띠(정보 아이콘, 제목 14/600 + 설명 13). 위 막대 바로 아래에 붙는다. 계획 탭 입금 확인 전 안내도 쓴다.
+class PlanInfoBand extends StatelessWidget {
   /// 2026-11-03: 제목 [title]과 설명 [body]로 만든다.
-  const _InfoBand({super.key, required this.title, required this.body});
+  const PlanInfoBand({super.key, required this.title, required this.body});
 
   final String title;
   final String body;

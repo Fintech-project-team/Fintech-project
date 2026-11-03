@@ -66,8 +66,24 @@ final class CardInstrument extends Instrument {
 /// 2026-10-31: 계좌·카드별 조회의 '바꾸기' 범위. 이번 기간 내역에서 들어왔으면 그 조회 대상, 그 밖에는 연결한 전체다.
 enum InstrumentScope { period, connected }
 
+/// 2026-11-02: 계획 탭의 안쪽 탭.
+enum PlanTab { scheduled, reserves }
+
+/// 2026-11-03: 홈·계산 내역에서 계획 탭의 안쪽 탭 [tab]을 지금 월급 기간·맨 위로 열어 달라는 요청. 앱 셸이 [show]를 부르고 계획 탭이
+/// 듣는다. 같은 탭을 다시 요청해도 알린다.
+class PlanFocus extends ChangeNotifier {
+  PlanTab tab = PlanTab.scheduled;
+
+  /// 2026-11-03: [next] 탭으로 열어 달라고 알린다.
+  void show(PlanTab next) {
+    tab = next;
+    notifyListeners();
+  }
+}
+
 /// 2026-10-31: 화면 사이 연결에 쓰는 공통 의존성. 현재 상태 [state], 저장 연결 [writer], 아래로 당겨 새로고침 [onRefresh],
 /// 홈에서 이번 기간 내역으로 가기 [onShowPeriod]다. 화면 열기는 overview_pages.dart가 맡는다.
+/// 2026-11-03: 홈 남겨둘 돈·예정 지출 행과 계산 내역 관리 줄에서 계획 탭으로 가기 [onShowPlan]을 더했다.
 class OverviewLinks {
   /// 2026-10-31: 각 의존성으로 만든다.
   const OverviewLinks({
@@ -75,12 +91,14 @@ class OverviewLinks {
     this.writer,
     this.onRefresh,
     this.onShowPeriod,
+    this.onShowPlan,
   });
 
   final ValueListenable<OverviewState> state;
   final AccountsWriter? writer;
   final PullRefresh? onRefresh;
   final VoidCallback? onShowPeriod;
+  final ValueChanged<PlanTab>? onShowPlan;
 
   /// 2026-10-31: 지금 Snapshot.
   FinancialSnapshot get snapshot => state.value.calculation.snapshot;
