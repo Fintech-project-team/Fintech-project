@@ -7,6 +7,30 @@ package com.payse.api.constants;
  */
 public final class ApiFieldConstants {
     /**
+     * 분석 실행 구성·비용 경계의 고정 문자열이다.
+     * @created 2026-11-03
+     * @usedBy AnalysisSettings, AnalysisPricing, AnalysisCosts, AnalysisConfiguration
+     */
+    public static final class Execution {
+        public static final String MODEL = "model";
+        public static final String INPUT_RATE = "inputMicrosPerMillion";
+        public static final String CACHED_RATE = "cachedMicrosPerMillion";
+        public static final String OUTPUT_RATE = "outputMicrosPerMillion";
+        public static final String COUNT_COST = "countingMicros";
+        public static final String KMS_COST = "kmsMicros";
+        public static final String INPUT_LIMIT = "inputLimit";
+        public static final String OUTPUT_LIMIT = "outputLimit";
+
+        /**
+         * 정적 상수 구간의 인스턴스 생성을 막는다.
+         * @created 2026-11-03
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private Execution() {
+        }
+    }
+
+    /**
      * 상수 컨테이너의 인스턴스 생성을 막는다.
      * @created 2026-11-02
      * @usedBy 없음: 정적 상수 전용 타입의 인스턴스화 차단

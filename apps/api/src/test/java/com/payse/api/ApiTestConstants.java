@@ -8,6 +8,29 @@ package com.payse.api;
  */
 public final class ApiTestConstants {
     /**
+     * 외부 호출 없는 비용 경계 검사의 독립 기대값이다.
+     * @created 2026-11-03
+     * @usedBy AnalysisPricingTest, AnalysisRuntimeTest, CostedModelTest
+     */
+    public static final class Execution {
+        public static final String MODEL = "test-model-2026-11-01";
+        public static final String PROJECT = "test-project";
+        public static final String VERSION = "test-pricing-v1";
+        public static final String PRICES = """
+            {"model":"test-model-2026-11-01","inputMicrosPerMillion":2000000,
+             "cachedMicrosPerMillion":1000000,"outputMicrosPerMillion":4000000,
+             "countingMicros":7,"kmsMicros":11,"inputLimit":6000,"outputLimit":1000}
+            """;
+
+        /**
+         * 기대값 전용 구간의 생성을 막는다.
+         * @created 2026-11-03
+         * @usedBy 없음: 정적 테스트 상수 전용
+         */
+        private Execution() {
+        }
+    }
+    /**
      * 테스트 계약만 제공하며 인스턴스 생성을 막는다.
      * @created 2026-11-02
      * @usedBy 없음: 정적 상수 전용 타입의 인스턴스화 차단

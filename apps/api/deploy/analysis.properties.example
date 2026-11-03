@@ -1,0 +1,8 @@
+# Copy outside Git; use absolute paths with forward slashes.
+# Activation requires an approved DB cost policy and separate OpenAI/KMS credentials.
+enabled=
+llmSettingsFile=
+kmsTokenFile=
+kmsKey=
+projectId=
+pricingVersion=

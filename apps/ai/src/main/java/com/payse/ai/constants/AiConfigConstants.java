@@ -22,6 +22,8 @@ public final class AiConfigConstants {
      * @usedBy AnalysisContract, InputMapper
      */
     public static final class Analysis {
+        public static final String ACCOUNT_PREFIX = "a";
+        public static final String CARD_PREFIX = "b";
         public static final String INPUT_SIDE = "input";
         public static final String OUTPUT_SIDE = "output";
         public static final String SCHEMA_SUFFIX = ".schema.json";

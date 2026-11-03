@@ -21,6 +21,16 @@ public final class AiFieldConstants {
      * @usedBy AnalysisContract, InputMapper, StorageContract
      */
     public static final class Analysis {
+        public static final String ACCOUNT_ID = "accountId";
+        public static final String CARD_ID = "cardId";
+        public static final String AMOUNT_KRW = "amountKRW";
+        public static final String PURCHASE_DATE = "purchaseDate";
+        public static final String WITHDRAWAL_DATE = "withdrawalDate";
+        public static final String REFUND_DATE = "refundDate";
+        public static final String CANCELLATION_DATE = "cancellationDate";
+        public static final String BOOKING_DATE = "bookingDate";
+        public static final String OCCURRED_AT = "occurredAt";
+        public static final String OCCURRED_AT_BASIS = "occurredAtBasis";
         public static final String SEMANTIC_TASK_KIND = "semanticTaskKind";
         public static final String ITEMS = "items";
         public static final String TRANSACTIONS = "transactions";

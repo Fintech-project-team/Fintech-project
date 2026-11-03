@@ -7,6 +7,33 @@ package com.payse.api.constants;
  */
 public final class ApiConfigConstants {
     /**
+     * 분석 실행 구성·비용 경계의 고정 문자열이다.
+     * @created 2026-11-03
+     * @usedBy AnalysisSettings, AnalysisPricing, AnalysisCosts, AnalysisConfiguration
+     */
+    public static final class Execution {
+        public static final String SETTINGS_PROPERTY = "payse.analysis.settings-file";
+        public static final String SETTINGS_BINDING = "${payse.analysis.settings-file:}";
+        public static final String ENABLED = "enabled";
+        public static final String LLM_FILE = "llmSettingsFile";
+        public static final String KMS_FILE = "kmsTokenFile";
+        public static final String KMS_KEY = "kmsKey";
+        public static final String PROJECT = "projectId";
+        public static final String PRICING = "pricingVersion";
+        public static final String COUNT_PREFIX = "analysis-count:";
+        public static final String PROMPT_VERSION = "PAYSE-model-facts-1";
+        public static final String RESPONSE_VERSION = "PAYSE-analysis-storage-1";
+
+        /**
+         * 정적 상수 구간의 인스턴스 생성을 막는다.
+         * @created 2026-11-03
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private Execution() {
+        }
+    }
+
+    /**
      * 상수 컨테이너의 인스턴스 생성을 막는다.
      * @created 2026-11-02
      * @usedBy 없음: 정적 상수 전용 타입의 인스턴스화 차단

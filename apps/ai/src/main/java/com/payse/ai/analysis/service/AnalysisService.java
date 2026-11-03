@@ -67,14 +67,25 @@ public final class AnalysisService {
      * 한 공급자 응답에서 기존 의미 출력과 보존 제안을 받는다. DB 저장·채택은 수행하지 않는다.
      * @created 2026-11-01
      * @usedBy AnalysisStorageTest, 미연결: 예정 사용처 API 분석 worker
+     * @modified 2026-11-03 - 모델 전용 DB 원천 투영을 받는 실행 경로와 공유
      * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조; 상수 타입 명시 참조; 제어문 본문 구분
      */
     public AnalysisResult analyzeForStorage(ObjectNode payload) {
-        InputMapper mapper = new InputMapper(payload, contract);
+        return analyzeForStorage(payload, null);
+    }
+
+    /**
+     * API가 인증한 DB 원천 보충만 모델에 전달하고 공개 응답 규격을 유지한다.
+     * @created 2026-11-03
+     * @usedBy AnalysisRuntime.analyze, analyzeForStorage
+     */
+    public AnalysisResult analyzeForStorage(ObjectNode payload, ObjectNode facts) {
+        InputMapper mapper = new InputMapper(payload, contract, facts);
 
         ModelReply reply = generate(
             mapper,
-            contract.instructions() + "\n" + StorageContract.instructions(),
+            contract.instructions() + "\n" + StorageContract.instructions()
+                + (facts == null ? "" : "\n" + Analysis.SOURCE_FACTS_INSTRUCTIONS),
             mapper.storageSchema()
         );
         if (reply.failure() != null) {

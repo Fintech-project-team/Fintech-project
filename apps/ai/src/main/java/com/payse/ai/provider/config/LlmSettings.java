@@ -118,6 +118,15 @@ public final class LlmSettings {
     }
 
     /**
+     * 승인 가격·캐시 버전과 대조할 모델 이름만 반환한다.
+     * @created 2026-11-03
+     * @usedBy AnalysisConfiguration
+     */
+    public String model() {
+        return model;
+    }
+
+    /**
      * 기존 게이트웨이를 생성할 팩토리를 반환한다. 모델·키는 파일, 호출 상한은 API 정책에서 받는다.
      * @created 2026-11-01
      * @usedBy API 분석 실행 구성, LlmSettingsTest

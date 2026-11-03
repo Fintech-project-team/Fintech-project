@@ -33,6 +33,50 @@ import tools.jackson.databind.node.ObjectNode;
  * @usedBy JUnit
  */
 class AnalysisServiceTest {
+    /**
+     * 서버의 금액·날짜만 결합하고 원래 ID·원천 객체·민감 추가 필드는 외부로 내보내지 않는다.
+     * @created 2026-11-03
+     * @usedBy JUnit
+     */
+    @Test
+    void usesSourceFactsWithoutChangingPublicInput() throws Exception {
+        ObjectNode payload = input();
+        ObjectNode before = payload.deepCopy();
+        ObjectNode facts = JSON.createObjectNode();
+        facts.set("asOf", payload.path("context").path("asOf"));
+        var rows = facts.putArray("transactions");
+        String account = UUID.randomUUID().toString();
+        for (JsonNode transaction : payload.path("transactions")) {
+            ObjectNode row = rows.addObject();
+            row.set("transactionId", transaction.path("transactionId"));
+            row.put("amountKRW", 123456).put("accountId", account).putNull("cardId");
+            for (String name : List.of(
+                "purchaseDate", "withdrawalDate", "refundDate", "cancellationDate",
+                "bookingDate", "occurredAt", "occurredAtBasis"
+            )) {
+                row.putNull(name);
+            }
+        }
+        AtomicInteger calls = new AtomicInteger();
+        AnalysisService service = new AnalysisService(
+            (instructions, schema) -> model(100, body -> {
+                calls.incrementAndGet();
+                assertEquals(123456, body.path("transactions").get(0).path("amountKRW").asInt());
+                assertFalse(body.toString().contains(account));
+                assertEquals("a1", body.path("transactions").get(0).path("accountId").asString());
+                assertTrue(body.path("transactions").get(0).path("bookingDate").isNull());
+                assertEquals(facts.path("asOf"), body.path("asOf"));
+                return new ModelReply(null, new TokenUsage(100, null, 10), "MODEL_REFUSAL");
+            }),
+            6000
+        );
+        assertEquals("MODEL_REFUSAL", service.analyzeForStorage(payload, facts).failure());
+        assertEquals(before, payload);
+        ((ObjectNode) rows.get(0)).put("expectedMeaning", "never-send-gold");
+        assertThrows(ContractFailure.class, () -> service.analyzeForStorage(payload, facts));
+        assertEquals(1, calls.get());
+    }
+
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     /**

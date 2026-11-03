@@ -19,6 +19,8 @@ import com.payse.api.PayseApiApplication;
 import com.payse.api.analysis.crypto.EnvelopeCipher;
 import com.payse.api.analysis.crypto.KeyProtector;
 import com.payse.api.analysis.crypto.WrappedKey;
+import com.payse.api.analysis.mapper.AnalysisCosts;
+import com.payse.api.analysis.service.AnalysisEvidence;
 import com.payse.api.analysis.service.AnalysisIdentity;
 import com.payse.api.analysis.service.AnalysisJobs;
 import com.payse.api.analysis.service.AnalysisRuntime;
@@ -85,6 +87,50 @@ import tools.jackson.databind.node.ObjectNode;
  * @usedBy test_analysis_service.py의 Gradle JUnit
  */
 class AnalysisHttpTest {
+    /**
+     * 실제 JPA 최소 권한 연결에서 비용 예약·전송권·별도 정산과 업무 롤백을 확인한다.
+     * @created 2026-11-03
+     * @usedBy 격리 DB JUnit
+     */
+    @Test
+    void persistsCostsOutsideFinancialTransaction() {
+        String project = UUID.randomUUID().toString();
+        String version = "test-policy";
+        admin.update("""
+            INSERT INTO payse.analysis_cost_projects (
+              project_id, pricing_version, pricing, opening_micros, limit_micros,
+              baseline_verified_at, enabled
+            ) VALUES (?, ?, '{}'::jsonb, 0, 45000000000, now(), true)
+            """, project, version);
+        AnalysisCosts costs = context.getBean(AnalysisCosts.class);
+        AuthTransactions transactions = context.getBean(AuthTransactions.class);
+        assertTrue(costs.policy(project, version).isEmpty());
+        UUID call = UUID.randomUUID();
+        transactions.run(() -> {
+            costs.reserve(project, call, version, "model", 100);
+            return null;
+        });
+        assertTrue(costs.start(project, call));
+        assertFalse(costs.start(project, call));
+        costs.settle(project, call, 41);
+        UUID rolledBack = UUID.randomUUID();
+        assertThrows(IllegalStateException.class, () -> transactions.run(() -> {
+            costs.reserve(project, rolledBack, version, "model", 100);
+            throw new IllegalStateException("test-rollback");
+        }));
+        costs.releaseUnstarted(project, call);
+        assertEquals(41L, admin.queryForObject(
+            "SELECT actual_micros FROM payse.analysis_cost_calls WHERE id=?",
+            Long.class,
+            call
+        ));
+        assertEquals(0, admin.queryForObject(
+            "SELECT count(*) FROM payse.analysis_cost_calls WHERE id=?",
+            Integer.class,
+            rolledBack
+        ));
+    }
+
     private static final String RESULT_TEXT = "검증용 분석 본문은 암호화 저장됩니다";
     private final JsonMapper json = JsonMapper.builder().build();
     private ConfigurableApplicationContext context;
@@ -1373,6 +1419,7 @@ class AnalysisHttpTest {
      * @created 2026-11-01
      * @usedBy JUnit
      * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
+     * @modified 2026-11-03 - 작업 원천 보충 필드 추가에 맞춰 중복 콜백 검사 유지
      */
     @Test
     void settledUsageSurvivesLateFailureCallback() throws Exception {
@@ -1405,6 +1452,7 @@ class AnalysisHttpTest {
             UUID.class,
             String.class,
             String.class,
+            ObjectNode.class,
             ObjectNode.class
         );
         constructor.setAccessible(true);
@@ -1415,7 +1463,8 @@ class AnalysisHttpTest {
             UUID.fromString(before.path(AnalysisFields.ID).asString()),
             hash,
             new AnalysisIdentity().sourceHash(source, input),
-            input.deepCopy()
+            input.deepCopy(),
+            new AnalysisEvidence().modelFacts(owner, source, input)
         );
         var callback = AnalysisJobs.class
             .getDeclaredMethod("fail", workType, boolean.class, String.class, TokenUsage.class);

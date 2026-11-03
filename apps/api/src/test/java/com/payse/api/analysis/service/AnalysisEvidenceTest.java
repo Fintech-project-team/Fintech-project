@@ -30,6 +30,34 @@ import tools.jackson.databind.node.ObjectNode;
  * @usedBy Gradle JUnit
  */
 class AnalysisEvidenceTest {
+    /**
+     * DB 원천의 요청 거래만 보충하며 금액·날짜를 보존하고 정답·잔액·인증은 제외한다.
+     * @created 2026-11-03
+     * @usedBy JUnit
+     */
+    @Test
+    void projectsOnlyAuthorizedSourceFacts() throws Exception {
+        ObjectNode source = source("demo-ready");
+        ObjectNode salary = salary(source);
+        ObjectNode input = input(source, List.of(salary));
+        ObjectNode before = source.deepCopy();
+        ObjectNode facts = evidence.modelFacts(owner(source), source, input);
+        assertEquals(1, facts.path("transactions").size());
+        JsonNode row = facts.path("transactions").get(0);
+        assertEquals(salary.path("amountKRW"), row.path("amountKRW"));
+        assertEquals(salary.path("bookingDate"), row.path("bookingDate"));
+        assertEquals(salary.path("accountId"), row.path("accountId"));
+        assertEquals(source.path("asOf"), facts.path("asOf"));
+        assertFalse(facts.toString().contains("payseTransactionType"));
+        assertFalse(facts.toString().contains("userId"));
+        assertFalse(facts.toString().contains("balanceKRW"));
+        assertEquals(before, source);
+        assertThrows(
+            FinancialException.class,
+            () -> evidence.modelFacts(UUID.randomUUID(), source, input)
+        );
+    }
+
     private final JsonMapper json = JsonMapper.builder().build();
     private final AnalysisEvidence evidence = new AnalysisEvidence();
     private static final List<String> FIELDS = List.of(

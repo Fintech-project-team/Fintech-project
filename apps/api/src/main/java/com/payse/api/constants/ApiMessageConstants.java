@@ -7,6 +7,28 @@ package com.payse.api.constants;
  */
 public final class ApiMessageConstants {
     /**
+     * 분석 실행 구성·비용 경계의 고정 문자열이다.
+     * @created 2026-11-03
+     * @usedBy AnalysisSettings, AnalysisPricing, AnalysisCosts, AnalysisConfiguration
+     */
+    public static final class Execution {
+        public static final String RELEASE_UNRECORDED = "Unstarted analysis cost release pending";
+        public static final String INVALID_SETTINGS = "Invalid analysis execution configuration";
+        public static final String REDACTED_SETTINGS = "AnalysisSettings[REDACTED]";
+        public static final String INVALID_PRICING = "Invalid analysis pricing policy";
+        public static final String COST_UNAVAILABLE = "Analysis cost authorization unavailable";
+        public static final String TRANSACTION_REQUIRED = "Analysis cost transaction required";
+
+        /**
+         * 정적 상수 구간의 인스턴스 생성을 막는다.
+         * @created 2026-11-03
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private Execution() {
+        }
+    }
+
+    /**
      * 상수 컨테이너의 인스턴스 생성을 막는다.
      * @created 2026-11-02
      * @usedBy 없음: 정적 상수 전용 타입의 인스턴스화 차단

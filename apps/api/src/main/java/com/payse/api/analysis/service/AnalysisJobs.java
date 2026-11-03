@@ -277,6 +277,7 @@ public final class AnalysisJobs {
      * @modified 2026-11-02 - 긴 식 지역변수 분리
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-03 - 분석 시도와 비용 예약을 원자 접수하고 DB 원천을 별도 투영
      */
     public Reply submit(String token, String id, boolean retry, Supplier<JsonNode> request) {
         Submission submission = authenticated(
@@ -503,6 +504,7 @@ public final class AnalysisJobs {
                     .put(AnalysisDb.DISPATCH_STATE, ApiCodeConstants.Analysis.NOT_SENT)
                     .put(AnalysisDb.CREATED_AT, now.toString());
                 repository.insert(ATTEMPTS, session.userId(), row);
+                runtime.reserve(attempt);
                 ObjectNode change = AnalysisJson.JSON.createObjectNode()
                     .put(ApiFieldConstants.Analysis.STATE, ApiCodeConstants.Analysis.RUNNING)
                     .put(AnalysisDb.INPUT_HASH, hash)
@@ -536,7 +538,8 @@ public final class AnalysisJobs {
                     attempt,
                     hash,
                     identity.sourceHash(source, input),
-                    input
+                    input,
+                    evidence.modelFacts(session.userId(), source, input)
                 );
                 return new Submission(
                     new Reply(202, status(session.userId(), uuid(current, AnalysisDb.ID))),
@@ -548,6 +551,7 @@ public final class AnalysisJobs {
             try {
                 workers.execute(() -> execute(submission.work()));
             } catch (java.util.concurrent.RejectedExecutionException rejected) {
+                runtime.cancel(submission.work().attempt());
                 fail(
                     submission.work(),
                     false,
@@ -569,10 +573,12 @@ public final class AnalysisJobs {
      * @usedBy submit의 worker
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-03 - 비용을 독립 정산하는 실행 경계와 전송 전 예약 취소 연결
      */
     private void execute(Work work) {
         com.payse.ai.provider.dto.TokenUsage observedUsage = null;
         boolean responseReceived = false;
+        boolean runtimeEntered = false;
         try {
             boolean dispatch = authenticated(
                 work.token(),
@@ -610,7 +616,12 @@ public final class AnalysisJobs {
                 return;
             }
 
-            AnalysisResult result = runtime.analyze(work.input());
+            runtimeEntered = true;
+            AnalysisResult result = runtime.analyze(
+                work.attempt(),
+                work.input(),
+                work.modelFacts()
+            );
             responseReceived = true;
             observedUsage = result.usage();
             if (result.failure() != null) {
@@ -683,6 +694,10 @@ public final class AnalysisJobs {
                     : ApiCodeConstants.Analysis.EXECUTION_UNCONFIRMED,
                 observedUsage
             );
+        } finally {
+            if (!runtimeEntered) {
+                runtime.cancel(work.attempt());
+            }
         }
     }
 
@@ -1569,6 +1584,7 @@ public final class AnalysisJobs {
      * 메모리 안에서만 전달하는 작업 입력이다. 토큰·본문을 DB나 로그에 남기지 않는다.
      * @created 2026-11-01
      * @usedBy submit, execute
+     * @modified 2026-11-03 - 공개 입력과 모델 전용 원천 근거를 분리 보관
      */
     private record Work(
         String token,
@@ -1577,7 +1593,8 @@ public final class AnalysisJobs {
         UUID attempt,
         String hash,
         String basisHash,
-        ObjectNode input
+        ObjectNode input,
+        ObjectNode modelFacts
     ) {
         /**
          * 자동 문자열 표현에 자격·금융 본문을 노출하지 않는다.
