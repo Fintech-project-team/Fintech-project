@@ -131,22 +131,31 @@ class _SalarySettingsScreenState extends State<SalarySettingsScreen> {
     if (day != null) _c.setDay(day);
   }
 
+  /// 2026-11-03: 입력칸 포커스를 풀어 키보드를 닫는다(선택창을 열거나 입력칸 밖을 누를 때).
+  void _unfocus() => FocusManager.instance.primaryFocus?.unfocus();
+
   /// 2026-10-28: [content]를 흰 면·위 반경 16·덮개 50% 바텀시트로 열고 고른 값을 반환한다. 높이는 화면의 85%까지이며
   /// 상태 표시줄을 가리지 않는다.
-  Future<T?> _sheet<T>(Widget content) => showModalBottomSheet<T>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    constraints: BoxConstraints(
-      maxHeight: MediaQuery.sizeOf(context).height * 0.85,
-    ),
-    backgroundColor: PayseColors.background,
-    barrierColor: const Color(0x80242629),
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(PayseRadius.lg)),
-    ),
-    builder: (_) => content,
-  );
+  /// 2026-11-03: 열기 전에 입력 포커스를 풀어 고른 뒤 키보드가 아래 내용을 가리지 않게 한다.
+  Future<T?> _sheet<T>(Widget content) {
+    _unfocus();
+    return showModalBottomSheet<T>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+      ),
+      backgroundColor: PayseColors.background,
+      barrierColor: const Color(0x80242629),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(PayseRadius.lg),
+        ),
+      ),
+      builder: (_) => content,
+    );
+  }
 
   /// 2026-10-28: 월급 계좌 선택을 열고 고른 계좌를 반영한다.
   /// 2026-10-28: 월급일과 같은 바텀시트로 바꿨다(혜연 요청).
@@ -225,86 +234,90 @@ class _SalarySettingsScreenState extends State<SalarySettingsScreen> {
       },
       child: ConnectionPage(
         onBack: busy ? null : _leave,
-        body: ListView(
-          children: [
-            const ConnectionHeading(
-              '월급 정보를\n확인해 주세요',
-              subtitle: '월급 설정을 확인하고 필요하면 수정해 주세요.',
-            ),
-            if (band != null)
+        body: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: _unfocus,
+          child: ListView(
+            children: [
+              const ConnectionHeading(
+                '월급 정보를\n확인해 주세요',
+                subtitle: '월급 설정을 확인하고 필요하면 수정해 주세요.',
+              ),
+              if (band != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: PayseSpace.x2),
+                  child: band,
+                ),
+              const _SettingsSection('월급 설정'),
               Padding(
-                padding: const EdgeInsets.only(top: PayseSpace.x2),
-                child: band,
+                padding: const EdgeInsets.fromLTRB(
+                  PayseSpace.screenHorizontal,
+                  PayseSpace.x4,
+                  PayseSpace.screenHorizontal,
+                  0,
+                ),
+                child: PayseSelectField(
+                  key: const ValueKey('salary-day'),
+                  label: '월급일',
+                  value: _c.day == null ? null : '매월 ${_c.day}일',
+                  placeholder: '월급일 선택',
+                  helper: '해당 날짜가 없는 달에는 말일로 계산해요.',
+                  onTap: busy ? null : _pickDay,
+                ),
               ),
-            const _SettingsSection('월급 설정'),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                PayseSpace.screenHorizontal,
-                PayseSpace.x4,
-                PayseSpace.screenHorizontal,
-                0,
-              ),
-              child: _PickerField(
-                key: const ValueKey('salary-day'),
-                label: '월급일',
-                value: _c.day == null ? null : '매월 ${_c.day}일',
-                placeholder: '월급일 선택',
-                helper: '해당 날짜가 없는 달에는 말일로 계산해요.',
-                onTap: busy ? null : _pickDay,
-              ),
-            ),
-            Padding(
-              padding: field,
-              child: PayseTextField(
-                key: const ValueKey('salary-amount'),
-                label: '예상 월급 금액',
-                controller: _amount,
-                enabled: !busy,
-                hintText: '금액 입력',
-                keyboardType: TextInputType.number,
-                inputFormatters: const [GroupedDigitsFormatter()],
-                textInputAction: TextInputAction.done,
-                onChanged: (text) => _c.setAmount(text.replaceAll(',', '')),
-                errorText: _c.amountMissing ? '예상 월급 금액을 입력해 주세요.' : null,
-                helperText: '앞으로 받을 것으로 예상하는 금액이며, 현재 잔액에는 더하지 않아요.',
-                trailing: const Padding(
-                  padding: EdgeInsets.only(left: PayseSpace.x1),
-                  child: Text(
-                    '원',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w500,
-                      color: PayseColors.textPrimary,
+              Padding(
+                padding: field,
+                child: PayseTextField(
+                  key: const ValueKey('salary-amount'),
+                  label: '예상 월급 금액',
+                  controller: _amount,
+                  enabled: !busy,
+                  hintText: '금액 입력',
+                  keyboardType: TextInputType.number,
+                  inputFormatters: const [GroupedDigitsFormatter()],
+                  textInputAction: TextInputAction.done,
+                  onChanged: (text) => _c.setAmount(text.replaceAll(',', '')),
+                  errorText: _c.amountMissing ? '예상 월급 금액을 입력해 주세요.' : null,
+                  helperText: '앞으로 받을 것으로 예상하는 금액이며, 현재 잔액에는 더하지 않아요.',
+                  trailing: const Padding(
+                    padding: EdgeInsets.only(left: PayseSpace.x1),
+                    child: Text(
+                      '원',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w500,
+                        color: PayseColors.textPrimary,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            Padding(
-              padding: field,
-              child: _PickerField(
-                key: const ValueKey('salary-account'),
-                label: '월급 계좌',
-                value: _accountText(),
-                muted: _c.accountHidden,
-                placeholder: '계좌 선택',
-                helper: '계산에 쓰기로 고른 계좌 중에서 고를 수 있어요.',
-                onTap: busy ? null : _pickAccount,
+              Padding(
+                padding: field,
+                child: PayseSelectField(
+                  key: const ValueKey('salary-account'),
+                  label: '월급 계좌',
+                  value: _accountText(),
+                  muted: _c.accountHidden,
+                  placeholder: '계좌 선택',
+                  helper: '계산에 쓰기로 고른 계좌 중에서 고를 수 있어요.',
+                  onTap: busy ? null : _pickAccount,
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                PayseSpace.screenHorizontal,
-                PayseSpace.x6,
-                PayseSpace.screenHorizontal,
-                PayseSpace.x6,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  PayseSpace.screenHorizontal,
+                  PayseSpace.x6,
+                  PayseSpace.screenHorizontal,
+                  PayseSpace.x6,
+                ),
+                child: _SaveButton(
+                  label: _c.save is SaveInProgress ? '저장하는 중' : '월급 설정 저장하기',
+                  onPressed: _c.canSave ? _save : null,
+                ),
               ),
-              child: _SaveButton(
-                label: _c.save is SaveInProgress ? '저장하는 중' : '월급 설정 저장하기',
-                onPressed: _c.canSave ? _save : null,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
         bottom: PrimaryButton(
           key: const ValueKey('salary-done'),
@@ -384,103 +397,6 @@ class _SettingsSection extends StatelessWidget {
             fontWeight: FontWeight.w700,
             color: PayseColors.textPrimary,
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 2026-10-28: 누르면 선택 화면을 여는 밑줄 칸. PayseTextField와 같은 라벨(13/600)·높이 52·1px borderStrong 밑줄·
-/// 값(17/500)·도움말(12/18)에 오른쪽 › 18을 둔다. 값이 없으면 [placeholder]를 보조 글자색으로 보인다.
-class _PickerField extends StatelessWidget {
-  /// 2026-10-28: 라벨 [label], 값 [value], 빈 값 문구 [placeholder], 도움말 [helper], 누름 [onTap](null이면 비활성),
-  /// 값을 보조 글자색으로 보일지 [muted]로 만든다.
-  const _PickerField({
-    super.key,
-    required this.label,
-    required this.value,
-    required this.placeholder,
-    required this.helper,
-    required this.onTap,
-    this.muted = false,
-  });
-
-  final String label;
-  final String? value;
-  final String placeholder;
-  final String helper;
-  final VoidCallback? onTap;
-  final bool muted;
-
-  /// 2026-10-28: 라벨·값 줄·도움말을 반환한다.
-  @override
-  Widget build(BuildContext context) {
-    final shown = value ?? placeholder;
-    final secondary = muted || value == null;
-    return Semantics(
-      button: true,
-      enabled: onTap != null,
-      label: '$label, $shown',
-      excludeSemantics: true,
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 13,
-                height: 18 / 13,
-                fontWeight: FontWeight.w600,
-                color: PayseColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              constraints: const BoxConstraints(
-                minHeight: PayseTextField.fieldHeight,
-              ),
-              decoration: const BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: PayseColors.borderStrong),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      shown,
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: secondary
-                            ? FontWeight.w400
-                            : FontWeight.w500,
-                        color: secondary
-                            ? PayseColors.textSecondary
-                            : PayseColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: PayseSpace.x2),
-                  const Icon(
-                    Icons.chevron_right,
-                    size: 18,
-                    color: PayseColors.borderStrong,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              helper,
-              style: const TextStyle(
-                fontSize: 12,
-                height: 18 / 12,
-                color: PayseColors.textSecondary,
-              ),
-            ),
-          ],
         ),
       ),
     );

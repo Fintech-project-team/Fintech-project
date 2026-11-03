@@ -512,6 +512,7 @@ class Obligation {
   /// 2026-10-22: 서버 ID [obligationId], 이름 [label], 출금 계좌 [withdrawalAccountId], 금액 [amountKrw],
   /// 날짜 [dueDate], 상태 [status](active·cancelled)로 만든다.
   /// 2026-11-02: 이 예정 지출이 대표하는 카드 청구 [statementId]를 더했다.
+  /// 2026-11-03: 저장된 반복 회차면 그 계획 [recurringPlanId]를 더했다.
   const Obligation({
     required this.obligationId,
     required this.label,
@@ -520,6 +521,7 @@ class Obligation {
     required this.dueDate,
     required this.status,
     this.statementId,
+    this.recurringPlanId,
   });
 
   final String obligationId;
@@ -532,6 +534,9 @@ class Obligation {
   /// 2026-11-02: 대표하는 청구. null이면 청구 연결이 없거나, 청구가 미연결이라 키가 생략된 것이다(제한 표식으로 구분).
   final String? statementId;
 
+  /// 2026-11-03: 저장된 반복 회차의 계획. 수동 단건·청구 대표 예정 지출이면 null이다.
+  final String? recurringPlanId;
+
   static Obligation _parse(_Fields f) => Obligation(
     obligationId: f.string('obligationId'),
     label: f.string('label'),
@@ -540,6 +545,7 @@ class Obligation {
     dueDate: f.businessDate('dueDate'),
     status: f.oneOf('status', const {'active', 'cancelled'}),
     statementId: f.stringOrNull('statementId'),
+    recurringPlanId: f.stringOrNull('recurringPlanId'),
   );
 }
 
@@ -1180,6 +1186,39 @@ class FinancialSnapshot {
 
   /// 2026-10-30: 다음 거래 페이지 cursor. null이면 받을 페이지가 없다.
   final String? nextTransactionCursor;
+
+  /// 2026-11-03: 예정 지출 [obligations]와 배정 [allocations]만 바꾼 사본을 반환한다(저장 전 미리보기 계산용). 이 Snapshot은
+  /// 바꾸지 않는다.
+  FinancialSnapshot withPlan({
+    required List<Obligation> obligations,
+    required List<Allocation> allocations,
+  }) => FinancialSnapshot(
+    userId: userId,
+    schemaVersion: schemaVersion,
+    currency: currency,
+    dataVersion: dataVersion,
+    sourceVersion: sourceVersion,
+    ruleVersion: ruleVersion,
+    asOf: asOf,
+    institutions: institutions,
+    institutionLinkCount: institutionLinkCount,
+    coverage: coverage,
+    accounts: accounts,
+    cards: cards,
+    transactions: transactions,
+    statements: statements,
+    settings: settings,
+    reserves: reserves,
+    obligations: List.unmodifiable(obligations),
+    allocations: List.unmodifiable(allocations),
+    settlements: settlements,
+    relatedTransactions: relatedTransactions,
+    referenceResolutions: referenceResolutions,
+    transactionRelations: transactionRelations,
+    hasMoreTransactions: hasMoreTransactions,
+    nextTransactionCursor: nextTransactionCursor,
+    accessRestrictions: accessRestrictions,
+  );
 
   /// 2026-10-22: 주 계좌가 미연결이라 일부 모아둘 돈이 응답에서 생략됐으면 true다.
   bool get reservesRestricted => isRestricted('response', null, 'reserves');

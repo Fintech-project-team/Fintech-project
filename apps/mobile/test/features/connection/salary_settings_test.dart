@@ -173,6 +173,37 @@ void main() {
       );
     });
 
+    testWidgets('금액 입력 중 월급일·월급 계좌를 고르거나 빈 곳을 누르면 입력 포커스가 풀린다', (tester) async {
+      await open(tester, _snapshot());
+      final amount = find.descendant(
+        of: find.byKey(const ValueKey('salary-amount')),
+        matching: find.byType(TextField),
+      );
+      bool focused() => tester
+          .widget<EditableText>(
+            find.descendant(of: amount, matching: find.byType(EditableText)),
+          )
+          .focusNode
+          .hasFocus;
+      await tester.tap(amount);
+      await tester.pump();
+      expect(focused(), isTrue);
+      await pickDay(tester, 10);
+      expect(focused(), isFalse, reason: '월급일 선택창을 열면 키보드를 닫음');
+      await tester.tap(amount);
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('salary-account')));
+      await tester.pumpAndSettle();
+      expect(focused(), isFalse, reason: '계좌 선택창을 열면 키보드를 닫음');
+      Navigator.of(tester.element(find.byType(BottomSheet))).pop();
+      await tester.pumpAndSettle();
+      await tester.tap(amount);
+      await tester.pump();
+      await tester.tap(find.text('월급 정보를\n확인해 주세요'));
+      await tester.pump();
+      expect(focused(), isFalse, reason: '입력칸 밖 빈 곳');
+    });
+
     testWidgets('save turns on only while a value differs from the saved one', (
       tester,
     ) async {

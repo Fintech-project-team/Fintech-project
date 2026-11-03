@@ -120,6 +120,26 @@ class _Pages implements UserFinancialRepository {
   ) => throw UnimplementedError();
 
   @override
+  Future<FinancialOutcome<WriteSuccess>> createObligation(
+    ObligationInput obligation,
+    WriteContext write,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<FinancialOutcome<WriteSuccess>> updateObligation(
+    String id,
+    ObligationPatch patch,
+    WriteContext write,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<FinancialOutcome<WriteSuccess>> cancelObligation(
+    String id,
+    List<DetachAllocation> detach,
+    WriteContext write,
+  ) => throw UnimplementedError();
+
+  @override
   void close() {}
 }
 

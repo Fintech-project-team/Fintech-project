@@ -8,13 +8,15 @@ import '../../shared/design/amount_format.dart';
 import '../../shared/design/payse_tokens.dart';
 import '../overview/accounts_cards_screen.dart' show InnerTab;
 import '../overview/calculation_detail_screen.dart'
-    show SnapshotNames, StatusLabel, md;
+    show SnapshotNames, StatusLabel, md, mdText;
 import '../overview/home_calculation.dart';
 import '../overview/home_screen.dart' show asOfLabel;
 import '../overview/overview_links.dart';
 import '../overview/pull_refresh.dart';
 import '../overview/transaction_sheets.dart' show showPayseSheet;
 import 'card_bill_screen.dart';
+import 'obligation_edit.dart' show obligationFacts;
+import 'obligation_edit_screen.dart';
 import 'plan_period_sheet.dart';
 import 'plan_periods.dart';
 
@@ -25,6 +27,8 @@ enum PlanTab { scheduled, reserves }
 /// 고르고 그 기간에 예정일이 든 '앞으로 나갈 돈 → 이미 나간 돈(접힘) → 계산에서 뺀 계좌(접힘)'를 보인다. 남겨둘 돈은 현재
 /// 설정이다. 금액·기간·위치는 홈 계산 결과를 그대로 쓰고 화면에서 새로 계산하지 않는다. 다른 하단 탭에 다녀와도 안쪽 탭·
 /// 기간·펼침·스크롤을 유지한다.
+/// 2026-11-03: 저장 연결이 있으면 기간 아래 '예정 지출 추가'와, 직접 만든 예정 지출·저장된 반복 회차 행의 수정 진입을 둔다(29-5a).
+/// 카드 청구 행은 지금처럼 카드 결제 상세로 간다.
 class PlanScreen extends StatefulWidget {
   /// 2026-11-02: 화면 사이 연결 [links](현재 계산·받은 거래·새로고침)로 만든다.
   const PlanScreen({required this.links, super.key});
@@ -42,6 +46,54 @@ class _PlanScreenState extends State<PlanScreen> {
   PlanPeriod? _period;
   bool _doneOpen = false;
   bool _excludedOpen = false;
+
+  /// 2026-11-03: 방금 저장한 예정일. 다음 그리기에서 그 날짜가 든 기간으로 옮긴 뒤 지운다.
+  String? _moveTo;
+
+  /// 2026-11-03: 예정 지출 편집을 열고, 저장·취소에 성공하면 알림을 보인다. 추가·수정한 날짜가 보고 있던 기간 밖이면 그 기간으로
+  /// 옮긴다.
+  Future<void> _edit(
+    FinancialSnapshot snapshot,
+    PlanPeriod viewing, {
+    String? obligationId,
+  }) async {
+    final writer = widget.links.writer;
+    if (writer == null) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final result = await openObligationEditor(
+      context,
+      snapshot: snapshot,
+      writer: writer,
+      obligationId: obligationId,
+      viewing: viewing,
+    );
+    if (result == null || !mounted) return;
+    final due = result.dueDate;
+    final moved =
+        due != null &&
+        !viewing.contains(calc.BusinessDate.parse(due, 'dueDate'));
+    if (moved) setState(() => _moveTo = due);
+    final done = result.cancelled
+        ? '예정 지출을 취소했어요.'
+        : obligationId == null
+        ? '예정 지출을 저장했어요.'
+        : '예정 지출을 수정했어요.';
+    messenger
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const ValueKey('plan-edit-saved'),
+          content: Text(moved ? '$done ${mdText(due)}이 있는 기간으로 이동했어요.' : done),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(
+            PayseSpace.x4,
+            0,
+            PayseSpace.x4,
+            PayseSpace.x3,
+          ),
+        ),
+      );
+  }
 
   /// 2026-11-02: 제목·안쪽 탭·화면을 반환한다.
   @override
@@ -170,6 +222,9 @@ class _PlanScreenState extends State<PlanScreen> {
             ? history.transactions
             : const [],
       ),
+      onEdit: widget.links.writer == null
+          ? null
+          : (id) => _edit(snapshot, period, obligationId: id),
     );
     final upcoming = groups[PlanGroup.upcoming]!;
     final done = groups[PlanGroup.done]!;
@@ -205,6 +260,37 @@ class _PlanScreenState extends State<PlanScreen> {
             },
           ),
         ),
+        if (widget.links.writer != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                PayseSpace.screenHorizontal,
+                PayseSpace.x4,
+                PayseSpace.screenHorizontal,
+                0,
+              ),
+              child: SizedBox(
+                height: PayseSize.touchMin,
+                child: OutlinedButton.icon(
+                  key: const ValueKey('plan-add'),
+                  onPressed: () => _edit(snapshot, period),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('예정 지출 추가'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: PayseColors.textPrimary,
+                    side: const BorderSide(color: PayseColors.borderStrong),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(PayseRadius.sm),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         if (salaryList == null)
           const SliverToBoxAdapter(
             child: _InfoBand(
@@ -304,6 +390,15 @@ class _PlanScreenState extends State<PlanScreen> {
     List<PlanPeriod> months,
     calc.BusinessDate today,
   ) {
+    final target = _moveTo;
+    if (target != null) {
+      _moveTo = null;
+      final due = calc.BusinessDate.parse(target, 'dueDate');
+      final fit = [...?salary?.periods]
+          .where((p) => p.contains(due))
+          .firstOrNull;
+      _period = fit ?? monthOf(due);
+    }
     final picked = _period;
     if (picked != null) {
       final list = picked.kind == PlanPeriodKind.salary
@@ -423,6 +518,7 @@ class _LineView {
     required this.today,
     required this.labelEnd,
     required this.onOpenBill,
+    this.onEdit,
   }) : names = SnapshotNames(snapshot),
        _obligations = {
          for (final o in snapshot.obligations ?? const <Obligation>[])
@@ -434,6 +530,9 @@ class _LineView {
   final calc.BusinessDate today;
   final calc.BusinessDate? labelEnd;
   final ValueChanged<String> onOpenBill;
+
+  /// 2026-11-03: 예정 지출 수정 열기. 없으면(저장 연결 없음) 수정 진입을 두지 않는다.
+  final ValueChanged<String>? onEdit;
   final SnapshotNames names;
   final Map<String, Obligation> _obligations;
 
@@ -446,7 +545,13 @@ class _LineView {
   }
 
   /// 2026-11-02: [line]을 누르면 청구 상세로 가면 true다.
-  bool linked(calc.ObligationLine line) => statementOf(line) != null;
+  /// 2026-11-03: 수정 화면으로 가도 true다(화살표를 둔다).
+  bool linked(calc.ObligationLine line) =>
+      statementOf(line) != null || _editable(line);
+
+  /// 2026-11-03: [line]을 고칠 수 있으면 true다(활성·카드 청구 아님, 저장 연결 있음).
+  bool _editable(calc.ObligationLine line) =>
+      onEdit != null && obligationFacts(snapshot, line.obligationId) != null;
 
   /// 2026-11-02: [group] 구역의 줄. [slot]이면 화살표가 없어도 금액 오른쪽에 화살표 자리를 둔다.
   Widget row(calc.ObligationLine line, PlanGroup group, {required bool slot}) {
@@ -470,8 +575,7 @@ class _LineView {
         line.remainingKrw,
         '남은 금액',
         '$due 예정 · $account',
-        '예정 ${formatKrw(line.amountKrw)} · '
-            '${withdrawalNote(withdrawals, line.settledKrw)}',
+        withdrawalNote(withdrawals, line.settledKrw, line.amountKrw),
       ),
       _ => (line.remainingKrw, null, '$due 예정 · $account', null),
     };
@@ -485,7 +589,11 @@ class _LineView {
       detail: detail,
       amount: formatKrw(amount),
       amountCaption: caption,
-      onTap: statement == null ? null : () => onOpenBill(statement),
+      onTap: statement != null
+          ? () => onOpenBill(statement)
+          : _editable(line)
+          ? () => onEdit!(line.obligationId)
+          : null,
       slot: slot,
     );
   }
@@ -495,7 +603,7 @@ class _LineView {
 int unreleasedKrw(Allocation a) => a.amountKrw - a.releasedKrw;
 
 /// 2026-11-02: 예정 지출 한 줄. 첫 줄 이름(말줄임)+회색 날짜 라벨, 둘째 줄 예정일·계좌, 필요하면 셋째 줄(예정·출금), 오른쪽 금액과
-/// 보조 문구, 청구 상세로 가면 화살표. 같은 목록에 화살표가 하나라도 있으면([slot]) 화살표 자리를 둬 금액 끝선을 맞춘다.
+/// 보조 문구(2026-11-03부터 금액 위 '남은 금액'), 청구 상세로 가면 화살표. 같은 목록에 화살표가 하나라도 있으면([slot]) 화살표 자리를 둬 금액 끝선을 맞춘다.
 class _PlanRow extends StatelessWidget {
   /// 2026-11-02: 이름 [name], 날짜 라벨 [label], 둘째 줄 [sub], 셋째 줄 [detail], 금액 [amount], 금액 아래 [amountCaption],
   /// 누르기 [onTap](없으면 누를 수 없음), 화살표 자리 [slot]으로 만든다.
@@ -570,14 +678,14 @@ class _PlanRow extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              if (amountCaption case final caption?)
+                Text(caption, style: PayseTypography.caption),
               Text(
                 amount,
                 style: PayseTypography.ledgerAmount.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              if (amountCaption case final caption?)
-                Text(caption, style: PayseTypography.caption),
             ],
           ),
           if (onTap != null)

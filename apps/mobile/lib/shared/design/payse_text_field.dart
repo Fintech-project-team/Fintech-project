@@ -6,9 +6,13 @@ import 'payse_tokens.dart';
 /// 2026-10-21: 밑줄형 입력 필드(design.md §5 PayseTextField). 화면 문구·검사 규칙을 넣지 않는다.
 /// 라벨 위 → 값 → 도움말·오류 아래. 선은 기본 1px borderStrong, 포커스 2px charcoal, 오류 2px error.
 /// [enabled]가 false면 수정할 수 없는 값을 점선 아래에 보여 주기만 한다.
+/// 2026-11-03: 한 줄 순서는 값 → 뒤쪽 위젯(단위 등) → 지우기 버튼이다(29-5a 혜연 결정). 지우기 버튼은 포커스와 관계없이 늘 같은
+/// 자리에 두고 값이 있을 때만 누를 수 있으며(비면 흐리게 비활성), 누르면 값을 지우고 이 칸에 포커스를 준다. 수정할 수 없는 칸은
+/// 버튼 없이 자리만 남겨 값 위치를 맞춘다.
 class PayseTextField extends StatefulWidget {
   /// 2026-10-21: [label]과 입력 [controller]로 만든다. [errorText]가 있으면 오류 상태, [helperText]는 보조 설명,
-  /// [trailing]은 지우기 버튼 뒤에 붙일 위젯(예: 인증 타이머)이다.
+  /// [trailing]은 값 뒤·지우기 버튼 앞에 붙일 위젯(예: 단위, 인증 타이머)이다.
+  /// 2026-11-03: [textAlign]은 값 정렬이다(금액은 오른쪽).
   const PayseTextField({
     super.key,
     required this.label,
@@ -27,6 +31,7 @@ class PayseTextField extends StatefulWidget {
     this.showClearButton = true,
     this.trailing,
     this.valueStyle,
+    this.textAlign = TextAlign.start,
   });
 
   static const double fieldHeight = 52;
@@ -50,6 +55,7 @@ class PayseTextField extends StatefulWidget {
   final bool showClearButton;
   final Widget? trailing;
   final TextStyle? valueStyle;
+  final TextAlign textAlign;
 
   /// 2026-10-21: 포커스·값 변화를 추적하는 상태 객체를 반환한다.
   @override
@@ -149,14 +155,19 @@ class _PayseTextFieldState extends State<PayseTextField> {
               : CustomPaint(
                   key: const ValueKey('payse-text-field-dashed'),
                   painter: const _DashedBottomLine(PayseColors.dividerSection),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      widget.controller.text,
-                      style: valueStyle.copyWith(
-                        color: PayseColors.textSecondary,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.controller.text,
+                          textAlign: widget.textAlign,
+                          style: valueStyle.copyWith(
+                            color: PayseColors.textSecondary,
+                          ),
+                        ),
                       ),
-                    ),
+                      ..._tail(null),
+                    ],
                   ),
                 ),
         ),
@@ -172,9 +183,9 @@ class _PayseTextFieldState extends State<PayseTextField> {
   }
 
   /// 2026-10-21: 입력칸, 값이 있을 때의 지우기 버튼, 뒤쪽 위젯을 한 줄로 반환한다.
+  /// 2026-11-03: 값 → 뒤쪽 위젯 → 지우기 버튼 순서다.
   Widget _editableRow(TextStyle valueStyle) {
-    final showClear =
-        widget.showClearButton && widget.controller.text.isNotEmpty;
+    final hasValue = widget.controller.text.isNotEmpty;
     return Row(
       children: [
         Expanded(
@@ -189,6 +200,7 @@ class _PayseTextFieldState extends State<PayseTextField> {
               textInputAction: widget.textInputAction,
               onChanged: widget.onChanged,
               onSubmitted: widget.onSubmitted,
+              textAlign: widget.textAlign,
               style: valueStyle,
               cursorColor: PayseColors.charcoal,
               decoration: InputDecoration.collapsed(
@@ -201,41 +213,59 @@ class _PayseTextFieldState extends State<PayseTextField> {
             ),
           ),
         ),
-        if (showClear)
-          SizedBox(
-            width: PayseSize.touchMin,
-            height: PayseSize.touchMin,
-            child: IconButton(
-              key: const ValueKey('payse-text-field-clear'),
-              tooltip: '${widget.label} 지우기',
-              padding: EdgeInsets.zero,
-              icon: Container(
-                key: const ValueKey('payse-text-field-clear-circle'),
-                width: PayseTextField.clearCircleSize,
-                height: PayseTextField.clearCircleSize,
-                decoration: const BoxDecoration(
-                  color: PayseColors.dividerSection,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.close,
-                  size: 13,
-                  color: PayseColors.onCharcoal,
-                ),
-              ),
-              onPressed: () {
-                widget.controller.clear();
-                widget.onChanged?.call('');
-              },
-            ),
-          ),
-        if (widget.trailing != null) ...[
-          const SizedBox(width: PayseSpace.x1),
-          widget.trailing!,
-        ],
+        ..._tail(
+          hasValue
+              ? () {
+                  widget.controller.clear();
+                  widget.onChanged?.call('');
+                  _focus.requestFocus();
+                }
+              : null,
+        ),
       ],
     );
   }
+
+  /// 2026-11-03: 값 뒤에 붙는 뒤쪽 위젯과 지우기 버튼 자리를 반환한다. [onClear]가 null이면 버튼이 흐리게 비활성이고,
+  /// 수정할 수 없는 칸은 버튼 없이 자리만 둔다.
+  List<Widget> _tail(VoidCallback? onClear) => [
+    if (widget.trailing != null) ...[
+      const SizedBox(width: PayseSpace.x1),
+      widget.trailing!,
+    ],
+    if (widget.showClearButton) ...[
+      const SizedBox(width: PayseSpace.x2),
+      SizedBox(
+        width: PayseSize.touchMin,
+        height: PayseSize.touchMin,
+        child: !widget.enabled
+            ? null
+            : Opacity(
+                opacity: onClear == null ? 0.4 : 1,
+                child: IconButton(
+                  key: const ValueKey('payse-text-field-clear'),
+                  tooltip: '${widget.label} 지우기',
+                  padding: EdgeInsets.zero,
+                  icon: Container(
+                    key: const ValueKey('payse-text-field-clear-circle'),
+                    width: PayseTextField.clearCircleSize,
+                    height: PayseTextField.clearCircleSize,
+                    decoration: const BoxDecoration(
+                      color: PayseColors.dividerSection,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close,
+                      size: 13,
+                      color: PayseColors.onCharcoal,
+                    ),
+                  ),
+                  onPressed: onClear,
+                ),
+              ),
+      ),
+    ],
+  ];
 }
 
 /// 2026-10-21: 입력칸 아래 도움말 한 줄. 오류면 아이콘과 error 색을 함께 쓴다.
@@ -267,6 +297,114 @@ class _HelperLine extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 2026-10-28: 누르면 선택 화면을 여는 밑줄 칸. PayseTextField와 같은 라벨(13/600)·높이 52·1px borderStrong 밑줄·
+/// 값(17/500)·도움말(12/18)에 오른쪽 › 18을 둔다. 값이 없으면 [placeholder]를 보조 글자색으로 보인다.
+/// 2026-11-03: 월급 편집 화면 안에 있던 위젯을 예정 지출 편집과 함께 쓰도록 공통으로 옮겼다(29-5a). [locked]면 고를 수 없는 값을
+/// PayseTextField 비활성과 같은 점선 아래 보조 글자색으로 보이고 ›를 두지 않는다.
+class PayseSelectField extends StatelessWidget {
+  /// 2026-10-28: 라벨 [label], 값 [value], 빈 값 문구 [placeholder], 도움말 [helper], 누름 [onTap](null이면 비활성),
+  /// 값을 보조 글자색으로 보일지 [muted]로 만든다.
+  /// 2026-11-03: [helper]를 생략할 수 있고, 잠금 [locked]를 더했다.
+  const PayseSelectField({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.placeholder,
+    required this.onTap,
+    this.helper,
+    this.muted = false,
+    this.locked = false,
+  });
+
+  final String label;
+  final String? value;
+  final String placeholder;
+  final String? helper;
+  final VoidCallback? onTap;
+  final bool muted;
+  final bool locked;
+
+  /// 2026-10-28: 라벨·값 줄·도움말을 반환한다.
+  @override
+  Widget build(BuildContext context) {
+    final shown = value ?? placeholder;
+    final secondary = locked || muted || value == null;
+    final text = Text(
+      shown,
+      style: TextStyle(
+        fontSize: 17,
+        fontWeight: value == null ? FontWeight.w400 : FontWeight.w500,
+        color: secondary ? PayseColors.textSecondary : PayseColors.textPrimary,
+      ),
+    );
+    final line = Container(
+      constraints: const BoxConstraints(minHeight: PayseTextField.fieldHeight),
+      decoration: locked
+          ? null
+          : const BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: PayseColors.borderStrong),
+              ),
+            ),
+      child: Row(
+        children: [
+          Expanded(child: text),
+          if (!locked) ...[
+            const SizedBox(width: PayseSpace.x2),
+            const Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: PayseColors.borderStrong,
+            ),
+          ],
+        ],
+      ),
+    );
+    return Semantics(
+      button: !locked,
+      enabled: !locked && onTap != null,
+      label: '$label, $shown',
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: locked ? null : onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                height: 18 / 13,
+                fontWeight: FontWeight.w600,
+                color: PayseColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            if (locked)
+              CustomPaint(
+                painter: const _DashedBottomLine(PayseColors.dividerSection),
+                child: line,
+              )
+            else
+              line,
+            if (helper case final helper?) ...[
+              const SizedBox(height: 6),
+              Text(
+                helper,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 18 / 12,
+                  color: PayseColors.textSecondary,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
