@@ -1,0 +1,45 @@
+{
+  "id": "PAYSE-GAMMA-EVALUATION-20261103",
+  "role": "data",
+  "baseCommit": "d9602708313df117d41cf28e2014fe932da400e5",
+  "branch": "fix/api/data-refresh-consistency",
+  "allowedPaths": [
+    "apps/api/testing/scenarios/gamma_challenge.py",
+    "apps/api/testing/analysis/gamma_evaluation.py",
+    "apps/api/testing/analysis/gamma_labels.py",
+    "apps/api/testing/analysis/gamma_local.py",
+    "apps/api/testing/analysis/test_gamma_evaluation.py",
+    "apps/api/testing/analysis/test_gamma_local.py",
+    "apps/api/src/test/java/com/payse/api/analysis/service/GammaLiveTest.java",
+    "apps/api/src/test/java/com/payse/api/analysis/service/GammaLocalConfig.java",
+    "apps/api/src/test/java/com/payse/api/analysis/service/GammaLocalTest.java",
+    "apps/api/src/test/java/com/payse/api/ApiTestConstants.java",
+    "apps/api/docs/gamma-local.md",
+    "apps/api/docs/gamma-evaluation.md"
+  ],
+  "acceptance": [
+    "사용자 요청대로 기존 브랜치에서 합성 연간 원천 1825건과 모호함·명시 관계·취소·환불·혼동 반례를 만든다. 계좌 80/20 분포와 미사용 계좌를 유지하고 운영 DB·모바일은 변경하지 않는다.",
+    "모델 호출 전에 공개 입력과 비공개 정답·판단 가능성·확인 필요 사유를 분리하여 해시로 동결한다. 생성 시나리오의 숨은 사실을 모델이 관찰 가능한 정답과 혼동하지 않는다.",
+    "기존 의미 계약·실제 HTTP 접수·소유권·토큰 계수·비용 장부·암호화 저장·결과 조회 경로를 사용한다. 비공개 정답은 모델 실행기에 전달하지 않는다. 실패를 unknown으로 바꾸거나 자동 재시도하지 않는다.",
+    "정답 자동 채점으로 유형별 정확도·정밀도·재현율·오탐률의 분모, 판단 유보·불필요 유보·정상 정보 부족, 근거 ID·사유 코드·누락·처리 실패를 구분한다. 후보 의미 분석과 앱의 사용자 확인·최종 설정 반영은 구분한다.",
+    "현재 승인된 초기 프로필 6000/1200 토큰·20초·사용자 동시 실행 1·10건 또는60초를 기준으로 검증한다. 별도 평가 프로필이 필요하면 문서상 차이와 비용 범위를 명시하고 사용자 확인 후 적용한다.",
+    "누적 45000원 차단선·미확정 예약을 유지한다. 실제 토큰과 청구 추정·보수 예약을 분리하여 보고한다. 폐기용 DB 하나와 제한된 JVM으로 순차 실행하며 기본 CI에 유료 호출을 넣지 않는다.",
+    "전체 연간 검증의 실행 수·미처리 수·유형별 오류 예시와 독립 최종셋이 아니라는 제한을 보고한다. 정답지와 결과를 바꿔 점수를 올리지 않는다. 민감자료를 Git에 포함하지 않는다."
+  ],
+  "readBefore": [
+    "apps/api/AGENTS.md",
+    "apps/ai/AGENTS.md",
+    "docs/payse-execution-contract.md",
+    "apps/api/docs/llm-execution.md",
+    "apps/api/docs/analysis-meaning.md",
+    "apps/api/docs/analysis-runtime.md",
+    "apps/api/docs/gamma-local.md",
+    "apps/api/testing/analysis/README.md",
+    "docs/data-contracts.md",
+    "docs/database-schema.md",
+    "docs/calculation-rules.md",
+    "docs/development-workflow.md",
+    "docs/toolchain.md",
+    "docs/harness/AGENT_REVIEW.md"
+  ]
+}

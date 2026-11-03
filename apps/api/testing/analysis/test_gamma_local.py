@@ -41,6 +41,20 @@ class GammaLocalTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 reserve_run(path, 'blocked')
 
+    def test_evaluation_reservation_keeps_cumulative_cutoff(self):
+        """2026-11-03: 평가 예약 확대가 누적 차단선을 우회하거나 실패 예약을 지우지 않는다."""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            self.assertEqual(100_000_000, reserve_run(path, 'annual', 25_000_000_000))
+            with self.assertRaises(RuntimeError):
+                reserve_run(path, 'another-annual', 25_000_000_000)
+            with self.assertRaises(ValueError):
+                reserve_run(path, 'over-limit', 25_000_000_001)
+            ledger = json.loads((path / 'ledger.json').read_text(encoding='utf-8'))
+            self.assertEqual(1, len(ledger['runs']))
+            self.assertEqual(25_000_000_000, ledger['runs'][0]['budgetMicros'])
+            self.assertEqual('reserved', ledger['runs'][0]['state'])
+
 
 if __name__ == '__main__':
     unittest.main()

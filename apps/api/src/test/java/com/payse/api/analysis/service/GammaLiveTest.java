@@ -55,9 +55,10 @@ class GammaLiveTest {
     private final ObjectNode summary = AnalysisJson.JSON.createObjectNode();
 
     /**
-     * 연간 감마 자료의 세 해석을 실제 실행하고 재시작·재조회에서 추가 모델 호출이 없음을 확인한다.
+     * 감마 합성 해석을 실제 실행하고 재시작·재조회에서 추가 모델 호출이 없음을 확인한다.
      * @created 2026-11-03
      * @usedBy 명시 승인된 JUnit 실행
+     * @modified 2026-11-03 - 동결된 연간 사례의 결과를 정답 없이 수집하고 실패를 보존
      */
     @Test
     void verifiesLiveAnalysisAndEncryptedRecovery() throws Exception {
@@ -118,9 +119,13 @@ class GammaLiveTest {
 
             Path inputFile = Path.of(setting(GammaLocal.ENV_INPUTS));
             JsonNode cases = AnalysisJson.JSON.readTree(inputFile.toFile());
+            boolean evaluation = GammaLocal.APPROVED.equals(
+                System.getenv(GammaLocal.ENV_EVALUATION)
+            );
             var outcomes = summary.putArray(GammaLocal.CASES);
             List<ObjectNode> requests = new ArrayList<>();
             List<String> resultIds = new ArrayList<>();
+            int consecutiveFailures = 0;
             for (JsonNode testCase : cases) {
                 ObjectNode input = ((ObjectNode) testCase.path(AnalysisFields.INPUT)).deepCopy();
                 ObjectNode inputContext = (ObjectNode) input.path(AnalysisFields.CONTEXT);
@@ -135,12 +140,26 @@ class GammaLiveTest {
                 }
                 String name = testCase.path(AnalysisFields.NAME).asString();
                 ObjectNode outcome = outcomes.addObject().put(AnalysisFields.NAME, name);
+                long started = System.nanoTime();
                 String job = submit(input);
                 ObjectNode status = await(job, GammaLocal.SUCCEEDED);
+                outcome.put(GammaLocal.ELAPSED_MILLIS, (System.nanoTime() - started) / 1_000_000);
                 outcome.put(AnalysisFields.STATE, status.path(AnalysisFields.STATE).asString());
                 if (!status.path(AnalysisFields.STATE).asString().equals(GammaLocal.SUCCEEDED)) {
                     outcome.set(AnalysisFields.ERROR, status.path(AnalysisFields.ERROR).deepCopy());
+                    if (evaluation) {
+                        consecutiveFailures++;
+                        Files.writeString(
+                            Path.of(setting(GammaLocal.ENV_REPORT)),
+                            summary.toPrettyString()
+                        );
+                        if (consecutiveFailures >= 3) {
+                            break;
+                        }
+                        continue;
+                    }
                 }
+                consecutiveFailures = 0;
                 assertEquals(
                     GammaLocal.SUCCEEDED,
                     status.path(AnalysisFields.STATE).asString(),
@@ -153,6 +172,21 @@ class GammaLiveTest {
                     AnalysisFields.RESULT_AVAILABILITY,
                     retrieved.path(AnalysisFields.RESULT_AVAILABILITY)
                 );
+                if (evaluation) {
+                    var interpretations = outcome.putArray(GammaLocal.INTERPRETATIONS);
+                    for (JsonNode item : retrieved.path(AnalysisFields.RESULT)
+                        .path(AnalysisFields.ITEMS)) {
+                        interpretations.add(item.path(AnalysisFields.INTERPRETATION).deepCopy());
+                    }
+                    Files.writeString(
+                        Path.of(setting(GammaLocal.ENV_REPORT)),
+                        summary.toPrettyString()
+                    );
+                    if (!retrieved.path(AnalysisFields.RESULT_AVAILABILITY)
+                        .asString().equals(GammaLocal.AVAILABLE)) {
+                        continue;
+                    }
+                }
                 assertEquals(
                     GammaLocal.AVAILABLE,
                     retrieved.path(AnalysisFields.RESULT_AVAILABILITY).asString()
@@ -172,7 +206,12 @@ class GammaLiveTest {
                     + "AND dispatched_at IS NOT NULL",
                 Long.class
             );
-            assertEquals(3L, modelCalls);
+            if (evaluation) {
+                assertTrue(modelCalls <= cases.size());
+                summary.put(GammaLocal.EVALUATION_COMPLETE, outcomes.size() == cases.size());
+            } else {
+                assertEquals(3L, modelCalls);
+            }
             long kmsCalls = admin.queryForObject(
                 "SELECT count(*) FROM payse.analysis_cost_calls WHERE category='kms'",
                 Long.class
@@ -198,7 +237,15 @@ class GammaLiveTest {
             summary.put(GammaLocal.RESTART_RECOVERY, true);
             summary.put(GammaLocal.SOURCES_PRESERVED, true);
             summary.put(GammaLocal.KMS_CALLS, 0);
-            summary.put(GammaLocal.PASSED, true);
+            boolean successful = outcomes.size() == cases.size();
+            for (JsonNode outcome : outcomes) {
+                successful = successful
+                    && GammaLocal.SUCCEEDED.equals(outcome.path(AnalysisFields.STATE).asString())
+                    && GammaLocal.AVAILABLE.equals(
+                        outcome.path(AnalysisFields.RESULT_AVAILABILITY).asString()
+                    );
+            }
+            summary.put(GammaLocal.PASSED, successful);
         } finally {
             if (context != null) {
                 context.close();

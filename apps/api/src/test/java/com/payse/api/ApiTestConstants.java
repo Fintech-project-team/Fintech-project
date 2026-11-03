@@ -95,6 +95,10 @@ public final class ApiTestConstants {
         public static final String ENV_PROJECT = "PROJECT";
         public static final String ENV_PRICING = "PRICING";
         public static final String ENV_SOURCE_VERSION = "SOURCE_VERSION";
+        public static final String ENV_EVALUATION = "PAYSE_GAMMA_EVALUATION";
+        public static final String INTERPRETATIONS = "interpretations";
+        public static final String ELAPSED_MILLIS = "elapsedMillis";
+        public static final String EVALUATION_COMPLETE = "evaluationComplete";
 
         /**
          * 정적 시험 규격의 인스턴스 생성을 막는다.

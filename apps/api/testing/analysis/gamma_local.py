@@ -92,8 +92,10 @@ def private_directory(path):
         path.chmod(0o700)
 
 
-def reserve_run(directory, run_id):
+def reserve_run(directory, run_id, reservation=RUN_RESERVE):
     """2026-11-03: 새 DB로 과거 호출 예산이 초기화되지 않도록 영속 예약을 먼저 기록한다."""
+    if not isinstance(reservation, int) or not 0 < reservation <= 25_000_000_000:
+        raise ValueError('Invalid explicitly bounded run reservation')
     ledger_path = directory / 'ledger.json'
     if ledger_path.exists():
         ledger = json.loads(ledger_path.read_text(encoding='utf-8'))
@@ -101,16 +103,16 @@ def reserve_run(directory, run_id):
         # 사용자 확인: 온보딩 외 사용 없음. 온보딩 정확한 청구는 미확인으로 100 KRW 보류.
         ledger = {'onboardingReserveMicros': 100_000_000, 'runs': []}
     occupied = ledger['onboardingReserveMicros'] + sum(row['budgetMicros'] for row in ledger['runs'])
-    if occupied + RUN_RESERVE >= LIMIT:
+    if occupied + reservation >= LIMIT:
         raise RuntimeError('Gamma cumulative budget exhausted')
-    ledger['runs'].append({'id': run_id, 'budgetMicros': RUN_RESERVE, 'state': 'reserved'})
+    ledger['runs'].append({'id': run_id, 'budgetMicros': reservation, 'state': 'reserved'})
     temporary = ledger_path.with_suffix('.pending')
     temporary.write_text(json.dumps(ledger, indent=2), encoding='utf-8')
     os.replace(temporary, ledger_path)
     return occupied
 
 
-def prepare(cluster, source, opening):
+def prepare(cluster, source, opening, evaluation=False):
     """2026-11-03: 새 DB에 세 계정의 일반 금융 자료와 감마 전용 비용 정책만 준비한다."""
     create_database(cluster, API / 'database', DATABASE)
     cluster.sql(institution_sql(), DATABASE)
@@ -138,9 +140,13 @@ def prepare(cluster, source, opening):
     pricing = {'model': 'gpt-6-luna', 'inputMicrosPerMillion': 750_000_000,
         'cachedMicrosPerMillion': 750_000_000, 'outputMicrosPerMillion': 1_500_000_000,
         'countingMicros': 100_000_000, 'kmsMicros': 0, 'inputLimit': 6000, 'outputLimit': 1200}
+    reservation = RUN_RESERVE
+    if evaluation:
+        pricing.update(inputLimit=12000, outputLimit=4000)
+        reservation = 25_000_000_000
     cluster.sql('INSERT INTO payse.analysis_cost_projects VALUES (' +
         ','.join((quote(PROJECT), quote(VERSION), quote(json.dumps(pricing)) + '::jsonb',
-                  str(opening), str(opening + RUN_RESERVE), 'now()', 'true')) + ');', DATABASE)
+                  str(opening), str(opening + reservation), 'now()', 'true')) + ');', DATABASE)
     return {'PAYSE_GAMMA_JDBC_URL': f"jdbc:postgresql://127.0.0.1:{cluster.env['PGPORT']}/{DATABASE}",
         'PAYSE_GAMMA_DB_USER': login, 'PAYSE_GAMMA_DB_PASSWORD': password,
         'PAYSE_GAMMA_ADMIN_USER': admin, 'PAYSE_GAMMA_ADMIN_PASSWORD': admin_password}
@@ -153,6 +159,7 @@ def main():
     parser.add_argument('--pg-bin', required=True, type=Path)
     parser.add_argument('--work-dir', required=True, type=Path)
     parser.add_argument('--env-file', required=True, type=Path)
+    parser.add_argument('--evaluation-dir', type=Path)
     args = parser.parse_args()
     if not args.live:
         raise ValueError('Explicit --live approval is required')
@@ -162,6 +169,12 @@ def main():
     ignored = subprocess.run(['git', 'check-ignore', '--quiet', str(env_file)], cwd=ROOT)
     if ignored.returncode:
         raise ValueError('The credential file must be Git ignored')
+    dataset = args.evaluation_dir.resolve(strict=True) if args.evaluation_dir else None
+    if dataset:
+        from testing.analysis.gamma_evaluation import verify_bundle, score_run
+        manifest = verify_bundle(dataset)
+        if manifest['batches'] > 200 or not dataset.is_relative_to(ROOT / '.harness'):
+            raise ValueError('Evaluation must be a bounded ignored synthetic dataset')
     private = ROOT / '.harness/gamma-local-private'
     private_directory(private)
     lock = private / 'run.lock'
@@ -179,25 +192,31 @@ def main():
         llm.write_text('enabled=true\nprovider=openai\nmodel=gpt-6-luna\napiKey=\n'
             + 'apiKeyEnvFile=' + env_file.as_posix() + '\nreasoningEffort=none\n', encoding='utf-8')
         run_id = str(uuid.uuid4())
-        opening = reserve_run(private, run_id)
-        source, _ = build()
+        opening = reserve_run(private, run_id, 25_000_000_000 if dataset else RUN_RESERVE)
+        source = json.loads((dataset / 'source.json').read_text(encoding='utf-8')) if dataset else build()[0]
         with Cluster(args.pg_bin, args.work_dir) as cluster:
             environment = {key: value for key, value in os.environ.items()
                            if not key.upper().startswith(('PAYSE_', 'SPRING_', 'PG'))}
-            environment.update(prepare(cluster, source, opening))
+            environment.update(prepare(cluster, source, opening, evaluation=bool(dataset)))
             requests = cluster.work / 'synthetic-inputs.json'
-            requests.write_text(json.dumps(inputs(source), ensure_ascii=False), encoding='utf-8')
+            cases = json.loads((dataset / 'inputs.json').read_text(encoding='utf-8')) if dataset else inputs(source)
+            requests.write_text(json.dumps(cases, ensure_ascii=False), encoding='utf-8')
             report = cluster.work / 'live-summary.json'
             environment.update(PAYSE_GAMMA_LIVE='approved', PAYSE_GAMMA_LLM_FILE=str(llm),
                 PAYSE_GAMMA_KEY_FILE=str(master), PAYSE_GAMMA_PROJECT=PROJECT,
                 PAYSE_GAMMA_PRICING=VERSION, PAYSE_GAMMA_SOURCE_VERSION=source['sourceVersion'],
                 PAYSE_GAMMA_INPUTS=str(requests), PAYSE_GAMMA_REPORT=str(report),
                 PYTHONIOENCODING='utf-8', PYTHONDONTWRITEBYTECODE='1')
+            if dataset:
+                environment['PAYSE_GAMMA_EVALUATION'] = 'approved'
+                (cluster.work / 'dataset-manifest.json').write_text(
+                    json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
             launcher = ['cmd.exe', '/d', '/c', 'gradlew.bat'] if os.name == 'nt' else ['./gradlew']
             with (cluster.work / 'java-tests.log').open('w', encoding='utf-8') as output:
                 completed = subprocess.run(launcher + ['gammaLiveTest', '--no-daemon',
                     '--max-workers=1', '--console=plain'], cwd=API, env=environment,
-                    stdout=output, stderr=subprocess.STDOUT, timeout=600, creationflags=PROCESS_FLAGS)
+                    stdout=output, stderr=subprocess.STDOUT, timeout=5400 if dataset else 600,
+                    creationflags=PROCESS_FLAGS)
             ledger = json.loads((private / 'ledger.json').read_text(encoding='utf-8'))
             entry = next(row for row in ledger['runs'] if row['id'] == run_id)
             costs = cluster.sql("SELECT coalesce(sum(CASE WHEN state='reserved' THEN maximum_micros "
@@ -209,6 +228,10 @@ def main():
             cluster.report.update(passed=completed.returncode == 0, provider='openai',
                 googleKmsCalled=False, sourceTransactions=len(source['transactions']),
                 budgetUpperMicros=int(costs[0]), dispatchedCalls=int(costs[1]), runId=run_id)
+            if report.exists():
+                cluster.report['executionCompleted'] = completed.returncode == 0
+                cluster.report['passed'] = completed.returncode == 0 and json.loads(
+                    report.read_text(encoding='utf-8')).get('passed', False)
             cluster.report['modelCalls'] = int(cluster.sql(
                 "SELECT count(*) FROM payse.analysis_cost_calls WHERE category='model' "
                 "AND dispatched_at IS NOT NULL;", DATABASE)[0])
@@ -219,7 +242,22 @@ def main():
             cluster.report['encryptedItems'] = int(cluster.sql(
                 "SELECT count(*) FROM payse.analysis_items WHERE ciphertext IS NOT NULL "
                 "AND crypto_meta::text LIKE '%gamma-local-v1:%';", DATABASE)[0])
-        print(json.dumps(cluster.report, ensure_ascii=False))
+            cluster.report['callDurations'] = [json.loads(row) for row in cluster.sql(
+                "SELECT jsonb_build_object('category',category,'seconds',"
+                "extract(epoch FROM finished_at-dispatched_at))::text "
+                "FROM payse.analysis_cost_calls ORDER BY dispatched_at;", DATABASE)]
+            if dataset and report.exists():
+                summary = json.loads(report.read_text(encoding='utf-8'))
+                quality = score_run(dataset, summary)
+                quality['runId'] = run_id
+                quality['usage'] = cluster.report['usage']
+                quality['budgetUpperMicros'] = int(costs[0])
+                (cluster.work / 'evaluation.json').write_text(
+                    json.dumps(quality, ensure_ascii=False, indent=2), encoding='utf-8')
+                cluster.report['evaluationItems'] = quality['overall']['items']
+                cluster.report['evaluationFailures'] = quality['overall']['failures']
+        safe_report = {key: value for key, value in cluster.report.items() if key not in ('usage', 'callDurations')}
+        print(json.dumps(safe_report, ensure_ascii=False))
         return completed.returncode
     finally:
         lock.unlink(missing_ok=True)

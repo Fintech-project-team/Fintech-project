@@ -90,6 +90,7 @@ public class GammaLocalConfig {
      * 로컬 키 작업은 외부 비용이 없고 모델 호출에는 기존 DB 비용 장부를 그대로 적용한다.
      * @created 2026-11-03
      * @usedBy Spring 시험 구성
+     * @modified 2026-11-03 - 승인된 연간 평가에만 별도 토큰 상한을 적용
      */
     @Bean
     @Primary
@@ -106,8 +107,11 @@ public class GammaLocalConfig {
         }
         LlmSettings llm = LlmSettings.read(Path.of(file));
         AnalysisPricing pricing = new AnalysisPricing(costs.policy(project, version), llm.model());
+        boolean evaluation = GammaLocal.APPROVED.equals(System.getenv(GammaLocal.ENV_EVALUATION));
+        int inputLimit = evaluation ? 12000 : 6000;
+        int outputLimit = evaluation ? 4000 : 1200;
         if (!llm.enabled() || pricing.kmsMicros() != 0
-            || pricing.inputLimit() > 6000 || pricing.outputLimit() > 1200) {
+            || pricing.inputLimit() > inputLimit || pricing.outputLimit() > outputLimit) {
             throw new IllegalStateException(GammaLocal.INVALID_POLICY);
         }
         HttpClient client = HttpClient.newBuilder()
@@ -174,6 +178,7 @@ public class GammaLocalConfig {
      * 분석 controller 진입 전에 감마 인증과 현재 연간 시험 원천을 확인한다.
      * @created 2026-11-03
      * @usedBy Spring MVC
+     * @modified 2026-11-03 - 명시적 난도 확장 시험 원천 버전도 대조
      */
     @Bean
     WebMvcConfigurer gammaGuard(
@@ -183,7 +188,7 @@ public class GammaLocalConfig {
         FinancialRepository finances,
         @Value("${payse.gamma-local.source-version:}") String sourceVersion
     ) {
-        if (!sourceVersion.matches("fixture:gamma-year:1:[0-9-]+:[0-9]+")) {
+        if (!sourceVersion.matches("fixture:gamma-(year|challenge):1:[0-9-]+:[0-9]+")) {
             throw new IllegalStateException(GammaLocal.MISSING_SOURCE);
         }
         Guard guard = new Guard(transactions, auth, crypto, finances, owner(), sourceVersion);

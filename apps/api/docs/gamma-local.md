@@ -23,6 +23,8 @@ python -B apps/api/testing/analysis/gamma_local.py --live --pg-bin <PostgreSQL-b
 
 같은 테스트 API를 재시작하고 저장 결과를 복구하며 추가 모델 호출이 없는지 확인한다. 금융 원천·설정·버전을 전후 비교한다. 연간 전체 자료가 저장돼 있다는 검사와 세 표본의 실제 모델 검증을 구분하며, 이를 1,825건 전체의 정확도로 보고하지 않는다. 실제 휴대폰·운영 서버 배포는 별도다.
 
+연간 전건과 어려운 사례의 실제 응답을 사전 정답으로 채점하는 별도 실행은 [감마 연간 평가](gamma-evaluation.md)를 따른다. 이 모드에만 승인된 12,000/4,000토큰 상한과 25,000원 예약을 적용하며, 합성 결과의 의미·사유·근거 ID를 Git 제외 파일에 보관한다. 세 표본 실행과 운영 설정은 유지한다.
+
 실제 호출 중 확인한 공통 문제도 수정했다. 공개 분류 기준은 한글을 그대로 쓰고 반복 필드명을 `columns`·`rows` 표로 표현해 입력을 줄인다. 테스트에서 표를 원래 JSON으로 복원해 모든 값·구조가 같음을 확인한다. 기준이나 정답을 제거하지 않고 6,000토큰 제한을 유지한다. 보존 지침은 `active`를 사용자 승인·장기 참고와 구분한다. 현재 유효한 후보·판단 유보는 활성으로 제안하고, 부적합 근거가 있으면 비활성 사유를 제안한다. 서버는 모델의 플래그를 덮어쓰지 않는다.
 
 키와 실행 비용 장부는 Git 제외 `.harness/gamma-local-private/`에 두고 현재 실행 사용자와 시스템 계정으로 접근을 제한한다. OpenAI 키를 복제하지 않고 기존 `.env.local`을 명시 참조한다. DB 비밀번호는 새로 생성해 하위 프로세스 환경으로만 전달한다. 모델 입력·응답 원문·토큰·키는 실행 로그에 남기지 않는다. 입력 파일은 테스트 생성기로 만든 합성 사례이며 운영 요청 저장 기능이 아니다.
@@ -50,5 +52,7 @@ payse.gamma-local.source-version=
 ```
 
 시험 종료 시 `GammaLocal*`, `GammaLiveTest`, `ApiTestConstants.GammaLocal`, `testing/analysis/gamma_local.py`, `test_gamma_local.py`, Gradle의 두 감마 실행 작업과 제외·혼입 검사, 이 문서 및 실행 문서의 링크를 제거한다. 일반 서버 JAR의 코드 경로나 공개 API에 감마 분기를 추가하지 않았다. 공통 프롬프트 압축·활성 의미 보완, 무료 키 비용을 표현하는 일반 가격 검증과 Google KMS의 양수 검사에는 감마 의존성이 없다.
+
+연간 평가도 폐기할 때는 `testing/scenarios/gamma_challenge.py`, `testing/analysis/gamma_labels.py`, `gamma_evaluation.py`, `test_gamma_evaluation.py`와 [평가 문서](gamma-evaluation.md)를 함께 제거한다. 실행 입력·정답·결과는 Git 제외 `.harness/`의 해당 평가 폴더에만 있으며, 삭제 범위는 보관할 평가 근거를 확인한 뒤 정한다.
 
 로컬 상위 키는 연결된 시험 DB·백업·복구 필요성을 확인한 뒤 폐기한다. Google KMS로 나중에 전환하더라도 기존 로컬 암호문이 자동 변환되는 것은 아니다. 폐기 가능한 합성 결과는 제거 후 재생성하거나 별도로 검토한 키 이행 절차가 필요하다.
