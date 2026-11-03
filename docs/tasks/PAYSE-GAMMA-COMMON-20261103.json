@@ -1,0 +1,18 @@
+{
+  "id": "PAYSE-GAMMA-COMMON-20261103",
+  "role": "integration",
+  "baseCommit": "6dd8d632fa08b92f0e229748aca8e0e8874f3c78",
+  "branch": "fix/api/data-refresh-consistency",
+  "allowedPaths": ["docs/api-response-models.md"],
+  "acceptance": [
+    "사용자가 전달한 프론트 담당자의 #193 요청과 서버 기본 사례 변경에 맞춰 공용 문서의 감마 initialCase를 gamma-life로 정정한다. 기존 gamma-month-end 사례는 별도 검증용으로 보존한다.",
+    "공개 필드·계산·모바일 구현은 변경하지 않는다. API 역할 변경으로 경로 검사를 통과시키지 않고 이미 검증·커밋한 API 작업과 분리한다."
+  ],
+  "readBefore": [
+    "docs/api-response-models.md",
+    "docs/ownership.md",
+    "docs/development-workflow.md",
+    "docs/toolchain.md",
+    "docs/harness/COMMIT_PR_POLICY.md"
+  ]
+}

@@ -27,6 +27,7 @@ tasks.named('test') {
 
 tasks.register('contractCases', Exec) {
     inputs.dir('../api/testing/analysis')
+    inputs.dir('../api/testing/scenarios')
     inputs.dir('../api/fixtures/generated-v4')
     inputs.dir('contracts')
     inputs.file('testing/export_contracts.py')

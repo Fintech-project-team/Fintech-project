@@ -148,6 +148,7 @@ public final class AiTestConstants {
     public static final class Files {
         public static final String TEST_DATA_PROPERTY = "payse.testData";
         public static final String INPUT_FILE = "service-input.json";
+        public static final String GAMMA_YEAR_FILE = "gamma-year-inputs.json";
         public static final String PARITY_FILE = "parity.jsonl";
         public static final String INVALID_INPUTS_FILE = "invalid-inputs.json";
         public static final String DATE_INPUTS_FILE = "date-inputs.json";

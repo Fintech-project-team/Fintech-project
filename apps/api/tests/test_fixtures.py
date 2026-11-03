@@ -48,6 +48,25 @@ class FixtureTests(unittest.TestCase):
         """2026-10-19: Build immutable reference fixtures once for independent copies in tests."""
         cls.cases,cls.seeds,cls.catalog=build()
 
+    def test_gamma_default_is_unconfigured_source(self):
+        """2026-11-03: 감마 최초 자료는 LLM 전 금융 원천이며 월말 시나리오 설정을 가져오지 않는다."""
+        gamma = [row for row in self.seeds['users'] if row['initialCase'] == 'gamma-life']
+        self.assertEqual(len(gamma), 1)
+        source = self.cases[gamma[0]['initialCase']]
+        self.assertEqual(source['userId'], gamma[0]['userId'])
+        self.assertTrue(source['transactions'])
+        self.assertTrue(source['institutionLinks'])
+        self.assertTrue(all(not row['included'] for row in source['accounts']))
+        self.assertTrue(all(row['payseTransactionType'] is None
+                            for key in ('transactions', 'relatedTransactions') for row in source[key]))
+        self.assertEqual(source['settings']['salary'], {
+            'salaryDay': None, 'salaryAmountKRW': None, 'salaryAccountId': None,
+            'receiptEvidence': []})
+        for key in ('transactionRelations', 'recurringPlans', 'recurringPlanRevisions',
+                    'obligations', 'reserves', 'allocations', 'settlements'):
+            self.assertEqual(source[key], [], key)
+        self.assertEqual(source['settings']['cardPlans'], [])
+
     def test_distinct_counterparties_and_methods(self):
         """2026-10-28: 계좌 1년 내역에 종류명만 반복하거나 적요를 복사하지 않는다. 사용: unittest."""
         rows = [r for r in self.cases['demo-ready']['transactions'] if r['recordKind'] == 'account_entry']
@@ -665,6 +684,132 @@ class FixtureTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 export(p,cases=['alpha-ready','salary-wait'])
             self.assertEqual(literal("a'; DROP TABLE x;--"),"'a''; DROP TABLE x;--'")
+
+
+class SourceRefreshPreparationTests(unittest.TestCase):
+    """2026-11-02: 기존 fixture CI에서 원천 갱신 입력의 안전 경계도 검사한다."""
+
+    def setUp(self):
+        """2026-11-02: 원본 fixture를 수정하지 않는 독립 갱신 입력을 준비한다."""
+        from database.test_source_refresh import refresh_pair
+        from tools.refresh_source import render
+        self.before, self.after = refresh_pair()
+        self.render = render
+
+    def test_valid_refresh_is_offline_and_nonmutating(self):
+        """2026-11-02: SQL 생성은 입력·DB를 수정하지 않고 기본은 전체 롤백이다."""
+        before, after = copy.deepcopy(self.before), copy.deepcopy(self.after)
+        sql = self.render(self.before, self.after, 7, 'reviewed_database')
+        self.assertTrue(sql.endswith('ROLLBACK;\n'))
+        self.assertEqual(before, self.before)
+        self.assertEqual(after, self.after)
+        self.assertTrue(self.render(before, after, 7, 'reviewed_database', apply=True)
+                        .endswith('COMMIT;\n'))
+
+    def test_current_data_version_is_explicit_and_bounded(self):
+        """2026-11-02: 초기 fixture 버전을 현재 DB 버전으로 추측하거나 정밀도를 잃지 않는다."""
+        for version in (None, True, 0, -1, 1.5, '7', 9223372036854775807):
+            with self.assertRaises(ValueError):
+                self.render(self.before, self.after, version, 'reviewed_database')
+
+    def test_future_facts_and_balance_time_disagreement_are_rejected(self):
+        """2026-11-02: 날짜만 늘린 거래와 다른 시점의 잔액은 갱신 SQL로 만들지 않는다."""
+        invalid = copy.deepcopy(self.after)
+        for row in invalid['transactions']:
+            row['bookingDate'] = '2026-10-21'
+        with self.assertRaises(ValueError):
+            self.render(self.before, invalid, 1, 'reviewed_database')
+        invalid = copy.deepcopy(self.after)
+        for row in invalid['accounts']:
+            row['asOf'] = self.before['asOf']
+        with self.assertRaises(ValueError):
+            self.render(self.before, invalid, 1, 'reviewed_database')
+
+    def test_source_version_cannot_be_reused_or_rolled_back(self):
+        """2026-11-02: 새 버전 없는 덮어쓰기와 시간 역행은 이전 사실의 재확인으로 처리하지 않는다."""
+        with self.assertRaises(ValueError):
+            self.render(self.before, self.before, 1, 'reviewed_database')
+        with self.assertRaises(ValueError):
+            self.render(self.after, self.before, 1, 'reviewed_database')
+
+    def test_source_refresh_cannot_change_user_settings(self):
+        """2026-11-02: 원천 전달에 섞인 사용자 급여 설정 변경을 조용히 성공 처리하지 않는다."""
+        self.after['settings']['salary']['salaryDay'] = 20
+        with self.assertRaises(ValueError):
+            self.render(self.before, self.after, 1, 'reviewed_database')
+
+    def test_source_rows_cannot_be_removed(self):
+        """2026-11-02: 여전히 참조되는 자료 또는 기존 ID를 원천 교체로 삭제하지 않는다."""
+        self.after['transactions'] = []
+        with self.assertRaises(ValueError):
+            self.render(self.before, self.after, 1, 'reviewed_database')
+
+    def test_account_preferences_are_not_source_updates(self):
+        """2026-11-02: 원천 교체 입력에 섞인 별칭 변경을 성공으로 표시하지 않는다."""
+        for row in self.after['accounts']:
+            row['nickname'] = '임의 변경'
+        with self.assertRaises(ValueError):
+            self.render(self.before, self.after, 1, 'reviewed_database')
+
+
+class GammaYearTests(unittest.TestCase):
+    """2026-11-03: 재현성·정답 분리·원천 일관성과 의미 입력의 연간 포함 범위를 검사한다."""
+
+    def test_daily_count_balances_and_unconfigured_state(self):
+        """2026-11-03: 365일/1825건과 계좌 원장을 검증하고 사용자 확정값은 비워 둔다."""
+        from collections import Counter
+        from testing.scenarios.gamma_year import build as year
+        source, gold = year()
+        self.assertEqual((source, gold), year())
+        counts = Counter(row['occurredAt'][:10] for row in source['transactions'])
+        self.assertEqual(len(counts), 365)
+        self.assertEqual(set(counts.values()), {5})
+        self.assertEqual(len(source['transactions']), 1825)
+        self.assertEqual(len(source['accounts']), 9)
+        bank_counts = Counter(row['accountId'] for row in source['transactions']
+                              if row['recordKind'] == 'account_entry')
+        self.assertEqual(sum(bank_counts.values()), 1000)
+        self.assertEqual(bank_counts[gold['mainAccountId']], 800)
+        self.assertEqual([bank_counts[key] for key in gold['secondaryAccountIds']], [40] * 5)
+        self.assertEqual([bank_counts[key] for key in gold['unusedAccountIds']], [0] * 3)
+        transfers = [refs for group, refs in gold['groups'].items() if group.startswith('own-transfer-')]
+        self.assertEqual(len(transfers), 200)
+        by_id = {row['transactionId']: row for row in source['transactions']}
+        for refs in transfers:
+            self.assertEqual(len(refs), 2)
+            pair = [by_id[key] for key in refs]
+            self.assertEqual({row['direction'] for row in pair}, {'in', 'out'})
+            self.assertEqual(len({row['accountId'] for row in pair}), 2)
+            self.assertEqual(len({row['amountKRW'] for row in pair}), 1)
+            self.assertEqual(len({row['occurredAt'] for row in pair}), 1)
+        self.assertTrue(all(row['payseTransactionType'] is None for row in source['transactions']))
+        self.assertFalse(any(row['included'] for row in source['accounts']))
+        self.assertEqual(source['transactionRelations'], [])
+        for account in source['accounts']:
+            movement = sum((1 if row['direction'] == 'in' else -1) * row['amountKRW']
+                for row in source['transactions'] if row['accountId'] == account['accountId'])
+            self.assertEqual(account['balanceKRW'], gold['openingBalancesKRW'][account['accountId']] + movement)
+        self.assertEqual(len(gold['groups']['salary']), 12)
+        self.assertEqual(source['settings']['salary']['salaryDay'], None)
+        self.assertEqual(source['settings']['cardPlans'], [])
+
+    def test_year_analysis_inputs_exclude_gold_and_cover_all_transactions(self):
+        """2026-11-03: 전체 원천을 제한 내로 분할하고 정상 판단 유보·반복 응답 형식을 검사한다."""
+        from testing.analysis.gamma_year_cases import prepare
+        batches, examples = prepare()
+        self.assertEqual(len(batches), 97)
+        seen = {row['transactionId'] for batch in batches for row in batch['transactions']}
+        self.assertEqual(len(seen), 1825)
+        for batch in batches:
+            self.assertLessEqual(len(batch['transactions']), 20)
+            self.assertEqual(batch['currentClassifications'], [])
+            serialized = json.dumps(batch)
+            for field in ('scenarioTruth', 'openingBalancesKRW', 'payseTransactionType'):
+                self.assertNotIn(field, serialized)
+        transfer = examples['transferUnknown']['output']['items'][0]
+        self.assertEqual(transfer['classification']['status'], 'unknown')
+        self.assertIsNone(transfer['classification']['value'])
+        self.assertEqual(len(transfer['evidenceTransactionIds']), 2)
 
 
 if __name__=='__main__':

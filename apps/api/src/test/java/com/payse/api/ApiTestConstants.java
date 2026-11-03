@@ -265,6 +265,7 @@ public final class ApiTestConstants {
      * @usedBy AccountStatusTest, BillingProjectionTest, FinancialCursorTest,
      * FinancialHttpInputTest, FinancialHttpTest, FinancialInputTest, FinancialProjectionTest,
      * FinancialShapeTest, FinancialTupleTest
+     * @modified 2026-11-02 - 기준 시각 회귀 검사의 기존 날짜·기록 필드를 독립 선언
      */
     public static final class FinanceFields {
         public static final String ACCESS_RESTRICTIONS = "accessRestrictions";
@@ -282,6 +283,9 @@ public final class ApiTestConstants {
         public static final String BILLED_AMOUNT_KRW = "billedAmountKRW";
         public static final String BILLED_PRINCIPAL_KRW = "billedPrincipalKRW";
         public static final String BOOKING_DATE = "bookingDate";
+        public static final String WITHDRAWAL_DATE = "withdrawalDate";
+        public static final String CANCELLED_AT = "cancelledAt";
+        public static final String RESERVES = "reserves";
         public static final String CARDS = "cards";
         public static final String CARD_ID = "cardId";
         public static final String CARD_PLANS = "cardPlans";
