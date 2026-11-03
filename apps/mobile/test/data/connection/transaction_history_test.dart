@@ -170,16 +170,38 @@ void main() {
     );
   });
 
-  test('계약 밖 열거값은 형식 오류, 계좌 내역의 approved·cancelled는 허용', () {
+  test('계약 밖 열거값은 형식 오류, 계좌 내역은 posted·unknown만, 카드 기록은 네 상태 모두 허용', () {
     final json = readSource('demo-ready');
     final rows = json['transactions']! as List;
     final account = (rows.cast<Map>()).firstWhere(
       (t) => t['recordKind'] == 'account_entry',
     );
-    account['status'] = 'approved';
-    expect(() => FinancialSnapshot.fromJson(json), returnsNormally);
-    account['status'] = 'cancelled';
-    expect(() => FinancialSnapshot.fromJson(json), returnsNormally);
+    final card = (rows.cast<Map>()).firstWhere(
+      (t) => t['recordKind'] == 'card_purchase',
+    );
+    for (final status in ['posted', 'unknown']) {
+      account['status'] = status;
+      expect(() => FinancialSnapshot.fromJson(json), returnsNormally);
+    }
+    for (final status in ['approved', 'cancelled']) {
+      account['status'] = status;
+      expect(
+        () => FinancialSnapshot.fromJson(json),
+        throwsA(
+          isA<SnapshotFormatException>().having(
+            (e) => e.path,
+            'path',
+            endsWith('.status'),
+          ),
+        ),
+      );
+    }
+    account['status'] = 'posted';
+    for (final status in ['approved', 'posted', 'cancelled', 'unknown']) {
+      card['status'] = status;
+      expect(() => FinancialSnapshot.fromJson(json), returnsNormally);
+    }
+    card['status'] = 'approved';
     account['status'] = 'pending';
     expect(
       () => FinancialSnapshot.fromJson(json),
@@ -187,6 +209,40 @@ void main() {
     );
     account['status'] = 'posted';
     account['direction'] = 'sideways';
+    expect(
+      () => FinancialSnapshot.fromJson(json),
+      throwsA(isA<SnapshotFormatException>()),
+    );
+  });
+
+  test('관련 거래·거래 페이지의 계좌 내역도 approved·cancelled면 형식 오류', () {
+    final json = readSource('demo-ready');
+    final rows = (json['transactions']! as List).cast<Map>();
+    final account = Map<String, Object?>.of(
+      rows.firstWhere((t) => t['recordKind'] == 'account_entry').cast(),
+    );
+    Map<String, Object?> page(String status) => {
+      'transactions': [
+        {...account, 'status': status},
+      ],
+      'coverage': <Object?>[],
+      'page': {'nextCursor': null, 'dataVersion': 'v1'},
+    };
+    expect(() => TransactionPage.fromJson(page('unknown')), returnsNormally);
+    for (final status in ['approved', 'cancelled']) {
+      expect(
+        () => TransactionPage.fromJson(page(status)),
+        throwsA(isA<SnapshotFormatException>()),
+      );
+    }
+
+    json['transactions'] = [
+      for (final t in rows)
+        if (t['transactionId'] != account['transactionId']) t,
+    ];
+    json['relatedTransactions'] = [account];
+    expect(() => FinancialSnapshot.fromJson(json), returnsNormally);
+    account['status'] = 'cancelled';
     expect(
       () => FinancialSnapshot.fromJson(json),
       throwsA(isA<SnapshotFormatException>()),
