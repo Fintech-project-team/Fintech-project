@@ -26,6 +26,7 @@ import '../features/auth/auth_screens.dart';
 import '../features/auth/auth_services.dart';
 import '../features/auth/auth_view_models.dart';
 import '../features/connection/connection_presentation_policy.dart';
+import '../features/my_info/my_info_screen.dart' show AppVersionReader;
 import '../shared/design/font_licenses.dart';
 import '../shared/design/payse_theme.dart';
 import 'dev/dev_demo_accounts.dart';
@@ -75,6 +76,7 @@ class PayseApp extends StatefulWidget {
     this.firstCalcRecords,
     this.coachmarkRecords,
     this.server,
+    this.appVersion,
   });
 
   final SnapshotSource? snapshotSource;
@@ -95,6 +97,9 @@ class PayseApp extends StatefulWidget {
   final FirstCalcRecordStore? firstCalcRecords;
   final CoachmarkRecordStore? coachmarkRecords;
   final ({ApiConfig config, ApiTransport transport})? server;
+
+  /// 2026-11-03: 설치된 앱 버전 읽기(앱 시작 지점이 넘김). 없으면 내 정보 탭에 버전 줄을 두지 않는다.
+  final AppVersionReader? appVersion;
 
   /// 2026-10-20: 앱 루트 상태 객체를 반환한다. 인자 없음.
   @override
@@ -499,6 +504,7 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
         salaryNoticeApi: _salaryNoticeApi,
         devEntryBuilder: _devEntryOrNull,
         onLogout: _logout,
+        appVersion: widget.appVersion,
         onSessionInvalid: _onFinancialSessionInvalid,
       ),
     };

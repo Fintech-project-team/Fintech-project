@@ -13,6 +13,7 @@ import '../features/connection/connection_flow.dart';
 import '../features/connection/connection_illustration.dart';
 import '../features/connection/connection_page.dart';
 import '../features/connection/connection_presentation_policy.dart';
+import '../features/my_info/my_info_screen.dart' show AppVersionReader;
 import '../features/overview/home_screen.dart' show HomeRefresh;
 import '../features/overview/pull_refresh.dart';
 import '../features/overview/slide_switch.dart';
@@ -45,6 +46,7 @@ class MainEntry extends StatefulWidget {
     this.coachmarkRecords,
     this.salaryNoticeApi,
     this.onLogout,
+    this.appVersion,
   });
 
   final UserFinancialRepository financial;
@@ -57,6 +59,9 @@ class MainEntry extends StatefulWidget {
   final CoachmarkRecordStore? coachmarkRecords;
   final SalaryNoticeApi? salaryNoticeApi;
   final Future<String?> Function()? onLogout;
+
+  /// 2026-11-03: 내 정보 탭의 설치된 앱 버전 읽기. 없으면 버전 줄을 두지 않는다.
+  final AppVersionReader? appVersion;
 
   /// 2026-10-21: 조회 상태 객체를 반환한다.
   @override
@@ -388,6 +393,8 @@ class _MainEntryState extends State<MainEntry> {
             ),
             salaryNotices: _salaryNotices,
             onLogout: widget.onLogout,
+            userName: widget.userName,
+            appVersion: widget.appVersion,
           ),
         ),
         EntryDestination.connect || EntryDestination.chooseAccounts => Builder(
