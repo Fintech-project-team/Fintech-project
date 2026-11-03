@@ -106,6 +106,14 @@ void main() {
     await tester.pump();
     expect(find.text('월세'), findsOneWidget, reason: '공개된 항목은 그대로');
     expect(find.text('수리비'), findsNothing, reason: '숨겨진 항목은 추정하지 않음');
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('plan-section-앞으로 나갈 돈')))
+          .textSpan!
+          .toPlainText(),
+      isNot(contains('원')),
+      reason: '일부만 보이면 합계를 전체처럼 보이지 않음',
+    );
   });
 
   testWidgets('제한이 없으면 제한 안내 없음', (tester) async {
@@ -146,7 +154,7 @@ void main() {
       expect(linkText(tester, s), '보여 드릴 수 있는 연결이 없어요');
     });
 
-    testWidgets('배정 정보를 받지 못하면 받지 못했다고, 제한 없는 빈 연결은 없다고', (tester) async {
+    testWidgets('배정 정보를 받지 못하면 받지 못했다고, 제한 없는 빈 연결은 설정액만', (tester) async {
       final json = readSource('beta-ready')..remove('allocations');
       final missing = FinancialSnapshot.fromJson(json);
       expect(missing.allocations, isNull);
@@ -156,7 +164,13 @@ void main() {
       final none = readSource('beta-ready')..['allocations'] = <Object?>[];
       final empty = FinancialSnapshot.fromJson(none);
       await openReserves(tester, empty);
-      expect(linkText(tester, empty), '연결한 예정 지출이 없어요');
+      expect(
+        find.byKey(
+          ValueKey('plan-reserve-links-${empty.reserves!.single.reserveId}'),
+        ),
+        findsNothing,
+        reason: '연결이 없으면 설정액만(하위 행·안내 없음)',
+      );
       expect(
         find.byKey(const ValueKey('plan-allocations-restricted')),
         findsNothing,

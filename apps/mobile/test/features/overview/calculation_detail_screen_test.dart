@@ -142,7 +142,7 @@ void main() {
     expect(find.text('−360,000원'), findsOneWidget);
     expect(find.text('1,300,000원'), findsOneWidget);
     expect(
-      find.text('현재 비상금 400,000원 중 60,000원은 예정 지출에 쓸 예정이에요.'),
+      find.text('현재 비상금 400,000원 중 60,000원은 수리비에 쓸 금액이에요.'),
       findsOneWidget,
     );
     expect(find.textContaining('월세'), findsNothing, reason: '처음에는 모두 접혀 있다');
