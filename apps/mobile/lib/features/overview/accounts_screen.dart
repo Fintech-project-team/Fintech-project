@@ -25,6 +25,42 @@ typedef AccountsWriter = ({
   ValueChanged<FinancialSnapshot> onSnapshot,
 });
 
+/// 2026-10-29: 01-1을 [snapshot]의 계산 포함 계좌가 고른 상태로 열고, 저장되면 [writer]로 앱에 반영한다. 떠 있는 알림은
+/// 닫아 다음 화면의 아래 버튼을 가리지 않게 한다.
+/// 2026-11-03: 내 정보 탭도 같은 화면·저장을 쓰도록 계좌 관리 밖으로 꺼냈다(29-4).
+Future<void> openAccountSelection(
+  BuildContext context,
+  FinancialSnapshot snapshot,
+  AccountsWriter writer,
+) async {
+  ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+  final next = await Navigator.of(context).push<FinancialSnapshot>(
+    MaterialPageRoute(
+      builder: (_) => AccountSelectionPage(snapshot: snapshot, writer: writer),
+    ),
+  );
+  if (next != null) writer.onSnapshot(next);
+}
+
+/// 2026-10-29: 월급 정보 줄 설명. [snapshot]의 월급 설정 [salary]에서 저장된 값만 '매월 D일 · 금액 · 기관 ····끝 4자리'로 잇는다.
+/// 2026-11-03: 내 정보 탭도 같은 문구를 쓰도록 계좌 관리 밖으로 꺼냈다(29-4).
+String salarySummary(FinancialSnapshot snapshot, SalarySetting salary) {
+  final id = salary.salaryAccountId;
+  final account = id == null ? null : accountById(snapshot, id);
+  return [
+    if (salary.salaryDay case final day?) '매월 $day일' else '월급일 미입력',
+    if (salary.salaryAmountKrw case final amount?)
+      formatKrw(amount)
+    else
+      '금액 미입력',
+    if (salary.salaryAccountRestricted)
+      '월급 계좌 정보를 볼 수 없어요'
+    else if (account != null)
+      '${institutionName(snapshot, account.institutionCode)} '
+          '····${lastFour(account.maskedNumber)}',
+  ].join(' · ');
+}
+
 /// 2026-10-29: 02-3 계좌 관리(29-1 단독). 계산에 포함한 계좌 잔액·계좌 수·기준 시각 → '계산에 포함할 계좌 바꾸기' →
 /// 금융사별 계좌 목록(이름·끝 4자리·보조 정보·잔액·연필). 계산에서 제외한 계좌도 보이되 흐리게 두고 표시를 붙인다.
 /// 잔액 합계는 홈 계산 결과(B)를 그대로 쓰고 화면에서 더하지 않는다. 2026-10-30: '계좌·카드' 탭의 '계좌 관리'로 들어가며
@@ -85,38 +121,6 @@ class AccountsScreen extends StatelessWidget {
           ),
         ),
       );
-  }
-
-  /// 2026-10-29: 01-1을 현재 계산 포함 계좌가 고른 상태로 열고, 저장되면 앱에 반영한다. 떠 있는 알림은 닫아 다음 화면의
-  /// 아래 버튼을 가리지 않게 한다.
-  Future<void> _changeSelection(BuildContext context) async {
-    final w = writer;
-    if (w == null) return;
-    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
-    final next = await Navigator.of(context).push<FinancialSnapshot>(
-      MaterialPageRoute(
-        builder: (_) => AccountSelectionPage(snapshot: snapshot, writer: w),
-      ),
-    );
-    if (next != null) w.onSnapshot(next);
-  }
-
-  /// 2026-10-29: 월급 정보 줄 설명. 저장된 값만 '매월 D일 · 금액 · 기관 ····끝 4자리'로 잇는다.
-  String _salaryText(SalarySetting salary) {
-    final id = salary.salaryAccountId;
-    final account = id == null ? null : accountById(snapshot, id);
-    return [
-      if (salary.salaryDay case final day?) '매월 $day일' else '월급일 미입력',
-      if (salary.salaryAmountKrw case final amount?)
-        formatKrw(amount)
-      else
-        '금액 미입력',
-      if (salary.salaryAccountRestricted)
-        '월급 계좌 정보를 볼 수 없어요'
-      else if (account != null)
-        '${institutionName(snapshot, account.institutionCode)} '
-            '····${lastFour(account.maskedNumber)}',
-    ].join(' · ');
   }
 
   /// 2026-10-29: 월급 정보 편집 화면을 연다. 저장하면 응답 Snapshot으로 앱을 다시 계산한다.
@@ -245,9 +249,14 @@ class AccountsScreen extends StatelessWidget {
                   height: PayseSize.touchMin,
                   child: OutlinedButton(
                     key: const ValueKey('accounts-change-selection'),
-                    onPressed: writer == null
-                        ? null
-                        : () => _changeSelection(context),
+                    onPressed: switch (writer) {
+                      final w? => () => openAccountSelection(
+                        context,
+                        snapshot,
+                        w,
+                      ),
+                      null => null,
+                    },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: PayseColors.textPrimary,
                       side: const BorderSide(color: PayseColors.borderStrong),
@@ -266,7 +275,7 @@ class AccountsScreen extends StatelessWidget {
                 const Divider(height: 1, color: PayseColors.dividerSection),
                 if (snapshot.settings?.salary case final salary?)
                   _SalaryRow(
-                    text: _salaryText(salary),
+                    text: salarySummary(snapshot, salary),
                     onTap: writer == null ? null : () => _editSalary(context),
                   ),
                 for (final (i, g) in ordered.indexed) ...[

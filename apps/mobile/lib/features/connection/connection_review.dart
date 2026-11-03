@@ -30,18 +30,11 @@ String productTypeLabel(String productType) => switch (productType) {
   _ => '기타',
 };
 
-/// 2026-10-22: 01-2 카드 결제일 표시. 사용자 설정·다음 확인 일정·예정 일정 없음을 구분한다.
+/// 2026-10-22: 01-2 카드 결제일 표시. 다음 확인 일정·예정 일정 없음을 구분한다.
+/// 2026-11-03: 사용자 계획 결제일은 이번 앱 범위에서 보이지 않아 카드사 확인 일정만 쓴다(29-4 카드 범위).
 sealed class CardPaymentDay {
   /// 2026-10-22: 하위 값만 만든다.
   const CardPaymentDay();
-}
-
-/// 2026-10-22: 사용자가 정한 계획 결제일(매월 [day]일).
-final class PlannedPaymentDay extends CardPaymentDay {
-  /// 2026-10-22: 매월 날짜 [day]로 만든다.
-  const PlannedPaymentDay(this.day);
-
-  final int day;
 }
 
 /// 2026-10-22: 기준일 이후 가장 이른 카드사 확인 결제일 [date](YYYY-MM-DD).
@@ -52,21 +45,16 @@ final class NextConfirmedDue extends CardPaymentDay {
   final String date;
 }
 
-/// 2026-10-22: 사용자 설정도, 기준일 이후 확인 일정도 없다. 지난 날짜로 대신하지 않는다.
+/// 2026-10-22: 기준일 이후 확인 일정이 없다. 지난 날짜로 대신하지 않는다.
 final class NoUpcomingDue extends CardPaymentDay {
   /// 2026-10-22: 일정 없음 값을 만든다.
   const NoUpcomingDue();
 }
 
-/// 2026-10-22: 카드 [card]의 결제일 표시를 고른다. 사용자 설정(plannedPaymentDay)이 있으면 그것을,
-/// 없으면 Snapshot asOf의 날짜(기기 날짜가 아님) 이상인 확인 dueDate 중 가장 이른 날짜를 쓴다.
-/// 반복 주기를 추정하지 않는다. 현재 계약에는 결제 완료 일정 표시가 없어 제외할 일정이 없다.
+/// 2026-10-22: 카드 [card]의 결제일 표시를 고른다. Snapshot asOf의 날짜(기기 날짜가 아님) 이상인 확인 dueDate 중
+/// 가장 이른 날짜를 쓴다. 반복 주기를 추정하지 않는다. 현재 계약에는 결제 완료 일정 표시가 없어 제외할 일정이 없다.
+/// 2026-11-03: 사용자 계획(settings.cardPlans plannedPaymentDay)은 있어도 쓰지 않는다.
 CardPaymentDay cardPaymentDay(FinancialSnapshot snapshot, PaymentCard card) {
-  for (final plan in snapshot.settings?.cardPlans ?? const <CardPlan>[]) {
-    if (plan.cardId == card.cardId && plan.plannedPaymentDay != null) {
-      return PlannedPaymentDay(plan.plannedPaymentDay!);
-    }
-  }
   final basis = snapshot.asOf.substring(0, 10);
   final upcoming = [
     for (final s in card.scheduleEvidence)

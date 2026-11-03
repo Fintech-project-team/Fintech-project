@@ -11,6 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_secure_storage: 11.2.0
+  package_info_plus: 10.2.2
   payse_calculation:
     path: ../../packages/payse_calculation
   shared_preferences: 2.5.6
