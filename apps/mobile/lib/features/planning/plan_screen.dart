@@ -20,6 +20,7 @@ import 'obligation_edit.dart' show obligationFacts;
 import 'obligation_edit_screen.dart';
 import 'plan_period_sheet.dart';
 import 'plan_periods.dart';
+import 'reserve_edit_screen.dart';
 
 /// 2026-11-02: 하단 '계획' 탭(29-3, 읽기 전용). 안쪽 탭 '예정 지출 / 남겨둘 돈'. 예정 지출은 위에서 기간(월급 기간 또는 달력 월)을
 /// 고르고 그 기간에 예정일이 든 '앞으로 나갈 돈 → 이미 나간 돈(접힘) → 계산에서 뺀 계좌(접힘)'를 보인다. 남겨둘 돈은 현재
@@ -132,6 +133,43 @@ class _PlanScreenState extends State<PlanScreen> {
         SnackBar(
           key: const ValueKey('plan-edit-saved'),
           content: Text(moved ? '$done ${mdText(due)}이 있는 기간으로 이동했어요.' : done),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(
+            PayseSpace.x4,
+            0,
+            PayseSpace.x4,
+            PayseSpace.x3,
+          ),
+        ),
+      );
+  }
+
+  /// 2026-11-03: 남겨둘 돈 편집을 열고, 저장·취소에 성공하면 알림을 보인다(29-5b).
+  Future<void> _editReserve(
+    FinancialSnapshot snapshot, {
+    String? reserveId,
+  }) async {
+    final writer = widget.links.writer;
+    if (writer == null) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final result = await openReserveEditor(
+      context,
+      snapshot: snapshot,
+      writer: writer,
+      reserveId: reserveId,
+    );
+    if (result == null || !mounted) return;
+    final done = result.cancelled
+        ? '남겨둘 돈을 취소했어요.'
+        : reserveId == null
+        ? '남겨둘 돈을 저장했어요.'
+        : '남겨둘 돈을 수정했어요.';
+    messenger
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const ValueKey('plan-reserve-saved'),
+          content: Text(done),
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.fromLTRB(
             PayseSpace.x4,
@@ -543,6 +581,9 @@ class _PlanScreenState extends State<PlanScreen> {
       line: lines?.where((l) => l.reserveId == r.reserveId).firstOrNull,
       restricted: allocationsRestricted,
       excluded: excluded,
+      onTap: widget.links.writer == null
+          ? null
+          : () => _editReserve(snapshot, reserveId: r.reserveId),
       noSalary:
           result?.insufficient.any(
             (r) =>
@@ -566,6 +607,30 @@ class _PlanScreenState extends State<PlanScreen> {
           sliver: SliverList.list(
             children: [
               Text(asOfLabel(snapshot.asOf), style: PayseTypography.caption),
+              if (widget.links.writer != null && snapshot.reserves != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: PayseSpace.x4),
+                  child: SizedBox(
+                    height: PayseSize.touchMin,
+                    child: OutlinedButton.icon(
+                      key: const ValueKey('plan-reserve-add'),
+                      onPressed: () => _editReserve(snapshot),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('남겨둘 돈 추가'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: PayseColors.textPrimary,
+                        side: const BorderSide(color: PayseColors.borderStrong),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(PayseRadius.sm),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               if (snapshot.reserves == null)
                 const _Message(text: '남겨둘 돈 정보를 받지 못했어요.')
               else ...[
@@ -1281,8 +1346,12 @@ class _ReserveBlock extends StatelessWidget {
     required this.restricted,
     required this.excluded,
     required this.noSalary,
+    this.onTap,
     super.key,
   });
+
+  /// 2026-11-03: 누르면 수정 화면을 연다(저장 연결이 없으면 null, 화살표도 없음).
+  final VoidCallback? onTap;
 
   /// 2026-11-03: 계산에서 뺀 계좌의 남겨둘 돈이면 true다. 연결을 부호 없이 보이고 '남겨둘 금액' 줄을 두지 않는다.
   final bool excluded;
@@ -1325,7 +1394,7 @@ class _ReserveBlock extends StatelessWidget {
               ),
           ];
     final effective = line?.effectiveKrw;
-    return Container(
+    final block = Container(
       padding: const EdgeInsets.symmetric(vertical: PayseSpace.x4),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: PayseColors.dividerRow)),
@@ -1370,6 +1439,14 @@ class _ReserveBlock extends StatelessWidget {
                   const Text('설정액', style: PayseTypography.caption),
                 ],
               ),
+              if (onTap != null) ...[
+                const SizedBox(width: PayseSpace.x1),
+                const Icon(
+                  Icons.chevron_right,
+                  size: 16,
+                  color: PayseColors.textSecondary,
+                ),
+              ],
             ],
           ),
           if (allocations == null || (subs.isEmpty && restricted))
@@ -1437,6 +1514,13 @@ class _ReserveBlock extends StatelessWidget {
         ],
       ),
     );
+    return onTap == null
+        ? block
+        : InkWell(
+            key: ValueKey('plan-reserve-open-${reserve.reserveId}'),
+            onTap: onTap,
+            child: block,
+          );
   }
 }
 

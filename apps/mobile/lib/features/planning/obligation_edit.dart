@@ -184,20 +184,25 @@ String? _reasonOf(HomeCalculation calculation) => switch (calculation) {
   _ => '받은 정보로 계산할 수 없어요.',
 };
 
-/// 2026-11-03: 지금 Snapshot [snapshot]과 계산 [current]에 예정 지출 바꾸기([obligations]·[allocations] 전체)를 적용했을 때의
-/// 미리보기를 계산한다. 원본 Snapshot·홈 결과는 바꾸지 않으며 결과는 메모리에만 둔다.
+/// 2026-11-03: 지금 Snapshot [snapshot]과 계산 [current]에 예정 지출 바꾸기([obligations]·[allocations] 전체, 남겨둘 돈은
+/// [reserves]가 있으면 그것)를 적용했을 때의 미리보기를 계산한다. 원본 Snapshot·홈 결과는 바꾸지 않으며 결과는 메모리에만 둔다.
 PlanPreview previewPlan(
   FinancialSnapshot snapshot,
   HomeCalculation current, {
   required List<Obligation> obligations,
   required List<Allocation> allocations,
+  List<Reserve>? reserves,
 }) {
   final now = _amountOf(current);
   if (now == null) {
     return PreviewUnavailable(reason: _reasonOf(current));
   }
   final after = computeHomeCalculation(
-    snapshot.withPlan(obligations: obligations, allocations: allocations),
+    snapshot.withPlan(
+      obligations: obligations,
+      allocations: allocations,
+      reserves: reserves,
+    ),
   );
   final value = _amountOf(after);
   return value == null
