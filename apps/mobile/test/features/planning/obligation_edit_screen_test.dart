@@ -357,15 +357,16 @@ void main() {
     expect(balanceText(account), '잔액 확인 불가');
   });
 
-  testWidgets('연결 없는 취소 확인창: 공통 확인창 폭, 구분선·연결 안내 없음', (tester) async {
+  testWidgets('연결 없는 취소: 하단 취소 버튼, 공통 확인창 폭, 구분선·연결 안내 없음', (tester) async {
     await _pump(tester);
     await _openRow(tester, '월세');
     expect(
-      DefaultTextStyle.of(tester.element(find.text('이 예정 지출 취소')))
-          .style
-          .decoration,
-      isNot(TextDecoration.underline),
-      reason: '글꼴 밑줄을 쓰지 않음(띄어쓰기에서 높이가 달라짐)',
+      find.descendant(
+        of: find.byKey(const ValueKey('edit-preview')),
+        matching: find.text('예정 지출 취소하기'),
+      ),
+      findsOneWidget,
+      reason: '취소는 하단 버튼 줄의 저장 버튼 왼쪽(2026-11-03 결정)',
     );
     await tester.tap(find.byKey(const ValueKey('edit-cancel')));
     await tester.pumpAndSettle();

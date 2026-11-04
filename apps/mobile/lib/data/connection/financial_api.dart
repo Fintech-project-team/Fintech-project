@@ -100,6 +100,53 @@ class ObligationPatch {
   };
 }
 
+/// 2026-11-03: POST /reserves의 남겨둘 돈. 이름 [label], 보호 계좌 [accountId], 금액 [amountKrw]다. 29-5b는 연결을 바꾸지 않으므로
+/// allocationChanges는 계약상 필수인 세 빈 배열로 보낸다.
+class ReserveInput {
+  /// 2026-11-03: 세 필드로 만든다.
+  const ReserveInput({
+    required this.label,
+    required this.accountId,
+    required this.amountKrw,
+  });
+
+  final String label;
+  final String accountId;
+  final int amountKrw;
+
+  /// 2026-11-03: 요청 본문을 키 이름 순서로 반환한다.
+  Map<String, Object?> toJson() => {
+    'accountId': accountId,
+    'allocationChanges': const {
+      'create': <Object?>[],
+      'remove': <Object?>[],
+      'update': <Object?>[],
+    },
+    'amountKRW': amountKrw,
+    'label': label,
+  };
+}
+
+/// 2026-11-03: PATCH /reserves/{id}의 바꾼 필드. 보내지 않는 필드는 null이며 allocationChanges는 보내지 않는다(연결 그대로).
+class ReservePatch {
+  /// 2026-11-03: 바꿀 이름 [label], 보호 계좌 [accountId], 금액 [amountKrw]로 만든다.
+  const ReservePatch({this.label, this.accountId, this.amountKrw});
+
+  final String? label;
+  final String? accountId;
+  final int? amountKrw;
+
+  /// 2026-11-03: 보낼 필드가 하나도 없으면 true를 반환한다.
+  bool get isEmpty => label == null && accountId == null && amountKrw == null;
+
+  /// 2026-11-03: 요청 본문을 키 이름 순서로 반환한다. 보내지 않는 필드는 키가 없다.
+  Map<String, Object?> toJson() => {
+    'accountId': ?accountId,
+    'amountKRW': ?amountKrw,
+    'label': ?label,
+  };
+}
+
 /// 2026-11-03: 취소와 함께 푸는 미해제 배정 하나(DetachAllocation). [unreleasedKrw]는 지금 미해제 금액 전부다.
 class DetachAllocation {
   /// 2026-11-03: 배정 [allocationId]와 미해제 금액 [unreleasedKrw]로 만든다.
@@ -302,6 +349,26 @@ abstract interface class UserFinancialRepository {
     WriteContext write,
   );
 
+  /// 2026-11-03: POST /reserves. 남겨둘 돈 [reserve]를 [write]로 만든다.
+  Future<FinancialOutcome<WriteSuccess>> createReserve(
+    ReserveInput reserve,
+    WriteContext write,
+  );
+
+  /// 2026-11-03: PATCH /reserves/{id}. 남겨둘 돈 [reserveId]의 바꾼 필드 [patch]를 [write]로 저장한다.
+  Future<FinancialOutcome<WriteSuccess>> updateReserve(
+    String reserveId,
+    ReservePatch patch,
+    WriteContext write,
+  );
+
+  /// 2026-11-03: POST /reserves/{id}/cancel. 남겨둘 돈 [reserveId]를 취소하며 그 미해제 배정 [detach]를 함께 푼다.
+  Future<FinancialOutcome<WriteSuccess>> cancelReserve(
+    String reserveId,
+    List<DetachAllocation> detach,
+    WriteContext write,
+  );
+
   /// 2026-10-30: GET /transactions?cursor. Snapshot(첫 페이지)의 page.nextCursor로 다음 TransactionPage JSON을 반환한다.
   /// 자료 버전이 바뀌었으면 [FinancialStaleData](409), 변조 cursor는 [FinancialInvalid](400), 다른 세션의 cursor는
   /// [FinancialForbidden](403)이다.
@@ -371,6 +438,29 @@ class UnavailableUserFinancialRepository implements UserFinancialRepository {
   @override
   Future<FinancialOutcome<WriteSuccess>> cancelObligation(
     String obligationId,
+    List<DetachAllocation> detach,
+    WriteContext write,
+  ) async => const FinancialUnavailable();
+
+  /// 2026-11-03: 저장하지 않고 서비스 불가를 반환한다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> createReserve(
+    ReserveInput reserve,
+    WriteContext write,
+  ) async => const FinancialUnavailable();
+
+  /// 2026-11-03: 저장하지 않고 서비스 불가를 반환한다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> updateReserve(
+    String reserveId,
+    ReservePatch patch,
+    WriteContext write,
+  ) async => const FinancialUnavailable();
+
+  /// 2026-11-03: 저장하지 않고 서비스 불가를 반환한다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> cancelReserve(
+    String reserveId,
     List<DetachAllocation> detach,
     WriteContext write,
   ) async => const FinancialUnavailable();

@@ -186,6 +186,44 @@ void main() {
     },
   );
 
+  test('reserve writes: empty allocationChanges on create, patch without it, cancel path', () async {
+    transport.handler = (_) => jsonResponse(200, _saved('8'));
+    await repo.createReserve(
+      const ReserveInput(label: '비상금', accountId: 'a1', amountKrw: 400000),
+      _w,
+    );
+    await repo.updateReserve('r 1', const ReservePatch(amountKrw: 300000), _w);
+    await repo.cancelReserve('r1', const [
+      DetachAllocation(allocationId: 'al1', unreleasedKrw: 60000),
+    ], _w);
+    final [create, update, cancel] = transport.requests;
+    const w = {
+      'expectedDataVersion': '7',
+      'ruleVersion': 'PAYSE-CALC-1',
+      'idempotencyKey': 'key-1',
+    };
+    expect((create.method, create.uri.path), ('POST', '/api/reserves'));
+    expect(create.body, {
+      'accountId': 'a1',
+      'allocationChanges': {'create': [], 'remove': [], 'update': []},
+      'amountKRW': 400000,
+      'label': '비상금',
+      ...w,
+    });
+    expect((update.method, update.uri.path), ('PATCH', '/api/reserves/r%201'));
+    expect(update.body, {'amountKRW': 300000, ...w}, reason: '연결은 보내지 않음');
+    expect(
+      (cancel.method, cancel.uri.path),
+      ('POST', '/api/reserves/r1/cancel'),
+    );
+    expect(cancel.body, {
+      'detachAllocations': [
+        {'allocationId': 'al1', 'unreleasedKRW': 60000},
+      ],
+      ...w,
+    });
+  });
+
   test('409·422 business codes keep their status and code', () async {
     for (final (status, code) in const [
       (409, 'HISTORY_LOCKED'),

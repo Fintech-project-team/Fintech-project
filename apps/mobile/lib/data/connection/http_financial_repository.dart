@@ -116,6 +116,36 @@ class HttpUserFinancialRepository implements UserFinancialRepository {
     write,
   );
 
+  /// 2026-11-03: POST /reserves.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> createReserve(
+    ReserveInput reserve,
+    WriteContext write,
+  ) => _write('POST', '/reserves', reserve.toJson(), write);
+
+  /// 2026-11-03: PATCH /reserves/{id}.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> updateReserve(
+    String reserveId,
+    ReservePatch patch,
+    WriteContext write,
+  ) => _write(
+    'PATCH',
+    '/reserves/${Uri.encodeComponent(reserveId)}',
+    patch.toJson(),
+    write,
+  );
+
+  /// 2026-11-03: POST /reserves/{id}/cancel. 취소는 DELETE 대신 이 경로 하나로 보낸다(W는 본문).
+  @override
+  Future<FinancialOutcome<WriteSuccess>> cancelReserve(
+    String reserveId,
+    List<DetachAllocation> detach,
+    WriteContext write,
+  ) => _write('POST', '/reserves/${Uri.encodeComponent(reserveId)}/cancel', {
+    'detachAllocations': [for (final d in detach) d.toJson()],
+  }, write);
+
   /// 2026-11-01: 금융 쓰기. W는 본문 최상위에 둔다(§1). 재시도는 호출부가 같은 [write]로 다시 부른다(자동 재시도 없음).
   Future<FinancialOutcome<WriteSuccess>> _write(
     String method,
