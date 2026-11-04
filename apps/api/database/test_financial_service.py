@@ -5,6 +5,7 @@ fixture를 읽는 경로를 만들지 않는다. 앱 자격은 하위 검사 환
 """
 from pathlib import Path
 import argparse
+import json
 import os
 import secrets
 import subprocess
@@ -34,10 +35,25 @@ def prepare_database(cluster):
     sys.path.insert(0, str(API))
     from reference_data.export_sql import export as institution_sql
     from testing.scenarios.export_state import export as scenario_sql
+    from testing.scenarios.export_state import state_rows
+    from testing.scenarios.gamma_year import build as gamma_year
+    from fixtures.export_sql import financial_rows, load_sources, render
     cluster.sql(institution_sql(), DATABASE)
     seed = cluster.work / "financial-seed.sql"
     seed.write_text(scenario_sql(API / "fixtures/generated",
         ["alpha-ready", "beta-ready", "gamma-month-end"]), encoding="utf-8")
+    snapshots, seeds = load_sources(API / "fixtures/generated", ["alpha-ready", "beta-ready"])
+    gamma, _ = gamma_year()
+    rows = []
+    for snapshot in snapshots:
+        rows.extend(row for row in financial_rows(snapshot, seeds[snapshot['userId']], connected=True)
+                    if row[0] != 'user_attributes')
+        rows.extend(state_rows(snapshot))
+    rows.extend(financial_rows(gamma, seeds[gamma['userId']]))
+    gamma_seed = cluster.work / "gamma-import-seed.sql"
+    gamma_seed.write_text(render(rows), encoding="utf-8")
+    gamma_source = cluster.work / "gamma-import-source.json"
+    gamma_source.write_text(json.dumps(gamma, ensure_ascii=False), encoding="utf-8")
     responses = cluster.work / "public-responses"
     responses.mkdir()
     suffix = uuid.uuid4().hex
@@ -65,6 +81,8 @@ def prepare_database(cluster):
         "PAYSE_FINANCIAL_TEST_ADMIN_USER": admin,
         "PAYSE_FINANCIAL_TEST_ADMIN_PASSWORD": admin_password,
         "PAYSE_FINANCIAL_TEST_SEED_FILE": str(seed),
+        "PAYSE_FINANCIAL_TEST_GAMMA_SEED_FILE": str(gamma_seed),
+        "PAYSE_FINANCIAL_TEST_GAMMA_SOURCE_FILE": str(gamma_source),
         "PAYSE_FINANCIAL_TEST_RESPONSE_DIR": str(responses),
     })
     return environment
