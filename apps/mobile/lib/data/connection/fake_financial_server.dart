@@ -544,6 +544,344 @@ class FakeFinancialServer {
     },
   );
 
+  /// 2026-11-03: POST /reserves. 형식 오류(이름 1~80자, 금액 0~상한, allocationChanges 세 빈 배열 필수)는 422, 연결 밖·없는
+  /// 계좌는 403, 계산에 포함하지 않은 계좌면 422 VALIDATION_FAILED, 계좌별·선택 계좌 전체 상한(M5)을 넘으면 422 LIMIT_EXCEEDED다
+  /// (apps/api PlanWrites.reserve와 같은 순서).
+  /// 2026-11-04: allocationChanges도 판정한다([_allocationChanges], 29-5c).
+  Future<FinancialOutcome<WriteSuccess>> postReserve(
+    String accessToken,
+    ReserveInput reserve,
+    WriteContext write,
+  ) => _write(
+    accessToken: accessToken,
+    method: 'POST',
+    path: '/reserves',
+    body: reserve.toJson(),
+    write: write,
+    apply: (source, state) {
+      if (!_validLabel(reserve.label) ||
+          !_validMoney(reserve.amountKrw) ||
+          !_validChanges(reserve.changes)) {
+        return const FinancialInvalid(status: 422, code: 'VALIDATION_FAILED');
+      }
+      return _reserveChange(
+        source,
+        state,
+        null,
+        label: reserve.label,
+        accountId: reserve.accountId,
+        amountKrw: reserve.amountKrw,
+        changes: reserve.changes,
+      );
+    },
+  );
+
+  /// 2026-11-03: PATCH /reserves/{id}. 빈 patch·형식 오류는 422, 보이지 않거나 없는 남겨둘 돈·계좌는 403, 취소된 남겨둘 돈은 409
+  /// RELATION_CONFLICT다. 새 계좌·증액이면 계산 포함 계좌와 M5 상한을 검사하고, 미해제 배정 합계보다 작으면 422 LIMIT_EXCEEDED다.
+  Future<FinancialOutcome<WriteSuccess>> patchReserve(
+    String accessToken,
+    String reserveId,
+    ReservePatch patch,
+    WriteContext write,
+  ) => _write(
+    accessToken: accessToken,
+    method: 'PATCH',
+    path: '/reserves/$reserveId',
+    body: patch.toJson(),
+    write: write,
+    apply: (source, state) {
+      if (patch.isEmpty ||
+          (patch.label != null && !_validLabel(patch.label!)) ||
+          (patch.amountKrw != null && !_validMoney(patch.amountKrw!)) ||
+          !_validChanges(patch.changes)) {
+        return const FinancialInvalid(status: 422, code: 'VALIDATION_FAILED');
+      }
+      return _reserveChange(
+        source,
+        state,
+        reserveId,
+        label: patch.label,
+        accountId: patch.accountId,
+        amountKrw: patch.amountKrw,
+        changes: patch.changes,
+      );
+    },
+  );
+
+  /// 2026-11-03: POST /reserves/{id}/cancel. 지금 미해제 배정을 [detach]에 정확한 ID·금액으로 모두 담아야 한다. 중복 ID는 422,
+  /// 없거나 보이지 않는 배정·남겨둘 돈은 403, 다른 대상의 배정·누락·금액 불일치는 409 RELATION_CONFLICT다. 해제 이력 없는 배정은
+  /// 지우고, 있으면 금액을 해제 누계까지 줄인다. 예정 지출은 그대로다.
+  Future<FinancialOutcome<WriteSuccess>> postReserveCancel(
+    String accessToken,
+    String reserveId,
+    List<DetachAllocation> detach,
+    WriteContext write,
+  ) => _write(
+    accessToken: accessToken,
+    method: 'POST',
+    path: '/reserves/$reserveId/cancel',
+    body: {
+      'detachAllocations': [for (final d in detach) d.toJson()],
+    },
+    write: write,
+    apply: (source, state) {
+      final ids = [for (final d in detach) d.allocationId];
+      if (ids.toSet().length != ids.length ||
+          detach.any(
+            (d) => !_validMoney(d.unreleasedKrw) || d.unreleasedKrw < 1,
+          )) {
+        return const FinancialInvalid(status: 422, code: 'VALIDATION_FAILED');
+      }
+      final reachable = _reachable(source, state);
+      final reserves = _rows(source, 'reserves');
+      final index = reserves.indexWhere(
+        (r) =>
+            r['reserveId'] == reserveId && reachable.contains(r['accountId']),
+      );
+      if (index < 0) return const FinancialForbidden();
+      final allocations = _rows(source, 'allocations');
+      final visible = {
+        for (final a in allocations)
+          if (_allocationVisible(source, reachable, a))
+            a['allocationId']! as String: a,
+      };
+      if (ids.any((id) => !visible.containsKey(id))) {
+        return const FinancialForbidden();
+      }
+      final open = {
+        for (final a in allocations)
+          if (a['reserveId'] == reserveId &&
+              (a['amountKRW']! as int) > (a['releasedKRW']! as int))
+            a['allocationId']! as String:
+                (a['amountKRW']! as int) - (a['releasedKRW']! as int),
+      };
+      final asked = {for (final d in detach) d.allocationId: d.unreleasedKrw};
+      if (asked.length != open.length ||
+          asked.entries.any((e) => open[e.key] != e.value)) {
+        return _relationConflict;
+      }
+      final nextAllocations = [
+        for (final a in allocations)
+          if (!asked.containsKey(a['allocationId']))
+            a
+          else if ((a['releasedKRW']! as int) > 0)
+            {...a, 'amountKRW': a['releasedKRW']},
+      ];
+      final before = reserves[index];
+      final next = [...reserves];
+      if (before['cancelledAt'] == null) {
+        next[index] = {
+          ...before,
+          'cancelledAt': _now().toUtc().toIso8601String(),
+        };
+      }
+      return _planChange(
+        source,
+        state,
+        _rows(source, 'obligations'),
+        nextAllocations,
+        [
+          ChangedRef(resource: 'reserve', id: reserveId),
+          for (final id in asked.keys)
+            ChangedRef(resource: 'allocation', id: id),
+        ],
+        reserves: next,
+      );
+    },
+  );
+
+  /// 2026-11-03: 남겨둘 돈 [reserveId](null이면 새로 만듦)를 이름 [label]·계좌 [accountId]·금액 [amountKrw](null이면 그대로)로
+  /// 바꾼 변경을 만든다. 순서는 apps/api PlanWrites.reserve와 같다: 취소된 대상 409 → 계좌 403 → 새 계좌·증액인데 계산 제외 계좌면
+  /// 422 → 미해제 배정 한도 422 LIMIT_EXCEEDED → 새 계좌·증액이면 계좌별(잔액)·선택 계좌 전체(선택 잔액 합) 상한 422 LIMIT_EXCEEDED.
+  FinancialOutcome<_Change> _reserveChange(
+    Map<String, Object?> source,
+    ProjectionState state,
+    String? reserveId, {
+    String? label,
+    String? accountId,
+    int? amountKrw,
+    AllocationChanges changes = const AllocationChanges(),
+  }) {
+    final reachable = _reachable(source, state);
+    final reserves = _rows(source, 'reserves');
+    final index = reserveId == null
+        ? -1
+        : reserves.indexWhere(
+            (r) =>
+                r['reserveId'] == reserveId &&
+                reachable.contains(r['accountId']),
+          );
+    if (reserveId != null && index < 0) return const FinancialForbidden();
+    final before = index < 0 ? null : reserves[index];
+    if (before != null && before['cancelledAt'] != null) {
+      return _relationConflict;
+    }
+    final account = accountId ?? before!['accountId']! as String;
+    if (!reachable.contains(account)) return const FinancialForbidden();
+    final amount = amountKrw ?? before!['amountKRW']! as int;
+    final included = state.selectedAccountIds ?? const <String>{};
+    final increased =
+        before == null ||
+        account != before['accountId'] ||
+        amount > (before['amountKRW']! as int);
+    if (increased && !included.contains(account)) {
+      return const FinancialInvalid(status: 422, code: 'VALIDATION_FAILED');
+    }
+    final id = reserveId ?? randomUuidV4(_random);
+    final row = {
+      ...?before,
+      'userId': source['userId'],
+      'reserveId': id,
+      'accountId': account,
+      'label': (label ?? before!['label']! as String).trim(),
+      'amountKRW': amount,
+      'cancelledAt': null,
+    };
+    final next = before == null
+        ? [...reserves, row]
+        : ([...reserves]..[index] = row);
+    final allocations = _allocationChanges(source, reachable, id, changes);
+    if (allocations is! FinancialOk<List<Map<String, Object?>>>) {
+      return switch (allocations) {
+        FinancialForbidden() => const FinancialForbidden(),
+        FinancialInvalid(:final status, :final code) => FinancialInvalid(
+          status: status,
+          code: code,
+        ),
+        _ => const FinancialInvalid(),
+      };
+    }
+    final change = _planChange(
+      source,
+      state,
+      _rows(source, 'obligations'),
+      allocations.value,
+      [ChangedRef(resource: 'reserve', id: id)],
+      reserves: next,
+    );
+    if (change is FinancialOk &&
+        increased &&
+        _overReserveLimit(source, included, next, account)) {
+      return const FinancialInvalid(status: 422, code: 'LIMIT_EXCEEDED');
+    }
+    return change;
+  }
+
+  /// 2026-11-04: allocationChanges 형식(apps/api FinancialInput.allocations): 금액 1원 이상, create의 예정 지출과 update·remove의
+  /// 배정이 겹치지 않으면 true다.
+  static bool _validChanges(AllocationChanges changes) {
+    final obligations = [for (final c in changes.create) c.obligationId];
+    final allocations = [
+      for (final u in changes.update) u.allocationId,
+      ...changes.remove,
+    ];
+    return obligations.toSet().length == obligations.length &&
+        allocations.toSet().length == allocations.length &&
+        changes.create.every(
+          (c) => c.amountKrw >= 1 && _validMoney(c.amountKrw),
+        ) &&
+        changes.update.every(
+          (u) => u.amountKrw >= 1 && _validMoney(u.amountKrw),
+        );
+  }
+
+  /// 2026-11-04: 남겨둘 돈 [reserveId]에 [changes]를 적용한 배정 목록(apps/api AllocationWrites.change). create는 보이는 활성 예정
+  /// 지출만(보이지 않으면 403, 활성이 아니면 409 RELATION_CONFLICT), update·remove는 보이는 이 남겨둘 돈의 배정만(다른 대상 409),
+  /// update는 대상이 활성이고 해제액 이상, remove는 해제 이력이 없어야 한다(아니면 409 HISTORY_LOCKED). 한도는 [_planChange]가 본다.
+  FinancialOutcome<List<Map<String, Object?>>> _allocationChanges(
+    Map<String, Object?> source,
+    Set<String> reachable,
+    String reserveId,
+    AllocationChanges changes,
+  ) {
+    final obligations = {
+      for (final o in _rows(source, 'obligations'))
+        o['obligationId']! as String: o,
+    };
+    final next = _rows(source, 'allocations');
+    for (final c in changes.create) {
+      final o = obligations[c.obligationId];
+      if (o == null || !reachable.contains(o['withdrawalAccountId'])) {
+        return const FinancialForbidden();
+      }
+      if (o['status'] != 'active') {
+        return const FinancialInvalid(status: 409, code: 'RELATION_CONFLICT');
+      }
+      next.add({
+        'userId': source['userId'],
+        'allocationId': randomUuidV4(_random),
+        'reserveId': reserveId,
+        'obligationId': c.obligationId,
+        'amountKRW': c.amountKrw,
+        'releasedKRW': 0,
+        'releaseEvidence': <Object?>[],
+      });
+    }
+    int? indexOf(String id) {
+      final i = next.indexWhere(
+        (a) =>
+            a['allocationId'] == id && _allocationVisible(source, reachable, a),
+      );
+      return i < 0 ? null : i;
+    }
+
+    for (final u in changes.update) {
+      final i = indexOf(u.allocationId);
+      if (i == null) return const FinancialForbidden();
+      final a = next[i];
+      if (a['reserveId'] != reserveId ||
+          obligations[a['obligationId']]?['status'] != 'active') {
+        return const FinancialInvalid(status: 409, code: 'RELATION_CONFLICT');
+      }
+      if (u.amountKrw < (a['releasedKRW']! as int)) {
+        return const FinancialInvalid(status: 409, code: 'HISTORY_LOCKED');
+      }
+      next[i] = {...a, 'amountKRW': u.amountKrw};
+    }
+    for (final id in changes.remove) {
+      final i = indexOf(id);
+      if (i == null) return const FinancialForbidden();
+      final a = next[i];
+      if (a['reserveId'] != reserveId) {
+        return const FinancialInvalid(status: 409, code: 'RELATION_CONFLICT');
+      }
+      if ((a['releasedKRW']! as int) != 0 ||
+          ((a['releaseEvidence'] as List?) ?? const []).isNotEmpty) {
+        return const FinancialInvalid(status: 409, code: 'HISTORY_LOCKED');
+      }
+      next.removeAt(i);
+    }
+    return FinancialOk(next);
+  }
+
+  /// 2026-11-03: M5. 계좌 [account]의 취소되지 않은 남겨둘 돈 합계가 그 계좌 잔액(음수면 0)을 넘거나, 계산 포함 계좌 전체의 합계가
+  /// 포함 계좌 잔액 합(음수면 0)을 넘으면 true다(apps/api PlanWrites.reserveLimits).
+  static bool _overReserveLimit(
+    Map<String, Object?> source,
+    Set<String> included,
+    List<Map<String, Object?>> reserves,
+    String account,
+  ) {
+    final balance = {
+      for (final a in _rows(source, 'accounts'))
+        a['accountId']! as String: (a['balanceKRW'] as int?) ?? 0,
+    };
+    var perAccount = 0;
+    var selectedReserve = 0;
+    for (final r in reserves) {
+      if (r['cancelledAt'] != null) continue;
+      final amount = r['amountKRW']! as int;
+      if (r['accountId'] == account) perAccount += amount;
+      if (included.contains(r['accountId'])) selectedReserve += amount;
+    }
+    var selectedBalance = 0;
+    for (final id in included) {
+      selectedBalance += balance[id] ?? 0;
+    }
+    return perAccount > max(0, balance[account] ?? 0) ||
+        selectedReserve > max(0, selectedBalance);
+  }
+
   static const FinancialOutcome<_Change> _historyLocked = FinancialInvalid(
     status: 409,
     code: 'HISTORY_LOCKED',
@@ -553,15 +891,17 @@ class FakeFinancialServer {
     code: 'RELATION_CONFLICT',
   );
 
-  /// 2026-11-03: 예정 지출·배정을 [obligations]·[allocations]로 바꾸는 변경을 만든다. 바꾼 뒤 미해제 배정이 예정 지출 잔여(금액 −
+  /// 2026-11-03: 예정 지출·배정·남겨둘 돈을 [obligations]·[allocations]·[reserves](없으면 원본 그대로)로 바꾸는 변경을 만든다. 바꾼 뒤 미해제 배정이 예정 지출 잔여(금액 −
   /// 유효 정산)나 보호 설정액을 넘거나, 활성이 아닌 대상에 남으면 422 LIMIT_EXCEEDED다(apps/api AllocationWrites.limits).
   FinancialOutcome<_Change> _planChange(
     Map<String, Object?> source,
     ProjectionState state,
     List<Map<String, Object?>> obligations,
     List<Map<String, Object?>> allocations,
-    List<ChangedRef> changed,
-  ) {
+    List<ChangedRef> changed, {
+    List<Map<String, Object?>>? reserves,
+  }) {
+    reserves ??= _rows(source, 'reserves');
     final byObligation = <String, int>{};
     final byReserve = <String, int>{};
     for (final a in allocations) {
@@ -587,7 +927,7 @@ class FakeFinancialServer {
         return const FinancialInvalid(status: 422, code: 'LIMIT_EXCEEDED');
       }
     }
-    for (final r in _rows(source, 'reserves')) {
+    for (final r in reserves) {
       final open = byReserve[r['reserveId']] ?? 0;
       final room = r['cancelledAt'] == null ? r['amountKRW']! as int : 0;
       if (open > room) {
@@ -599,7 +939,11 @@ class FakeFinancialServer {
       selectedAccountIds: state.selectedAccountIds,
       salarySettings: state.salarySettings,
       accountNicknames: state.accountNicknames,
-      plan: (obligations: obligations, allocations: allocations),
+      plan: (
+        obligations: obligations,
+        allocations: allocations,
+        reserves: reserves,
+      ),
       changed: changed,
     ));
   }
@@ -843,6 +1187,7 @@ class FakeFinancialServer {
           ...source,
           'obligations': plan.obligations,
           'allocations': plan.allocations,
+          'reserves': plan.reserves,
         };
 
   /// 2026-10-22: 영수증 [receipt]와 현재 상태의 최신 Snapshot으로 성공 결과를 만든다(replay도 최신 상태).
@@ -911,10 +1256,11 @@ class FakeFinancialServer {
   }
 }
 
-/// 2026-11-03: 사용자가 바꾼 예정 지출·배정 전체. 원본은 그대로 두고 투영 때 이 목록으로 덮는다.
+/// 2026-11-03: 사용자가 바꾼 예정 지출·배정·남겨둘 돈 전체. 원본은 그대로 두고 투영 때 이 목록으로 덮는다.
 typedef _Plan = ({
   List<Map<String, Object?>> obligations,
   List<Map<String, Object?>> allocations,
+  List<Map<String, Object?>> reserves,
 });
 
 /// 2026-10-22: 쓰기 한 건이 만들 다음 상태와 바뀐 자원.
@@ -1080,6 +1426,39 @@ class FakeUserFinancialRepository implements UserFinancialRepository {
             detach,
             write,
           ),
+        );
+
+  /// 2026-11-03: 남겨둘 돈을 만든다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> createReserve(
+    ReserveInput reserve,
+    WriteContext write,
+  ) async => _closed
+      ? const FinancialSessionInvalid()
+      : _accepted(await server.postReserve(accessToken, reserve, write));
+
+  /// 2026-11-03: 남겨둘 돈을 고친다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> updateReserve(
+    String reserveId,
+    ReservePatch patch,
+    WriteContext write,
+  ) async => _closed
+      ? const FinancialSessionInvalid()
+      : _accepted(
+          await server.patchReserve(accessToken, reserveId, patch, write),
+        );
+
+  /// 2026-11-03: 남겨둘 돈을 취소한다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> cancelReserve(
+    String reserveId,
+    List<DetachAllocation> detach,
+    WriteContext write,
+  ) async => _closed
+      ? const FinancialSessionInvalid()
+      : _accepted(
+          await server.postReserveCancel(accessToken, reserveId, detach, write),
         );
 
   /// 2026-10-22: 쓰기 성공의 Snapshot 버전을 기록한다. 닫힌 세션의 늦은 응답은 세션 무효, 낮은 버전 응답은 서비스 불가로 바꿔 반영하지 않게 한다.

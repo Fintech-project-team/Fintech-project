@@ -43,8 +43,8 @@ Future<ObligationEditResult?> openObligationEditor(
   );
 }
 
-/// 2026-11-03: 03-2 예정 지출 추가·수정(29-5a). 하단 탭 없는 화면이며 위에서부터 안내 띠 → 이름 → 금액 → 예정일 → 출금 계좌 →
-/// (수정이면) '이 예정 지출 취소', 맨 아래에 미리보기('지금 쓸 수 있는 돈 / 추가하면·수정하면')와 동작 이름 버튼을 고정한다.
+/// 2026-11-03: 03-2 예정 지출 추가·수정(29-5a). 하단 탭 없는 화면이며 위에서부터 안내 띠 → 이름 → 금액 → 예정일 → 출금 계좌,
+/// 맨 아래에 미리보기('지금 쓸 수 있는 돈 / 추가하면·수정하면')와 동작 이름 버튼(수정이면 왼쪽에 '예정 지출 취소하기')을 고정한다.
 class ObligationEditScreen extends StatefulWidget {
   /// 2026-11-03: 지금 Snapshot [snapshot], 저장 연결 [writer], 대상 [obligationId], 보고 있던 기간 [viewing]으로 만든다.
   const ObligationEditScreen({
@@ -120,8 +120,15 @@ class _ObligationEditScreenState extends State<ObligationEditScreen> {
     if (facts == null) return;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) =>
-          _CancelDialog(facts: facts, preview: _c.cancelPreview),
+      builder: (context) => CancelConfirmDialog(
+        title: '${facts.obligation.label} 예정 지출을 취소할까요?',
+        lines: [
+          for (final h in facts.held)
+            '${h.reserveLabel ?? '남겨둘 돈'}과 연결한 '
+                '${formatKrw(h.unreleasedKrw)}도 연결 해제돼요.',
+        ],
+        preview: _c.cancelPreview,
+      ),
     );
     if (confirmed != true || !mounted) return;
     await _sendCancel();
@@ -161,7 +168,7 @@ class _ObligationEditScreenState extends State<ObligationEditScreen> {
     _unfocus();
     final picked = await showPayseSheet<String>(
       context,
-      _AccountSheet(snapshot: _c.snapshot, selected: _c.draft.accountId),
+      AccountPickSheet(snapshot: _c.snapshot, selected: _c.draft.accountId),
     );
     if (picked != null) _c.setAccount(picked);
   }
@@ -406,43 +413,16 @@ class _ObligationEditScreenState extends State<ObligationEditScreen> {
                       ),
                     ),
                     if (shortfall != null) _ShortfallNote(shortfall),
-                    if (facts != null &&
-                        !facts.withdrawn &&
-                        (!_c.locked || _cancelPending))
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(
-                            PayseSpace.screenHorizontal - PayseSpace.x2,
-                            PayseSpace.x5,
-                            0,
-                            0,
-                          ),
-                          child: TextButton(
-                            key: const ValueKey('edit-cancel'),
-                            onPressed: _c.busy || _c.needsLatest
-                                ? null
-                                : _c.locked
-                                ? _sendCancel
-                                : _cancel,
-                            style: TextButton.styleFrom(
-                              foregroundColor: PayseColors.textPrimary,
-                              minimumSize: const Size(0, PayseSize.touchMin),
-                              textStyle: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            child: const _Underlined('이 예정 지출 취소'),
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
             ),
-            _Bottom(
+            EditBottom(
               verb: _verb,
+              cancelLabel: facts != null && !facts.withdrawn && !_c.locked
+                  ? '예정 지출 취소하기'
+                  : null,
+              onCancel: _c.busy || _c.needsLatest ? null : _cancel,
               preview: _c.preview,
               unchanged: _c.unchanged,
               laterNote: _laterNote(),
@@ -494,17 +474,22 @@ String _delta(int krw) => krw == 0
     ? '현재 금액 변화 없음'
     : '${krw > 0 ? '+' : '−'}${formatKrwDigits(krw.abs())}원';
 
-/// 2026-11-03: 하단 고정 영역(위 선 → 미리보기 → 버튼).
-class _Bottom extends StatelessWidget {
+/// 2026-11-03: 하단 고정 영역(위 선 → 미리보기 → 버튼). 예정 지출·남겨둘 돈 편집이 함께 쓴다.
+/// 2026-11-03: 취소는 밑줄 글자 대신 저장 버튼 왼쪽 같은 크기의 테두리 버튼 [cancelLabel]이다(혜연 결정). 한 줄에 들어가지 않으면
+/// 저장 버튼을 위로 쌓는다.
+class EditBottom extends StatelessWidget {
   /// 2026-11-03: 동작 이름 [verb], 미리보기 [preview](null이면 다시 계산 안내), 바꾼 내용 없음 [unchanged], 다음 월급일 뒤
-  /// 설명 [laterNote], 버튼 [label]·[onPressed]로 만든다.
-  const _Bottom({
+  /// 설명 [laterNote], 버튼 [label]·[onPressed], 취소 버튼 [cancelLabel](null이면 없음)·[onCancel]로 만든다.
+  const EditBottom({
+    super.key,
     required this.verb,
     required this.preview,
     required this.unchanged,
     required this.laterNote,
     required this.label,
     required this.onPressed,
+    this.cancelLabel,
+    this.onCancel,
   });
 
   final String verb;
@@ -513,6 +498,8 @@ class _Bottom extends StatelessWidget {
   final String? laterNote;
   final String label;
   final VoidCallback? onPressed;
+  final String? cancelLabel;
+  final VoidCallback? onCancel;
 
   /// 2026-11-03: 영역을 반환한다.
   @override
@@ -577,30 +564,83 @@ class _Bottom extends StatelessWidget {
               Text(note, style: PayseTypography.caption),
             ],
             const SizedBox(height: PayseSpace.x3),
-            SizedBox(
-              height: 52,
-              child: FilledButton(
-                key: const ValueKey('edit-save'),
-                onPressed: onPressed,
-                style: FilledButton.styleFrom(
-                  backgroundColor: PayseColors.charcoal,
-                  foregroundColor: PayseColors.onCharcoal,
-                  disabledBackgroundColor: PayseColors.surfaceMuted,
-                  disabledForegroundColor: PayseColors.textSecondary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(PayseRadius.sm),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                child: Text(label),
-              ),
-            ),
+            _buttons(context),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 2026-11-03: 저장 버튼과(있으면) 취소 버튼. 취소 문구가 절반 폭에 들어가지 않으면 저장을 위로 쌓는다.
+extension on EditBottom {
+  Widget _buttons(BuildContext context) {
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(PayseRadius.sm),
+    );
+    const text = TextStyle(fontSize: 16, fontWeight: FontWeight.w600);
+    final save = SizedBox(
+      height: 52,
+      child: FilledButton(
+        key: const ValueKey('edit-save'),
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: PayseColors.charcoal,
+          foregroundColor: PayseColors.onCharcoal,
+          disabledBackgroundColor: PayseColors.surfaceMuted,
+          disabledForegroundColor: PayseColors.textSecondary,
+          padding: const EdgeInsets.symmetric(horizontal: PayseSpace.x2),
+          shape: shape,
+          textStyle: text,
+        ),
+        child: Text(label),
+      ),
+    );
+    final cancel = cancelLabel;
+    if (cancel == null) return save;
+    final secondary = SizedBox(
+      height: 52,
+      child: OutlinedButton(
+        key: const ValueKey('edit-cancel'),
+        onPressed: onCancel,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: PayseColors.textPrimary,
+          side: const BorderSide(color: PayseColors.borderStrong),
+          padding: const EdgeInsets.symmetric(horizontal: PayseSpace.x2),
+          shape: shape,
+          textStyle: text,
+        ),
+        child: Text(cancel),
+      ),
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: cancel, style: text),
+          textDirection: TextDirection.ltr,
+          textScaler: MediaQuery.textScalerOf(context),
+          maxLines: 1,
+        )..layout();
+        final half = (constraints.maxWidth - PayseSpace.x2) / 2;
+        if (painter.width + PayseSpace.x2 * 2 > half) {
+          return Column(
+            key: const ValueKey('edit-buttons-stacked'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              save,
+              const SizedBox(height: PayseSpace.x2),
+              secondary,
+            ],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: secondary),
+            const SizedBox(width: PayseSpace.x2),
+            Expanded(child: save),
+          ],
+        );
+      },
     );
   }
 }
@@ -748,11 +788,18 @@ class PlanInfoBand extends StatelessWidget {
 }
 
 /// 2026-11-03: 취소 확인창(공통 확인창과 같은 폭, 금액 앞 구분선 없이 여백만, 금액과 변화량은 글자 기준선 맞춤). 제목, 미해제 연결 해제 한 줄(연결마다), '취소 후 쓸 수 있는 돈'과 '금액 (변화량)', 돌아가기·취소하기.
-class _CancelDialog extends StatelessWidget {
-  /// 2026-11-03: 대상 [facts]와 미리보기 [preview]로 만든다.
-  const _CancelDialog({required this.facts, required this.preview});
+class CancelConfirmDialog extends StatelessWidget {
+  /// 2026-11-03: 제목 [title], 설명 줄 [lines](없으면 제목 아래 바로 금액), 미리보기 [preview]로 만든다. 예정 지출·남겨둘 돈 취소가
+  /// 함께 쓴다.
+  const CancelConfirmDialog({
+    super.key,
+    required this.title,
+    required this.lines,
+    required this.preview,
+  });
 
-  final ObligationFacts facts;
+  final String title;
+  final List<String> lines;
   final PlanPreview? preview;
 
   /// 2026-11-03: 확인창을 반환한다.
@@ -775,7 +822,7 @@ class _CancelDialog extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              '${facts.obligation.label} 예정 지출을 취소할까요?',
+              title,
               style: const TextStyle(
                 fontSize: 17,
                 height: 1.45,
@@ -783,11 +830,10 @@ class _CancelDialog extends StatelessWidget {
                 color: PayseColors.textPrimary,
               ),
             ),
-            if (facts.held.isNotEmpty) const SizedBox(height: PayseSpace.x3),
-            for (final h in facts.held)
+            if (lines.isNotEmpty) const SizedBox(height: PayseSpace.x3),
+            for (final line in lines)
               Text(
-                '${h.reserveLabel ?? '남겨둘 돈'}과 연결한 '
-                '${formatKrw(h.unreleasedKrw)}도 연결 해제돼요.',
+                line,
                 style: const TextStyle(
                   fontSize: 15,
                   height: 1.55,
@@ -1068,29 +1114,40 @@ class _DayCell extends StatelessWidget {
 
 /// 2026-11-03: 출금 계좌 선택 시트. 연결된 계좌를 모두 보이고, 계산에서 뺀 계좌는 보조 줄로 알린다(고르는 것은 막지 않음).
 /// 계좌마다 보조 줄에 현재 잔액을, 제목 아래에 자료 기준 시각을 한 번 보인다. 잔액으로 고르기를 막지 않는다.
-class _AccountSheet extends StatefulWidget {
-  /// 2026-11-03: [snapshot]과 지금 값 [selected]로 만든다.
-  const _AccountSheet({required this.snapshot, required this.selected});
+class AccountPickSheet extends StatefulWidget {
+  /// 2026-11-03: [snapshot]과 지금 값 [selected]로 만든다. [title]은 시트 제목, [includedOnly]면 계산에 포함한 계좌만 보이고 그
+  /// 사실을 기준 시각 줄에 함께 적는다(남겨둘 돈). 예정 지출·남겨둘 돈 편집이 함께 쓴다.
+  const AccountPickSheet({
+    super.key,
+    required this.snapshot,
+    required this.selected,
+    this.title = '출금 계좌',
+    this.includedOnly = false,
+  });
 
   final FinancialSnapshot snapshot;
   final String? selected;
+  final String title;
+  final bool includedOnly;
 
   /// 2026-11-03: 고른 계좌 상태를 반환한다.
   @override
-  State<_AccountSheet> createState() => _AccountSheetState();
+  State<AccountPickSheet> createState() => _AccountSheetState();
 }
 
 /// 2026-11-03: 고른 계좌를 보관한다.
-class _AccountSheetState extends State<_AccountSheet> {
+class _AccountSheetState extends State<AccountPickSheet> {
   late String? _picked = widget.selected;
 
   /// 2026-11-03: 시트를 반환한다. 계산 포함 계좌를 먼저 둔다.
   @override
   Widget build(BuildContext context) {
-    final accounts = [...?widget.snapshot.accounts]
-      ..sort((a, b) => (b.included ? 1 : 0) - (a.included ? 1 : 0));
+    final accounts = [
+      for (final a in widget.snapshot.accounts ?? const <Account>[])
+        if (!widget.includedOnly || a.included) a,
+    ]..sort((a, b) => (b.included ? 1 : 0) - (a.included ? 1 : 0));
     return SelectSheet(
-      title: '출금 계좌',
+      title: widget.title,
       header: Padding(
         padding: const EdgeInsets.fromLTRB(
           PayseSpace.screenHorizontal,
@@ -1099,7 +1156,9 @@ class _AccountSheetState extends State<_AccountSheet> {
           PayseSpace.x1,
         ),
         child: Text(
-          '${asOfLabel(widget.snapshot.asOf)} 잔액',
+          widget.includedOnly
+              ? '${asOfLabel(widget.snapshot.asOf)} 잔액 · 계산에 포함한 계좌만 고를 수 있어요'
+              : '${asOfLabel(widget.snapshot.asOf)} 잔액',
           key: const ValueKey('edit-account-asof'),
           style: PayseTypography.caption,
         ),
@@ -1117,31 +1176,6 @@ class _AccountSheetState extends State<_AccountSheet> {
             onTap: () => setState(() => _picked = a.accountId),
           ),
       ],
-    );
-  }
-}
-
-/// 2026-11-03: 글꼴 밑줄 대신 글자 아래에 선을 그은 글자. 띄어쓰기에서 밑줄 높이가 달라지지 않는다.
-class _Underlined extends StatelessWidget {
-  /// 2026-11-03: 글자 [text]로 만든다.
-  const _Underlined(this.text);
-
-  final String text;
-
-  /// 2026-11-03: 글자와 아래 선을 반환한다. 선 색은 버튼 글자색을 따른다.
-  @override
-  Widget build(BuildContext context) {
-    final color = DefaultTextStyle.of(context).style.color;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: color ?? PayseColors.textPrimary),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 1),
-        child: Text(text),
-      ),
     );
   }
 }
