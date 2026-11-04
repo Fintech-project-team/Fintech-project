@@ -6,6 +6,7 @@ import com.payse.ai.constants.AiCodeConstants;
 import com.payse.ai.constants.AiConfigConstants;
 import com.payse.ai.constants.AiFieldConstants;
 import com.payse.ai.constants.AiFieldConstants.Analysis;
+import com.payse.ai.constants.AiFieldConstants.Guide;
 import com.payse.ai.constants.AiMessageConstants;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -45,6 +46,7 @@ public final class AnalysisContract {
      * @created 2026-11-01
      * @usedBy AnalysisService 생성자, 계약 테스트
      * @modified 2026-11-03 - 공개 기준의 문자 이스케이프·반복 필드명을 손실 없는 표로 정규화
+     * @modified 2026-11-04 - 반복 근거를 사전 참조로 바꾸고 원래 적용 범위·순서 보존
      * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조
      */
     public AnalysisContract() {
@@ -62,6 +64,8 @@ public final class AnalysisContract {
             resource(AiConfigConstants.Analysis.CRITERIA_FILE)
         );
         JsonNode meanings = criteria.get(Analysis.MEANINGS);
+        ObjectNode common = commonEvidence(meanings);
+        criteria.set(Guide.COMMON_EVIDENCE, common);
         var columns = new ArrayList<>(meanings.get(0).propertyNames());
         ObjectNode table = JSON.createObjectNode();
         var columnNames = table.putArray(Analysis.COLUMNS);
@@ -73,11 +77,56 @@ public final class AnalysisContract {
                 AiCodeConstants.Analysis.INVALID_INPUT
             );
             var values = rows.addArray();
-            columns.forEach(column -> values.add(meaning.get(column)));
+            for (String column : columns) {
+                if (!common.has(column)) {
+                    values.add(meaning.get(column));
+                    continue;
+                }
+                var remaining = values.addArray();
+                for (JsonNode evidence : meaning.get(column)) {
+                    int sharedIndex = -1;
+                    for (int index = 0; index < common.get(column).size(); index++) {
+                        if (common.get(column).get(index).equals(evidence)) {
+                            sharedIndex = index;
+                            break;
+                        }
+                    }
+                    if (sharedIndex < 0) {
+                        remaining.add(evidence);
+                    } else {
+                        remaining.add(sharedIndex);
+                    }
+                }
+            }
         }
         criteria.set(Analysis.MEANINGS, table);
         instructions = resource(AiConfigConstants.Analysis.INSTRUCTIONS_FILE) + "\n"
             + JSON.writeValueAsString(criteria);
+    }
+
+    /**
+     * 두 번 이상 반복된 근거를 처음 등장한 순서로 사전화한다. 적용 범위를 넓히지 않는다.
+     * @created 2026-11-04
+     * @usedBy AnalysisContract 생성자
+     */
+    private ObjectNode commonEvidence(JsonNode meanings) {
+        ObjectNode common = JSON.createObjectNode();
+        for (String field : new String[] {
+            Guide.REQUIRED_EVIDENCE, Guide.INSUFFICIENT_EVIDENCE }) {
+            Map<JsonNode, Integer> counts = new LinkedHashMap<>();
+            for (JsonNode meaning : meanings) {
+                for (JsonNode entry : meaning.get(field)) {
+                    counts.merge(entry, 1, Integer::sum);
+                }
+            }
+            var entries = common.putArray(field);
+            counts.forEach((entry, count) -> {
+                if (count > 1) {
+                    entries.add(entry);
+                }
+            });
+        }
+        return common;
     }
 
     /**

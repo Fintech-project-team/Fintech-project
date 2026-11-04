@@ -112,7 +112,16 @@ def reserve_run(directory, run_id, reservation=RUN_RESERVE):
     return occupied
 
 
-def prepare(cluster, source, opening, evaluation=False):
+def run_reservation(evaluation, requested_krw=None):
+    """2026-11-04: 표본 평가 예약은 기존 25000원 상한 안에서만 줄일 수 있다. 사용: CLI."""
+    if requested_krw is None:
+        return 25_000_000_000 if evaluation else RUN_RESERVE
+    if not evaluation or type(requested_krw) is not int or not 1 <= requested_krw <= 25000:
+        raise ValueError('Sample reserve must be 1..25000 KRW in evaluation mode')
+    return requested_krw * 1_000_000
+
+
+def prepare(cluster, source, opening, evaluation=False, reservation=None):
     """2026-11-03: 새 DB에 세 계정의 일반 금융 자료와 감마 전용 비용 정책만 준비한다."""
     create_database(cluster, API / 'database', DATABASE)
     cluster.sql(institution_sql(), DATABASE)
@@ -140,10 +149,11 @@ def prepare(cluster, source, opening, evaluation=False):
     pricing = {'model': 'gpt-6-luna', 'inputMicrosPerMillion': 750_000_000,
         'cachedMicrosPerMillion': 750_000_000, 'outputMicrosPerMillion': 1_500_000_000,
         'countingMicros': 100_000_000, 'kmsMicros': 0, 'inputLimit': 6000, 'outputLimit': 1200}
-    reservation = RUN_RESERVE
+    reservation = run_reservation(evaluation) if reservation is None else reservation
+    if type(reservation) is not int or not 0 < reservation <= run_reservation(evaluation):
+        raise ValueError('Invalid run budget')
     if evaluation:
         pricing.update(inputLimit=12000, outputLimit=4000)
-        reservation = 25_000_000_000
     cluster.sql('INSERT INTO payse.analysis_cost_projects VALUES (' +
         ','.join((quote(PROJECT), quote(VERSION), quote(json.dumps(pricing)) + '::jsonb',
                   str(opening), str(opening + reservation), 'now()', 'true')) + ');', DATABASE)
@@ -160,6 +170,7 @@ def main():
     parser.add_argument('--work-dir', required=True, type=Path)
     parser.add_argument('--env-file', required=True, type=Path)
     parser.add_argument('--evaluation-dir', type=Path)
+    parser.add_argument('--reserve-krw', type=int)
     args = parser.parse_args()
     if not args.live:
         raise ValueError('Explicit --live approval is required')
@@ -175,6 +186,7 @@ def main():
         manifest = verify_bundle(dataset)
         if manifest['batches'] > 200 or not dataset.is_relative_to(ROOT / '.harness'):
             raise ValueError('Evaluation must be a bounded ignored synthetic dataset')
+    reservation = run_reservation(bool(dataset), args.reserve_krw)
     private = ROOT / '.harness/gamma-local-private'
     private_directory(private)
     lock = private / 'run.lock'
@@ -192,12 +204,13 @@ def main():
         llm.write_text('enabled=true\nprovider=openai\nmodel=gpt-6-luna\napiKey=\n'
             + 'apiKeyEnvFile=' + env_file.as_posix() + '\nreasoningEffort=none\n', encoding='utf-8')
         run_id = str(uuid.uuid4())
-        opening = reserve_run(private, run_id, 25_000_000_000 if dataset else RUN_RESERVE)
+        opening = reserve_run(private, run_id, reservation)
         source = json.loads((dataset / 'source.json').read_text(encoding='utf-8')) if dataset else build()[0]
         with Cluster(args.pg_bin, args.work_dir) as cluster:
             environment = {key: value for key, value in os.environ.items()
                            if not key.upper().startswith(('PAYSE_', 'SPRING_', 'PG'))}
-            environment.update(prepare(cluster, source, opening, evaluation=bool(dataset)))
+            environment.update(prepare(cluster, source, opening, evaluation=bool(dataset),
+                                       reservation=reservation))
             requests = cluster.work / 'synthetic-inputs.json'
             cases = json.loads((dataset / 'inputs.json').read_text(encoding='utf-8')) if dataset else inputs(source)
             requests.write_text(json.dumps(cases, ensure_ascii=False), encoding='utf-8')

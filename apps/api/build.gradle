@@ -117,7 +117,11 @@ tasks.register('aiArchiveCheck') {
                 throw new GradleException('Private evaluation material entered AI deployment')
             }
             def publicFiles = names.findAll { it.startsWith('com/payse/ai/rules/') && !it.endsWith('/') }
-            if (publicFiles.size() != 6) throw new GradleException('Unexpected AI public resource set')
+            def expectedPublic = ['criteria.json', 'instructions.txt', 'prompt-guide.json',
+                'transactionMeaning.input.schema.json', 'transactionMeaning.output.schema.json',
+                'recurringMeaning.input.schema.json', 'recurringMeaning.output.schema.json']
+                .collect { 'com/payse/ai/rules/' + it }.toSet()
+            if (publicFiles.toSet() != expectedPublic) throw new GradleException('Unexpected AI public resource set')
         }
     }
 }

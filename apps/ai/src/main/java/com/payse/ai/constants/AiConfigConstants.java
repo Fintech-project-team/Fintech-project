@@ -29,6 +29,8 @@ public final class AiConfigConstants {
         public static final String SCHEMA_SUFFIX = ".schema.json";
         public static final String INSTRUCTIONS_FILE = "instructions.txt";
         public static final String CRITERIA_FILE = "criteria.json";
+        public static final String GUIDE_FILE = "prompt-guide.json";
+        public static final String PROMPT_RENDERER = "PAYSE-PROMPT-3";
         public static final String RULES_PATH = "/com/payse/ai/rules/";
         public static final String TRANSACTION_PREFIX = "t";
         public static final String ITEM_PREFIX = "i";

@@ -91,6 +91,7 @@ public class GammaLocalConfig {
      * @created 2026-11-03
      * @usedBy Spring 시험 구성
      * @modified 2026-11-03 - 승인된 연간 평가에만 별도 토큰 상한을 적용
+     * @modified 2026-11-04 - 시험에서도 실제 프롬프트 지문을 재사용 판정에 반영
      */
     @Bean
     @Primary
@@ -122,14 +123,15 @@ public class GammaLocalConfig {
         var factory = llm.factory(http, pricing.inputLimit(), pricing.outputLimit());
         ModelFactory models = (instructions, schema) ->
             new ObservedModel(factory.create(instructions, schema));
+        var analysis = new AnalysisService(models, pricing.inputLimit());
         ObjectNode versions = AnalysisJson.JSON.createObjectNode()
             .put(AnalysisFields.MODEL, llm.model())
-            .put(AnalysisFields.PROMPT, GammaLocal.VERSION)
+            .put(AnalysisFields.PROMPT, analysis.promptVersion())
             .put(AnalysisFields.RESPONSE, GammaLocal.VERSION)
             .put(AnalysisFields.POLICY, version);
         var execution = new AnalysisRuntime.Execution(models, costs, pricing, project, version);
         return new AnalysisRuntime(
-            new AnalysisService(models, pricing.inputLimit()),
+            analysis,
             new EnvelopeCipher(keys),
             versions,
             execution

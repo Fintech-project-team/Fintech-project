@@ -10,6 +10,7 @@ public final class ApiConfigConstants {
      * 분석 실행 구성·비용 경계의 고정 문자열이다.
      * @created 2026-11-03
      * @usedBy AnalysisSettings, AnalysisPricing, AnalysisCosts, AnalysisConfiguration
+     * @modified 2026-11-04 - 프롬프트 버전의 중복 상수를 실제 지문으로 대체
      */
     public static final class Execution {
         public static final String SETTINGS_PROPERTY = "payse.analysis.settings-file";
@@ -21,7 +22,6 @@ public final class ApiConfigConstants {
         public static final String PROJECT = "projectId";
         public static final String PRICING = "pricingVersion";
         public static final String COUNT_PREFIX = "analysis-count:";
-        public static final String PROMPT_VERSION = "PAYSE-model-facts-1";
         public static final String RESPONSE_VERSION = "PAYSE-analysis-storage-1";
 
         /**

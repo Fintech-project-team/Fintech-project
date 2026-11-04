@@ -34,6 +34,7 @@ public class AnalysisConfiguration {
      * @created 2026-11-01
      * @usedBy Spring 생성자 주입
      * @modified 2026-11-03 - 명시 설정·비용 장부 연결 및 Google KMS 양수 단가 확인
+     * @modified 2026-11-04 - 실제 프롬프트 내용 지문을 재사용 버전에 연결
      */
     @Bean
     @ConditionalOnMissingBean(AnalysisRuntime.class)
@@ -73,9 +74,10 @@ public class AnalysisConfiguration {
             settings.pricingVersion(),
             pricing.kmsMicros()
         );
+        var analysis = new AnalysisService(models, pricing.inputLimit());
         var versions = AnalysisJson.JSON.createObjectNode()
             .put(ApiFieldConstants.Analysis.MODEL, llm.model())
-            .put(ApiFieldConstants.Analysis.PROMPT, Execution.PROMPT_VERSION)
+            .put(ApiFieldConstants.Analysis.PROMPT, analysis.promptVersion())
             .put(ApiFieldConstants.Analysis.RESPONSE, Execution.RESPONSE_VERSION)
             .put(ApiFieldConstants.Analysis.POLICY, settings.pricingVersion());
         var execution = new AnalysisRuntime.Execution(
@@ -86,7 +88,7 @@ public class AnalysisConfiguration {
             settings.pricingVersion()
         );
         return new AnalysisRuntime(
-            new AnalysisService(models, pricing.inputLimit()),
+            analysis,
             new EnvelopeCipher(keys),
             versions,
             execution

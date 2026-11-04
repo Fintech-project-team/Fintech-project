@@ -7,6 +7,36 @@ package com.payse.ai.constants;
  */
 public final class AiFieldConstants {
     /**
+     * 공급자 공통 프롬프트 교육 자료의 키다. 공개 금융 응답 필드가 아니다.
+     * @created 2026-11-04
+     * @usedBy PromptGuide, AnalysisContract, InputMapper
+     */
+    public static final class Guide {
+        public static final String VERSION = "version";
+        public static final String RULES = "rules";
+        public static final String SECTIONS = "sections";
+        public static final String ID = "id";
+        public static final String TASKS = "tasks";
+        public static final String RECORD_KINDS = "recordKinds";
+        public static final String DIRECTIONS = "directions";
+        public static final String RULE = "rule";
+        public static final String EXAMPLES = "examples";
+        public static final String TARGET = "target";
+        public static final String CANDIDATE = "candidate";
+        public static final String COMMON_EVIDENCE = "commonEvidence";
+        public static final String REQUIRED_EVIDENCE = "requiredEvidence";
+        public static final String INSUFFICIENT_EVIDENCE = "insufficientEvidence";
+
+        /**
+         * 정적 키 구간의 생성을 막는다.
+         * @created 2026-11-04
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private Guide() {
+        }
+    }
+
+    /**
      * 값 참조 전용 클래스의 생성을 막는다.
      * @created 2026-11-02
      * @usedBy 없음: 정적 상수 전용 타입의 인스턴스화 차단

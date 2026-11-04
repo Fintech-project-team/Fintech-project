@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from gamma_local import inputs, reserve_run, LIMIT, RUN_RESERVE
+from gamma_local import inputs, reserve_run, run_reservation, LIMIT, RUN_RESERVE
 from contract import validate_input
 from testing.scenarios.gamma_year import build
 
@@ -54,6 +54,17 @@ class GammaLocalTests(unittest.TestCase):
             self.assertEqual(1, len(ledger['runs']))
             self.assertEqual(25_000_000_000, ledger['runs'][0]['budgetMicros'])
             self.assertEqual('reserved', ledger['runs'][0]['state'])
+
+    def test_small_sample_keeps_the_same_budget_boundary(self):
+        """2026-11-04: 표본 예약 축소만 허용하며 일반 프로필/전체 한도 변경을 거절한다."""
+        self.assertEqual(3_000_000_000, run_reservation(True, 3000))
+        self.assertEqual(25_000_000_000, run_reservation(True))
+        self.assertEqual(RUN_RESERVE, run_reservation(False))
+        for value in (0, -1, 25001, True, 2.5):
+            with self.assertRaises(ValueError):
+                run_reservation(True, value)
+        with self.assertRaises(ValueError):
+            run_reservation(False, 3000)
 
 
 if __name__ == '__main__':

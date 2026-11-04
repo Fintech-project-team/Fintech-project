@@ -39,6 +39,7 @@ class AnalysisServiceTest {
      * 한글·표 형태로 줄인 기준을 복원하면 공개 원문의 값·구조가 모두 일치한다.
      * @created 2026-11-03
      * @usedBy JUnit
+     * @modified 2026-11-04 - 공통 근거를 복원하여 41개 의미의 모든 기준 보존 확인
      */
     @Test
     void preservesCriteriaWithoutEscapedUnicode() throws Exception {
@@ -48,6 +49,10 @@ class AnalysisServiceTest {
             String instructions = new AnalysisContract().instructions();
             String criteria = instructions.substring(instructions.indexOf('{'));
             ObjectNode restored = (ObjectNode) JSON.readTree(criteria);
+            JsonNode common = restored.remove("commonEvidence");
+            assertNotNull(common);
+            assertFalse(common.path("requiredEvidence").isEmpty());
+            assertFalse(common.path("insufficientEvidence").isEmpty());
             JsonNode table = restored.get(AnalysisFields.MEANINGS);
             JsonNode columns = table.get(AnalysisFields.COLUMNS);
             var meanings = restored.putArray(AnalysisFields.MEANINGS);
@@ -55,7 +60,16 @@ class AnalysisServiceTest {
                 assertEquals(columns.size(), row.size());
                 ObjectNode meaning = meanings.addObject();
                 for (int index = 0; index < columns.size(); index++) {
-                    meaning.set(columns.get(index).asString(), row.get(index));
+                    String column = columns.get(index).asString();
+                    if (common.has(column)) {
+                        var evidence = meaning.putArray(column);
+                        for (JsonNode value : row.get(index)) {
+                            evidence.add(value.isIntegralNumber()
+                                ? common.get(column).get(value.asInt()) : value);
+                        }
+                    } else {
+                        meaning.set(column, row.get(index).deepCopy());
+                    }
                 }
             }
             assertEquals(JSON.readTree(raw), restored);
@@ -68,6 +82,7 @@ class AnalysisServiceTest {
      * 서버의 금액·날짜만 결합하고 원래 ID·원천 객체·민감 추가 필드는 외부로 내보내지 않는다.
      * @created 2026-11-03
      * @usedBy JUnit
+     * @modified 2026-11-04 - 모델 전용 null 생략과 공개 입력 불변을 구별하여 검사
      */
     @Test
     void usesSourceFactsWithoutChangingPublicInput() throws Exception {
@@ -92,10 +107,11 @@ class AnalysisServiceTest {
         AnalysisService service = new AnalysisService(
             (instructions, schema) -> model(100, body -> {
                 calls.incrementAndGet();
-                assertEquals(123456, body.path("transactions").get(0).path("amountKRW").asInt());
+                JsonNode target = body.path("items").get(0).path("target");
+                assertEquals(123456, target.path("amountKRW").asInt());
                 assertFalse(body.toString().contains(account));
-                assertEquals("a1", body.path("transactions").get(0).path("accountId").asString());
-                assertTrue(body.path("transactions").get(0).path("bookingDate").isNull());
+                assertEquals("a1", target.path("accountId").asString());
+                assertTrue(target.path("bookingDate").isMissingNode());
                 assertEquals(facts.path("asOf"), body.path("asOf"));
                 return new ModelReply(null, new TokenUsage(100, null, 10), "MODEL_REFUSAL");
             }),
