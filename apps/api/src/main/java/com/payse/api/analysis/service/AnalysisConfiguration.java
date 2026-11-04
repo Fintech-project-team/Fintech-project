@@ -30,6 +30,17 @@ import org.springframework.context.annotation.Profile;
 @Profile("database & auth & finance & analysis")
 public class AnalysisConfiguration {
     /**
+     * 일반 API의 기존 대기 사용자2/전체20·실행 사용자1/전체2를 유지한다.
+     * @created 2026-11-04
+     * @usedBy AnalysisJobs 생성자
+     */
+    @Bean
+    @ConditionalOnMissingBean(AnalysisCapacity.class)
+    public AnalysisCapacity analysisCapacity() {
+        return new AnalysisCapacity(2, 20, 1, 2);
+    }
+
+    /**
      * 운영비·공급자·KMS 준비가 승인되기 전에는 전송 차단 경계를 사용한다.
      * @created 2026-11-01
      * @usedBy Spring 생성자 주입

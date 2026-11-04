@@ -13,6 +13,10 @@ public final class ApiTestConstants {
      * @usedBy GammaLocalConfig, GammaLocalKeys, GammaLiveTest
      */
     public static final class GammaLocal {
+        public static final String ENV_PARALLEL = "PAYSE_GAMMA_PARALLEL";
+        public static final String PIPELINE_MILLIS = "pipelineElapsedMillis";
+        public static final String MAX_ACTIVE = "maximumConcurrentRequests";
+        public static final String PARALLELISM = "parallelism";
         public static final String KEY_REFERENCE = "gamma-local-v1:";
         public static final String HASH_ALGORITHM = "SHA-256";
         public static final String CIPHER_ALGORITHM = "AES/GCM/NoPadding";
@@ -630,6 +634,7 @@ public final class ApiTestConstants {
      */
     public static final class AnalysisColumns {
         public static final String DISPATCH_STATE = "dispatch_state";
+        public static final String FINISHED_AT = "finished_at";
         public static final String EXECUTION_EXPIRES_AT = "execution_expires_at";
         public static final String GUARD_EXPIRES_AT = "guard_expires_at";
         public static final String NORMAL_EXPIRES_AT_FIELD = "normal_expires_at";
@@ -691,6 +696,10 @@ public final class ApiTestConstants {
         public static final String ACCOUNTS = "accounts";
         public static final String ACCOUNT_ID = "accountId";
         public static final String ACKNOWLEDGE_DUPLICATE_RISK = "acknowledgeDuplicateRisk";
+        public static final String REVIEW = "review";
+        public static final String ITEMS_AVAILABLE = "itemsAvailable";
+        public static final String REQUIRES_USER_INPUT = "requiresUserInput";
+        public static final String RETRY_REQUIRES_ACKNOWLEDGEMENT = "retryRequiresAcknowledgement";
         public static final String ACTION = "action";
         public static final String ACTIVE = "active";
         public static final String AMOUNT_KRW = "amountKRW";

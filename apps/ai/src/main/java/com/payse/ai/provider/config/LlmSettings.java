@@ -193,6 +193,30 @@ public final class LlmSettings {
     }
 
     /**
+     * 준비 프로필과 실제 추론 설정을 대조한다.
+     * @created 2026-11-04
+     * @usedBy GammaDeployment.deployedGammaRuntime
+     */
+    public String reasoningEffort() {
+        return effort;
+    }
+
+    /**
+     * 자격 회전 시 연결 확인을 무효화하며 자격 자체를 노출하지 않는다.
+     * @created 2026-11-04
+     * @usedBy GammaDeployment.deployedGammaRuntime
+     */
+    public String configurationFingerprint() {
+        try {
+            byte[] hash = java.security.MessageDigest.getInstance(AiConfigConstants.Llm.FINGERPRINT_ALGORITHM)
+                .digest((model + "\n" + effort + "\n" + apiKey).getBytes(StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(hash);
+        } catch (java.security.NoSuchAlgorithmException failure) {
+            throw invalid();
+        }
+    }
+
+    /**
      * 기존 게이트웨이를 생성할 팩토리를 반환한다. 모델·키는 파일, 호출 상한은 API 정책에서 받는다.
      * @created 2026-11-01
      * @usedBy API 분석 실행 구성, LlmSettingsTest

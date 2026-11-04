@@ -30,6 +30,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
@@ -59,6 +61,7 @@ class GammaLiveTest {
      * @created 2026-11-03
      * @usedBy 명시 승인된 JUnit 실행
      * @modified 2026-11-03 - 동결된 연간 사례의 결과를 정답 없이 수집하고 실패를 보존
+     * @modified 2026-11-04 - 감마 전용 제한 동시 실행·전체 경과시간·실패 보존
      */
     @Test
     void verifiesLiveAnalysisAndEncryptedRecovery() throws Exception {
@@ -80,6 +83,7 @@ class GammaLiveTest {
             );
             configure();
             launch();
+            summary.set(AnalysisFields.VERSIONS, context.getBean(AnalysisRuntime.class).versions());
             UUID gamma = GammaLocalConfig.owner();
             token = login(gamma);
             var source = source(token);
@@ -125,82 +129,48 @@ class GammaLiveTest {
             var outcomes = summary.putArray(GammaLocal.CASES);
             List<ObjectNode> requests = new ArrayList<>();
             List<String> resultIds = new ArrayList<>();
+            int parallel = GammaLocalConfig.parallelism();
+            summary.put(GammaLocal.PARALLELISM, parallel);
+            long pipelineStarted = System.nanoTime();
+            int next = 0;
+            int active = 0;
+            int maximumActive = 0;
             int consecutiveFailures = 0;
-            for (JsonNode testCase : cases) {
-                ObjectNode input = ((ObjectNode) testCase.path(AnalysisFields.INPUT)).deepCopy();
-                ObjectNode inputContext = (ObjectNode) input.path(AnalysisFields.CONTEXT);
-                var versionFields = List.of(
-                    AnalysisFields.DATA_VERSION,
-                    AnalysisFields.SOURCE_VERSION,
-                    AnalysisFields.AS_OF,
-                    AnalysisFields.RULE_VERSION
-                );
-                for (String field : versionFields) {
-                    inputContext.set(field, source.get(field));
-                }
-                String name = testCase.path(AnalysisFields.NAME).asString();
-                ObjectNode outcome = outcomes.addObject().put(AnalysisFields.NAME, name);
-                long started = System.nanoTime();
-                String job = submit(input);
-                ObjectNode status = await(job, GammaLocal.SUCCEEDED);
-                outcome.put(GammaLocal.ELAPSED_MILLIS, (System.nanoTime() - started) / 1_000_000);
-                outcome.put(AnalysisFields.STATE, status.path(AnalysisFields.STATE).asString());
-                if (!status.path(AnalysisFields.STATE).asString().equals(GammaLocal.SUCCEEDED)) {
-                    outcome.set(AnalysisFields.ERROR, status.path(AnalysisFields.ERROR).deepCopy());
-                    if (evaluation) {
-                        consecutiveFailures++;
-                        Files.writeString(
-                            Path.of(setting(GammaLocal.ENV_REPORT)),
-                            summary.toPrettyString()
-                        );
-                        if (consecutiveFailures >= 3) {
-                            break;
-                        }
-                        continue;
+            boolean stopped = false;
+            try (var executor = Executors.newFixedThreadPool(parallel)) {
+                var completed = new ExecutorCompletionService<CompletedCase>(executor);
+                while (next < cases.size() || active > 0) {
+                    while (next < cases.size() && active < parallel && !stopped) {
+                        JsonNode testCase = cases.get(next++);
+                        completed.submit(() -> executeCase(testCase, source, evaluation));
+                        active++;
+                        maximumActive = Math.max(maximumActive, active);
                     }
-                }
-                consecutiveFailures = 0;
-                assertEquals(
-                    GammaLocal.SUCCEEDED,
-                    status.path(AnalysisFields.STATE).asString(),
-                    GammaLocal.ANALYSIS_FAILED
-                );
-                String result = status.path(AnalysisFields.RESULT_ID).asString();
-                assertFalse(result.isBlank());
-                ObjectNode retrieved = query(input, result);
-                outcome.set(
-                    AnalysisFields.RESULT_AVAILABILITY,
-                    retrieved.path(AnalysisFields.RESULT_AVAILABILITY)
-                );
-                if (evaluation) {
-                    var interpretations = outcome.putArray(GammaLocal.INTERPRETATIONS);
-                    for (JsonNode item : retrieved.path(AnalysisFields.RESULT)
-                        .path(AnalysisFields.ITEMS)) {
-                        interpretations.add(item.path(AnalysisFields.INTERPRETATION).deepCopy());
+                    if (active == 0) {
+                        break;
+                    }
+                    CompletedCase result = completed.take().get();
+                    active--;
+                    outcomes.add(result.outcome());
+                    if (result.resultId() != null) {
+                        requests.add(result.input());
+                        resultIds.add(result.resultId());
+                        consecutiveFailures = 0;
+                    } else {
+                        consecutiveFailures++;
+                        stopped = stopped || consecutiveFailures >= 3;
                     }
                     Files.writeString(
                         Path.of(setting(GammaLocal.ENV_REPORT)),
                         summary.toPrettyString()
                     );
-                    if (!retrieved.path(AnalysisFields.RESULT_AVAILABILITY)
-                        .asString().equals(GammaLocal.AVAILABLE)) {
-                        continue;
-                    }
                 }
-                assertEquals(
-                    GammaLocal.AVAILABLE,
-                    retrieved.path(AnalysisFields.RESULT_AVAILABILITY).asString()
-                );
-                assertEquals(result, retrieved.path(AnalysisFields.RESULT_ID).asString());
-                outcome.put(GammaLocal.STORED_AND_RETRIEVED, true);
-                outcome.set(GammaLocal.MEANING_CODES, meaningCodes(retrieved));
-                requests.add(input);
-                resultIds.add(result);
-                Files.writeString(
-                    Path.of(setting(GammaLocal.ENV_REPORT)),
-                    summary.toPrettyString()
-                );
             }
+            summary.put(
+                GammaLocal.PIPELINE_MILLIS,
+                (System.nanoTime() - pipelineStarted) / 1_000_000
+            );
+            summary.put(GammaLocal.MAX_ACTIVE, maximumActive);
             long modelCalls = admin.queryForObject(
                 "SELECT count(*) FROM payse.analysis_cost_calls WHERE category='model' "
                     + "AND dispatched_at IS NOT NULL",
@@ -246,12 +216,83 @@ class GammaLiveTest {
                     );
             }
             summary.put(GammaLocal.PASSED, successful);
+            if (!evaluation) {
+                assertTrue(successful, GammaLocal.ANALYSIS_FAILED);
+            }
         } finally {
             if (context != null) {
                 context.close();
             }
             Files.writeString(Path.of(setting(GammaLocal.ENV_REPORT)), summary.toPrettyString());
         }
+    }
+
+    /**
+     * 한 요청의 입력·결과를 작업 간 공유 없이 수집기에 전달한다.
+     * @created 2026-11-04
+     * @usedBy executeCase, verifiesLiveAnalysisAndEncryptedRecovery
+     */
+    private record CompletedCase(ObjectNode input, ObjectNode outcome, String resultId) {}
+
+    /**
+     * 실제 인증·허가·공급자·암호화·조회 경로를 한 번만 실행한다.
+     * @created 2026-11-04
+     * @usedBy verifiesLiveAnalysisAndEncryptedRecovery
+     */
+    private CompletedCase executeCase(JsonNode testCase, JsonNode source, boolean evaluation) {
+        ObjectNode input = ((ObjectNode) testCase.path(AnalysisFields.INPUT)).deepCopy();
+        ObjectNode inputContext = (ObjectNode) input.path(AnalysisFields.CONTEXT);
+        var versionFields = List.of(
+            AnalysisFields.DATA_VERSION,
+            AnalysisFields.SOURCE_VERSION,
+            AnalysisFields.AS_OF,
+            AnalysisFields.RULE_VERSION
+        );
+        for (String field : versionFields) {
+            inputContext.set(field, source.get(field));
+        }
+        String name = testCase.path(AnalysisFields.NAME).asString();
+        ObjectNode outcome = AnalysisJson.JSON.createObjectNode().put(AnalysisFields.NAME, name);
+        long started = System.nanoTime();
+        String resultId = null;
+        try {
+            String job = submit(input);
+            ObjectNode status = await(job, GammaLocal.SUCCEEDED);
+            outcome.put(AnalysisFields.STATE, status.path(AnalysisFields.STATE).asString());
+            if (!status.path(AnalysisFields.STATE).asString().equals(GammaLocal.SUCCEEDED)) {
+                outcome.set(AnalysisFields.ERROR, status.path(AnalysisFields.ERROR).deepCopy());
+                return new CompletedCase(input, outcome, null);
+            }
+            String result = status.path(AnalysisFields.RESULT_ID).asString();
+            assertFalse(result.isBlank());
+            ObjectNode retrieved = query(input, result);
+            outcome.set(
+                AnalysisFields.RESULT_AVAILABILITY,
+                retrieved.path(AnalysisFields.RESULT_AVAILABILITY)
+            );
+            if (evaluation) {
+                var interpretations = outcome.putArray(GammaLocal.INTERPRETATIONS);
+                for (JsonNode item : retrieved.path(AnalysisFields.RESULT)
+                    .path(AnalysisFields.ITEMS)) {
+                    interpretations.add(item.path(AnalysisFields.INTERPRETATION).deepCopy());
+                }
+            }
+            assertEquals(
+                GammaLocal.AVAILABLE,
+                retrieved.path(AnalysisFields.RESULT_AVAILABILITY).asString()
+            );
+            assertEquals(result, retrieved.path(AnalysisFields.RESULT_ID).asString());
+            outcome.put(GammaLocal.STORED_AND_RETRIEVED, true);
+            outcome.set(GammaLocal.MEANING_CODES, meaningCodes(retrieved));
+            resultId = result;
+        } catch (Exception | AssertionError failure) {
+            // No exception text: provider data or authentication values must not enter reports.
+            outcome.put(AnalysisFields.STATE, GammaLocal.FAILED);
+            outcome.put(AnalysisFields.ERROR, failure.getClass().getSimpleName());
+        } finally {
+            outcome.put(GammaLocal.ELAPSED_MILLIS, (System.nanoTime() - started) / 1_000_000);
+        }
+        return new CompletedCase(input, outcome, resultId);
     }
 
     /**
@@ -301,21 +342,28 @@ class GammaLiveTest {
     }
 
     /**
-     * 기존 서버와 별개인 임의 loopback 포트의 API를 시작한다.
+     * 기존 서버와 별개인 임의 loopback 포트에서 배포 또는 비교 구성의 API를 시작한다.
      * @created 2026-11-03
      * @usedBy verifiesLiveAnalysisAndEncryptedRecovery
+     * @modified 2026-11-04 - 실제 배포 프로필과 제한된 독립 재검토 구성 선택
      */
     private void launch() {
-        SpringApplication application = new SpringApplication(
-            PayseApiApplication.class,
-            GammaLocalConfig.class
-        );
-        application.setAdditionalProfiles(
-            GammaLocal.PROFILE_DATABASE,
-            GammaLocal.PROFILE_AUTH,
-            GammaLocal.PROFILE_FINANCE,
-            GammaLocal.PROFILE_ANALYSIS
-        );
+        boolean deployment = "approved".equals(System.getenv("PAYSE_GAMMA_DEPLOYMENT"));
+        SpringApplication application = deployment
+            ? new SpringApplication(PayseApiApplication.class)
+            : new SpringApplication(PayseApiApplication.class, GammaLocalConfig.class);
+        var profiles = new java.util.ArrayList<>(java.util.List.of(
+            GammaLocal.PROFILE_DATABASE, GammaLocal.PROFILE_AUTH,
+            GammaLocal.PROFILE_FINANCE, GammaLocal.PROFILE_ANALYSIS));
+        if (deployment) {
+            profiles.add("gamma-local");
+            properties.put("payse.gamma-local.state-directory", setting("STATE"));
+        }
+        String reviewer = System.getenv("PAYSE_GAMMA_REVIEWER");
+        if (reviewer != null) {
+            properties.put("payse.gamma-local.review-file", reviewer);
+        }
+        application.setAdditionalProfiles(profiles.toArray(String[]::new));
         application.setDefaultProperties(properties);
         context = application.run();
         base = GammaLocal.HTTP_LOOPBACK
@@ -464,6 +512,7 @@ class GammaLiveTest {
      * 실제 loopback HTTP 요청만 전송하고 오류에도 본문·토큰을 테스트 출력에 넣지 않는다.
      * @created 2026-11-03
      * @usedBy login, submit, await, query
+     * @modified 2026-11-04 - 병렬 요청에서 공유 보고서 쓰기 제거
      */
     private ObjectNode send(String method, String path, JsonNode body, String bearer, int expected)
         throws Exception {
@@ -477,7 +526,6 @@ class GammaLiveTest {
             : HttpRequest.BodyPublishers.ofString(body.toString());
         request.method(method, publisher);
         var response = client.send(request.build(), HttpResponse.BodyHandlers.ofString());
-        summary.put(GammaLocal.LAST_HTTP_STATUS, response.statusCode());
         assertEquals(expected, response.statusCode(), GammaLocal.HTTP_MISMATCH);
         return (ObjectNode) AnalysisJson.JSON.readTree(response.body());
     }

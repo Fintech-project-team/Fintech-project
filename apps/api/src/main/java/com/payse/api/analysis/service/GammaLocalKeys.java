@@ -1,8 +1,10 @@
 package com.payse.api.analysis.service;
 
-import com.payse.api.ApiTestConstants.GammaLocal;
 import com.payse.api.analysis.crypto.KeyProtector;
 import com.payse.api.analysis.crypto.WrappedKey;
+import com.payse.api.constants.ApiConfigConstants.GammaLocal;
+import com.payse.api.constants.ApiConfigConstants;
+import com.payse.api.constants.ApiMessageConstants;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -19,7 +21,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
- * 감마 시험에서만 상위 키 파일로 개별 데이터 키를 인증 암호화한다. 운영 JAR에는 포함하지 않는다.
+ * 감마 시험에서만 상위 키 파일로 개별 데이터 키를 인증 암호화한다. 명시적인 gamma-local 프로필에서만 사용한다.
  * @created 2026-11-03
  * @usedBy GammaLocalConfig.gammaKeys, GammaLocalTest
  */
@@ -59,6 +61,15 @@ final class GammaLocalKeys implements KeyProtector, AutoCloseable {
                 Arrays.fill(candidate, (byte) 0);
             }
         }
+    }
+
+    /**
+     * 비밀 원문 대신 키 버전 지문으로 준비 기록을 무효화한다.
+     * @created 2026-11-04
+     * @usedBy GammaDeployment.deployedGammaRuntime
+     */
+    String fingerprint() {
+        return reference;
     }
 
     /**
@@ -161,7 +172,7 @@ final class GammaLocalKeys implements KeyProtector, AutoCloseable {
      */
     @Override
     public String toString() {
-        return GammaLocal.REDACTED;
+        return ApiMessageConstants.GammaLocal.REDACTED;
     }
 
     /**
@@ -170,6 +181,6 @@ final class GammaLocalKeys implements KeyProtector, AutoCloseable {
      * @usedBy GammaLocalKeys
      */
     private static IllegalStateException invalid() {
-        return new IllegalStateException(GammaLocal.KEY_UNAVAILABLE);
+        return new IllegalStateException(ApiMessageConstants.GammaLocal.KEY_UNAVAILABLE);
     }
 }

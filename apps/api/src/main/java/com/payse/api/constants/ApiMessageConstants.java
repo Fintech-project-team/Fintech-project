@@ -7,6 +7,30 @@ package com.payse.api.constants;
  */
 public final class ApiMessageConstants {
     /**
+     * 비공개 AI 준비와 상태의 고정 규격이다.
+     * @created 2026-11-04
+     * @usedBy GammaDeployment, GammaLocalKeys, AnalysisReadiness
+     */
+    public static final class GammaLocal {
+        public static final String REDACTED = "GammaLocalKeys[REDACTED]";
+        public static final String KEY_UNAVAILABLE = "Gamma local key unavailable";
+        public static final String IDENTITY_UNAVAILABLE = "Gamma fixture identity unavailable";
+        public static final String DISABLED = "Gamma local configuration disabled";
+        public static final String INCOMPLETE = "Gamma local configuration incomplete";
+        public static final String INVALID_POLICY = "Gamma local policy invalid";
+        public static final String MISSING_SOURCE = "Gamma source version missing";
+        public static final String PREPARATION_FAILED = "AI preparation unavailable";
+
+        /**
+         * 정적 상수 구간의 인스턴스 생성을 막는다.
+         * @created 2026-11-04
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private GammaLocal() {
+        }
+    }
+
+    /**
      * 분석 실행 구성·비용 경계의 고정 문자열이다.
      * @created 2026-11-03
      * @usedBy AnalysisSettings, AnalysisPricing, AnalysisCosts, AnalysisConfiguration
@@ -43,6 +67,7 @@ public final class ApiMessageConstants {
      * @usedBy AnalysisIdentity, AnalysisJobs, AnalysisJson, AnalysisRepository
      */
     public static final class Analysis {
+        public static final String INVALID_CAPACITY = "Invalid analysis capacity";
         // 진단 문구
         public static final String INCOMPLETE_MEMORY = "Encrypted memory is incomplete";
         public static final String PROTECTOR = "protector";

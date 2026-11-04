@@ -7,6 +7,45 @@ package com.payse.api.constants;
  */
 public final class ApiFieldConstants {
     /**
+     * 비공개 AI 준비와 상태의 고정 규격이다.
+     * @created 2026-11-04
+     * @usedBy AnalysisReadiness, GammaDeployment
+     */
+    public static final class Readiness {
+        public static final String FORMAT = "format";
+        public static final String AGENT = "agent";
+        public static final String MODE = "mode";
+        public static final String AUTOMATIC_RETRIES = "automaticRetries";
+        public static final String VALIDATED_PROMPT = "validatedPrompt";
+        public static final String FINGERPRINT = "fingerprint";
+        public static final String PREPARED_AT = "preparedAt";
+        public static final String PREPARATION_COUNT = "preparationCount";
+        public static final String PREPARATION = "preparation";
+        public static final String PREPARATION_REUSED = "preparationReused";
+        public static final String RUNTIME_STARTED_AT = "runtimeStartedAt";
+        public static final String PROCESS_ID = "processId";
+        public static final String PROFILE = "profile";
+        public static final String LAST_EVENT = "lastEvent";
+        public static final String AT_SUFFIX = "At";
+        public static final String COUNT_SUFFIX = "Count";
+        public static final String PARALLELISM = "parallelism";
+        public static final String MODEL = "model";
+        public static final String REASONING_EFFORT = "reasoningEffort";
+        public static final String INPUT_LIMIT = "inputLimit";
+        public static final String OUTPUT_LIMIT = "outputLimit";
+        public static final String REQUEST_TIMEOUT_SECONDS = "requestTimeoutSeconds";
+        public static final String USER_ID = "userId";
+
+        /**
+         * 정적 상수 구간의 인스턴스 생성을 막는다.
+         * @created 2026-11-04
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private Readiness() {
+        }
+    }
+
+    /**
      * 분석 실행 구성·비용 경계의 고정 문자열이다.
      * @created 2026-11-03
      * @usedBy AnalysisSettings, AnalysisPricing, AnalysisCosts, AnalysisConfiguration
@@ -181,6 +220,10 @@ public final class ApiFieldConstants {
         public static final String DETAIL = "detail";
         public static final String PERMIT = "permit";
         public static final String ACKNOWLEDGE_DUPLICATE_RISK = "acknowledgeDuplicateRisk";
+        public static final String REVIEW = "review";
+        public static final String ITEMS_AVAILABLE = "itemsAvailable";
+        public static final String REQUIRES_USER_INPUT = "requiresUserInput";
+        public static final String RETRY_REQUIRES_ACKNOWLEDGEMENT = "retryRequiresAcknowledgement";
         public static final String ACTION = "action";
         public static final String PERMIT_EXPIRES_AT = "permitExpiresAt";
         public static final String USAGE_KNOWN = "usageKnown";

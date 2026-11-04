@@ -65,6 +65,7 @@ class PromptGuideTest {
      * 예시/스키마를 현재 거래로 변환하지 않고 고정 교육 자료만 공급자 중립으로 제공한다.
      * @created 2026-11-04
      * @usedBy JUnit
+     * @modified 2026-11-04 - Markdown을 포함한 프롬프트 버전 확인
      */
     @Test
     void usesSameVersionAcrossProvidersAndChangesWithCriteria() {
@@ -75,7 +76,7 @@ class PromptGuideTest {
             throw new AssertionError("A different adapter must not change prompt identity");
         }, 12000);
         assertEquals(first.promptVersion(), second.promptVersion());
-        assertTrue(first.promptVersion().matches("PAYSE-PROMPT-3:[0-9a-f]{64}"));
+        assertTrue(first.promptVersion().matches("PAYSE-PROMPT-4:[0-9a-f]{64}"));
         String criteria = new AnalysisContract().instructions();
         assertNotEquals(first.promptVersion(), new PromptGuide(criteria + "changed").version());
     }
@@ -84,6 +85,7 @@ class PromptGuideTest {
      * 교육 예시는 공개 enum만 사용하며 평가 정답·사용자/거래 ID·개인 연결정보를 포함하지 않는다.
      * @created 2026-11-04
      * @usedBy JUnit
+     * @modified 2026-11-04 - 예시의 두 판단을 실제 객체 형식으로 개별 검증
      */
     @Test
     void educationalExamplesStaySeparateFromEvaluationLabels() throws Exception {
@@ -116,15 +118,20 @@ class PromptGuideTest {
                 assertEquals(2, section.path("examples").size());
                 for (JsonNode example : section.path("examples")) {
                     assertEquals(
-                        Set.of("source", "classification", "meaning", "reasonCode"),
+                        Set.of("source", "classification", "meaning"),
                         example.propertyNames()
                     );
-                    assertTrue(contains(meanings, example.path("meaning")));
-                    assertTrue(contains(basics, example.path("classification")));
-                    assertEquals(
-                        example.path("meaning").isNull(),
-                        !example.path("reasonCode").asString().equals("supported")
-                    );
+                    assertTrue(contains(meanings, example.path("meaning").path("value")));
+                    assertTrue(contains(basics, example.path("classification").path("value")));
+                    for (String name : Set.of("meaning", "classification")) {
+                        JsonNode decision = example.path(name);
+                        boolean unknown = decision.path("value").isNull();
+                        assertEquals(unknown, decision.path("status").asString().equals("unknown"));
+                        assertEquals(
+                            unknown,
+                            !decision.path("reasonCode").asString().equals("supported")
+                        );
+                    }
                 }
             }
         }
@@ -134,6 +141,7 @@ class PromptGuideTest {
      * 실행 서비스가 실제로 선택된 프롬프트를 팩토리에 전달하고 원래 공개 입력을 보존한다.
      * @created 2026-11-04
      * @usedBy JUnit
+     * @modified 2026-11-04 - 실제 Markdown 지침의 공급자 전달 확인
      */
     @Test
     void serviceUsesGuideBeforeAnyProviderCall() throws Exception {
@@ -141,8 +149,9 @@ class PromptGuideTest {
         ObjectNode payload = (ObjectNode) JSON.readTree(Files.readString(file));
         ObjectNode before = payload.deepCopy();
         var service = new AnalysisService((instructions, schema) -> {
-            assertTrue(instructions.contains("PAYSE-PROMPT-3"));
+            assertTrue(instructions.contains("PAYSE-PROMPT-4"));
             assertFalse(selection(instructions).isEmpty());
+            assertTrue(instructions.contains("classification의 reasonCode"));
             String sourceVersion = payload.path("context").path("sourceVersion").asString();
             assertFalse(instructions.contains(sourceVersion));
             throw new IllegalStateException("test-stop-before-network");

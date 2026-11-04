@@ -58,6 +58,7 @@ public final class AnalysisService {
      * @usedBy AnalysisServiceTest, 미연결: 예정 사용처 API 작업 실행
      * @modified 2026-11-01 - 저장용 호출과 계수·생성 정책을 공유하고 기존 의미 반환 계약 유지
      * @modified 2026-11-04 - 원천 구조에 맞는 공개 교육 예시를 선택하여 전달
+     * @modified 2026-11-04 - 본문 없이 제한된 계약 실패 코드 기록
      * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조; 상수 타입 명시 참조; 제어문 본문 구분
      */
     public ModelReply analyze(ObjectNode payload) {
@@ -72,6 +73,7 @@ public final class AnalysisService {
         try {
             return new ModelReply(mapper.restore(reply.output()), reply.usage(), null);
         } catch (ContractFailure failure) {
+            rejection(failure);
             return new ModelReply(null, reply.usage(), Provider.INVALID_MODEL_OUTPUT);
         }
     }
@@ -92,6 +94,7 @@ public final class AnalysisService {
      * @created 2026-11-03
      * @usedBy AnalysisRuntime.analyze, analyzeForStorage
      * @modified 2026-11-04 - 저장 지침과 공개 교육 자료를 같은 조립 경로에서 제공
+     * @modified 2026-11-04 - 본문 없이 제한된 계약 실패 코드 기록
      */
     public AnalysisResult analyzeForStorage(ObjectNode payload, ObjectNode facts) {
         InputMapper mapper = new InputMapper(payload, contract, facts);
@@ -105,6 +108,7 @@ public final class AnalysisService {
         try {
             return mapper.restoreStorage(reply.output(), reply.usage());
         } catch (ContractFailure failure) {
+            rejection(failure);
             return new AnalysisResult(
                 null,
                 List.of(),
@@ -112,6 +116,23 @@ public final class AnalysisService {
                 Provider.INVALID_MODEL_OUTPUT
             );
         }
+    }
+
+    /**
+     * 고정 검증 코드만 남겨 자료 노출 없이 구조 실패 원인을 구분한다.
+     * @created 2026-11-04
+     * @usedBy analyze, analyzeForStorage
+     */
+    private void rejection(ContractFailure failure) {
+        String code = failure.getMessage();
+        if (code == null || !code.matches("[A-Z_]{1,80}")) {
+            code = Provider.INVALID_MODEL_OUTPUT;
+        }
+        System.getLogger(AnalysisService.class.getName()).log(
+            System.Logger.Level.WARNING,
+            Analysis.VALIDATION_FAILURE,
+            code
+        );
     }
 
     /**

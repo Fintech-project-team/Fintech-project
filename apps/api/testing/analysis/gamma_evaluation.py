@@ -180,7 +180,10 @@ def verify_bundle(directory):
 
 
 def score_run(directory, summary):
-    """2026-11-03: 저장·조회된 실제 의미값과 사전 정답을 항목별 채점한다. 사용: runner, CLI."""
+    """2026-11-03: 저장·조회된 실제 의미값과 사전 정답을 항목별 채점한다. 사용: runner, CLI.
+
+    2026-11-04: 전체 요청 완료 표식과 단조 시계 측정이 함께 있는 실행만 시간 실측으로 표시한다.
+    """
     manifest = verify_bundle(directory)
     expected = json.loads((directory / 'expected.private.json').read_text(encoding='utf-8'))
     cases = json.loads((directory / 'inputs.json').read_text(encoding='utf-8'))
@@ -248,8 +251,13 @@ def score_run(directory, summary):
                 'state': observation.get('state', 'not_executed')})
     transactions = [row for row in outcomes if row['taskKind'] == 'transactionMeaning']
     recurring = [row for row in outcomes if row['taskKind'] == 'recurringMeaning']
+    elapsed = summary.get('pipelineElapsedMillis')
+    measured = (summary.get('evaluationComplete') is True and len(observations) == len(inputs)
+                and type(elapsed) is int and elapsed >= 0)
     return {'evaluationKind': 'gamma_year_live_saved_results', 'manifest': manifest,
-            'wholePipelineMeasured': False, 'byCategory': grouped(outcomes, 'category'),
+            'wholePipelineMeasured': measured, 'pipelineElapsedMillis': elapsed if measured else None,
+            'timingScope': 'first_http_request_to_last_saved_result_query' if measured else None,
+            'byCategory': grouped(outcomes, 'category'),
             'byDifficulty': grouped(outcomes, 'difficulty'), 'overall': metrics(outcomes),
             'transactions': metrics(transactions), 'recurringCandidates': metrics(recurring),
             'perMeaning': confusion(transactions), 'perRecurringMeaning': confusion(recurring), 'items': outcomes,

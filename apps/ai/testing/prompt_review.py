@@ -14,7 +14,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'apps/api/testing/analysis'))
-from gamma_evaluation import FILES, score_run, verify_bundle
+from gamma_evaluation import FILES, metrics, score_run, verify_bundle
 
 
 def read(path):
@@ -138,10 +138,30 @@ def compare(dataset, baseline, revised):
         'limits': '프롬프트 개발에 사용한 합성 자료의 회귀 비교. 서로 다른 시각의 실행이며 독립 정확도·모델 간 동일 속도 보장이 아님.'}
 
 
+def stability(dataset, summary):
+    """2026-11-04: 사전 요청 순서의 세 구간에서 실패 포함 성능과 시간을 비교한다."""
+    quality = score_run(dataset, summary)
+    names = [row['name'] for row in read(dataset / 'inputs.json')]
+    observed = {row['name']: row for row in summary.get('cases', [])}
+    windows = []
+    for index in range(3):
+        start, end = len(names) * index // 3, len(names) * (index + 1) // 3
+        selected = set(names[start:end])
+        rows = [row for row in quality['items'] if row['caseId'] in selected]
+        durations = [observed[name] for name in selected if name in observed]
+        windows.append({'window': index + 1, 'firstCase': names[start], 'lastCase': names[end - 1],
+            'requestedBatches': len(selected), 'executedBatches': len(durations),
+            'metrics': metrics(rows), 'httpLatency': timing(durations)})
+    return {'version': 'PAYSE-STABILITY-1', 'items': quality['overall']['items'],
+            'prompt': summary.get('versions'), 'windows': windows,
+            'pipelineElapsedMillis': summary.get('pipelineElapsedMillis'),
+            'limits': '요청 순서별 비교. 공급자 캐시를 강제로 비운 실험이나 장기 운영 보장은 아니다.'}
+
+
 def main():
     """2026-11-04: 분류·표본 동결·결과 비교만 실행하며 유료 호출은 하지 않는다."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=('catalog', 'subset', 'compare'))
+    parser.add_argument('action', choices=('catalog', 'subset', 'compare', 'stability'))
     parser.add_argument('--dataset', type=Path, required=True)
     parser.add_argument('--baseline', type=Path)
     parser.add_argument('--revised', type=Path)
@@ -156,8 +176,11 @@ def main():
     elif args.action == 'compare' and args.baseline and args.revised:
         result = compare(args.dataset, read(args.baseline), read(args.revised))
         write(args.out, result)
+    elif args.action == 'stability' and args.revised:
+        result = stability(args.dataset, read(args.revised))
+        write(args.out, result)
     else:
-        parser.error('catalog needs --baseline; compare needs --baseline and --revised')
+        parser.error('catalog needs --baseline; compare needs both; stability needs --revised')
     print(json.dumps({key: result[key] for key in ('version', 'items', 'families', 'batches')
                       if key in result}, ensure_ascii=False))
 

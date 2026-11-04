@@ -1252,6 +1252,298 @@ class FinancialHttpTest {
     }
 
     /**
+     * 저장된 중복은 거절하되 서로 다른 준비금의 합법적인 분할 배정은 보존한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void rejectsStoredDuplicateAllocation() throws Exception {
+        String obligation = createObligation();
+        String reserve = createReserve(obligation);
+        String before = version();
+        JsonNode original = allocationFor(reserve);
+        error(
+            send(
+                FinanceHttp.PATCH,
+                FinancePaths.RESERVE_PATH + reserve,
+                allocationCreate(obligation, 1000)
+            ),
+            409,
+            FinanceCodes.RELATION_CONFLICT
+        );
+        assertEquals(before, version());
+        assertEquals(original, allocationFor(reserve));
+
+        String another = createReserve(null);
+        ObjectNode split = allocationCreate(obligation, 1000);
+        ok(FinanceHttp.PATCH, FinancePaths.RESERVE_PATH + another, split);
+        assertEquals(1000, allocationFor(another).path(FinanceFields.AMOUNT_KRW).asLong());
+        assertEquals(original, allocationFor(reserve));
+    }
+
+    /**
+     * 같은 배정 요청의 동시 재전송·응답 유실 복구와 다른 키의 버전 경합을 구분한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void concurrentAllocationRequests() throws Exception {
+        String obligation = createObligation();
+        String reserve = createReserve(null);
+        String path = FinancePaths.RESERVE_PATH + reserve;
+        ObjectNode first = allocationCreate(obligation, 1000);
+        long before = Long.parseLong(version());
+        List<HttpResponse<String>> responses = parallel(path, first, first.deepCopy());
+        assertTrue(responses.stream().allMatch(value -> value.statusCode() == 200));
+        assertEquals(before + 1, Long.parseLong(version()));
+        JsonNode original = allocationFor(reserve);
+        JsonNode replay = ok(FinanceHttp.PATCH, path, first);
+        assertTrue(replay.path(FinanceFields.REPLAYED).asBoolean());
+        assertEquals(original, allocationFor(reserve));
+
+        String another = createReserve(null);
+        String otherPath = FinancePaths.RESERVE_PATH + another;
+        ObjectNode left = allocationCreate(obligation, 1000);
+        ObjectNode right = left.deepCopy()
+            .put(FinanceFields.IDEMPOTENCY_KEY, UUID.randomUUID().toString());
+        List<HttpResponse<String>> competing = parallel(otherPath, left, right);
+        assertEquals(
+            Set.of(200, 409),
+            Set.of(competing.get(0).statusCode(), competing.get(1).statusCode())
+        );
+        for (HttpResponse<String> response : competing) {
+            if (response.statusCode() == 409) {
+                error(response, 409, FinanceCodes.STALE_DATA);
+            }
+        }
+        JsonNode saved = allocationFor(another);
+        error(
+            send(FinanceHttp.PATCH, otherPath, allocationCreate(obligation, 1000)),
+            409,
+            FinanceCodes.RELATION_CONFLICT
+        );
+        assertEquals(saved, allocationFor(another));
+    }
+
+    /**
+     * 생성 뒤 제거하는 기존 실행 순서에서도 최종 연결 하나만 남기고 두 변경을 기록한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void replacesUnusedAllocationAtomically() throws Exception {
+        String obligation = createObligation();
+        String reserve = createReserve(obligation);
+        JsonNode original = allocationFor(reserve);
+        String oldId = original.path(FinanceFields.ALLOCATION_ID).asString();
+        ObjectNode body = allocationCreate(obligation, 15000);
+        ((ArrayNode) body.path(FinanceFields.ALLOCATION_CHANGES).path("remove")).add(oldId);
+        JsonNode saved = ok(FinanceHttp.PATCH, FinancePaths.RESERVE_PATH + reserve, body);
+        JsonNode replacement = allocationFor(reserve);
+        String newId = replacement.path(FinanceFields.ALLOCATION_ID).asString();
+        assertNotEquals(oldId, newId);
+        assertEquals(15000, replacement.path(FinanceFields.AMOUNT_KRW).asLong());
+        Set<String> refs = new HashSet<>();
+        for (JsonNode ref : saved.path(FinanceFields.RECEIPT).path(FinanceFields.CHANGED_REFS)) {
+            refs.add(ref.path("resource").asString() + ":" + ref.path("id").asString());
+        }
+        assertEquals(
+            Set.of("allocation:" + oldId, "allocation:" + newId),
+            refs
+        );
+    }
+
+    /**
+     * 사용한 배정은 해제 누계까지 줄여 보존하며 새 연결과 과거 이력의 재활성 충돌을 구분한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void preservesReleasedAllocationHistory() throws Exception {
+        JsonNode partial = single(
+            source.path(FinanceFields.ALLOCATIONS),
+            value -> value.path(FinanceFields.RELEASED_KRW).asLong() > 0
+        );
+        String reserve = partial.path(FinanceFields.RESERVE_ID).asString();
+        String allocation = partial.path(FinanceFields.ALLOCATION_ID).asString();
+        String obligation = partial.path(FinanceFields.OBLIGATION_ID).asString();
+        String path = FinancePaths.RESERVE_PATH + reserve;
+        long released = partial.path(FinanceFields.RELEASED_KRW).asLong();
+        ObjectNode body = allocationCreate(obligation, 1000);
+        ((ArrayNode) body.path(FinanceFields.ALLOCATION_CHANGES).path("update")).addObject()
+            .put(FinanceFields.ALLOCATION_ID, allocation)
+            .put(FinanceFields.AMOUNT_KRW, released);
+        ok(FinanceHttp.PATCH, path, body);
+        JsonNode historical = single(
+            ok(FinanceHttp.GET, FinancePaths.SNAPSHOT_PATH, null).path(FinanceFields.ALLOCATIONS),
+            row -> allocation.equals(row.path(FinanceFields.ALLOCATION_ID).asString())
+        );
+        assertEquals(released, historical.path(FinanceFields.AMOUNT_KRW).asLong());
+        assertEquals(partial.path("releaseEvidence"), historical.path("releaseEvidence"));
+
+        ObjectNode reactivate = command();
+        ObjectNode changes = allocations();
+        ((ArrayNode) changes.path("update")).addObject()
+            .put(FinanceFields.ALLOCATION_ID, allocation)
+            .put(FinanceFields.AMOUNT_KRW, released + 1);
+        reactivate.set(FinanceFields.ALLOCATION_CHANGES, changes);
+        String before = version();
+        error(send(FinanceHttp.PATCH, path, reactivate), 409, FinanceCodes.RELATION_CONFLICT);
+        ((ObjectNode) changes.path("update").get(0)).put(FinanceFields.AMOUNT_KRW, released - 1);
+        reactivate.put(FinanceFields.IDEMPOTENCY_KEY, UUID.randomUUID().toString());
+        error(send(FinanceHttp.PATCH, path, reactivate), 409, FinanceCodes.HISTORY_LOCKED);
+        ObjectNode remove = command();
+        ObjectNode removal = allocations();
+        ((ArrayNode) removal.path("remove")).add(allocation);
+        remove.set(FinanceFields.ALLOCATION_CHANGES, removal);
+        error(send(FinanceHttp.PATCH, path, remove), 409, FinanceCodes.HISTORY_LOCKED);
+        assertEquals(before, version());
+    }
+
+    /**
+     * 과거 중복 자료를 자동 삭제하지 않고 명시 제거로만 단일 연결 상태를 복구한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void repairsLegacyDuplicateExplicitly() throws Exception {
+        String obligation = createObligation();
+        String reserve = createReserve(obligation);
+        JsonNode original = allocationFor(reserve);
+        UUID duplicate = UUID.randomUUID();
+        assertEquals(
+            1,
+            admin.update(
+                """
+                INSERT INTO payse.reserve_allocations
+                    (id, user_id, reserve_id, obligation_id, amount_krw, released_krw, release_evidence)
+                VALUES (?, ?, ?, ?, 1000, 0, '[]'::jsonb)
+                """,
+                duplicate,
+                owner,
+                UUID.fromString(reserve),
+                UUID.fromString(obligation)
+            )
+        );
+        String path = FinancePaths.RESERVE_PATH + reserve;
+        error(
+            send(FinanceHttp.PATCH, path, allocationCreate(obligation, 1000)),
+            409,
+            FinanceCodes.RELATION_CONFLICT
+        );
+        ObjectNode repair = command();
+        ObjectNode changes = allocations();
+        ((ArrayNode) changes.path("remove")).add(duplicate.toString());
+        repair.set(FinanceFields.ALLOCATION_CHANGES, changes);
+        ok(FinanceHttp.PATCH, path, repair);
+        assertEquals(original, allocationFor(reserve));
+    }
+
+    /**
+     * 형식·버전·접근 권한 순서를 유지하며 같은 요청의 UUID 중복도 정규 비교한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void allocationValidationOrder() throws Exception {
+        String obligation = createObligation();
+        String reserve = createReserve(null);
+        String path = FinancePaths.RESERVE_PATH + reserve;
+        ObjectNode stale = allocationCreate(obligation, 1000);
+        ok(FinanceHttp.PATCH, path, command().put(FinanceFields.LABEL, "버전 변경"));
+        ObjectNode malformed = stale.deepCopy();
+        ((ObjectNode) malformed.at("/allocationChanges/create/0"))
+            .put(FinanceFields.OBLIGATION_ID, "invalid-uuid");
+        error(send(FinanceHttp.PATCH, path, malformed), 422, FinanceCodes.VALIDATION_FAILED);
+        ObjectNode hidden = stale.deepCopy();
+        ((ObjectNode) hidden.at("/allocationChanges/create/0"))
+            .put(FinanceFields.OBLIGATION_ID, UUID.randomUUID().toString());
+        error(send(FinanceHttp.PATCH, path, hidden), 409, FinanceCodes.STALE_DATA);
+        hidden.put(FinanceFields.EXPECTED_DATA_VERSION, version());
+        error(send(FinanceHttp.PATCH, path, hidden), 403, FinanceCodes.RESOURCE_FORBIDDEN);
+        ObjectNode repeated = allocationCreate(obligation, 1000);
+        ((ArrayNode) repeated.at("/allocationChanges/create")).addObject()
+            .put(FinanceFields.OBLIGATION_ID, obligation.toUpperCase(java.util.Locale.ROOT))
+            .put(FinanceFields.AMOUNT_KRW, 1000);
+        error(send(FinanceHttp.PATCH, path, repeated), 422, FinanceCodes.VALIDATION_FAILED);
+    }
+
+    /**
+     * 현재 출금 계좌가 공개여도 고정된 반복 버전의 계좌가 숨겨지면 배정을 거절한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void allocationRequiresFixedRevisionAccess() throws Exception {
+        JsonNode recurring = single(
+            source.path(FinanceFields.OBLIGATIONS),
+            row -> row.path("planRevisionId").isString()
+        );
+        JsonNode other = single(
+            source.path(FinanceFields.ACCOUNTS),
+            row -> row.path(FinanceFields.INCLUDED).asBoolean()
+                && !row.path(FinanceFields.ACCOUNT_ID)
+                    .equals(recurring.path(FinanceFields.WITHDRAWAL_ACCOUNT_ID))
+        );
+        String obligation = recurring.path(FinanceFields.OBLIGATION_ID).asString();
+        ObjectNode move = command()
+            .put(
+                FinanceFields.WITHDRAWAL_ACCOUNT_ID,
+                other.path(FinanceFields.ACCOUNT_ID).asString()
+            );
+        ok(FinanceHttp.PATCH, FinancePaths.OBLIGATION_PATH + obligation, move);
+        ObjectNode reserveBody = command()
+            .put(FinanceFields.ACCOUNT_ID, other.path(FinanceFields.ACCOUNT_ID).asString())
+            .put(FinanceFields.LABEL, "연결 권한 확인")
+            .put(FinanceFields.AMOUNT_KRW, 10000);
+        reserveBody.set(FinanceFields.ALLOCATION_CHANGES, allocations());
+        JsonNode created = ok(FinanceHttp.POST, FinancePaths.RESERVES_PATH, reserveBody);
+        String reserve = changed(created, "reserve");
+        ObjectNode links = command();
+        links.putArray(FinanceFields.INSTITUTION_CODES)
+            .add(other.path(FinanceFields.INSTITUTION_CODE).asString());
+        ok(FinanceHttp.POST, FinancePaths.INSTITUTION_LINKS_PATH, links);
+        String before = version();
+        error(
+            send(
+                FinanceHttp.PATCH,
+                FinancePaths.RESERVE_PATH + reserve,
+                allocationCreate(obligation, 1000)
+            ),
+            403,
+            FinanceCodes.RESOURCE_FORBIDDEN
+        );
+        assertEquals(before, version());
+    }
+
+    /**
+     * 배정 하나를 추가하는 실제 저장 요청을 현재 버전으로 만든다.
+     * @created 2026-11-04
+     * @usedBy 배정 중복·경합·이력 검사
+     */
+    private ObjectNode allocationCreate(String obligation, long amount) {
+        ObjectNode body = command();
+        ObjectNode changes = allocations();
+        ((ArrayNode) changes.path("create")).addObject()
+            .put(FinanceFields.OBLIGATION_ID, obligation)
+            .put(FinanceFields.AMOUNT_KRW, amount);
+        body.set(FinanceFields.ALLOCATION_CHANGES, changes);
+        return body;
+    }
+
+    /**
+     * 준비금의 단일 배정을 검증된 실제 응답에서 찾으며 중복을 첫 행으로 숨기지 않는다.
+     * @created 2026-11-04
+     * @usedBy 배정 중복·경합·이력 검사
+     */
+    private JsonNode allocationFor(String reserve) throws Exception {
+        return single(
+            ok(FinanceHttp.GET, FinancePaths.SNAPSHOT_PATH, null).path(FinanceFields.ALLOCATIONS),
+            row -> reserve.equals(row.path(FinanceFields.RESERVE_ID).asString())
+        );
+    }
+
+    /**
      * 미지급 배정 목록을 빠뜨리면 전부 거절하고 정확한 확인 목록에서만 의무를 취소한다.
      * @created 2026-10-29
      * @usedBy JUnit

@@ -1,7 +1,7 @@
 {
-  "version": "PAYSE-GUIDE-2",
+  "version": "PAYSE-GUIDE-5",
   "rules": [
-    "meaning과 classification은 독립이다. 예시 reasonCode는 meaning용이다. classification=null이면 기본 분류는 unknown/null과 별도 사유다. 기존 비null 분류를 보존한다.",
+    "meaning과 classification은 독립된 판단이다. 아래 예시는 실제 객체 형식을 사용한다. 각 판단은 candidate/값/supported 또는 unknown/null/유보사유 중 하나다. 기존 비null 기본 분류는 보존한다.",
     "새 income은 명시된 근로/용역 대가·상여·연금·지원금·이자·배당, expense는 확인된 구매·서비스·세금·기부·수수료의 후보다. 대출·개인 송금·경비 정산·환불·원금/보증금/현금 이동은 의미를 알아도 기본 unknown이다.",
     "unknown의 사유: 목적/관계 없음=insufficient_evidence, 양립 불가한 근거=conflicting_evidence, 명확한 복합 목적·목록 밖=outside_taxonomy. 금액/날짜 유사성은 관계 증명이 아니다.",
     "명시된 짧은 적요를 이유 없이 유보하지 않는다. 이유는 결정적 근거/부족 정보를 한국어 한 문장으로 짧게 쓰고 별칭은 근거 ID 필드에만 쓴다. 아래 가상 예시는 현재 거래/정답이 아니다."
@@ -16,15 +16,29 @@
       "examples": [
         {
           "source": "계좌 입금; 적요 정기 급여이체; 반대 근거 없음",
-          "classification": "income",
-          "meaning": "salary",
-          "reasonCode": "supported"
+          "classification": {
+            "status": "candidate",
+            "value": "income",
+            "reasonCode": "supported"
+          },
+          "meaning": {
+            "status": "candidate",
+            "value": "salary",
+            "reasonCode": "supported"
+          }
         },
         {
           "source": "계좌 입금; 월급이 아닌 출장비 실비 반환",
-          "classification": null,
-          "meaning": "reimbursement",
-          "reasonCode": "supported"
+          "classification": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          },
+          "meaning": {
+            "status": "candidate",
+            "value": "reimbursement",
+            "reasonCode": "supported"
+          }
         }
       ]
     },
@@ -37,15 +51,29 @@
       "examples": [
         {
           "source": "대상 출금; 양끝 명시 internal_transfer 관계; 적요에는 급여",
-          "classification": "internal_transfer",
-          "meaning": "self_transfer",
-          "reasonCode": "supported"
+          "classification": {
+            "status": "candidate",
+            "value": "internal_transfer",
+            "reasonCode": "supported"
+          },
+          "meaning": {
+            "status": "candidate",
+            "value": "self_transfer",
+            "reasonCode": "supported"
+          }
         },
         {
           "source": "같은 날 동일 금액 입출금; 일반이체 적요; 관계 없음",
-          "classification": null,
-          "meaning": null,
-          "reasonCode": "insufficient_evidence"
+          "classification": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          },
+          "meaning": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          }
         }
       ]
     },
@@ -58,15 +86,29 @@
       "examples": [
         {
           "source": "계좌 출금; 이동통신 사용료",
-          "classification": "expense",
-          "meaning": "telecom",
-          "reasonCode": "supported"
+          "classification": {
+            "status": "candidate",
+            "value": "expense",
+            "reasonCode": "supported"
+          },
+          "meaning": {
+            "status": "candidate",
+            "value": "telecom",
+            "reasonCode": "supported"
+          }
         },
         {
           "source": "계좌 출금; 주거회사 CMS; 지급 목적 없음",
-          "classification": null,
-          "meaning": null,
-          "reasonCode": "insufficient_evidence"
+          "classification": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          },
+          "meaning": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          }
         }
       ]
     },
@@ -79,15 +121,29 @@
       "examples": [
         {
           "source": "대상 card_purchase; 생활용품 구매 승인; 별도 취소가 이 구매를 참조",
-          "classification": "expense",
-          "meaning": "retail",
-          "reasonCode": "supported"
+          "classification": {
+            "status": "candidate",
+            "value": "expense",
+            "reasonCode": "supported"
+          },
+          "meaning": {
+            "status": "candidate",
+            "value": "retail",
+            "reasonCode": "supported"
+          }
         },
         {
           "source": "대상 card_refund; 일부 반환; 적요는 급여",
-          "classification": null,
-          "meaning": "refund",
-          "reasonCode": "supported"
+          "classification": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          },
+          "meaning": {
+            "status": "candidate",
+            "value": "refund",
+            "reasonCode": "supported"
+          }
         }
       ]
     },
@@ -100,15 +156,29 @@
       "examples": [
         {
           "source": "로컬 반복 후보; 이동통신료; features 충족",
-          "classification": null,
-          "meaning": "telecom",
-          "reasonCode": "supported"
+          "classification": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          },
+          "meaning": {
+            "status": "candidate",
+            "value": "telecom",
+            "reasonCode": "supported"
+          }
         },
         {
           "source": "로컬 반복 후보; 결제대행사 출금; 목적 없음",
-          "classification": null,
-          "meaning": null,
-          "reasonCode": "insufficient_evidence"
+          "classification": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          },
+          "meaning": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          }
         }
       ]
     }

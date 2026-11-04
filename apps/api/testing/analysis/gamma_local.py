@@ -13,6 +13,7 @@ import secrets
 import subprocess
 import sys
 import uuid
+import tempfile
 
 API = Path(__file__).resolve().parents[2]
 ROOT = API.parents[1]
@@ -102,7 +103,8 @@ def reserve_run(directory, run_id, reservation=RUN_RESERVE):
     else:
         # 사용자 확인: 온보딩 외 사용 없음. 온보딩 정확한 청구는 미확인으로 100 KRW 보류.
         ledger = {'onboardingReserveMicros': 100_000_000, 'runs': []}
-    occupied = ledger['onboardingReserveMicros'] + sum(row['budgetMicros'] for row in ledger['runs'])
+    from testing.analysis.credit_guard import occupied_krw
+    occupied = occupied_krw(ledger)
     if occupied + reservation >= LIMIT:
         raise RuntimeError('Gamma cumulative budget exhausted')
     ledger['runs'].append({'id': run_id, 'budgetMicros': reservation, 'state': 'reserved'})
@@ -163,7 +165,10 @@ def prepare(cluster, source, opening, evaluation=False, reservation=None):
 
 
 def main():
-    """2026-11-03: 승인된 실제 호출을 순차 실행하고 자체 소유 PostgreSQL만 종료한다."""
+    """2026-11-03: 승인된 호출과 자체 소유 PostgreSQL만 관리한다.
+
+    2026-11-04: 평가 전용 1..6 병렬 요청, USD 하한과 기존 KRW 장부를 함께 적용한다.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--live', action='store_true')
     parser.add_argument('--pg-bin', required=True, type=Path)
@@ -171,6 +176,10 @@ def main():
     parser.add_argument('--env-file', required=True, type=Path)
     parser.add_argument('--evaluation-dir', type=Path)
     parser.add_argument('--reserve-krw', type=int)
+    parser.add_argument('--parallel', type=int, default=1)
+    parser.add_argument('--deployment', action='store_true')
+    parser.add_argument('--reasoning-effort', choices=('none', 'low'), default='none')
+    parser.add_argument('--reviewer', action='store_true')
     args = parser.parse_args()
     if not args.live:
         raise ValueError('Explicit --live approval is required')
@@ -187,10 +196,15 @@ def main():
         if manifest['batches'] > 200 or not dataset.is_relative_to(ROOT / '.harness'):
             raise ValueError('Evaluation must be a bounded ignored synthetic dataset')
     reservation = run_reservation(bool(dataset), args.reserve_krw)
+    if not 1 <= args.parallel <= 6 or (args.parallel > 1 and not dataset):
+        raise ValueError('Parallel execution requires a bounded evaluation')
+    if args.deployment and (not dataset or args.parallel != 6 or args.reasoning_effort != 'none' or args.reviewer):
+        raise ValueError('Deployment verification uses the fixed validated profile')
     private = ROOT / '.harness/gamma-local-private'
     private_directory(private)
     lock = private / 'run.lock'
     lock.touch(exist_ok=False)
+    deployment_state = tempfile.TemporaryDirectory(prefix='payse-gamma-readiness-') if args.deployment else None
     try:
         master = private / 'master.key'
         if not master.exists():
@@ -202,8 +216,11 @@ def main():
             raise ValueError('Invalid local master key')
         llm = private / 'llm.properties'
         llm.write_text('enabled=true\nprovider=openai\nmodel=gpt-6-luna\napiKey=\n'
-            + 'apiKeyEnvFile=' + env_file.as_posix() + '\nreasoningEffort=none\n', encoding='utf-8')
+            + 'apiKeyEnvFile=' + env_file.as_posix() + '\nreasoningEffort=' + args.reasoning_effort + '\n', encoding='utf-8')
         run_id = str(uuid.uuid4())
+        from testing.analysis import credit_guard
+        credit_path = private / 'credit-20261104.json'
+        credit_guard.reserve(credit_path, run_id, manifest['batches'] if dataset else 3)
         opening = reserve_run(private, run_id, reservation)
         source = json.loads((dataset / 'source.json').read_text(encoding='utf-8')) if dataset else build()[0]
         with Cluster(args.pg_bin, args.work_dir) as cluster:
@@ -220,8 +237,15 @@ def main():
                 PAYSE_GAMMA_PRICING=VERSION, PAYSE_GAMMA_SOURCE_VERSION=source['sourceVersion'],
                 PAYSE_GAMMA_INPUTS=str(requests), PAYSE_GAMMA_REPORT=str(report),
                 PYTHONIOENCODING='utf-8', PYTHONDONTWRITEBYTECODE='1')
+            if deployment_state:
+                private_directory(Path(deployment_state.name))
+                environment['PAYSE_GAMMA_DEPLOYMENT'] = 'approved'
+                environment['PAYSE_GAMMA_STATE'] = deployment_state.name
+            if args.reviewer:
+                environment['PAYSE_GAMMA_REVIEWER'] = str(API / 'testing/analysis/reviewer.json')
             if dataset:
                 environment['PAYSE_GAMMA_EVALUATION'] = 'approved'
+                environment['PAYSE_GAMMA_PARALLEL'] = str(args.parallel)
                 (cluster.work / 'dataset-manifest.json').write_text(
                     json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
             launcher = ['cmd.exe', '/d', '/c', 'gradlew.bat'] if os.name == 'nt' else ['./gradlew']
@@ -240,6 +264,8 @@ def main():
             (private / 'ledger.json').write_text(json.dumps(ledger, indent=2), encoding='utf-8')
             cluster.report.update(passed=completed.returncode == 0, provider='openai',
                 googleKmsCalled=False, sourceTransactions=len(source['transactions']),
+                deploymentProfile=args.deployment, reasoningEffort=args.reasoning_effort,
+                reviewer=args.reviewer,
                 budgetUpperMicros=int(costs[0]), dispatchedCalls=int(costs[1]), runId=run_id)
             if report.exists():
                 cluster.report['executionCompleted'] = completed.returncode == 0
@@ -252,6 +278,18 @@ def main():
                 "SELECT jsonb_build_object('known',detail->'usageKnown','reason',detail->'reason',"
                 "'inputTokens',detail->'inputTokens','outputTokens',detail->'outputTokens',"
                 "'cachedTokens',detail->'cachedTokens')::text FROM payse.analysis_attempts;", DATABASE)]
+            count_calls = int(cluster.sql(
+                "SELECT count(*) FROM payse.analysis_cost_calls WHERE category='counting' "
+                "AND dispatched_at IS NOT NULL;", DATABASE)[0])
+            cluster.report['creditGuard'] = credit_guard.settle(credit_path, run_id,
+                cluster.report['modelCalls'], count_calls, cluster.report['usage'])
+            if ledger.get('countingPolicy') == credit_guard.SHARED_POLICY:
+                generation = int(costs[0]) - count_calls * 100_000_000
+                if generation < 0:
+                    raise ValueError('Invalid counted reservation')
+                entry['generationBudgetMicros'] = generation
+                entry['separateCountReserveMicros'] = count_calls * 100_000_000
+                (private / 'ledger.json').write_text(json.dumps(ledger, indent=2), encoding='utf-8')
             cluster.report['encryptedItems'] = int(cluster.sql(
                 "SELECT count(*) FROM payse.analysis_items WHERE ciphertext IS NOT NULL "
                 "AND crypto_meta::text LIKE '%gamma-local-v1:%';", DATABASE)[0])
@@ -259,6 +297,17 @@ def main():
                 "SELECT jsonb_build_object('category',category,'seconds',"
                 "extract(epoch FROM finished_at-dispatched_at))::text "
                 "FROM payse.analysis_cost_calls ORDER BY dispatched_at;", DATABASE)]
+            cluster.report['maximumPotentialModelCalls'] = int(cluster.sql(
+                "SELECT coalesce(max(n),0) FROM (SELECT count(*) n "
+                "FROM payse.analysis_cost_calls a JOIN payse.analysis_cost_calls b "
+                "ON b.category='model' AND b.dispatched_at <= a.dispatched_at "
+                "AND coalesce(b.finished_at,'infinity'::timestamptz) > a.dispatched_at "
+                "WHERE a.category='model' AND a.dispatched_at IS NOT NULL GROUP BY a.id) observed;",
+                DATABASE)[0])
+            cluster.report['failureReasons'] = cluster.sql(
+                "SELECT coalesce(detail->>'reason','unspecified') || ':' || count(*) "
+                "FROM payse.analysis_attempts WHERE detail ? 'reason' GROUP BY detail->>'reason';",
+                DATABASE)
             if dataset and report.exists():
                 summary = json.loads(report.read_text(encoding='utf-8'))
                 quality = score_run(dataset, summary)
@@ -269,10 +318,16 @@ def main():
                     json.dumps(quality, ensure_ascii=False, indent=2), encoding='utf-8')
                 cluster.report['evaluationItems'] = quality['overall']['items']
                 cluster.report['evaluationFailures'] = quality['overall']['failures']
+        if deployment_state:
+            readiness = Path(deployment_state.name) / 'ai-status.json'
+            if readiness.exists():
+                (cluster.work / 'readiness-summary.json').write_bytes(readiness.read_bytes())
         safe_report = {key: value for key, value in cluster.report.items() if key not in ('usage', 'callDurations')}
         print(json.dumps(safe_report, ensure_ascii=False))
-        return completed.returncode
+        return 0 if cluster.report.get('passed') else 1
     finally:
+        if deployment_state:
+            deployment_state.cleanup()
         lock.unlink(missing_ok=True)
 
 

@@ -76,6 +76,30 @@ class PromptReviewTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             review.compare(destination, {'cases': []}, {'cases': []})
 
+    def test_stability_windows_keep_missing_results(self):
+        """2026-11-04: 후반 누락을 빠른 성공으로 처리하거나 분모에서 빼지 않는다."""
+        result = review.stability(self.dataset, {'cases': []})
+        self.assertEqual(1837, sum(row['metrics']['items'] for row in result['windows']))
+        self.assertEqual(1837, sum(row['metrics']['failures'] for row in result['windows']))
+        self.assertTrue(all(row['executedBatches'] == 0 for row in result['windows']))
+        self.assertTrue(all(row['httpLatency']['meanSeconds'] is None for row in result['windows']))
+        self.assertIsNone(result['pipelineElapsedMillis'])
+
+    def test_pipeline_timing_requires_all_request_attempts_and_completion(self):
+        """2026-11-04: 부분 실행·시간 미측정을 전체 5분 검증으로 보고하지 않는다."""
+        cases = [{'name': row['name']} for row in review.read(self.dataset / 'inputs.json')]
+        summary = {'cases': cases, 'evaluationComplete': True, 'pipelineElapsedMillis': 250000}
+        result = review.score_run(self.dataset, summary)
+        self.assertTrue(result['wholePipelineMeasured'])
+        self.assertEqual(250000, result['pipelineElapsedMillis'])
+        self.assertEqual(1837, result['overall']['failures'])
+        for change in ({'cases': cases[:-1]}, {'evaluationComplete': False},
+                       {'pipelineElapsedMillis': None}, {'pipelineElapsedMillis': True}):
+            with self.subTest(change=list(change)):
+                result = review.score_run(self.dataset, summary | change)
+                self.assertFalse(result['wholePipelineMeasured'])
+                self.assertIsNone(result['pipelineElapsedMillis'])
+
 
 if __name__ == '__main__':
     unittest.main()

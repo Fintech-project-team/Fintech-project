@@ -96,7 +96,7 @@ tasks.register('aiArchiveCheck') {
     doLast {
         def archive = tasks.named('bootJar').get().archiveFile.get().asFile
         new java.util.zip.ZipFile(archive).withCloseable { boot ->
-            if (boot.entries().toList().any { it.name.contains('/GammaLocal') || it.name.contains('/GammaLive') }) {
+            if (boot.entries().toList().any { it.name.contains('/GammaLocalConfig') || it.name.contains('/GammaLocalServer') || it.name.contains('/GammaLive') || it.name.endsWith('Test.class') }) {
                 throw new GradleException('Gamma-only test code entered the deployment JAR')
             }
             def aiEntries = boot.entries().toList().findAll { it.name.startsWith('BOOT-INF/lib/ai-') && it.name.endsWith('.jar') }
@@ -117,7 +117,7 @@ tasks.register('aiArchiveCheck') {
                 throw new GradleException('Private evaluation material entered AI deployment')
             }
             def publicFiles = names.findAll { it.startsWith('com/payse/ai/rules/') && !it.endsWith('/') }
-            def expectedPublic = ['criteria.json', 'instructions.txt', 'prompt-guide.json',
+            def expectedPublic = ['criteria.json', 'instructions.txt', 'guidance.md', 'performance.json', 'prompt-guide.json',
                 'transactionMeaning.input.schema.json', 'transactionMeaning.output.schema.json',
                 'recurringMeaning.input.schema.json', 'recurringMeaning.output.schema.json']
                 .collect { 'com/payse/ai/rules/' + it }.toSet()
@@ -126,3 +126,19 @@ tasks.register('aiArchiveCheck') {
     }
 }
 tasks.named('check') { dependsOn 'aiArchiveCheck' }
+
+// Only the public canonical gamma identity is bundled; no test source, key or financial row.
+def gammaIdentityDir = layout.buildDirectory.dir('generated/gamma-identity')
+tasks.register('gammaIdentity') {
+    inputs.file('fixtures/generated-v4/server-seeds.json')
+    outputs.dir(gammaIdentityDir)
+    doLast {
+        def seeds = new groovy.json.JsonSlurper().parse(file('fixtures/generated-v4/server-seeds.json'))
+        def gamma = seeds.users.findAll { it.initialCase == 'gamma-life' }
+        if (gamma.size() != 1) { throw new GradleException('Unique gamma identity required') }
+        def output = gammaIdentityDir.get().asFile
+        output.mkdirs()
+        new File(output, 'gamma-identity.json').text = groovy.json.JsonOutput.toJson([userId: gamma[0].userId])
+    }
+}
+tasks.named('processResources') { dependsOn 'gammaIdentity'; from(gammaIdentityDir) }

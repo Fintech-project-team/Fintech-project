@@ -1,8 +1,6 @@
 package com.payse.api.analysis.service;
 
-import com.payse.api.ApiTestConstants.AnalysisCodes;
 import com.payse.api.ApiTestConstants.AnalysisFields;
-import com.payse.api.ApiTestConstants.AnalysisHttp;
 import com.payse.api.ApiTestConstants.GammaLocal;
 import com.payse.ai.analysis.service.AnalysisService;
 import com.payse.ai.provider.ModelFactory;
@@ -16,10 +14,7 @@ import com.payse.api.analysis.mapper.AnalysisCosts;
 import com.payse.api.auth.crypto.AuthCrypto;
 import com.payse.api.auth.mapper.AuthRepository;
 import com.payse.api.auth.mapper.AuthTransactions;
-import com.payse.api.finance.error.FinancialException;
 import com.payse.api.finance.mapper.FinancialRepository;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import java.net.http.HttpClient;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -28,8 +23,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
-import org.springframework.web.method.HandlerMethod;
-import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import tools.jackson.databind.node.ObjectNode;
@@ -42,6 +35,35 @@ import tools.jackson.databind.JsonNode;
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class GammaLocalConfig {
+    /**
+     * 명시 감마 평가에만 1..6개 작업을 허용한다. 일반 구성은 기존 용량을 유지한다.
+     * @created 2026-11-04
+     * @usedBy gammaCapacity, GammaLiveTest
+     */
+    static int parallelism() {
+        String value = System.getenv(GammaLocal.ENV_PARALLEL);
+        if (value == null) {
+            return 1;
+        }
+        if (!GammaLocal.APPROVED.equals(System.getenv(GammaLocal.ENV_EVALUATION))
+            || !value.matches("[1-6]")) {
+            throw new IllegalStateException(GammaLocal.INCOMPLETE);
+        }
+        return Integer.parseInt(value);
+    }
+
+    /**
+     * 감마 전용 인증 가드가 있는 시험 구성에서만 용량을 바꾼다.
+     * @created 2026-11-04
+     * @usedBy AnalysisJobs 생성자
+     */
+    @Bean
+    @Primary
+    AnalysisCapacity gammaCapacity() {
+        int parallel = parallelism();
+        return new AnalysisCapacity(Math.max(2, parallel), 20, parallel, Math.max(2, parallel));
+    }
+
     /**
      * 저장소의 감마 초기 사례 한 건만 선택한다. 표시명이나 클라이언트 userId를 사용하지 않는다.
      * @created 2026-11-03
@@ -91,7 +113,7 @@ public class GammaLocalConfig {
      * @created 2026-11-03
      * @usedBy Spring 시험 구성
      * @modified 2026-11-03 - 승인된 연간 평가에만 별도 토큰 상한을 적용
-     * @modified 2026-11-04 - 시험에서도 실제 프롬프트 지문을 재사용 판정에 반영
+     * @modified 2026-11-04 - 프롬프트 지문 및 독립 재검토·추론 설정의 별도 버전 반영
      */
     @Bean
     @Primary
@@ -100,7 +122,8 @@ public class GammaLocalConfig {
         AnalysisCosts costs,
         @Value("${payse.gamma-local.llm-file:}") String file,
         @Value("${payse.gamma-local.project:}") String project,
-        @Value("${payse.gamma-local.pricing:}") String version
+        @Value("${payse.gamma-local.pricing:}") String version,
+        @Value("${payse.gamma-local.review-file:}") String reviewFile
     ) {
         if (file.isBlank() || !Path.of(file).isAbsolute()
             || project.isBlank() || version.isBlank()) {
@@ -120,13 +143,14 @@ public class GammaLocalConfig {
             .followRedirects(HttpClient.Redirect.NEVER)
             .build();
         ProviderHttp http = new ProviderHttp(client, Duration.ofSeconds(20), 1048576);
+        String review = reviewer(reviewFile);
         var factory = llm.factory(http, pricing.inputLimit(), pricing.outputLimit());
         ModelFactory models = (instructions, schema) ->
-            new ObservedModel(factory.create(instructions, schema));
+            new ObservedModel(factory.create(instructions + review, schema));
         var analysis = new AnalysisService(models, pricing.inputLimit());
         ObjectNode versions = AnalysisJson.JSON.createObjectNode()
             .put(AnalysisFields.MODEL, llm.model())
-            .put(AnalysisFields.PROMPT, analysis.promptVersion())
+            .put(AnalysisFields.PROMPT, comparisonVersion(analysis.promptVersion(), llm.reasoningEffort(), review))
             .put(AnalysisFields.RESPONSE, GammaLocal.VERSION)
             .put(AnalysisFields.POLICY, version);
         var execution = new AnalysisRuntime.Execution(models, costs, pricing, project, version);
@@ -136,6 +160,50 @@ public class GammaLocalConfig {
             versions,
             execution
         );
+    }
+
+    /**
+     * 별도 비교 실행에서만 도구 없는 1회 독립 재검토 지시를 읽는다.
+     * @created 2026-11-04
+     * @usedBy gammaRuntime
+     */
+    private static String reviewer(String path) {
+        if (path.isBlank()) {
+            return "";
+        }
+        try {
+            Path file = Path.of(path);
+            if (!file.isAbsolute() || java.nio.file.Files.size(file) > 8192) {
+                throw new IllegalArgumentException();
+            }
+            var review = AnalysisJson.JSON.readTree(file.toFile());
+            if (!"payse-bounded-reviewer-v1".equals(review.path("format").asString())
+                || review.path("maximumCallsPerBatch").asInt() != 1
+                || !review.path("instructions").isString()) {
+                throw new IllegalArgumentException();
+            }
+            return "\n" + review.path("instructions").asString();
+        } catch (Exception failure) {
+            throw new IllegalStateException(GammaLocal.INCOMPLETE);
+        }
+    }
+
+    /**
+     * 추론 설정·추가 지시가 다른 비교 결과를 같은 캐시 버전으로 저장하지 않는다.
+     * @created 2026-11-04
+     * @usedBy gammaRuntime
+     */
+    private static String comparisonVersion(String prompt, String effort, String review) {
+        if ("none".equals(effort) && review.isEmpty()) {
+            return prompt;
+        }
+        try {
+            byte[] bytes = (prompt + "\n" + effort + review).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            return "PAYSE-AGENT-1:" + java.util.HexFormat.of().formatHex(
+                java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (Exception failure) {
+            throw new IllegalStateException(GammaLocal.INCOMPLETE);
+        }
     }
 
     /**
@@ -181,6 +249,7 @@ public class GammaLocalConfig {
      * @created 2026-11-03
      * @usedBy Spring MVC
      * @modified 2026-11-03 - 명시적 난도 확장 시험 원천 버전도 대조
+     * @modified 2026-11-04 - 동결 원천 버전 허용 및 실제 배포와 인증/원천 가드 공유
      */
     @Bean
     WebMvcConfigurer gammaGuard(
@@ -190,10 +259,13 @@ public class GammaLocalConfig {
         FinancialRepository finances,
         @Value("${payse.gamma-local.source-version:}") String sourceVersion
     ) {
-        if (!sourceVersion.matches("fixture:gamma-(year|challenge):1:[0-9-]+:[0-9]+")) {
+        boolean original = sourceVersion.matches("fixture:gamma-(year|challenge):1:[0-9-]+:[0-9]+");
+        boolean fresh = sourceVersion.matches("fixture:gamma-fresh:(development|holdout):[0-9]+");
+        if (!original && !fresh) {
             throw new IllegalStateException(GammaLocal.MISSING_SOURCE);
         }
-        Guard guard = new Guard(transactions, auth, crypto, finances, owner(), sourceVersion);
+        var guard = new GammaDeployment.Guard(
+            transactions, auth, crypto, finances, owner(), sourceVersion);
         return new WebMvcConfigurer() {
             /**
              * 모든 분석 controller를 경로 별칭과 무관하게 보호한다.
@@ -207,78 +279,4 @@ public class GammaLocalConfig {
         };
     }
 
-    /**
-     * 분석 API에만 추가 시험 범위를 적용한다. 일반 로그인·금융 조회는 기존 경로를 유지한다.
-     * @created 2026-11-03
-     * @usedBy gammaGuard, GammaLocalTest
-     */
-    static final class Guard implements HandlerInterceptor {
-        private final AuthTransactions transactions;
-        private final AuthRepository auth;
-        private final AuthCrypto crypto;
-        private final FinancialRepository finances;
-        private final UUID owner;
-        private final String sourceVersion;
-
-        /**
-         * 인증 및 원천 저장소와 서버 측 허용 대상을 받는다.
-         * @created 2026-11-03
-         * @usedBy gammaGuard, GammaLocalTest
-         */
-        Guard(
-            AuthTransactions transactions,
-            AuthRepository auth,
-            AuthCrypto crypto,
-            FinancialRepository finances,
-            UUID owner,
-            String sourceVersion
-        ) {
-            this.transactions = transactions;
-            this.auth = auth;
-            this.crypto = crypto;
-            this.finances = finances;
-            this.owner = owner;
-            this.sourceVersion = sourceVersion;
-        }
-
-        /**
-         * 클라이언트 본문을 읽기 전에 세션 사용자와 현재 원천 버전을 확인한다.
-         * @created 2026-11-03
-         * @usedBy Spring MVC
-         */
-        @Override
-        public boolean preHandle(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            Object handler
-        ) {
-            if (!(handler instanceof HandlerMethod method)
-                || !method.getBeanType().getPackageName()
-                    .equals(GammaLocal.CONTROLLER_PACKAGE)) {
-                return true;
-            }
-            String header = request.getHeader(AnalysisHttp.AUTHORIZATION);
-            String token = header != null && header.startsWith(AnalysisHttp.BEARER_PREFIX)
-                ? header.substring(7) : null;
-            transactions.run(() -> {
-                String digest;
-                try {
-                    digest = crypto.tokenDigest(token);
-                } catch (IllegalArgumentException failure) {
-                    digest = null;
-                }
-                var session = auth.authorize(digest)
-                    .orElseThrow(() -> new FinancialException(401, GammaLocal.SESSION_INVALID));
-                if (!owner.equals(session.userId())) {
-                    throw new FinancialException(403, AnalysisCodes.RESOURCE_FORBIDDEN);
-                }
-                ObjectNode source = finances.load(session.userId());
-                if (!sourceVersion.equals(source.path(AnalysisFields.SOURCE_VERSION).asString())) {
-                    throw new FinancialException(409, AnalysisCodes.STALE_DATA);
-                }
-                return null;
-            });
-            return true;
-        }
-    }
 }

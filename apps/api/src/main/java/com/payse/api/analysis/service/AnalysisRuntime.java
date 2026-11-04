@@ -26,11 +26,13 @@ public class AnalysisRuntime {
     private final EnvelopeCipher cipher;
     private final ObjectNode versions;
     private final Execution execution;
+    private final AnalysisReadiness readiness;
 
     /**
      * 미준비 서버에서는 테스트 응답·임시 키·다른 계정으로 대체하지 않는다.
      * @created 2026-11-01
      * @usedBy AnalysisConfiguration
+     * @modified 2026-11-04 - 비활성 구성에서는 운영 관측도 비활성화
      * @modified 2026-11-03 - 비용 구성 없는 기본 실행 차단 유지
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조
@@ -39,6 +41,7 @@ public class AnalysisRuntime {
         service = null;
         cipher = null;
         execution = null;
+        readiness = null;
         versions = AnalysisJson.JSON.createObjectNode()
             .put(ApiFieldConstants.Analysis.RUNTIME, ApiCodeConstants.Analysis.DISABLED);
     }
@@ -60,6 +63,7 @@ public class AnalysisRuntime {
      * 운영 구성은 비용 장부와 고정된 공급자 팩토리를 함께 받는다.
      * @created 2026-11-03
      * @usedBy AnalysisConfiguration, AnalysisRuntime의 테스트 생성자
+     * @modified 2026-11-04 - 선택적 준비 관측 생성자로 위임
      */
     AnalysisRuntime(
         AnalysisService service,
@@ -67,6 +71,17 @@ public class AnalysisRuntime {
         ObjectNode versions,
         Execution execution
     ) {
+        this(service, cipher, versions, execution, null);
+    }
+
+    /**
+     * 선택적 비공개 운영 관측에 실제 분석 검증 결과만 전달한다.
+     * @created 2026-11-04
+     * @usedBy GammaDeployment, AnalysisRuntime 생성자
+     */
+    AnalysisRuntime(AnalysisService service, EnvelopeCipher cipher, ObjectNode versions,
+        Execution execution, AnalysisReadiness readiness) {
+        this.readiness = readiness;
         this.service = Objects.requireNonNull(service);
         this.cipher = Objects.requireNonNull(cipher);
         this.execution = execution;
@@ -153,6 +168,7 @@ public class AnalysisRuntime {
      * 공급자 호출 전에 예약의 전송권을 확정하고 관측 비용을 저장보다 먼저 정산한다.
      * @created 2026-11-03
      * @usedBy AnalysisJobs.execute
+     * @modified 2026-11-04 - 비공개 준비 상태에 실제 결과 검증 시각 기록
      */
     public AnalysisResult analyze(UUID attempt, ObjectNode input, ObjectNode facts) {
         requireReady();
@@ -167,8 +183,15 @@ public class AnalysisRuntime {
             attempt
         );
         try {
-            return new AnalysisService(models, execution.pricing().inputLimit())
+            AnalysisResult result = new AnalysisService(models, execution.pricing().inputLimit())
                 .analyzeForStorage(input, facts);
+            if (readiness != null) {
+                String event = result.failure() == null
+                    ? ApiCodeConstants.Readiness.ANALYSIS_VALIDATED
+                    : ApiCodeConstants.Readiness.ANALYSIS_FAILURE;
+                readiness.observe(event);
+            }
+            return result;
         } finally {
             cancel(attempt);
         }

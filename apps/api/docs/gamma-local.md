@@ -4,7 +4,7 @@
 
 ## 분리와 접근 경계
 
-- `src/test/java/com/payse/api/analysis/service/GammaLocal*`와 `GammaLiveTest`는 일반 서버 JAR에 들어가지 않는다. `aiArchiveCheck`가 혼입을 검사한다.
+- 평가 실행기 `GammaLocalConfig`, `GammaLocalServer`, `GammaLiveTest`는 서버 JAR에 들어가지 않는다. 2026-11-04 사용자 요청으로 로컬 키 구현은 별도 `GammaDeployment`의 명시 `gamma-local` 프로필에서도 사용한다. 준비·상태·새 PC 설치와 제거 범위는 [AI 시작 안내](ai-startup.md)를 따른다. `aiArchiveCheck`는 평가 실행기와 비공개 정답의 혼입을 계속 거절한다.
 - 실행 구성은 명시 활성화와 키·LLM 설정·비용 정책·합성 원천 버전을 모두 요구한다. 서버 시드의 `initialCase=gamma-life`에 대응하는 유일한 사용자만 허용한다.
 - 분석 controller 진입 전에 기존 DB 세션 인증과 감마 사용자, 현재 연간 원천 버전을 확인한다. 본문의 `userId`나 fixture의 `verified` 표식으로 권한을 부여하지 않는다. 일반 금융 API는 기존 동작을 유지한다.
 - 감마 원천과 분류 정답은 분리한다. 입력은 실제 DB의 소유권·연결·원천과 다시 대조한다. 이체 금액·일시만으로 관계를 확정하지 않는다.

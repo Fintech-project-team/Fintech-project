@@ -31,14 +31,17 @@ public final class PromptGuide {
      * 배포된 자료만 읽고 내용 지문을 만든다. 요청 데이터나 통신은 사용하지 않는다.
      * @created 2026-11-04
      * @usedBy AnalysisService 생성자
+     * @modified 2026-11-04 - 실제 Markdown 판단 절차를 입력과 지문에 포함
      */
     public PromptGuide(String criteria) {
-        String source = resource();
+        String source = resource(Analysis.GUIDE_FILE);
         guide = (ObjectNode) JSON.readTree(source);
         validate();
-        base = criteria + "\n" + JSON.writeValueAsString(guide.get(Guide.RULES));
+        String markdown = resource(Analysis.GUIDE_MARKDOWN);
+        base = criteria + "\n" + markdown + "\n"
+            + JSON.writeValueAsString(guide.get(Guide.RULES));
         String material = Analysis.PROMPT_RENDERER + "\n" + JSON.writeValueAsString(guide)
-            + "\n" + criteria
+            + "\n" + criteria + "\n" + markdown
             + "\n" + StorageContract.instructions()
             + "\n" + AiMessageConstants.Analysis.SOURCE_FACTS_INSTRUCTIONS;
         try {
@@ -160,10 +163,11 @@ public final class PromptGuide {
      * 정해진 공개 리소스만 읽으며 로컬 파일·평가 디렉터리를 탐색하지 않는다.
      * @created 2026-11-04
      * @usedBy PromptGuide 생성자
+     * @modified 2026-11-04 - 고정된 JSON과 Markdown 리소스를 같은 경로로 읽음
      */
-    private String resource() {
+    private String resource(String file) {
         try (var stream = PromptGuide.class.getResourceAsStream(
-            Analysis.RULES_PATH + Analysis.GUIDE_FILE
+            Analysis.RULES_PATH + file
         )) {
             if (stream == null) {
                 throw new IllegalStateException(AiMessageConstants.Analysis.MISSING_RESOURCE);

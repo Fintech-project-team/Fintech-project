@@ -7,6 +7,53 @@ package com.payse.api.constants;
  */
 public final class ApiConfigConstants {
     /**
+     * 비공개 AI 준비와 상태의 고정 규격이다.
+     * @created 2026-11-04
+     * @usedBy AnalysisReadiness
+     */
+    public static final class Readiness {
+        public static final String LOCK_FILE = "ai.lock";
+        public static final String STATUS_FILE = "ai-status.json";
+        public static final String PROFILE_FILE = "ai-profile.json";
+        public static final String PERFORMANCE_FORMAT = "payse-ai-performance-v1";
+        public static final String READINESS_FORMAT = "payse-ai-readiness-v1";
+        public static final String GIT_MARKER = ".git";
+        public static final String NEXT_SUFFIX = ".next";
+
+        /**
+         * 정적 상수 구간의 인스턴스 생성을 막는다.
+         * @created 2026-11-04
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private Readiness() {
+        }
+    }
+
+    /**
+     * 명시적인 폐기용 감마 배포의 설정 및 암호 규격이다.
+     * @created 2026-11-04
+     * @usedBy GammaDeployment, GammaLocalKeys, AnalysisReadiness
+     */
+    public static final class GammaLocal {
+        public static final String KEY_REFERENCE = "gamma-local-v1:";
+        public static final String HASH_ALGORITHM = "SHA-256";
+        public static final String CIPHER_ALGORITHM = "AES/GCM/NoPadding";
+        public static final String KEY_ALGORITHM = "AES";
+        public static final String VERSION = "gamma-local-2";
+        public static final String CONTROLLER_PACKAGE = "com.payse.api.analysis.controller";
+        public static final String PERFORMANCE = "/com/payse/ai/rules/performance.json";
+        public static final String IDENTITY = "/gamma-identity.json";
+
+        /**
+         * 정적 설정 구간의 인스턴스 생성을 막는다.
+         * @created 2026-11-04
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private GammaLocal() {
+        }
+    }
+
+    /**
      * 분석 실행 구성·비용 경계의 고정 문자열이다.
      * @created 2026-11-03
      * @usedBy AnalysisSettings, AnalysisPricing, AnalysisCosts, AnalysisConfiguration

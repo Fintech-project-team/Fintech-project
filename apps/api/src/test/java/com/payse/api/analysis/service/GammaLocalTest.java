@@ -161,7 +161,7 @@ class GammaLocalTest {
         when(crypto.tokenDigest(nullable(String.class))).thenReturn("test-digest");
         UUID owner = GammaLocalConfig.owner();
         String version = "fixture:gamma-year:1:2026-10-31:20261103";
-        var guard = new GammaLocalConfig.Guard(
+        var guard = new GammaDeployment.Guard(
             transactions,
             auth,
             crypto,

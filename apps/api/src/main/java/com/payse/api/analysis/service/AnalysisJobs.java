@@ -55,12 +55,14 @@ public final class AnalysisJobs {
     private final AnalysisIdentity identity = new AnalysisIdentity();
     private final AnalysisEvidence evidence = new AnalysisEvidence();
     private final MemoryPolicy retention = new MemoryPolicy();
-    private final ExecutorService workers = Executors.newFixedThreadPool(2);
+    private final AnalysisCapacity capacityLimits;
+    private final ExecutorService workers;
 
     /**
      * API의 기존 인증·저장소와 요청별 분석 실행 경계를 연결한다.
      * @created 2026-11-01
      * @usedBy Spring 생성자 주입
+     * @modified 2026-11-04 - 승인된 용량 구성에 맞춰 작업자와 접수 상한을 함께 사용
      */
     public AnalysisJobs(
         AuthTransactions transactions,
@@ -70,7 +72,8 @@ public final class AnalysisJobs {
         AnalysisRepository repository,
         AnalysisRuntime runtime,
         AnalysisResults results,
-        Clock clock
+        Clock clock,
+        AnalysisCapacity capacityLimits
     ) {
         this.transactions = transactions;
         this.auth = auth;
@@ -80,12 +83,15 @@ public final class AnalysisJobs {
         this.runtime = runtime;
         this.results = results;
         this.clock = clock;
+        this.capacityLimits = capacityLimits;
+        workers = Executors.newFixedThreadPool(capacityLimits.runningTotal());
     }
 
     /**
      * 본문 없는 descriptor를 접수한다. recovery만 현재 입력 검증과 기존 결과 재사용을 먼저 한다.
      * @created 2026-11-01
      * @usedBy AnalysisController.accept
+     * @modified 2026-11-04 - 기존 잠금 안에서 주입된 대기 용량을 검사
      * @modified 2026-11-02 - 긴 식 지역변수 분리
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
@@ -211,7 +217,7 @@ public final class AnalysisJobs {
 
                 if (cachedResult == null) {
                     long[] capacity = repository.capacity(session.userId());
-                    if (capacity[0] >= 2 || capacity[1] >= 20) {
+                    if (capacityLimits.waitingFull(capacity[0], capacity[1])) {
                         throw new FinancialException(429, ApiCodeConstants.Analysis.RATE_LIMITED);
                     }
                 }
@@ -278,6 +284,7 @@ public final class AnalysisJobs {
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
      * @modified 2026-11-03 - 분석 시도와 비용 예약을 원자 접수하고 DB 원천을 별도 투영
+     * @modified 2026-11-04 - 주입된 실행 상한 적용, 일반 API 기본값 유지
      */
     public Reply submit(String token, String id, boolean retry, Supplier<JsonNode> request) {
         Submission submission = authenticated(
@@ -488,7 +495,7 @@ public final class AnalysisJobs {
                 }
                 runtime.requireReady();
                 long[] capacity = repository.capacity(session.userId());
-                if (capacity[2] >= 1 || capacity[3] >= 2) {
+                if (capacityLimits.runningFull(capacity[2], capacity[3])) {
                     ObjectNode waiting = status(session.userId(), uuid(current, AnalysisDb.ID));
                     waiting.put(ApiFieldConstants.Analysis.ACTION, ApiCodeConstants.Analysis.WAIT);
                     waiting.remove(ApiFieldConstants.Analysis.PERMIT);
@@ -1118,6 +1125,7 @@ public final class AnalysisJobs {
      * 진행 상태와 Q2 조건에 따른 60초 입력 허용 식별을 반환한다. 별도 인증 수단이 아니다.
      * @created 2026-11-01
      * @usedBy read, accept, submit
+     * @modified 2026-11-04 - 실패 확인 목록을 결과 본문 없이 상세 보관 기한 안에서 제공
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
      * @modified 2026-11-02 - 동일 구현의 Jackson 문자열 노드 생성 메서드로 교체
@@ -1148,6 +1156,10 @@ public final class AnalysisJobs {
                 ApiFieldConstants.Analysis.RESULT_AVAILABILITY,
                 ApiCodeConstants.Analysis.UNCHECKED
             );
+        ObjectNode review = AnalysisReview.describe(current, state, clock.instant());
+        if (review != null) {
+            response.set(ApiFieldConstants.Analysis.REVIEW, review);
+        }
         if (current.path(ApiFieldConstants.Analysis.DETAIL)
             .path(ApiFieldConstants.Analysis.ITEMS)
             .isArray()
