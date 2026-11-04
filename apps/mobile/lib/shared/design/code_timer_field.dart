@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'payse_text_field.dart';
 import 'payse_tokens.dart';
+import 'underlined_text.dart';
 
 /// 2026-10-21: 인증번호 입력과 표시용 타이머(design.md §5 CodeTimerField).
 /// 남은 시간은 호출자가 계산해 넘긴다. 세션 만료·잠금과 관계없고 0:00 아래로 표시하지 않는다.
@@ -110,18 +111,15 @@ class CodeTimerField extends StatelessWidget {
                     minWidth: PayseSize.touchMin,
                   ),
                   child: Center(
-                    child: Text(
+                    child: UnderlinedText(
                       resendLabel,
+                      underline: expired,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: expired
                             ? PayseColors.textPrimary
                             : PayseColors.textSecondary,
-                        decoration: expired
-                            ? TextDecoration.underline
-                            : TextDecoration.none,
-                        decorationColor: PayseColors.textPrimary,
                       ),
                     ),
                   ),

@@ -17,6 +17,7 @@ import 'connection_flow_controller.dart';
 import 'connection_illustration.dart';
 import 'connection_page.dart';
 import 'connection_review.dart';
+import '../../shared/design/underlined_text.dart';
 
 /// 2026-10-22: 기관 종류 문자열을 표시 종류로 바꾼다. 은행이 아니면 카드사로 그린다.
 InstitutionKind _kindOf(Institution i) =>
@@ -1448,10 +1449,9 @@ class ConnectionReviewScreen extends StatelessWidget {
             textStyle: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              decoration: TextDecoration.underline,
             ),
           ),
-          child: Text(result == null ? '홈으로 가기' : '나중에 확인하고 홈으로 가기'),
+          child: UnderlinedText(result == null ? '홈으로 가기' : '나중에 확인하고 홈으로 가기'),
         ),
         Semantics(
           enabled: false,
