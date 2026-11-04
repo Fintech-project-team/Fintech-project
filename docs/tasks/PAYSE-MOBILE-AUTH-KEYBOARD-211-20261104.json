@@ -1,0 +1,29 @@
+{
+  "id": "PAYSE-MOBILE-AUTH-KEYBOARD-211-20261104",
+  "role": "integration",
+  "baseCommit": "7bc649a9f8f244a5d6516158a9b92344d4283da5",
+  "branch": "feat/integration/auth-keyboard-211",
+  "allowedPaths": [
+    "docs/tasks/PAYSE-MOBILE-AUTH-KEYBOARD-211-20261104.json",
+    "apps/mobile/lib/features/auth/auth_screens.dart",
+    "apps/mobile/test/features/auth/",
+    "apps/mobile/docs/auth.md"
+  ],
+  "acceptance": [
+    "목적: 이슈 #211. 인증 화면(10-2 본인확인 정보 입력, 10-3 인증번호 입력)에서 입력칸 밖 빈 곳을 누르면 입력 포커스를 풀어 키보드를 닫는다. 예정 지출 편집(29-5a)·월급 정보 편집과 같은 방식(본문 GestureDetector translucent + primaryFocus.unfocus)이다. baseCommit은 hyeyeon-dev 7bc649a다",
+    "방법: 인증 화면 공통 틀 AuthPage의 본문을 감싸 모든 인증 화면에 같은 규칙을 둔다. 입력칸·버튼·체크 등 본문 안 조작은 지금처럼 동작해야 한다(안쪽 누르기가 우선). 화면 모양·문구는 바꾸지 않으므로 시안은 만들지 않는다",
+    "검증 계획: 10-2에서 이름·휴대폰 번호에 포커스가 있을 때 빈 곳을 누르면 포커스가 풀리고, 입력칸을 누르면 다시 입력되는지, 10-3 인증번호 칸도 같은지 위젯 테스트. 기존 인증 흐름 테스트 통과. 실기기에서 확인. 공식 검증은 npm run verify -- --task <이 명세>(mobile:check 포함)",
+    "범위 밖: 다른 화면의 키보드 처리, 화면 모양 변경, 서버·DB·API 계약. 커밋·PR·merge는 혜연 요청 전 실행하지 않는다"
+  ],
+  "readBefore": [
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/app-architecture.md",
+    "docs/v0.6-screen-rules.md",
+    "apps/mobile/docs/auth.md",
+    "docs/design.md",
+    "docs/harness/AGENT_REVIEW.md"
+  ]
+}

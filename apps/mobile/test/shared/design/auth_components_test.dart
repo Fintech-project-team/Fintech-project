@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:payse/shared/design/code_timer_field.dart';
+import 'package:payse/shared/design/underlined_text.dart';
 import 'package:payse/shared/design/payse_text_field.dart';
 import 'package:payse/shared/design/payse_tokens.dart';
 import 'package:payse/shared/design/pin_pad.dart';
@@ -560,8 +561,10 @@ void main() {
             .color,
         PayseColors.textPrimary,
       );
-      final resend = tester.widget<Text>(find.text('다시 받기'));
-      expect(resend.style!.decoration, TextDecoration.underline);
+      final resend = tester.widget<UnderlinedText>(
+        find.widgetWithText(UnderlinedText, '다시 받기'),
+      );
+      expect(resend.underline, isTrue, reason: '0:00 뒤에만 직접 그린 밑줄');
       await tester.tap(find.byKey(const ValueKey('code-resend')));
       expect(resent, 1);
     });
