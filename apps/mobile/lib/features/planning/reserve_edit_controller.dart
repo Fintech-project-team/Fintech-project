@@ -11,6 +11,7 @@ import '../overview/accounts_screen.dart' show AccountsWriter;
 import '../overview/home_calculation.dart';
 import 'obligation_edit.dart';
 import 'obligation_edit_controller.dart';
+import 'plan_periods.dart';
 import 'reserve_edit.dart';
 
 /// 2026-11-03: 결과를 확인하지 못한 남겨둘 돈 요청. 다시 보낼 때 본문·버전·배열 순서·작업 키를 그대로 쓴다.
@@ -22,9 +23,11 @@ typedef _Pending = ({
   List<DetachAllocation>? detach,
 });
 
-/// 2026-11-03: 남겨둘 돈 추가·수정·취소(03-5, 29-5b)의 입력·미리보기·저장. 연결(이 돈으로 낼 지출)은 바꾸지 않는다. 저장 상태와
+/// 2026-11-03: 남겨둘 돈 추가·수정·취소(03-5, 29-5b)의 입력·미리보기·저장. 저장 상태와
 /// 재시도 규칙은 예정 지출 편집([ObligationEditController])과 같다: 결과 불명은 같은 요청 재전송, 자료 충돌은 최신 정보를 받은 뒤
 /// 새 키로, 최신 정보를 받기 전에는 저장·취소를 막는다.
+/// 2026-11-04: 이 돈으로 낼 지출(사용 계획) 고르기·금액 바꾸기·해제를 더했다(29-5c). 새로 고르거나 늘리는 것은 이번 월급 주기
+/// 예정 지출만 가능하고, 다음 월급 기간 지출이나 월급 주기를 정할 수 없을 때는 줄이기·해제만 된다.
 class ReserveEditController extends ChangeNotifier {
   /// 2026-11-03: 지금 Snapshot [snapshot], 저장 연결 [writer], 고칠 남겨둘 돈 [reserveId](추가면 null)로 만든다. [random]은
   /// 작업 키 생성용이며 테스트에서만 바꾼다.
@@ -40,6 +43,7 @@ class ReserveEditController extends ChangeNotifier {
     _label = r?.label ?? '';
     _amount = r?.amountKrw;
     _accountId = r?.accountId;
+    _plans = planItems(facts);
   }
 
   final AccountsWriter writer;
@@ -50,6 +54,8 @@ class ReserveEditController extends ChangeNotifier {
   late String _label;
   int? _amount;
   String? _accountId;
+  late List<PlanItem> _plans;
+  ({int index, PlanItem item})? _lastUnplanned;
   EditSave _save = const EditIdle();
   _Pending? _pending;
   bool _needsLatest = false;
@@ -68,8 +74,63 @@ class ReserveEditController extends ChangeNotifier {
   }
 
   /// 2026-11-03: 지금 입력.
-  ReserveDraft get draft =>
-      (label: _label, amountKrw: _amount, accountId: _accountId);
+  ReserveDraft get draft => (
+    label: _label,
+    amountKrw: _amount,
+    accountId: _accountId,
+    plans: List.unmodifiable(_plans),
+  );
+
+  /// 2026-11-04: 지금 사용 계획(예정일 순).
+  List<PlanItem> get plans => List.unmodifiable(_plans);
+
+  /// 2026-11-04: 이번 월급 주기를 정할 수 있으면 true다. false면 지출을 새로 고르거나 늘릴 수 없다.
+  bool get cycleKnown => cycleRange != null;
+
+  /// 2026-11-04: 이번 월급 주기의 날짜 범위('9/25 ~ 10/24'). 정할 수 없으면 null이다.
+  String? get cycleRange {
+    final now = _calculation;
+    if (now is! HomeCalculationReady) return null;
+    final cycle = now.result.salaryCycle;
+    final end = cycle?.periodEnd;
+    if (cycle == null || end == null) return null;
+    return PlanPeriod(
+      kind: PlanPeriodKind.salary,
+      start: cycle.periodStart,
+      end: end,
+      role: SalaryRole.current,
+    ).range;
+  }
+
+  /// 2026-11-04: 새로 고를 수 있는 이번 월급 주기 예정 지출.
+  List<PlanCandidate> get candidates => planCandidates(
+    _snapshot,
+    _calculation,
+    reserveId,
+    {for (final p in _plans) p.obligationId},
+  );
+
+  /// 2026-11-04: 예정 지출 [obligationId]에 이 돈에서 쓸 수 있는 최대 금액. 예정 지출 몫과 남겨둘 금액에서 다른 사용 계획을 뺀
+  /// 금액 중 작은 값이다. 새로 고르거나 늘릴 수 없으면(다음 월급 기간·월급 주기 모름) 지금 금액이다(없으면 0).
+  int planMax(String obligationId) {
+    final current = _planOf(obligationId)?.amountKrw ?? 0;
+    final cap = planCap(_snapshot, _calculation, reserveId, obligationId);
+    if (cap == null) return current;
+    final others = _plans
+        .where((p) => p.obligationId != obligationId)
+        .fold(0, (sum, p) => sum + p.amountKrw);
+    final amount = _amount;
+    return amount == null ? cap : max(0, min(cap, amount - others));
+  }
+
+  /// 2026-11-04: 금액을 바꿀 수 있는 사용 계획이면 true다. 이번 월급 주기 지출은 최대 금액까지, 월급 주기를 정할 수 없으면 줄이기만
+  /// 된다. 다음 월급 기간 지출은 false다(해제만).
+  bool planAdjustable(String obligationId) =>
+      !cycleKnown ||
+      planCap(_snapshot, _calculation, reserveId, obligationId) != null;
+
+  /// 2026-11-04: 바로 앞에 해제한 사용 계획. 되돌릴 것이 없으면 null이다.
+  PlanItem? get lastUnplanned => _lastUnplanned?.item;
 
   /// 2026-11-03: 저장 진행 상태.
   EditSave get save => _save;
@@ -87,7 +148,11 @@ class ReserveEditController extends ChangeNotifier {
   bool get needsLatest => _needsLatest;
 
   /// 2026-11-03: 입력의 칸별 문제.
-  DraftProblems get problems => reserveDraftProblems(draft, facts);
+  DraftProblems get problems => reserveDraftProblems(draft);
+
+  /// 2026-11-04: 원래 사용 계획에서 바뀐 배정.
+  AllocationChanges get changes =>
+      allocationChangesOf(planItems(facts), _plans);
 
   /// 2026-11-03: 수정에서 바꾼 필드. 추가면 null이다.
   ReservePatch? get patch {
@@ -98,6 +163,7 @@ class ReserveEditController extends ChangeNotifier {
       label: label != r.label ? label : null,
       amountKrw: _amount != r.amountKrw ? _amount : null,
       accountId: _accountId != r.accountId ? _accountId : null,
+      changes: changes,
     );
   }
 
@@ -110,7 +176,7 @@ class ReserveEditController extends ChangeNotifier {
     if (locked) return true;
     if (_save is EditGone) return false;
     if (reserveId != null && facts == null) return false;
-    return reserveDraftComplete(draft, facts) && !unchanged;
+    return reserveDraftComplete(draft) && !unchanged;
   }
 
   /// 2026-11-03: 저장 버튼 위 미리보기. 자료 충돌·거절 뒤 최신 정보를 받기 전이면 null이다(이전 숫자를 보이지 않음).
@@ -152,6 +218,84 @@ class ReserveEditController extends ChangeNotifier {
     _edit(() => _accountId = value);
   }
 
+  /// 2026-11-04: 예정 지출 [obligationId]를 이 돈에서 [amountKrw]원 쓰도록 고른다. 후보에 있고 1원 이상 최대 금액 이하일 때만 된다.
+  /// 이 화면에서 해제한 저장된 배정을 다시 고르면 새로 만들지 않고 그 배정을 쓴다.
+  void addPlan(String obligationId, int amountKrw) {
+    final c = candidates.where((c) => c.obligationId == obligationId);
+    if (c.isEmpty || amountKrw <= 0 || amountKrw > planMax(obligationId)) {
+      return;
+    }
+    final saved = planItems(facts)
+        .where((p) => p.obligationId == obligationId)
+        .firstOrNull;
+    _edit(() {
+      _lastUnplanned = null;
+      _plans = [
+        ..._plans,
+        (
+          allocationId: saved?.allocationId,
+          obligationId: obligationId,
+          label: c.first.label,
+          dueDate: c.first.dueDate,
+          amountKrw: amountKrw,
+          releasedKrw: saved?.releasedKrw ?? 0,
+          inPeriod: true,
+        ),
+      ]..sort((x, y) => (x.dueDate ?? '').compareTo(y.dueDate ?? ''));
+    });
+  }
+
+  /// 2026-11-04: 사용 계획 [obligationId]의 쓸 금액을 [amountKrw]로 바꾼다. 1원 이상 최대 금액 이하일 때만 된다(늘릴 수 없는
+  /// 계획은 줄이기만).
+  void setPlanAmount(String obligationId, int amountKrw) {
+    final p = _planOf(obligationId);
+    if (p == null || amountKrw <= 0 || amountKrw > planMax(obligationId)) {
+      return;
+    }
+    if (!planAdjustable(obligationId)) return;
+    _edit(() {
+      _lastUnplanned = null;
+      _plans = [
+        for (final q in _plans)
+          q.obligationId == obligationId
+              ? (
+                  allocationId: q.allocationId,
+                  obligationId: q.obligationId,
+                  label: q.label,
+                  dueDate: q.dueDate,
+                  amountKrw: amountKrw,
+                  releasedKrw: q.releasedKrw,
+                  inPeriod: q.inPeriod,
+                )
+              : q,
+      ];
+    });
+  }
+
+  /// 2026-11-04: 사용 계획 [obligationId]를 해제한다(예정 지출은 그대로). 저장 전에는 [undoUnplan]으로 되돌릴 수 있다.
+  void unplan(String obligationId) {
+    final index = _plans.indexWhere((p) => p.obligationId == obligationId);
+    if (index < 0) return;
+    _edit(() {
+      _lastUnplanned = (index: index, item: _plans[index]);
+      _plans = [..._plans]..removeAt(index);
+    });
+  }
+
+  /// 2026-11-04: 바로 앞에 해제한 사용 계획을 되돌린다.
+  void undoUnplan() {
+    final last = _lastUnplanned;
+    if (last == null) return;
+    _edit(() {
+      _lastUnplanned = null;
+      _plans = [..._plans]..insert(min(last.index, _plans.length), last.item);
+    });
+  }
+
+  /// 2026-11-04: 사용 계획 중 예정 지출 [obligationId]의 것. 없으면 null이다.
+  PlanItem? _planOf(String obligationId) =>
+      _plans.where((p) => p.obligationId == obligationId).firstOrNull;
+
   /// 2026-11-03: 결과를 모르는 요청이 없을 때만 입력을 바꾼다. 거절 안내는 입력을 바꾸면 내린다.
   void _edit(VoidCallback change) {
     if (locked || busy) return;
@@ -173,6 +317,7 @@ class ReserveEditController extends ChangeNotifier {
           label: _label.trim(),
           accountId: _accountId!,
           amountKrw: _amount!,
+          changes: changes,
         ),
         patch: null,
         detach: null,
@@ -245,6 +390,7 @@ class ReserveEditController extends ChangeNotifier {
         } else {
           _pending = null;
           _replace(next);
+          _plans = planItems(facts);
           _save = const EditIdle();
           writer.onSnapshot(next);
           _changed();
@@ -307,9 +453,27 @@ class ReserveEditController extends ChangeNotifier {
   }
 
   /// 2026-11-03: 기준 Snapshot을 [next]로 바꾸고 다시 계산한다.
+  /// 2026-11-04: 입력 중인 사용 계획은 그대로 두되, 저장된 배정은 새 Snapshot의 해제액·기간으로 맞추고 사라진 것은 뺀다.
   void _replace(FinancialSnapshot next) {
     _snapshot = next;
     _calculation = computeHomeCalculation(next);
+    final saved = {for (final p in planItems(facts)) p.allocationId: p};
+    _plans = [
+      for (final p in _plans)
+        if (p.allocationId == null)
+          p
+        else if (saved[p.allocationId] case final s?)
+          (
+            allocationId: s.allocationId,
+            obligationId: s.obligationId,
+            label: s.label,
+            dueDate: s.dueDate,
+            amountKrw: p.amountKrw,
+            releasedKrw: s.releasedKrw,
+            inPeriod: s.inPeriod,
+          ),
+    ];
+    _lastUnplanned = null;
   }
 
   /// 2026-11-03: 응답 JSON [json]을 Snapshot으로 읽는다. 형식이 맞지 않으면 null이다.
