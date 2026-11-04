@@ -57,6 +57,7 @@ class AppShell extends StatefulWidget {
     this.history,
     this.userName,
     this.appVersion,
+    this.onChangePin,
   });
 
   final FinancialSnapshot snapshot;
@@ -81,6 +82,9 @@ class AppShell extends StatefulWidget {
   /// 2026-11-03: 내 정보 탭의 로그인한 사용자 이름(없으면 이름 줄 없음)과 설치된 앱 버전 읽기(없으면 버전 줄 없음).
   final String? userName;
   final AppVersionReader? appVersion;
+
+  /// 2026-11-04: 내 정보의 앱 비밀번호 바꾸기 열기(#213). 없으면 줄을 두지 않는다.
+  final Future<bool> Function(BuildContext context)? onChangePin;
 
   static const List<String> tabTitles = ['홈', '계좌·카드', '계획', '내 정보'];
 
@@ -379,6 +383,7 @@ class _AppShellState extends State<AppShell> {
             },
             footer: _accountFooter(),
             version: widget.appVersion,
+            onChangePin: widget.onChangePin,
           ),
         ],
       ),

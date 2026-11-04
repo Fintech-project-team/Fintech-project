@@ -486,3 +486,176 @@ class PinLoginViewModel extends ChangeNotifier {
     super.dispose();
   }
 }
+
+/// 2026-11-04: 앱 비밀번호 바꾸기 단계(#213). 지금 비밀번호 확인 → 새 비밀번호 → 한 번 더.
+enum PinChangePhase { current, create, confirm }
+
+/// 2026-11-04: 내 정보의 앱 비밀번호 바꾸기 상태(#213). 지금 비밀번호 틀림은 잠금 해제와 같은 실패 횟수([LocalPinStore])를
+/// 쓰고, 5번이면 본인 확인 복구를 요구한다. 새 비밀번호는 처음 만들 때와 같은 규칙에 더해 지금 비밀번호와 같으면 거절한다.
+/// 기기에만 저장하고 서버로 보내지 않는다.
+class PinChangeViewModel extends ChangeNotifier {
+  /// 2026-11-04: PIN 저장소 [pinStore]로 만들고 저장된 실패 횟수를 읽는다.
+  PinChangeViewModel(this.pinStore) {
+    _loadFailures();
+  }
+
+  static const int length = 6;
+
+  final LocalPinStore pinStore;
+  PinChangePhase _phase = PinChangePhase.current;
+  String _entry = '';
+  String? _current;
+  String? _first;
+  String? _error;
+  int _failures = 0;
+  bool _busy = false;
+  bool _completed = false;
+  bool _disposed = false;
+
+  /// 2026-11-04: 현재 단계를 반환한다.
+  PinChangePhase get phase => _phase;
+
+  /// 2026-11-04: 입력한 자리 수를 반환한다.
+  int get filled => _entry.length;
+
+  /// 2026-11-04: 점 아래 오류 문구를 반환한다. 없으면 null이다.
+  String? get error => _error;
+
+  /// 2026-11-04: 지금 비밀번호 누적 실패 횟수를 반환한다.
+  int get failures => _failures;
+
+  /// 2026-11-04: 5번 틀려 본인 확인 복구가 필요하면 true를 반환한다.
+  bool get recoveryRequired => _failures >= maxPinFailures;
+
+  /// 2026-11-04: 새 비밀번호 저장까지 끝났으면 true를 반환한다.
+  bool get completed => _completed;
+
+  /// 2026-11-04: 저장된 실패 횟수를 읽는다. 읽지 못하면 저장소 오류 문구를 보인다.
+  Future<void> _loadFailures() async {
+    try {
+      final count = await pinStore.failureCount();
+      if (_disposed) return;
+      _failures = count;
+      if (recoveryRequired) _error = '비밀번호를 $maxPinFailures번 틀렸어요';
+    } on Exception {
+      if (_disposed) return;
+      _error = storageReadFailedMessage;
+    }
+    notifyListeners();
+  }
+
+  /// 2026-11-04: 숫자 [digit]을 더하고 6자리가 되면 단계 규칙을 적용한다.
+  Future<void> addDigit(int digit) async {
+    if (_completed || _busy || recoveryRequired || _entry.length >= length) {
+      return;
+    }
+    _entry += '$digit';
+    if (_entry.length < length) {
+      notifyListeners();
+      return;
+    }
+    final pin = _entry;
+    _entry = '';
+    switch (_phase) {
+      case PinChangePhase.current:
+        await _checkCurrent(pin);
+      case PinChangePhase.create:
+        if (isWeakPin(pin)) {
+          _error = '같은 숫자나 연속된 숫자는 쓸 수 없어요';
+        } else if (pin == _current) {
+          _error = '지금 쓰는 비밀번호와 다르게 만들어주세요';
+        } else {
+          _first = pin;
+          _error = null;
+          _phase = PinChangePhase.confirm;
+        }
+      case PinChangePhase.confirm:
+        await _save(pin);
+    }
+    if (!_disposed) notifyListeners();
+  }
+
+  /// 2026-11-04: 지금 비밀번호 [pin]을 저장소로 확인한다. 맞으면 새 비밀번호 단계로 간다.
+  Future<void> _checkCurrent(String pin) async {
+    _busy = true;
+    try {
+      final result = await pinStore.verify(pin);
+      if (_disposed) return;
+      _failures = result.failures;
+      if (result.matched) {
+        _current = pin;
+        _error = null;
+        _phase = PinChangePhase.create;
+      } else if (result.recoveryRequired) {
+        _error = '비밀번호를 $maxPinFailures번 틀렸어요';
+      } else {
+        _error = '비밀번호가 맞지 않아요 ($_failures/$maxPinFailures)';
+      }
+    } on Exception {
+      if (_disposed) return;
+      _error = storageReadFailedMessage;
+    } finally {
+      _busy = false;
+    }
+  }
+
+  /// 2026-11-04: 확인 입력 [pin]이 새 비밀번호와 같으면 저장한다. 다르면 새 비밀번호부터 다시 입력한다.
+  Future<void> _save(String pin) async {
+    if (pin != _first) {
+      _first = null;
+      _phase = PinChangePhase.create;
+      _error = '비밀번호가 일치하지 않아요. 다시 입력해주세요';
+      return;
+    }
+    _busy = true;
+    try {
+      await pinStore.setPin(pin);
+      if (_disposed) return;
+      _current = null;
+      _first = null;
+      _error = null;
+      _completed = true;
+    } on Exception {
+      if (_disposed) return;
+      _error = storageWriteFailedMessage;
+    } finally {
+      _busy = false;
+    }
+  }
+
+  /// 2026-11-04: 마지막 자리를 지운다.
+  void removeDigit() {
+    if (_entry.isEmpty) return;
+    _entry = _entry.substring(0, _entry.length - 1);
+    notifyListeners();
+  }
+
+  /// 2026-11-04: 한 단계 뒤로 간다. 한 번 더 → 새 비밀번호, 새 비밀번호 → 지금 비밀번호(다시 확인). 지금 비밀번호 단계면
+  /// false를 반환해 화면을 닫게 한다.
+  bool back() {
+    if (_busy) return true;
+    switch (_phase) {
+      case PinChangePhase.current:
+        return false;
+      case PinChangePhase.create:
+        _current = null;
+        _phase = PinChangePhase.current;
+      case PinChangePhase.confirm:
+        _first = null;
+        _phase = PinChangePhase.create;
+    }
+    _entry = '';
+    _error = null;
+    notifyListeners();
+    return true;
+  }
+
+  /// 2026-11-04: 폐기 표시 후 정리한다. 늦게 끝난 저장소 응답을 반영하지 않는다.
+  @override
+  void dispose() {
+    _disposed = true;
+    _current = null;
+    _first = null;
+    super.dispose();
+  }
+}

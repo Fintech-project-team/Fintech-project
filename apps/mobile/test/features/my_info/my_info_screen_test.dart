@@ -60,6 +60,7 @@ Future<int Function()> _pump(
   AppVersionReader? version,
   Size size = const Size(390, 844),
   double textScale = 1,
+  Future<bool> Function(BuildContext)? onChangePin,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -88,6 +89,7 @@ Future<int Function()> _pump(
           onEditSalary: () => salaryOpened++,
           footer: LogoutAction(onLogout: () async => null),
           version: version,
+          onChangePin: onChangePin,
         ),
       ),
     ),
@@ -108,6 +110,52 @@ void main() {
 
   setUp(() async {
     (repo, snapshot) = await _connected();
+  });
+
+  group('앱 비밀번호 바꾸기(#213)', () {
+    testWidgets('계산에 포함할 계좌 아래 보조 문구 없는 한 줄, 바꾸면 알림', (tester) async {
+      var opened = 0;
+      await _pump(
+        tester,
+        snapshot,
+        repository: repo,
+        onChangePin: (_) async {
+          opened++;
+          return true;
+        },
+      );
+      final row = find.byKey(const ValueKey('my-info-pin'));
+      expect(
+        find.descendant(of: row, matching: find.byType(Text)),
+        findsOneWidget,
+        reason: '제목만, 보조 문구 없음',
+      );
+      expect(
+        _top(tester, row),
+        greaterThan(
+          _top(tester, find.byKey(const ValueKey('my-info-accounts'))),
+        ),
+      );
+      expect(tester.getSize(row).height, greaterThanOrEqualTo(72));
+      await tester.tap(find.text('앱 비밀번호 바꾸기'));
+      await tester.pumpAndSettle();
+      expect(opened, 1);
+      expect(find.text('앱 비밀번호를 바꿨어요.'), findsOneWidget);
+    });
+
+    testWidgets('바꾸지 않고 나오면 알림 없음, 열기가 없으면 줄도 없음', (tester) async {
+      await _pump(
+        tester,
+        snapshot,
+        repository: repo,
+        onChangePin: (_) async => false,
+      );
+      await tester.tap(find.text('앱 비밀번호 바꾸기'));
+      await tester.pumpAndSettle();
+      expect(find.text('앱 비밀번호를 바꿨어요.'), findsNothing);
+      await _pump(tester, snapshot, repository: repo);
+      expect(find.byKey(const ValueKey('my-info-pin')), findsNothing);
+    });
   });
 
   group('my info tab', () {
