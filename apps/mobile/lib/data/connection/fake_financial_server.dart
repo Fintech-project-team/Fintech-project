@@ -546,7 +546,8 @@ class FakeFinancialServer {
 
   /// 2026-11-03: POST /reserves. 형식 오류(이름 1~80자, 금액 0~상한, allocationChanges 세 빈 배열 필수)는 422, 연결 밖·없는
   /// 계좌는 403, 계산에 포함하지 않은 계좌면 422 VALIDATION_FAILED, 계좌별·선택 계좌 전체 상한(M5)을 넘으면 422 LIMIT_EXCEEDED다
-  /// (apps/api PlanWrites.reserve와 같은 순서). 29-5b 앱은 연결을 만들지 않으므로 빈 allocationChanges만 받는다.
+  /// (apps/api PlanWrites.reserve와 같은 순서).
+  /// 2026-11-04: allocationChanges도 판정한다([_allocationChanges], 29-5c).
   Future<FinancialOutcome<WriteSuccess>> postReserve(
     String accessToken,
     ReserveInput reserve,
@@ -558,7 +559,9 @@ class FakeFinancialServer {
     body: reserve.toJson(),
     write: write,
     apply: (source, state) {
-      if (!_validLabel(reserve.label) || !_validMoney(reserve.amountKrw)) {
+      if (!_validLabel(reserve.label) ||
+          !_validMoney(reserve.amountKrw) ||
+          !_validChanges(reserve.changes)) {
         return const FinancialInvalid(status: 422, code: 'VALIDATION_FAILED');
       }
       return _reserveChange(
@@ -568,6 +571,7 @@ class FakeFinancialServer {
         label: reserve.label,
         accountId: reserve.accountId,
         amountKrw: reserve.amountKrw,
+        changes: reserve.changes,
       );
     },
   );
@@ -588,7 +592,8 @@ class FakeFinancialServer {
     apply: (source, state) {
       if (patch.isEmpty ||
           (patch.label != null && !_validLabel(patch.label!)) ||
-          (patch.amountKrw != null && !_validMoney(patch.amountKrw!))) {
+          (patch.amountKrw != null && !_validMoney(patch.amountKrw!)) ||
+          !_validChanges(patch.changes)) {
         return const FinancialInvalid(status: 422, code: 'VALIDATION_FAILED');
       }
       return _reserveChange(
@@ -598,6 +603,7 @@ class FakeFinancialServer {
         label: patch.label,
         accountId: patch.accountId,
         amountKrw: patch.amountKrw,
+        changes: patch.changes,
       );
     },
   );
@@ -694,6 +700,7 @@ class FakeFinancialServer {
     String? label,
     String? accountId,
     int? amountKrw,
+    AllocationChanges changes = const AllocationChanges(),
   }) {
     final reachable = _reachable(source, state);
     final reserves = _rows(source, 'reserves');
@@ -733,17 +740,118 @@ class FakeFinancialServer {
     final next = before == null
         ? [...reserves, row]
         : ([...reserves]..[index] = row);
-    if (increased && _overReserveLimit(source, included, next, account)) {
-      return const FinancialInvalid(status: 422, code: 'LIMIT_EXCEEDED');
+    final allocations = _allocationChanges(source, reachable, id, changes);
+    if (allocations is! FinancialOk<List<Map<String, Object?>>>) {
+      return switch (allocations) {
+        FinancialForbidden() => const FinancialForbidden(),
+        FinancialInvalid(:final status, :final code) => FinancialInvalid(
+          status: status,
+          code: code,
+        ),
+        _ => const FinancialInvalid(),
+      };
     }
-    return _planChange(
+    final change = _planChange(
       source,
       state,
       _rows(source, 'obligations'),
-      _rows(source, 'allocations'),
+      allocations.value,
       [ChangedRef(resource: 'reserve', id: id)],
       reserves: next,
     );
+    if (change is FinancialOk &&
+        increased &&
+        _overReserveLimit(source, included, next, account)) {
+      return const FinancialInvalid(status: 422, code: 'LIMIT_EXCEEDED');
+    }
+    return change;
+  }
+
+  /// 2026-11-04: allocationChanges 형식(apps/api FinancialInput.allocations): 금액 1원 이상, create의 예정 지출과 update·remove의
+  /// 배정이 겹치지 않으면 true다.
+  static bool _validChanges(AllocationChanges changes) {
+    final obligations = [for (final c in changes.create) c.obligationId];
+    final allocations = [
+      for (final u in changes.update) u.allocationId,
+      ...changes.remove,
+    ];
+    return obligations.toSet().length == obligations.length &&
+        allocations.toSet().length == allocations.length &&
+        changes.create.every(
+          (c) => c.amountKrw >= 1 && _validMoney(c.amountKrw),
+        ) &&
+        changes.update.every(
+          (u) => u.amountKrw >= 1 && _validMoney(u.amountKrw),
+        );
+  }
+
+  /// 2026-11-04: 남겨둘 돈 [reserveId]에 [changes]를 적용한 배정 목록(apps/api AllocationWrites.change). create는 보이는 활성 예정
+  /// 지출만(보이지 않으면 403, 활성이 아니면 409 RELATION_CONFLICT), update·remove는 보이는 이 남겨둘 돈의 배정만(다른 대상 409),
+  /// update는 대상이 활성이고 해제액 이상, remove는 해제 이력이 없어야 한다(아니면 409 HISTORY_LOCKED). 한도는 [_planChange]가 본다.
+  FinancialOutcome<List<Map<String, Object?>>> _allocationChanges(
+    Map<String, Object?> source,
+    Set<String> reachable,
+    String reserveId,
+    AllocationChanges changes,
+  ) {
+    final obligations = {
+      for (final o in _rows(source, 'obligations'))
+        o['obligationId']! as String: o,
+    };
+    final next = _rows(source, 'allocations');
+    for (final c in changes.create) {
+      final o = obligations[c.obligationId];
+      if (o == null || !reachable.contains(o['withdrawalAccountId'])) {
+        return const FinancialForbidden();
+      }
+      if (o['status'] != 'active') {
+        return const FinancialInvalid(status: 409, code: 'RELATION_CONFLICT');
+      }
+      next.add({
+        'userId': source['userId'],
+        'allocationId': randomUuidV4(_random),
+        'reserveId': reserveId,
+        'obligationId': c.obligationId,
+        'amountKRW': c.amountKrw,
+        'releasedKRW': 0,
+        'releaseEvidence': <Object?>[],
+      });
+    }
+    int? indexOf(String id) {
+      final i = next.indexWhere(
+        (a) =>
+            a['allocationId'] == id && _allocationVisible(source, reachable, a),
+      );
+      return i < 0 ? null : i;
+    }
+
+    for (final u in changes.update) {
+      final i = indexOf(u.allocationId);
+      if (i == null) return const FinancialForbidden();
+      final a = next[i];
+      if (a['reserveId'] != reserveId ||
+          obligations[a['obligationId']]?['status'] != 'active') {
+        return const FinancialInvalid(status: 409, code: 'RELATION_CONFLICT');
+      }
+      if (u.amountKrw < (a['releasedKRW']! as int)) {
+        return const FinancialInvalid(status: 409, code: 'HISTORY_LOCKED');
+      }
+      next[i] = {...a, 'amountKRW': u.amountKrw};
+    }
+    for (final id in changes.remove) {
+      final i = indexOf(id);
+      if (i == null) return const FinancialForbidden();
+      final a = next[i];
+      if (a['reserveId'] != reserveId) {
+        return const FinancialInvalid(status: 409, code: 'RELATION_CONFLICT');
+      }
+      if ((a['releasedKRW']! as int) != 0 ||
+          ((a['releaseEvidence'] as List?) ?? const []).isNotEmpty) {
+        return const FinancialInvalid(status: 409, code: 'HISTORY_LOCKED');
+      }
+      next.removeAt(i);
+    }
+    return FinancialOk(next);
   }
 
   /// 2026-11-03: M5. 계좌 [account]의 취소되지 않은 남겨둘 돈 합계가 그 계좌 잔액(음수면 0)을 넘거나, 계산 포함 계좌 전체의 합계가

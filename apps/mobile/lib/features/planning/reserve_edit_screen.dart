@@ -14,6 +14,7 @@ import 'obligation_edit_controller.dart';
 import 'obligation_edit_screen.dart';
 import 'reserve_edit.dart';
 import 'reserve_edit_controller.dart';
+import 'reserve_plan_sheets.dart';
 
 /// 2026-11-03: 남겨둘 돈 편집을 마친 결과. 취소면 [cancelled]가 true다.
 typedef ReserveEditResult = ({bool cancelled});
@@ -38,9 +39,9 @@ Future<ReserveEditResult?> openReserveEditor(
   );
 }
 
-/// 2026-11-03: 03-5 남겨둘 돈 추가·수정(29-5b). 위에서부터 안내 띠 → (추가면) 한 줄 설명 → 이름 → 금액 → 남겨둘 계좌 → (수정이고
-/// 이 돈으로 낼 지출이 있으면) 읽기 전용 '이 돈으로 낼 지출', 맨 아래에 미리보기와 버튼(수정이면 왼쪽에 '남겨둘 돈 취소하기')을
-/// 고정한다. 이 돈으로 낼 지출을 고르거나 바꾸는 일은 29-5c다.
+/// 2026-11-03: 03-5 남겨둘 돈 추가·수정(29-5b). 위에서부터 안내 띠 → (추가면) 한 줄 설명 → 이름 → 금액 → 남겨둘 계좌 → '이 돈으로
+/// 낼 지출', 맨 아래에 미리보기와 버튼(수정이면 왼쪽에 '남겨둘 돈 취소하기')을 고정한다.
+/// 2026-11-04: '이 돈으로 낼 지출'에서 지출을 고르고 금액을 바꾸거나 사용 계획을 해제한다(29-5c). 저장 전까지는 화면 안에서만 바뀐다.
 class ReserveEditScreen extends StatefulWidget {
   /// 2026-11-03: 지금 Snapshot [snapshot], 저장 연결 [writer], 대상 [reserveId]로 만든다.
   const ReserveEditScreen({
@@ -75,6 +76,8 @@ class _ReserveEditScreenState extends State<ReserveEditScreen> {
         : formatKrwDigits(_c.draft.amountKrw!),
   );
 
+  final GlobalKey _bottom = GlobalKey();
+
   bool get _adding => widget.reserveId == null;
   String get _verb => _adding ? '추가' : '수정';
 
@@ -100,7 +103,9 @@ class _ReserveEditScreenState extends State<ReserveEditScreen> {
   /// 2026-11-03: 저장하고 성공하면 결과와 함께 닫는다.
   Future<void> _submit() async {
     final ok = await _c.submit();
-    if (ok && mounted) Navigator.of(context).pop((cancelled: false));
+    if (!ok || !mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+    Navigator.of(context).pop((cancelled: false));
   }
 
   /// 2026-11-03: 취소 확인창을 보이고, 고르면 취소한다. 이 돈으로 낼 지출이 있으면 예정 지출은 그대로 남는다고 한 줄로 알린다.
@@ -126,12 +131,76 @@ class _ReserveEditScreenState extends State<ReserveEditScreen> {
   /// 2026-11-03: 취소를 보내고(결과 불명 뒤면 같은 요청을 그대로) 성공하면 취소 결과와 함께 닫는다.
   Future<void> _sendCancel() async {
     final ok = await _c.cancel();
-    if (ok && mounted) Navigator.of(context).pop((cancelled: true));
+    if (!ok || !mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+    Navigator.of(context).pop((cancelled: true));
+  }
+
+  /// 2026-11-04: 지출 선택창(R-3)을 열어 고른 지출과 금액을 사용 계획에 더한다.
+  Future<void> _pickPlan() async {
+    final range = _c.cycleRange;
+    if (range == null) return;
+    _unfocus();
+    final picked = await showPayseSheet<PlanPick>(
+      context,
+      PlanPickSheet(candidates: _c.candidates, range: range, maxOf: _c.planMax),
+    );
+    if (picked != null) _c.addPlan(picked.obligationId, picked.amountKrw);
+  }
+
+  /// 2026-11-04: 사용 계획 [item]의 시트(R-5a·R-6)를 열어 금액을 바꾸거나 해제한다. 해제하면 하단이 다시 그려진 뒤 그 높이 위에
+  /// 되돌리기 알림을 보인다.
+  Future<void> _openPlan(PlanItem item) async {
+    _unfocus();
+    final id = item.obligationId;
+    final action = await showPayseSheet<PlanRowAction>(
+      context,
+      PlanRowSheet(
+        item: item,
+        maxKrw: _c.planMax(id),
+        adjustable: _c.planAdjustable(id),
+        cycleKnown: _c.cycleKnown,
+      ),
+    );
+    if (!mounted) return;
+    switch (action) {
+      case PlanRowAmount(:final amountKrw):
+        _c.setPlanAmount(id, amountKrw);
+      case PlanRowRelease():
+        _c.unplan(id);
+        await WidgetsBinding.instance.endOfFrame;
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              key: const ValueKey('reserve-unplan-notice'),
+              content: Text(
+                '${withTopic(item.label ?? '예정 지출')} 이 돈으로 내지 않아요. 예정 지출에는 그대로 있어요.',
+              ),
+              action: SnackBarAction(
+                label: '되돌리기',
+                textColor: PayseColors.moonYellow,
+                onPressed: _c.undoUnplan,
+              ),
+              behavior: SnackBarBehavior.floating,
+              margin: EdgeInsets.fromLTRB(
+                PayseSpace.x4,
+                0,
+                PayseSpace.x4,
+                (_bottom.currentContext?.size?.height ?? 0) + PayseSpace.x3,
+              ),
+            ),
+          );
+      case null:
+        break;
+    }
   }
 
   /// 2026-11-03: 나가기. 결과를 모르는 요청이 있으면 최신 정보를 다시 받아 목록에 반영한다.
   void _leave() {
     if (_c.busy) return;
+    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
     if (_c.locked) refreshLatest(widget.writer);
     Navigator.of(context).pop();
   }
@@ -348,16 +417,21 @@ class _ReserveEditScreenState extends State<ReserveEditScreen> {
                         onTap: frozen ? null : _pickAccount,
                       ),
                     ),
-                    if (facts != null && facts.uses.isNotEmpty)
-                      Padding(
-                        padding: gap,
-                        child: _Uses(facts: facts),
+                    Padding(
+                      padding: gap,
+                      child: _Plans(
+                        controller: _c,
+                        frozen: frozen,
+                        onPick: _pickPlan,
+                        onOpen: _openPlan,
                       ),
+                    ),
                   ],
                 ),
               ),
             ),
             EditBottom(
+              key: _bottom,
               verb: _verb,
               preview: _c.preview,
               unchanged: _c.unchanged,
@@ -382,23 +456,61 @@ class _ReserveEditScreenState extends State<ReserveEditScreen> {
   }
 }
 
-/// 2026-11-03: 읽기 전용 '이 돈으로 낼 지출'(입력칸 라벨 모양) — 지출마다 이름 / M/D 예정(다음 월급 기간이면 표시) … 남은 사용
-/// 예정액. 이번 계산에서 빠지지 않는 지출은 금액을 회색으로 보인다. 고르거나 바꾸는 일은 29-5c다.
-class _Uses extends StatelessWidget {
-  /// 2026-11-03: 남겨둘 돈 제약 [facts]로 만든다.
-  const _Uses({required this.facts});
+/// 2026-11-04: '이 돈으로 낼 지출 (선택)'. 고른 지출이 없으면 '지출 선택' 선택 행과 보조 문구, 있으면 지출마다 이름 / M/D 예정
+/// (다음 월급 기간이면 표시) … 쓸 금액 › 행과 '+ 지출 더 선택하기'를 보인다. 새로 고를 수 없으면 고르기를 흐리게 하고 이유를 한 줄로
+/// 붙인다.
+class _Plans extends StatelessWidget {
+  /// 2026-11-04: 편집 [controller], 입력 잠김 [frozen], 고르기 [onPick], 행 누르기 [onOpen]으로 만든다.
+  const _Plans({
+    required this.controller,
+    required this.frozen,
+    required this.onPick,
+    required this.onOpen,
+  });
 
-  final ReserveFacts facts;
+  final ReserveEditController controller;
+  final bool frozen;
+  final VoidCallback onPick;
+  final ValueChanged<PlanItem> onOpen;
 
-  /// 2026-11-03: 제목과 줄을 반환한다.
+  /// 2026-11-04: 제목·행·고르기를 반환한다.
   @override
   Widget build(BuildContext context) {
+    final c = controller;
+    final plans = c.plans;
+    final reason = !c.cycleKnown
+        ? '월급 주기를 확인할 수 없어 지출을 새로 고를 수 없어요.'
+        : c.candidates.isEmpty
+        ? '이번 월급 주기에 고를 수 있는 예정 지출이 없어요.'
+        : null;
+    final canPick = !frozen && reason == null;
+    final note = Text(
+      plans.isEmpty
+          ? reason ??
+                (c.reserveId == null
+                    ? '남겨둘 돈에서 낼 예정 지출이 있으면 골라 주세요.'
+                    : '예정 지출에 쓸 몫은 두 번 빼지 않아요.')
+          : reason ?? '',
+      key: const ValueKey('reserve-plan-note'),
+      style: PayseTypography.caption,
+    );
     return Column(
-      key: const ValueKey('reserve-uses'),
+      key: const ValueKey('reserve-plans'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          '이 돈으로 낼 지출',
+        const Text.rich(
+          TextSpan(
+            text: '이 돈으로 낼 지출 ',
+            children: [
+              TextSpan(
+                text: '(선택)',
+                style: TextStyle(
+                  fontWeight: FontWeight.w400,
+                  color: PayseColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
           style: TextStyle(
             fontSize: 13,
             height: 18 / 13,
@@ -406,53 +518,135 @@ class _Uses extends StatelessWidget {
             color: PayseColors.textPrimary,
           ),
         ),
-        for (final u in facts.uses)
-          Container(
-            constraints: const BoxConstraints(minHeight: 64),
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: PayseColors.dividerRow)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        u.label ?? '예정 지출',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: PayseColors.textPrimary,
+        if (plans.isEmpty) ...[
+          const SizedBox(height: 6),
+          Opacity(
+            opacity: canPick ? 1 : .45,
+            child: InkWell(
+              key: const ValueKey('reserve-plan-pick'),
+              onTap: canPick ? onPick : null,
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 52),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: PayseColors.borderStrong),
+                  ),
+                ),
+                child: const Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '지출 선택',
+                        style: TextStyle(
+                          fontSize: 17,
+                          color: PayseColors.textSecondary,
                         ),
                       ),
-                      Text(
-                        [
-                          if (u.dueDate case final due?) '${mdText(due)} 예정',
-                          if (!u.inPeriod) '다음 월급 기간',
-                        ].join(' · '),
-                        style: PayseTypography.caption,
-                      ),
-                    ],
-                  ),
+                    ),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 20,
+                      color: PayseColors.textSecondary,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: PayseSpace.x3),
-                Text(
-                  formatKrw(u.unreleasedKrw),
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: u.inPeriod
-                        ? PayseColors.textPrimary
-                        : PayseColors.textSecondary,
-                    fontFeatures: PayseTypography.tabular,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
+          const SizedBox(height: 6),
+          note,
+        ] else ...[
+          for (final p in plans) _planRow(p),
+          Opacity(
+            opacity: canPick ? 1 : .45,
+            child: InkWell(
+              key: const ValueKey('reserve-plan-more'),
+              onTap: canPick ? onPick : null,
+              child: const SizedBox(
+                height: 52,
+                child: Row(
+                  children: [
+                    Icon(Icons.add, size: 18, color: PayseColors.textPrimary),
+                    SizedBox(width: 6),
+                    Text(
+                      '지출 더 선택하기',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: PayseColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (reason != null) note,
+        ],
       ],
+    );
+  }
+
+  /// 2026-11-04: 사용 계획 [p] 한 줄. 다음 월급 기간 지출은 금액을 회색으로 보인다.
+  Widget _planRow(PlanItem p) {
+    final later =
+        controller.cycleKnown && !controller.planAdjustable(p.obligationId);
+    return InkWell(
+      key: ValueKey('reserve-plan-${p.obligationId}'),
+      onTap: frozen ? null : () => onOpen(p),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 64),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: PayseColors.dividerRow)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    p.label ?? '예정 지출',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: PayseColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    [
+                      if (p.dueDate case final due?) '${mdText(due)} 예정',
+                      if (later) '다음 월급 기간',
+                    ].join(' · '),
+                    style: PayseTypography.caption,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: PayseSpace.x3),
+            Text(
+              formatKrw(p.amountKrw),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: later
+                    ? PayseColors.textSecondary
+                    : PayseColors.textPrimary,
+                fontFeatures: PayseTypography.tabular,
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(left: 4),
+              child: Icon(
+                Icons.chevron_right,
+                size: 16,
+                color: PayseColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
