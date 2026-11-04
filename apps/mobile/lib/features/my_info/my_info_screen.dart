@@ -14,6 +14,7 @@ typedef AppVersionReader = Future<AppVersion?> Function();
 /// 2026-11-03: 하단 '내 정보' 탭(03-6, 29-4). 위에서부터 제목, 로그인한 사용자 이름, 설정 목록 위의 작은 기준 시각,
 /// '월급 정보'·'계산에 포함할 계좌' 줄, 로그아웃 등 아래 위젯, 앱 버전 순서다. 두 줄은 계좌 관리와 같은 화면·저장을 연다.
 /// 카드 목록·카드 결제일과 후속 메뉴는 두지 않는다. 내용이 화면보다 길면 함께 스크롤한다.
+/// 2026-11-04: '계산에 포함할 계좌' 아래 '앱 비밀번호 바꾸기' 줄(보조 문구 없음)을 더했다(#213). 바꾸면 '앱 비밀번호를 바꿨어요.'를 알린다.
 class MyInfoScreen extends StatefulWidget {
   /// 2026-11-03: 현재 Snapshot [snapshot], 사용자 이름 [userName](없으면 이름 줄 없음), 저장 연결 [writer](없으면 두 줄을
   /// 누를 수 없음), 월급 편집 열기 [onEditSalary], 로그아웃 등 아래 위젯 [footer], 버전 읽기 [version](없거나 실패하면
@@ -26,6 +27,7 @@ class MyInfoScreen extends StatefulWidget {
     this.onEditSalary,
     this.footer,
     this.version,
+    this.onChangePin,
   });
 
   final FinancialSnapshot snapshot;
@@ -34,6 +36,9 @@ class MyInfoScreen extends StatefulWidget {
   final VoidCallback? onEditSalary;
   final Widget? footer;
   final AppVersionReader? version;
+
+  /// 2026-11-04: 앱 비밀번호 바꾸기를 연다. 바꾸면 true를 돌려준다. 없으면 줄을 두지 않는다.
+  final Future<bool> Function(BuildContext context)? onChangePin;
 
   /// 2026-11-03: 버전 조회 상태 객체를 반환한다.
   @override
@@ -65,6 +70,28 @@ class _MyInfoScreenState extends State<MyInfoScreen> {
     final (:version, :buildNumber) = read;
     if (version.trim().isEmpty || buildNumber.trim().isEmpty) return;
     setState(() => _version = 'PAYSE $version ($buildNumber)');
+  }
+
+  /// 2026-11-04: 앱 비밀번호 바꾸기를 열고, 바꾸면 알림을 보인다.
+  Future<void> _changePin(Future<bool> Function(BuildContext) open) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final changed = await open(context);
+    if (!changed || !mounted) return;
+    messenger
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          key: ValueKey('my-info-pin-changed'),
+          content: Text('앱 비밀번호를 바꿨어요.'),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.fromLTRB(
+            PayseSpace.x4,
+            0,
+            PayseSpace.x4,
+            PayseSpace.x3,
+          ),
+        ),
+      );
   }
 
   /// 2026-11-03: 화면을 반환한다. 아래 위젯과 버전은 내용이 짧으면 화면 아래에 붙는다.
@@ -144,6 +171,13 @@ class _MyInfoScreenState extends State<MyInfoScreen> {
                       null => null,
                     },
                   ),
+                  if (widget.onChangePin case final open?)
+                    _MyInfoRow(
+                      key: const ValueKey('my-info-pin'),
+                      title: '앱 비밀번호 바꾸기',
+                      text: null,
+                      onTap: () => _changePin(open),
+                    ),
                   const Spacer(),
                   if (widget.footer case final footer?) ...[
                     const SizedBox(height: PayseSpace.x6),
@@ -172,7 +206,7 @@ class _MyInfoScreenState extends State<MyInfoScreen> {
 
 /// 2026-11-03: 내 정보 설정 줄(최소 높이 72, 제목 15/600·설명 13, 오른쪽 화살표, 아래 옅은 선). 누를 수 없으면 화살표를 두지 않는다.
 class _MyInfoRow extends StatelessWidget {
-  /// 2026-11-03: 제목 [title], 설명 [text], 누르기 [onTap]으로 만든다.
+  /// 2026-11-03: 제목 [title], 설명 [text](2026-11-04부터 없을 수 있음), 누르기 [onTap]으로 만든다.
   const _MyInfoRow({
     super.key,
     required this.title,
@@ -181,7 +215,7 @@ class _MyInfoRow extends StatelessWidget {
   });
 
   final String title;
-  final String text;
+  final String? text;
   final VoidCallback? onTap;
 
   /// 2026-11-03: 설정 줄을 반환한다.
@@ -213,7 +247,8 @@ class _MyInfoRow extends StatelessWidget {
                         color: PayseColors.textPrimary,
                       ),
                     ),
-                    Text(text, style: PayseTypography.caption),
+                    if (text case final text?)
+                      Text(text, style: PayseTypography.caption),
                   ],
                 ),
               ),

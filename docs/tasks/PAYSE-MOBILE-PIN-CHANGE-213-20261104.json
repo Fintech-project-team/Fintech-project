@@ -1,0 +1,38 @@
+{
+  "id": "PAYSE-MOBILE-PIN-CHANGE-213-20261104",
+  "role": "integration",
+  "baseCommit": "38a8d9c8896c5158aefaa4fdabf28c44f3ce3b2b",
+  "branch": "feat/integration/pin-change-213",
+  "allowedPaths": [
+    "docs/tasks/PAYSE-MOBILE-PIN-CHANGE-213-20261104.json",
+    "docs/design.md",
+    "docs/v0.6-screen-rules.md",
+    "apps/mobile/docs/auth.md",
+    "apps/mobile/docs/screen-rules-update.md",
+    "apps/mobile/lib/features/my_info/",
+    "apps/mobile/lib/features/auth/",
+    "apps/mobile/lib/app/",
+    "apps/mobile/test/features/my_info/",
+    "apps/mobile/test/features/auth/",
+    "apps/mobile/test/app/"
+  ],
+  "acceptance": [
+    "목적: 이슈 #213. 내 정보 탭(03-6)에서 앱 비밀번호(PIN 6자리)를 바꾼다. 지금 비밀번호 확인 → 새 비밀번호 → 한 번 더 → 기기 저장. 탈퇴는 2026-11-04 혜연 결정으로 범위에서 뺐다(API 계약 POST /account-deactivation은 있으나 서버 경로 미구현). baseCommit은 hyeyeon-dev",
+    "계약: API 계약 §2 '기기 PIN 생성·검사·재설정은 로컬이다'. 서버 요청 없이 LocalPinStore(verify·setPin)만 쓴다. 지금 비밀번호 틀림은 잠금 해제와 같은 실패 횟수(5회)를 쓴다",
+    "시안: 디자인 캔버스 'PIN 바꾸기(#213)' 줄. 시안 확인 전에는 제품 코드를 수정하지 않는다",
+    "검증 계획: 바꾸기 흐름(맞음·틀림·5회·새 비밀번호 규칙·확인 불일치·저장 실패), 바꾼 뒤 잠금 해제는 새 비밀번호로만, 뒤로 가기 단계별 동작 위젯·흐름 테스트. 실기기 확인. 공식 검증은 npm run verify -- --task <이 명세>(mobile:check 포함)",
+    "범위 밖: 탈퇴, 사용법 다시 보기, 연결 금융사 관리, 서버·DB·API 계약. 커밋·PR·merge는 혜연 요청 전 실행하지 않는다"
+  ],
+  "readBefore": [
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/app-architecture.md",
+    "docs/api-contract.md",
+    "docs/v0.6-screen-rules.md",
+    "apps/mobile/docs/auth.md",
+    "docs/design.md",
+    "docs/harness/AGENT_REVIEW.md"
+  ]
+}
