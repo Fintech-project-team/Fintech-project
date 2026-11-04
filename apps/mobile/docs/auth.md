@@ -24,6 +24,8 @@ lib/features/auth/            화면(auth_screens) · 흐름 Navigator(auth_flow
 lib/shared/design/            PayseTextField · SelectionCheck(Row/ListRow) · PayseChip · PayseToggle · PinPad · CodeTimerField
 ```
 
+키보드: 인증 화면 공통 틀(`AuthPage`) 본문의 입력칸 밖 빈 곳을 누르면 입력 포커스를 풀어 키보드를 닫는다. 입력칸·버튼·체크는 그대로 동작한다(2026-11-04, #211, 예정 지출·월급 편집과 같은 방식).
+
 진입: 세션 없음 → 00-1 / 세션 있음·PIN 없음 → 10-4 / 둘 다 있음 → 11-1 → 스냅샷 재조회. 첫 가입 직후에는 연결 자리부터 보인다.
 
 PIN 실패: 횟수는 `LocalPinStore`가 PIN과 함께 보관한다. 지금은 저장소 인스턴스가 살아 있는 동안 유지된다(화면을 다시 만들거나 잠금이 다시 걸려도 이어짐). 앱 프로세스를 다시 시작한 뒤에도 유지하는 것은 실제 기기 저장소 구현 때 제공한다. 5회면 맞는 PIN도 비교하지 않고 거절하며(09-12) 본인 확인 복구 후 새 PIN을 설정할 때만 0이 된다. 시간으로 풀리지 않으며 서버 인증 시도 제한(이름+전화번호 5회/5분)과 별개다.

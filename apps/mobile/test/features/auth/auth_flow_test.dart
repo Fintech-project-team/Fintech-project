@@ -283,6 +283,30 @@ void main() {
     },
   );
 
+  testWidgets('10-3: tapping outside the code field closes the keyboard', (
+    tester,
+  ) async {
+    final h = _Harness();
+    await h.pump(tester);
+    await tester.tap(find.text('시작하기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('terms-all')));
+    await tester.pump();
+    await tester.tap(find.text('다음'));
+    await tester.pumpAndSettle();
+    await fillIdentity(tester, _account.name, '010-9999-0000');
+    final code = find.descendant(
+      of: find.byKey(const ValueKey('code-field')),
+      matching: find.byType(EditableText),
+    );
+    expect(tester.widget<EditableText>(code).focusNode.hasFocus, isTrue);
+    final body = tester.getRect(find.byKey(const ValueKey('auth-body')));
+    await tester.tapAt(Offset(body.center.dx, body.bottom - 8));
+    await tester.pump();
+    expect(tester.widget<EditableText>(code).focusNode.hasFocus, isFalse);
+    expect(tester.testTextInput.isVisible, isFalse);
+  });
+
   testWidgets('10-3 timer is display-only and restarts only after 0:00', (
     tester,
   ) async {
