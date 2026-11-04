@@ -164,6 +164,29 @@ class ScriptedRepository implements UserFinancialRepository {
     WriteContext write,
   ) => throw UnimplementedError();
 
+  /// 2026-11-03: 연결 흐름은 남겨둘 돈을 쓰지 않는다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> createReserve(
+    ReserveInput reserve,
+    WriteContext write,
+  ) => throw UnimplementedError();
+
+  /// 2026-11-03: 연결 흐름은 남겨둘 돈을 쓰지 않는다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> updateReserve(
+    String reserveId,
+    ReservePatch patch,
+    WriteContext write,
+  ) => throw UnimplementedError();
+
+  /// 2026-11-03: 연결 흐름은 남겨둘 돈을 쓰지 않는다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> cancelReserve(
+    String reserveId,
+    List<DetachAllocation> detach,
+    WriteContext write,
+  ) => throw UnimplementedError();
+
   /// 2026-10-22: 상태가 없으므로 할 일이 없다.
   @override
   void close() {}

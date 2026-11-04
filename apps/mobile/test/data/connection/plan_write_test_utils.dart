@@ -201,5 +201,37 @@ class FlakyRepository implements UserFinancialRepository {
   ], () => inner.cancelObligation(obligationId, detach, write));
 
   @override
+  Future<FinancialOutcome<WriteSuccess>> createReserve(
+    ReserveInput reserve,
+    WriteContext write,
+  ) => _apply(
+    'reserve-create',
+    write,
+    reserve.toJson(),
+    () => inner.createReserve(reserve, write),
+  );
+
+  @override
+  Future<FinancialOutcome<WriteSuccess>> updateReserve(
+    String reserveId,
+    ReservePatch patch,
+    WriteContext write,
+  ) => _apply(
+    'reserve-update',
+    write,
+    patch.toJson(),
+    () => inner.updateReserve(reserveId, patch, write),
+  );
+
+  @override
+  Future<FinancialOutcome<WriteSuccess>> cancelReserve(
+    String reserveId,
+    List<DetachAllocation> detach,
+    WriteContext write,
+  ) => _apply('reserve-cancel', write, [
+    for (final d in detach) d.toJson(),
+  ], () => inner.cancelReserve(reserveId, detach, write));
+
+  @override
   void close() => inner.close();
 }

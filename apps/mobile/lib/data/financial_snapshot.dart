@@ -1189,9 +1189,11 @@ class FinancialSnapshot {
 
   /// 2026-11-03: 예정 지출 [obligations]와 배정 [allocations]만 바꾼 사본을 반환한다(저장 전 미리보기 계산용). 이 Snapshot은
   /// 바꾸지 않는다.
+  /// 2026-11-03: 남겨둘 돈 [reserves]도 바꿀 수 있다(없으면 그대로, 29-5b).
   FinancialSnapshot withPlan({
     required List<Obligation> obligations,
     required List<Allocation> allocations,
+    List<Reserve>? reserves,
   }) => FinancialSnapshot(
     userId: userId,
     schemaVersion: schemaVersion,
@@ -1208,7 +1210,7 @@ class FinancialSnapshot {
     transactions: transactions,
     statements: statements,
     settings: settings,
-    reserves: reserves,
+    reserves: reserves == null ? this.reserves : List.unmodifiable(reserves),
     obligations: List.unmodifiable(obligations),
     allocations: List.unmodifiable(allocations),
     settlements: settlements,
