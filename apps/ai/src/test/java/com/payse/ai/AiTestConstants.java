@@ -257,6 +257,9 @@ public final class AiTestConstants {
      * @usedBy OpenAiGatewayTest
      */
     public static final class OpenAiFields {
+        public static final String SERVICE_TIER = "service_tier";
+        public static final String VERBOSITY = "verbosity";
+        public static final String PHASE = "phase";
         public static final String INSTRUCTIONS = "instructions";
         public static final String TEXT = "text";
         public static final String FORMAT = "format";

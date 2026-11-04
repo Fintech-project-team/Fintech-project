@@ -4,6 +4,7 @@ import com.payse.api.ApiTestConstants.AnalysisFields;
 import com.payse.api.ApiTestConstants.GammaLocal;
 import com.payse.ai.analysis.service.AnalysisService;
 import com.payse.ai.provider.ModelFactory;
+import com.payse.ai.provider.CompactModel;
 import com.payse.ai.provider.ModelFailure;
 import com.payse.ai.provider.ModelGateway;
 import com.payse.ai.provider.dto.ModelReply;
@@ -114,6 +115,8 @@ public class GammaLocalConfig {
      * @usedBy Spring 시험 구성
      * @modified 2026-11-03 - 승인된 연간 평가에만 별도 토큰 상한을 적용
      * @modified 2026-11-04 - 프롬프트 지문 및 독립 재검토·추론 설정의 별도 버전 반영
+     * @modified 2026-11-04 - Fast 비교의 보수 단가와 별도 캐시 버전 확인
+     * @modified 2026-11-04 - 명시적 출력 압축 비교와 별도 버전 연결
      */
     @Bean
     @Primary
@@ -130,7 +133,8 @@ public class GammaLocalConfig {
             throw new IllegalStateException(GammaLocal.INCOMPLETE);
         }
         LlmSettings llm = LlmSettings.read(Path.of(file));
-        AnalysisPricing pricing = new AnalysisPricing(costs.policy(project, version), llm.model());
+        ObjectNode rates = costs.policy(project, version);
+        AnalysisPricing pricing = new AnalysisPricing(rates, llm.model());
         boolean evaluation = GammaLocal.APPROVED.equals(System.getenv(GammaLocal.ENV_EVALUATION));
         int inputLimit = evaluation ? 12000 : 6000;
         int outputLimit = evaluation ? 4000 : 1200;
@@ -144,13 +148,29 @@ public class GammaLocalConfig {
             .build();
         ProviderHttp http = new ProviderHttp(client, Duration.ofSeconds(20), 1048576);
         String review = reviewer(reviewFile);
-        var factory = llm.factory(http, pricing.inputLimit(), pricing.outputLimit());
-        ModelFactory models = (instructions, schema) ->
+        boolean fast = GammaLocal.APPROVED.equals(System.getenv(GammaLocal.ENV_FAST));
+        if (fast && (rates.path("inputMicrosPerMillion").asLong() < 1_500_000_000L
+            || rates.path("cachedMicrosPerMillion").asLong() < 1_500_000_000L
+            || rates.path("outputMicrosPerMillion").asLong() < 3_000_000_000L)) {
+            throw new IllegalStateException(GammaLocal.INVALID_POLICY);
+        }
+        boolean compact = GammaLocal.APPROVED.equals(System.getenv(GammaLocal.ENV_COMPACT));
+        var factory = llm.factory(
+            http,
+            pricing.inputLimit(),
+            pricing.outputLimit(),
+            fast ? GammaLocal.SERVICE_FAST : GammaLocal.SERVICE_DEFAULT,
+            compact ? GammaLocal.VERBOSITY_LOW : null
+        );
+        ModelFactory observed = (instructions, schema) ->
             new ObservedModel(factory.create(instructions + review, schema));
+        ModelFactory models = compact ? CompactModel.factory(observed) : observed;
         var analysis = new AnalysisService(models, pricing.inputLimit());
         ObjectNode versions = AnalysisJson.JSON.createObjectNode()
             .put(AnalysisFields.MODEL, llm.model())
-            .put(AnalysisFields.PROMPT, comparisonVersion(analysis.promptVersion(), llm.reasoningEffort(), review))
+            .put(AnalysisFields.PROMPT, comparisonVersion(analysis.promptVersion(),
+                fast ? llm.reasoningEffort() + "/fast" : llm.reasoningEffort(),
+                compact ? review + CompactModel.version() : review))
             .put(AnalysisFields.RESPONSE, GammaLocal.VERSION)
             .put(AnalysisFields.POLICY, version);
         var execution = new AnalysisRuntime.Execution(models, costs, pricing, project, version);
@@ -163,9 +183,10 @@ public class GammaLocalConfig {
     }
 
     /**
-     * 별도 비교 실행에서만 도구 없는 1회 독립 재검토 지시를 읽는다.
+     * 별도 비교 실행에서만 도구 없는 1회 재검토·짧은 응답 지시를 읽는다.
      * @created 2026-11-04
      * @usedBy gammaRuntime
+     * @modified 2026-11-04 - 상시 분석의 짧은 응답 지시 형식을 비교에 허용
      */
     private static String reviewer(String path) {
         if (path.isBlank()) {
@@ -177,7 +198,8 @@ public class GammaLocalConfig {
                 throw new IllegalArgumentException();
             }
             var review = AnalysisJson.JSON.readTree(file.toFile());
-            if (!"payse-bounded-reviewer-v1".equals(review.path("format").asString())
+            if (!java.util.Set.of("payse-bounded-reviewer-v1", "payse-bounded-guidance-v1")
+                .contains(review.path("format").asString())
                 || review.path("maximumCallsPerBatch").asInt() != 1
                 || !review.path("instructions").isString()) {
                 throw new IllegalArgumentException();

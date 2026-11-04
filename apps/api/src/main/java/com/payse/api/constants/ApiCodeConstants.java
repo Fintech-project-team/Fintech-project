@@ -7,6 +7,32 @@ package com.payse.api.constants;
  */
 public final class ApiCodeConstants {
     /**
+     * 사용자 반복 계획 결정과 일정 출처의 고정 값이다.
+     * @created 2026-11-04
+     * @usedBy RecurringInput, RecurringWrites, FinancialService
+     */
+    public static final class Recurring {
+        public static final String CREDIT = "credit";
+        public static final String APPROVED = "approved";
+        public static final String EXCLUDED = "excluded";
+        public static final String IMMEDIATE = "immediate";
+        public static final String CARD_BILL = "card_bill";
+        public static final String WITHDRAWAL = "withdrawal";
+        public static final String PURCHASE = "purchase";
+        public static final String PLAN_RESOURCE = "recurringPlan";
+        public static final String REVISION_RESOURCE = "recurringPlanRevision";
+        public static final String DECISION_RESOURCE = "recurringDecision";
+
+        /**
+         * 정적 상태 규격만 제공한다.
+         * @created 2026-11-04
+         * @usedBy 없음: 인스턴스화 금지
+         */
+        private Recurring() {
+        }
+    }
+
+    /**
      * 비공개 AI 준비와 상태의 고정 규격이다.
      * @created 2026-11-04
      * @usedBy AnalysisReadiness, AnalysisRuntime, GammaDeployment

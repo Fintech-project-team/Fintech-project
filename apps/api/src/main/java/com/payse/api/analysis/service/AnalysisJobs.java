@@ -26,8 +26,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.springframework.context.annotation.Profile;
@@ -57,6 +62,7 @@ public final class AnalysisJobs {
     private final MemoryPolicy retention = new MemoryPolicy();
     private final AnalysisCapacity capacityLimits;
     private final ExecutorService workers;
+    private final Map<UUID, Completion> completions = new ConcurrentHashMap<>();
 
     /**
      * API의 기존 인증·저장소와 요청별 분석 실행 경계를 연결한다.
@@ -277,6 +283,28 @@ public final class AnalysisJobs {
     }
 
     /**
+     * 실행 중인 작업마다 관찰자 하나만 비동기로 기다리고 반환 전에 인증을 다시 확인한다.
+     * @created 2026-11-04
+     * @usedBy AnalysisController.status
+     */
+    public CompletionStage<Reply> awaitRead(String token, String id, Runnable requestCheck) {
+        Reply current = read(token, id, requestCheck);
+        if (!ApiCodeConstants.Analysis.RUNNING.equals(
+            current.body().path(ApiFieldConstants.Analysis.STATE).asString()
+        )) {
+            return CompletableFuture.completedFuture(current);
+        }
+        Completion completion = completions.get(parseId(id));
+        if (completion == null || !completion.observing.compareAndSet(false, true)) {
+            return CompletableFuture.completedFuture(current);
+        }
+        return completion.finished.copy()
+            .completeOnTimeout(null, 5, TimeUnit.SECONDS)
+            .thenApplyAsync(ignored -> read(token, id, () -> {}))
+            .whenComplete((reply, failure) -> completion.observing.set(false));
+    }
+
+    /**
      * 사용자 입력·재시도만 접수하며 중복 요청으로 전송을 늘리지 않는다.
      * @created 2026-11-01
      * @usedBy AnalysisController.input, retry
@@ -285,6 +313,7 @@ public final class AnalysisJobs {
      * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
      * @modified 2026-11-03 - 분석 시도와 비용 예약을 원자 접수하고 DB 원천을 별도 투영
      * @modified 2026-11-04 - 주입된 실행 상한 적용, 일반 API 기본값 유지
+     * @modified 2026-11-04 - 실행 시도별 완료 신호를 등록하고 거절 시 관찰자를 정리
      */
     public Reply submit(String token, String id, boolean retry, Supplier<JsonNode> request) {
         Submission submission = authenticated(
@@ -555,16 +584,26 @@ public final class AnalysisJobs {
             }
         );
         if (submission.work() != null) {
+            Work work = submission.work();
+            Completion completion = new Completion();
+            completions.put(work.job(), completion);
             try {
-                workers.execute(() -> execute(submission.work()));
+                workers.execute(() -> {
+                    try {
+                        execute(work);
+                    } finally {
+                        completions.remove(work.job(), completion);
+                        completion.finished.complete(null);
+                    }
+                });
             } catch (java.util.concurrent.RejectedExecutionException rejected) {
-                runtime.cancel(submission.work().attempt());
-                fail(
-                    submission.work(),
-                    false,
-                    ApiCodeConstants.Analysis.DISPATCH_NOT_STARTED,
-                    null
-                );
+                try {
+                    runtime.cancel(work.attempt());
+                    fail(work, false, ApiCodeConstants.Analysis.DISPATCH_NOT_STARTED, null);
+                } finally {
+                    completions.remove(work.job(), completion);
+                    completion.finished.complete(null);
+                }
                 throw new FinancialException(
                     503,
                     ApiCodeConstants.Analysis.TEMPORARILY_UNAVAILABLE
@@ -1569,10 +1608,23 @@ public final class AnalysisJobs {
      * 서버 종료는 새 실행을 막지만 DB의 전송/미확인 기록을 삭제하지 않는다.
      * @created 2026-11-01
      * @usedBy Spring 종료
+     * @modified 2026-11-04 - 완료 관찰자를 해제하되 DB 실행 상태는 변경하지 않음
      */
     @PreDestroy
     public void close() {
         workers.shutdownNow();
+        completions.values().forEach(completion -> completion.finished.complete(null));
+        completions.clear();
+    }
+
+    /**
+     * 본문·토큰 없이 한 실행의 완료 신호와 단일 관찰권만 보관한다.
+     * @created 2026-11-04
+     * @usedBy submit, awaitRead, close
+     */
+    private static final class Completion {
+        private final CompletableFuture<Void> finished = new CompletableFuture<>();
+        private final AtomicBoolean observing = new AtomicBoolean();
     }
 
     /**

@@ -7,6 +7,42 @@ package com.payse.api.constants;
  */
 public final class ApiFieldConstants {
     /**
+     * 반복 후보의 사용자 승인·제외 명령 필드다.
+     * @created 2026-11-04
+     * @usedBy RecurringInput, RecurringWrites
+     */
+    public static final class Recurring {
+        public static final String CANDIDATE_KEY = "candidateKey";
+        public static final String SOURCE_VERSION = "sourceVersion";
+        public static final String EVIDENCE_IDS = "evidenceTransactionIds";
+        public static final String NAME = "normalizedName";
+        public static final String DECISION = "decision";
+        public static final String PLAN = "plan";
+        public static final String PLAN_ID = "planId";
+        public static final String REVISION_ID = "revisionId";
+        public static final String DECISION_ID = "decisionId";
+        public static final String FIRST_MONTH = "firstOccurrenceMonth";
+        public static final String MONTHLY_DAY = "monthlyDay";
+        public static final String PAYMENT_TIMING = "paymentTiming";
+        public static final String SCHEDULE_BASIS = "scheduleBasis";
+        public static final String CARD_ID = "cardId";
+        public static final String AS_OF = "asOf";
+        public static final String INSTRUMENT_ID = "instrumentId";
+        public static final String RECORD_KIND = "recordKind";
+        public static final String ELIGIBLE = "eligible";
+        public static final String DUPLICATE = "duplicate";
+        public static final String CARD_TYPE = "cardType";
+
+        /**
+         * 정적 필드 규격만 제공한다.
+         * @created 2026-11-04
+         * @usedBy 없음: 인스턴스화 금지
+         */
+        private Recurring() {
+        }
+    }
+
+    /**
      * 비공개 AI 준비와 상태의 고정 규격이다.
      * @created 2026-11-04
      * @usedBy AnalysisReadiness, GammaDeployment

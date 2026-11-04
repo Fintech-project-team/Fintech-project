@@ -57,6 +57,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -67,6 +68,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
@@ -89,6 +92,77 @@ import tools.jackson.databind.node.ObjectNode;
  * @usedBy test_analysis_service.py의 Gradle JUnit
  */
 class AnalysisHttpTest {
+    /**
+     * 완료·실패·완료 불명을 같은 HTTP 계약으로 알리고 작업별 대기 요청은 하나로 제한한다.
+     * @created 2026-11-04
+     * @usedBy 격리 DB JUnit
+     */
+    @ParameterizedTest
+    @CsvSource({"none,succeeded", "invalid,failed", "unknown,outcomeUnknown"})
+    void observesCompletion(String failure, String expected) throws Exception {
+        String job = accept(input, key()).path(AnalysisFields.JOB_ID).asString();
+        model.failure = failure;
+        model.block();
+        submit(job, input, key(), false, false);
+        assertTrue(model.entered.await(10, TimeUnit.SECONDS));
+        var first = waitingStatus(job);
+        var second = waitingStatus(job);
+        CompletableFuture.anyOf(first, second).get(3, TimeUnit.SECONDS);
+        var immediate = first.isDone() ? first : second;
+        var waiting = first.isDone() ? second : first;
+        assertEquals("running", body(immediate.get(), 200).path(AnalysisFields.STATE).asString());
+        assertFalse(waiting.isDone());
+        assertEquals(1, model.calls.get());
+        model.release.countDown();
+        assertEquals(expected, body(waiting.get(5, TimeUnit.SECONDS), 200)
+            .path(AnalysisFields.STATE).asString());
+        assertEquals(expected, body(waitingStatus(job).get(2, TimeUnit.SECONDS), 200)
+            .path(AnalysisFields.STATE).asString());
+        assertEquals(1, model.calls.get());
+    }
+
+    /**
+     * 5초 대기는 실행을 다시 보내지 않으며 대기 중 종료된 인증으로 결과를 공개하지 않는다.
+     * @created 2026-11-04
+     * @usedBy 격리 DB JUnit
+     */
+    @Test
+    void boundsObservationAndRechecksSession() throws Exception {
+        String job = accept(input, key()).path(AnalysisFields.JOB_ID).asString();
+        model.block();
+        submit(job, input, key(), false, false);
+        assertTrue(model.entered.await(10, TimeUnit.SECONDS));
+        var running = waitingStatus(job).get(8, TimeUnit.SECONDS);
+        assertEquals("running", body(running, 200).path(AnalysisFields.STATE).asString());
+        assertEquals(1, model.calls.get());
+
+        var first = waitingStatus(job);
+        var second = waitingStatus(job);
+        CompletableFuture.anyOf(first, second).get(3, TimeUnit.SECONDS);
+        var waiting = first.isDone() ? second : first;
+        assertFalse(waiting.isDone());
+        assertEquals(204, send(AnalysisHttp.DELETE, AnalysisPaths.CURRENT_SESSION_PATH,
+            null, token, null).statusCode());
+        model.release.countDown();
+        assertEquals(401, waiting.get(5, TimeUnit.SECONDS).statusCode());
+        assertEquals(1, model.calls.get());
+    }
+
+    /**
+     * 본문 없이 실제 HTTP 비동기 상태 관찰을 요청한다.
+     * @created 2026-11-04
+     * @usedBy observesCompletion, boundsObservationAndRechecksSession
+     */
+    private CompletableFuture<HttpResponse<String>> waitingStatus(String job) {
+        var request = HttpRequest.newBuilder(URI.create(base + AnalysisPaths.ANALYSIS_JOB_PATH + job))
+            .timeout(Duration.ofSeconds(10))
+            .header(AnalysisHttp.AUTHORIZATION, AnalysisHttp.BEARER_PREFIX + token)
+            .header(AnalysisHttp.PREFER, AnalysisHttp.WAIT)
+            .GET()
+            .build();
+        return client.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+    }
+
     /**
      * 실제 JPA 최소 권한 연결에서 비용 예약·전송권·별도 정산과 업무 롤백을 확인한다.
      * @created 2026-11-03
@@ -851,12 +925,16 @@ class AnalysisHttpTest {
      * 한 건은 60초 전에 전송하지 않고 경계 도달 시에만 같은 작업의 제출 허가를 발급한다.
      * @created 2026-11-01
      * @usedBy JUnit
+     * @modified 2026-11-04 - 최초 연결과 EX-B의 1건·9건 대기 경계를 함께 검사
      * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
-    @Test
-    void waitsForSingleItemThreshold() throws Exception {
-        ObjectNode single = subset(input, 0, 1);
-        String job = accept(single, key())
+    @ParameterizedTest
+    @CsvSource({"A,1", "B,1", "A,9", "B,9"})
+    void waitsForSingleItemThreshold(String trigger, int count) throws Exception {
+        ObjectNode single = subset(input, 0, count);
+        ObjectNode request = descriptor(single, key()).put(AnalysisFields.TRIGGER_KIND, trigger);
+        String job = body(send(AnalysisHttp.POST, AnalysisPaths.ANALYSIS_JOBS_PATH,
+            request.toString(), token, null), 202)
             .path(AnalysisFields.JOB_ID)
             .asString();
         ObjectNode waiting = body(
@@ -887,12 +965,45 @@ class AnalysisHttpTest {
         await(job, "succeeded");
         assertEquals(1, model.calls.get());
         assertEquals(
-            1,
+            count,
             query(single, null, token)
                 .path(AnalysisFields.RESULT)
                 .path(AnalysisFields.ITEMS)
                 .size()
         );
+    }
+
+    /**
+     * EX-B 10건은 즉시 실행하고 동일 원천의 재접수·재조회는 저장 결과를 재사용한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     * @modified 2026-11-04 - descriptor 접수 후 본문 검증 단계에서 재사용을 확인
+     */
+    @Test
+    void refreshReusesSuccessWithoutNewCall() throws Exception {
+        ObjectNode request = descriptor(input, key()).put(AnalysisFields.TRIGGER_KIND, "B");
+        String job = body(send(AnalysisHttp.POST, AnalysisPaths.ANALYSIS_JOBS_PATH,
+            request.toString(), token, null), 202).path(AnalysisFields.JOB_ID).asString();
+        assertEquals("submitInput", permit(job).path(AnalysisFields.ACTION).asString());
+        submit(job, input, key(), false, false);
+        String result = await(job, "succeeded").path(AnalysisFields.RESULT_ID).asString();
+        request.put(AnalysisFields.IDEMPOTENCY_KEY, key());
+        ObjectNode accepted = body(send(AnalysisHttp.POST, AnalysisPaths.ANALYSIS_JOBS_PATH,
+            request.toString(), token, null), 202);
+        String repeatedJob = accepted.path(AnalysisFields.JOB_ID).asString();
+        ObjectNode verified = submission(input, key(),
+            permit(repeatedJob).path(AnalysisFields.PERMIT).asString());
+        ObjectNode reused = body(send(AnalysisHttp.POST,
+            AnalysisPaths.ANALYSIS_JOB_PATH + repeatedJob + AnalysisPaths.INPUT_SUFFIX,
+            verified.toString(), token, null), 200);
+        assertEquals("succeeded", reused.path(AnalysisFields.STATE).asString());
+        assertEquals(result, reused.path(AnalysisFields.RESULT_ID).asString());
+        for (int repeat = 0; repeat < 3; repeat++) {
+            assertEquals("available", query(input, result, token)
+                .path(AnalysisFields.RESULT_AVAILABILITY).asString());
+        }
+        assertEquals(1, model.calls.get());
+        assertEquals(financialBefore, fingerprint());
     }
 
     /**

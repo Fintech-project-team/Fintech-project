@@ -4,6 +4,10 @@
 
 ## 1. 기존 API와의 경계
 
+2026-11-04 확정한 [Java·Dart 연동 합의](../../../docs/analysis-protocol.md)에 공통 HTTP Schema, 공개 지문 30개 사례, tracker·조회 규칙 및 A/B 인수 순서를 기록했다. [모의 공급자 서버](analysis-mock.md)에서 실제 인증·DB 경로로 공동 연동한다.
+
+`GET /analysis-jobs/{id}`에 단일 `Prefer: wait=5` 헤더를 보내면 실행 중인 작업의 완료를 최대 5초 비동기로 기다린다. 기본 조회는 즉시 반환하며 다른 선호 값은 무시한다. 완료·실패 신호 또는 대기 시간 종료 후 같은 상태 봉투를 반환하고 인증·소유권을 다시 검사한다. 작업마다 대기 관찰자는 하나이며 추가 조회는 즉시 상태를 반환한다. DB 트랜잭션과 요청 처리 스레드를 대기 동안 붙잡지 않고 모델을 재호출하지 않는다. 시간 종료의 `running`은 실패나 후보 0개가 아니다. 앱 종료 후 알림·자동 복구 기능은 이 선택적 대기와 별개다. 모바일 반영·실기기 검증은 아직 완료하지 않았다.
+
 - Bearer·HTTPS·UTF-8 JSON·`Cache-Control: no-store`와 [공통 오류 봉투](../../../docs/api-contract.md#6-오류-응답)를 재사용한다. userId는 서버 세션에서 정한다. 요청에 userId·PIN·설치 ID를 받지 않는다.
 - ID/Time/Version은 [공통 타입](../../../docs/data-model.md#1-읽는-방법과-공통-규칙)을 따른다. 분석 진행은 금융 `dataVersion`·원천·설정·`write_receipts`를 바꾸지 않는다.
 - 아래 `contractVersion`은 분석 통신 버전 `PAYSE-ANALYSIS-1`이다. 금융 `PAYSE-API-0.6-4`, `PAYSE-DRAFT-4`, `PAYSE-CALC-1`은 유지한다. API 구현과 별도로 B의 입력 생성·파서·상태 복구를 공동 확인한다. 기존 금융 v4 소비자가 분석 API까지 지원한다는 뜻은 아니다.

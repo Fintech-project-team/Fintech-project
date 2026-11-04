@@ -97,6 +97,8 @@ public final class ApiConfigConstants {
     public static final class Analysis {
         // 업무·프로토콜 값
         public static final String NO_STORE = "no-store";
+        public static final String PREFER = "Prefer";
+        public static final String WAIT_PREFERENCE = "wait=5";
         public static final String ENCRYPT_ACTION = ":encrypt";
         public static final String DECRYPT_ACTION = ":decrypt";
         public static final String API_V4 = "PAYSE-API-0.6-4";
@@ -257,6 +259,7 @@ public final class ApiConfigConstants {
         public static final String TRANSACTIONS_PATH = "/transactions";
         public static final String LINKS_PATH = "/institution-links";
         public static final String OBLIGATIONS_PATH = "/obligations";
+        public static final String RECURRING_DECISIONS_PATH = "/recurring-decisions";
         public static final String RESERVES_PATH = "/reserves";
         public static final String CANCEL_OBLIGATION_PATH = "/obligations/{id}/cancel";
         public static final String CANCEL_RESERVE_PATH = "/reserves/{id}/cancel";

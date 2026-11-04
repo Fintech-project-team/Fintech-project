@@ -22,6 +22,9 @@ public final class AiConfigConstants {
      * @usedBy AnalysisContract, InputMapper
      */
     public static final class Analysis {
+        public static final String COMPACT_FILE = "compact-output.md";
+        public static final String COMPACT_VERSION = "PAYSE-COMPACT-4";
+        public static final String UNKNOWN_PREFIX = "?";
         public static final String ACCOUNT_PREFIX = "a";
         public static final String CARD_PREFIX = "b";
         public static final String INPUT_SIDE = "input";
@@ -121,6 +124,15 @@ public final class AiConfigConstants {
      * @usedBy OpenAiGateway
      */
     public static final class OpenAi {
+        public static final String SERVICE_DEFAULT = "default";
+        public static final String COMMENTARY = "commentary";
+        public static final String FINAL_ANSWER = "final_answer";
+        public static final String SERVICE_FAST = "fast";
+        public static final String VERBOSITY_LOW = "low";
+        public static final String INCOMPLETE_OUTPUT_LIMIT = "max_output_tokens";
+        public static final String VERBOSITY_MEDIUM = "medium";
+        public static final String VERBOSITY_HIGH = "high";
+        public static final String SERVICE_PRIORITY = "priority";
         public static final String API_ENDPOINT = "https://api.openai.com/v1/";
         public static final String EFFORT_NONE = "none";
         public static final String EFFORT_LOW = "low";

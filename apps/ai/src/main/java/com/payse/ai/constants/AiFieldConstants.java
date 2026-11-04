@@ -7,6 +7,34 @@ package com.payse.ai.constants;
  */
 public final class AiFieldConstants {
     /**
+     * 공급자 중립 축약 전송 필드다. 공개 API 필드는 바꾸지 않는다.
+     * @created 2026-11-04
+     * @usedBy CompactOutput
+     */
+    public static final class Compact {
+        public static final String ROWS = "rows";
+        public static final String ITEM = "i";
+        public static final String MEANING = "m";
+        public static final String CLASSIFICATION = "c";
+        public static final String REASON = "r";
+        public static final String EVIDENCE = "e";
+        public static final String CANDIDATE = "q";
+        public static final String NAME = "n";
+        public static final String RETENTION = "k";
+        public static final String RETENTION_REASON = "s";
+        public static final String POLICY_VERSION = "meaningPolicyVersion";
+        public static final String PUBLIC_NAME = "name";
+
+        /**
+         * 전송 키 구간의 생성을 막는다.
+         * @created 2026-11-04
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private Compact() {
+        }
+    }
+
+    /**
      * 공급자 공통 프롬프트 교육 자료의 키다. 공개 금융 응답 필드가 아니다.
      * @created 2026-11-04
      * @usedBy PromptGuide, AnalysisContract, InputMapper
@@ -165,6 +193,13 @@ public final class AiFieldConstants {
      * @usedBy OpenAiGateway
      */
     public static final class OpenAi {
+        public static final String SERVICE_TIER = "service_tier";
+        public static final String VERBOSITY = "verbosity";
+        public static final String INCOMPLETE_DETAILS = "incomplete_details";
+        public static final String INCOMPLETE_REASON = "reason";
+        public static final String OUTPUT_TOKENS_DETAILS = "output_tokens_details";
+        public static final String REASONING_TOKENS = "reasoning_tokens";
+        public static final String PHASE = "phase";
         public static final String OBJECT = "object";
         public static final String INPUT_TOKENS = "input_tokens";
         public static final String STORE = "store";

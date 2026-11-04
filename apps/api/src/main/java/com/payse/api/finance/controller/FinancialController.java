@@ -73,6 +73,7 @@ public final class FinancialController {
      * 확정된 쓰기 경로만 서비스의 원자 저장으로 전달한다. 메서드별 허용 경로는 입력에서도 검사한다.
      * @created 2026-10-29
      * @usedBy 공통 HTTP 계약 §3·§4 금융 쓰기 경로
+     * @modified 2026-11-04 - 반복 후보의 사용자 승인·제외를 같은 금융 저장 경로에 연결
      */
     @RequestMapping(
         path = {
@@ -81,6 +82,7 @@ public final class FinancialController {
             ApiConfigConstants.Finance.ACCOUNT_PATH,
             ApiConfigConstants.Finance.SETTINGS_PATH,
             ApiConfigConstants.Finance.OBLIGATIONS_PATH,
+            ApiConfigConstants.Finance.RECURRING_DECISIONS_PATH,
             ApiConfigConstants.Finance.OBLIGATION_PATH,
             ApiConfigConstants.Finance.CANCEL_OBLIGATION_PATH,
             ApiConfigConstants.Finance.RESERVES_PATH,

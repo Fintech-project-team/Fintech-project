@@ -8,12 +8,47 @@ package com.payse.api;
  */
 public final class ApiTestConstants {
     /**
+     * 반복 계획 저장의 공개 필드와 경로를 검사한다.
+     * @created 2026-11-04
+     * @usedBy FinancialHttpTest
+     */
+    public static final class Recurring {
+        public static final String PATH = "/recurring-decisions";
+        public static final String KEY = "candidateKey";
+        public static final String SOURCE = "sourceVersion";
+        public static final String EVIDENCE = "evidenceTransactionIds";
+        public static final String NAME = "normalizedName";
+        public static final String DECISION = "decision";
+        public static final String PLAN = "plan";
+        public static final String MONTH = "firstOccurrenceMonth";
+        public static final String DAY = "monthlyDay";
+        public static final String TIMING = "paymentTiming";
+        public static final String BASIS = "scheduleBasis";
+        public static final String CARD = "cardId";
+        public static final String APPROVED = "approved";
+        public static final String EXCLUDED = "excluded";
+
+        /**
+         * 정적 검사 규격만 제공한다.
+         * @created 2026-11-04
+         * @usedBy 없음: 인스턴스화 금지
+         */
+        private Recurring() {
+        }
+    }
+    /**
      * 제거 가능한 감마 시험 구성의 설정·암호·보고 규격이다.
      * @created 2026-11-03
      * @usedBy GammaLocalConfig, GammaLocalKeys, GammaLiveTest
      */
     public static final class GammaLocal {
         public static final String ENV_PARALLEL = "PAYSE_GAMMA_PARALLEL";
+        public static final String ENV_FAST = "PAYSE_GAMMA_FAST";
+        public static final String ENV_COMPACT = "PAYSE_GAMMA_COMPACT";
+        public static final String ENV_WAIT = "PAYSE_GAMMA_WAIT";
+        public static final String SERVICE_FAST = "fast";
+        public static final String VERBOSITY_LOW = "low";
+        public static final String SERVICE_DEFAULT = "default";
         public static final String PIPELINE_MILLIS = "pipelineElapsedMillis";
         public static final String MAX_ACTIVE = "maximumConcurrentRequests";
         public static final String PARALLELISM = "parallelism";
@@ -839,6 +874,8 @@ public final class ApiTestConstants {
      * @usedBy AnalysisHttpTest
      */
     public static final class AnalysisHttp {
+        public static final String PREFER = "Prefer";
+        public static final String WAIT = "wait=5";
         public static final String AUTHORIZATION = "Authorization";
         public static final String BEARER_PREFIX = "Bearer ";
         public static final String CACHE_CONTROL = "Cache-Control";
