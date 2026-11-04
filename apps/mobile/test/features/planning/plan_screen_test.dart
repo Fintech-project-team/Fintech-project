@@ -79,7 +79,7 @@ void main() {
     expect(_inRow('수리비', '예정일 지남'), findsOneWidget);
     expect(_inRow('수리비', '60,000원'), findsOneWidget);
     expect(_inRow('수리비', '남은 금액'), findsOneWidget);
-    expect(_inRow('수리비', '예정 100,000원 · 10/16 출금 40,000원'), findsOneWidget);
+    expect(_inRow('수리비', '100,000원 중 10/16에 40,000원 출금됐어요'), findsOneWidget);
     expect(find.text('일부 출금'), findsNothing);
     expect(find.text('통신비'), findsNothing);
     expect(find.text('카드 청구'), findsNothing);
@@ -134,7 +134,7 @@ void main() {
     ];
     await _pump(tester, json);
     expect(_inRow('수리비', '50,000원'), findsOneWidget);
-    expect(_inRow('수리비', '예정 100,000원 · 누적 출금 50,000원'), findsOneWidget);
+    expect(_inRow('수리비', '100,000원 중 50,000원 출금됐어요 (누적)'), findsOneWidget);
   });
 
   testWidgets('청구를 대표하는 예정 지출을 누르면 카드 결제 상세, 뒤로 가면 펼침 유지', (tester) async {
