@@ -12,6 +12,7 @@ import 'auth_services.dart';
 import 'auth_view_models.dart';
 
 /// 2026-10-21: 인증 화면 공통 틀. 위쪽 뒤로 가기, 좌우 24dp 본문, 아래 차콜 띠 버튼.
+/// 2026-11-04: 본문의 입력칸 밖을 누르면 입력 포커스를 풀어 키보드를 닫는다(#211, 예정 지출·월급 편집과 같은 방식).
 class AuthPage extends StatelessWidget {
   /// 2026-10-21: 본문 [body], 아래 버튼 [bottom], 뒤로 가기 [onBack](null이면 숨김)으로 만든다.
   const AuthPage({super.key, required this.body, this.bottom, this.onBack});
@@ -45,11 +46,16 @@ class AuthPage extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: PayseSpace.screenHorizontal,
+              child: GestureDetector(
+                key: const ValueKey('auth-body'),
+                behavior: HitTestBehavior.translucent,
+                onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: PayseSpace.screenHorizontal,
+                  ),
+                  child: body,
                 ),
-                child: body,
               ),
             ),
             ?bottom,
