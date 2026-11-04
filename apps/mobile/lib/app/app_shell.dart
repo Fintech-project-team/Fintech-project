@@ -123,7 +123,17 @@ class _AppShellState extends State<AppShell> {
     writer: widget.accountsWriter,
     onRefresh: widget.onPullRefresh,
     onShowPeriod: _showPeriod,
+    onShowPlan: _showPlan,
   );
+
+  /// 2026-11-03: 계획 탭으로 열 안쪽 탭 요청.
+  final PlanFocus _planFocus = PlanFocus();
+
+  /// 2026-11-03: 계획 탭의 [tab]을 지금 월급 기간·맨 위로 연다(홈 행·계산 내역 관리 줄).
+  void _showPlan(PlanTab tab) {
+    _planFocus.show(tab);
+    _select(2);
+  }
 
   /// 2026-10-31: 계좌·카드 탭의 이번 기간 내역으로 간다.
   void _showPeriod() {
@@ -145,6 +155,7 @@ class _AppShellState extends State<AppShell> {
     widget.salaryNotices?.removeListener(_onSalaryNotices);
     _state.dispose();
     _accountsTab.dispose();
+    _planFocus.dispose();
     super.dispose();
   }
 
@@ -357,7 +368,7 @@ class _AppShellState extends State<AppShell> {
             calculation: _calculation,
             writer: widget.accountsWriter,
           ),
-          PlanScreen(links: links),
+          PlanScreen(links: links, focus: _planFocus),
           MyInfoScreen(
             snapshot: widget.snapshot,
             userName: widget.userName,

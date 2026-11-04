@@ -353,7 +353,15 @@ class _HomeReady extends StatelessWidget {
                       chips: showBar,
                       awaiting: awaiting,
                       onOpenDetail: (section) =>
-                          _openDetail(context, section: section),
+                          switch ((section, links?.onShowPlan)) {
+                            (CalcSection.reserve, final show?) => show(
+                              PlanTab.reserves,
+                            ),
+                            (CalcSection.scheduled, final show?) => show(
+                              PlanTab.scheduled,
+                            ),
+                            _ => _openDetail(context, section: section),
+                          },
                     ),
                   ),
                   if (links?.onShowPeriod case final show?) ...[

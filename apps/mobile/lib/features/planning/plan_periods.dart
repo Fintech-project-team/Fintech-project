@@ -272,6 +272,20 @@ List<calc.ObligationLine> carriedOver(
   ]..sort(_byDue);
 }
 
+/// 2026-11-03: 이전 기간에서 남은 지출 [carry]의 설명. 모두 현재 구간 E에 들어갔으면 홈 예정 지출에 함께 들어갔다고, 모두 월급 입금
+/// 확인 대기면 입금 확인 뒤 뺀다고 한다. 섞였거나 위치를 모르면(월급 정보 없음 등) 반영 여부를 말하지 않는다.
+String carryNote(List<calc.ObligationLine> carry) {
+  bool all(calc.ObligationPlacement p) =>
+      carry.isNotEmpty && carry.every((l) => l.placement == p);
+  if (all(calc.ObligationPlacement.inCurrentPeriod)) {
+    return '예정일이 지났지만 아직 남은 금액이라 홈 예정 지출에 함께 들어가 있어요.';
+  }
+  if (all(calc.ObligationPlacement.awaitingSalary)) {
+    return '월급 입금이 확인되면 쓸 수 있는 돈에서 빼요.';
+  }
+  return '받은 정보 기준으로 남은 금액이 있어요.';
+}
+
 /// 2026-11-02: 앞으로 나갈 돈의 날짜 라벨(홈 [dueLabel]과 같은 규칙·문구). 지난 예정일은 '예정일 지남'이다. 예정일 전·당일은
 /// [labelEnd](현재 월급 기간 다음 기간의 끝, 없으면 현재 기간 끝) 전일 때만 'D-n'·'오늘'이며, 월급 기간을 정할 수 없으면
 /// ([labelEnd] null) 붙이지 않는다. 보고 있는 기간과 무관하다.
