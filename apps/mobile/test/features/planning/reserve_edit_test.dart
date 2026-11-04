@@ -236,16 +236,14 @@ void main() {
       expect(find.text('여행 자금'), findsOneWidget);
     });
 
-    testWidgets('수정: 이 돈으로 낼 지출은 읽기 전용, 적게 줄이면 금액 아래 이유, 하단에 취소 버튼', (
-      tester,
-    ) async {
+    testWidgets('수정: 이 돈으로 낼 지출 행, 적게 줄이면 금액 아래 이유, 하단에 취소 버튼', (tester) async {
       await _pump(tester, rentHeld: true);
       await tester.tap(
         find.byKey(const ValueKey('plan-reserve-open-$reserveId')),
       );
       await tester.pumpAndSettle();
       expect(find.text('남겨둘 돈 수정'), findsOneWidget);
-      final uses = find.byKey(const ValueKey('reserve-uses'));
+      final uses = find.byKey(const ValueKey('reserve-plans'));
       expect(
         find.descendant(of: uses, matching: find.text('수리비')),
         findsOneWidget,

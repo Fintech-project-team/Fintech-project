@@ -100,48 +100,90 @@ class ObligationPatch {
   };
 }
 
-/// 2026-11-03: POST /reserves의 남겨둘 돈. 이름 [label], 보호 계좌 [accountId], 금액 [amountKrw]다. 29-5b는 연결을 바꾸지 않으므로
-/// allocationChanges는 계약상 필수인 세 빈 배열로 보낸다.
+/// 2026-11-04: 남겨둘 돈의 배정 변경(AllocationChanges, 29-5c). [create]는 새로 고른 예정 지출과 총 배정액, [update]는 기존 배정과
+/// 새 총 배정액(해제액 포함), [remove]는 지울 배정이다. 세 배열은 계약상 늘 보내며 변화가 없으면 빈 배열이다.
+class AllocationChanges {
+  /// 2026-11-04: 세 목록으로 만든다.
+  const AllocationChanges({
+    this.create = const [],
+    this.update = const [],
+    this.remove = const [],
+  });
+
+  final List<({String obligationId, int amountKrw})> create;
+  final List<({String allocationId, int amountKrw})> update;
+  final List<String> remove;
+
+  /// 2026-11-04: 바꿀 배정이 하나도 없으면 true다.
+  bool get isEmpty => create.isEmpty && update.isEmpty && remove.isEmpty;
+
+  /// 2026-11-04: 요청 본문 값을 반환한다(배열 순서 그대로).
+  Map<String, Object?> toJson() => {
+    'create': [
+      for (final c in create)
+        {'amountKRW': c.amountKrw, 'obligationId': c.obligationId},
+    ],
+    'remove': [...remove],
+    'update': [
+      for (final u in update)
+        {'allocationId': u.allocationId, 'amountKRW': u.amountKrw},
+    ],
+  };
+}
+
+/// 2026-11-03: POST /reserves의 남겨둘 돈. 이름 [label], 보호 계좌 [accountId], 금액 [amountKrw]다. allocationChanges는 계약상
+/// 필수라 늘 보낸다.
+/// 2026-11-04: 새로 고른 '이 돈으로 낼 지출' [changes]를 함께 보낸다(29-5c, 없으면 세 빈 배열).
 class ReserveInput {
   /// 2026-11-03: 세 필드로 만든다.
   const ReserveInput({
     required this.label,
     required this.accountId,
     required this.amountKrw,
+    this.changes = const AllocationChanges(),
   });
 
   final String label;
   final String accountId;
   final int amountKrw;
+  final AllocationChanges changes;
 
   /// 2026-11-03: 요청 본문을 키 이름 순서로 반환한다.
   Map<String, Object?> toJson() => {
     'accountId': accountId,
-    'allocationChanges': const {
-      'create': <Object?>[],
-      'remove': <Object?>[],
-      'update': <Object?>[],
-    },
+    'allocationChanges': changes.toJson(),
     'amountKRW': amountKrw,
     'label': label,
   };
 }
 
-/// 2026-11-03: PATCH /reserves/{id}의 바꾼 필드. 보내지 않는 필드는 null이며 allocationChanges는 보내지 않는다(연결 그대로).
+/// 2026-11-03: PATCH /reserves/{id}의 바꾼 필드. 보내지 않는 필드는 null이다.
+/// 2026-11-04: 배정 변경 [changes]가 있으면 allocationChanges를 함께 보낸다(없으면 키 없음, 연결 그대로).
 class ReservePatch {
   /// 2026-11-03: 바꿀 이름 [label], 보호 계좌 [accountId], 금액 [amountKrw]로 만든다.
-  const ReservePatch({this.label, this.accountId, this.amountKrw});
+  const ReservePatch({
+    this.label,
+    this.accountId,
+    this.amountKrw,
+    this.changes = const AllocationChanges(),
+  });
 
   final String? label;
   final String? accountId;
   final int? amountKrw;
+  final AllocationChanges changes;
 
   /// 2026-11-03: 보낼 필드가 하나도 없으면 true를 반환한다.
-  bool get isEmpty => label == null && accountId == null && amountKrw == null;
+  bool get isEmpty =>
+      label == null &&
+      accountId == null &&
+      amountKrw == null &&
+      changes.isEmpty;
 
   /// 2026-11-03: 요청 본문을 키 이름 순서로 반환한다. 보내지 않는 필드는 키가 없다.
   Map<String, Object?> toJson() => {
     'accountId': ?accountId,
+    if (!changes.isEmpty) 'allocationChanges': changes.toJson(),
     'amountKRW': ?amountKrw,
     'label': ?label,
   };
