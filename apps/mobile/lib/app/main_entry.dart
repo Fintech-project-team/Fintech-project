@@ -47,6 +47,7 @@ class MainEntry extends StatefulWidget {
     this.salaryNoticeApi,
     this.onLogout,
     this.appVersion,
+    this.onChangePin,
   });
 
   final UserFinancialRepository financial;
@@ -62,6 +63,9 @@ class MainEntry extends StatefulWidget {
 
   /// 2026-11-03: 내 정보 탭의 설치된 앱 버전 읽기. 없으면 버전 줄을 두지 않는다.
   final AppVersionReader? appVersion;
+
+  /// 2026-11-04: 내 정보의 앱 비밀번호 바꾸기 열기(#213). 없으면 줄을 두지 않는다.
+  final Future<bool> Function(BuildContext context)? onChangePin;
 
   /// 2026-10-21: 조회 상태 객체를 반환한다.
   @override
@@ -395,6 +399,7 @@ class _MainEntryState extends State<MainEntry> {
             onLogout: widget.onLogout,
             userName: widget.userName,
             appVersion: widget.appVersion,
+            onChangePin: widget.onChangePin,
           ),
         ),
         EntryDestination.connect || EntryDestination.chooseAccounts => Builder(

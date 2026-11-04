@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'payse_tokens.dart';
+import 'underlined_text.dart';
 
 /// 2026-10-21: 원형 체크 표시(design.md §5 SelectionCheck). 선택 상태를 채움과 체크 모양으로 함께 보인다.
 class SelectionCheckMark extends StatelessWidget {
@@ -139,13 +140,11 @@ class SelectionCheckRow extends StatelessWidget {
                     minWidth: PayseSize.touchMin,
                   ),
                   child: Center(
-                    child: Text(
+                    child: UnderlinedText(
                       linkLabel!,
                       style: const TextStyle(
                         fontSize: 13,
                         color: PayseColors.textSecondary,
-                        decoration: TextDecoration.underline,
-                        decorationColor: PayseColors.textSecondary,
                       ),
                     ),
                   ),

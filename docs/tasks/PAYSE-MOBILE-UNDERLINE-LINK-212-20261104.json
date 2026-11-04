@@ -1,0 +1,38 @@
+{
+  "id": "PAYSE-MOBILE-UNDERLINE-LINK-212-20261104",
+  "role": "integration",
+  "baseCommit": "7bc649a9f8f244a5d6516158a9b92344d4283da5",
+  "branch": "feat/integration/underline-link-212",
+  "allowedPaths": [
+    "docs/tasks/PAYSE-MOBILE-UNDERLINE-LINK-212-20261104.json",
+    "docs/design.md",
+    "apps/mobile/lib/shared/design/underlined_text.dart",
+    "apps/mobile/lib/shared/design/code_timer_field.dart",
+    "apps/mobile/lib/shared/design/selection_controls.dart",
+    "apps/mobile/lib/features/connection/connection_screens.dart",
+    "apps/mobile/lib/features/planning/reserve_plan_sheets.dart",
+    "apps/mobile/lib/features/overview/calculation_detail_screen.dart",
+    "apps/mobile/lib/features/overview/home_screen.dart",
+    "apps/mobile/lib/features/overview/pull_refresh.dart",
+    "apps/mobile/lib/features/overview/salary_notice.dart",
+    "apps/mobile/test/shared/design/",
+    "apps/mobile/test/features/"
+  ],
+  "acceptance": [
+    "목적: 이슈 #212. 실기기(SM-G988N)에서 글자 스타일 밑줄(TextDecoration.underline)이 띄어쓰기 부분에서 위로 올라가 보인다(글꼴이 글자마다 밑줄을 그림). 29-5a에서 '이 예정 지출 취소'에만 쓴 '글자 아래 선 직접 그리기'를 공통 위젯(lib/shared/design/underlined_text.dart)으로 만들고 앱의 밑줄 글자 8곳에 적용한다. baseCommit은 hyeyeon-dev 7bc649a다",
+    "대상: 연결 확인 '홈으로 가기·나중에 확인하고 홈으로 가기', 남겨둘 돈 '사용 계획 해제', 계산 내역 관리 링크, 홈 새로고침 실패 띠 동작 글자, 안내 띠 '다시 시도', 월급 안내 '월급 정보 확인·나중에 확인', 인증번호 '다시 받기'(0:00 뒤에만 밑줄), 약관 '보기'",
+    "모양: 글자 크기·굵기·색·밑줄 색(계산 내역 관리 링크는 borderStrong, 약관 보기는 textSecondary)은 docs/design.md 그대로 두고 밑줄 그리는 방식만 바꾼다. 선은 1px이고 글자 상자 안 맨 아래에 그려 글자 높이·배치·터치 영역을 바꾸지 않는다. 시각 변경이 아니라 그리는 방식 수정이라 새 시안은 만들지 않고 실기기 캡처로 확인한다",
+    "검증 계획: 공통 위젯 테스트(선 색·두께·위치, 밑줄 끄기), 각 사용처가 글꼴 밑줄을 쓰지 않는지, 기존 화면 테스트 통과. 실기기에서 띄어쓰기 있는 밑줄 글자(예: '사용 계획 해제', '나중에 확인') 확인. 공식 검증은 npm run verify -- --task <이 명세>(mobile:check 포함)",
+    "범위 밖: 밑줄 글자 문구·크기·색 변경, 밑줄이 아닌 버튼, 서버·DB·API 계약. 커밋·PR·merge는 혜연 요청 전 실행하지 않는다"
+  ],
+  "readBefore": [
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/app-architecture.md",
+    "docs/v0.6-screen-rules.md",
+    "docs/design.md",
+    "docs/harness/AGENT_REVIEW.md"
+  ]
+}

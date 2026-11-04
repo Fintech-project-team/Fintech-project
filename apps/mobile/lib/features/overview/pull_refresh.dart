@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import '../../data/connection/transaction_history.dart';
 import '../../shared/design/payse_tokens.dart';
+import '../../shared/design/underlined_text.dart';
 
 /// 2026-10-30: 아래로 당겨 새로고침 한 번의 결과(29-2 명세 '새로고침 반영 기준').
 sealed class PullRefreshResult {
@@ -59,7 +60,6 @@ class NoticeBand extends StatelessWidget {
     fontSize: 14,
     height: 20 / 14,
     fontWeight: FontWeight.w700,
-    decoration: TextDecoration.underline,
   );
 
   /// 2026-10-30: 띠를 반환한다.
@@ -144,7 +144,7 @@ class NoticeBand extends StatelessWidget {
                             foregroundColor: PayseColors.textPrimary,
                             textStyle: _retryStyle,
                           ),
-                          child: const Text('다시 시도'),
+                          child: const UnderlinedText('다시 시도'),
                         ),
                       ),
                     ],

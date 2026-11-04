@@ -79,7 +79,7 @@ void main() {
     expect(_inRow('수리비', '예정일 지남'), findsOneWidget);
     expect(_inRow('수리비', '60,000원'), findsOneWidget);
     expect(_inRow('수리비', '남은 금액'), findsOneWidget);
-    expect(_inRow('수리비', '예정 100,000원 · 10/16 출금 40,000원'), findsOneWidget);
+    expect(_inRow('수리비', '100,000원 중 10/16에 40,000원 출금됐어요'), findsOneWidget);
     expect(find.text('일부 출금'), findsNothing);
     expect(find.text('통신비'), findsNothing);
     expect(find.text('카드 청구'), findsNothing);
@@ -134,7 +134,7 @@ void main() {
     ];
     await _pump(tester, json);
     expect(_inRow('수리비', '50,000원'), findsOneWidget);
-    expect(_inRow('수리비', '예정 100,000원 · 누적 출금 50,000원'), findsOneWidget);
+    expect(_inRow('수리비', '100,000원 중 50,000원 출금됐어요 (누적)'), findsOneWidget);
   });
 
   testWidgets('청구를 대표하는 예정 지출을 누르면 카드 결제 상세, 뒤로 가면 펼침 유지', (tester) async {
@@ -172,8 +172,11 @@ void main() {
       'obligations',
     ).firstWhere((o) => o['label'] == '수리비')['dueDate'] = '2026-09-20';
     await _pump(tester, json);
-    expect(find.text('이전 기간에서 남은 지출 1건'), findsOneWidget);
-    expect(find.text('받은 정보 기준으로 남은 금액이 있어요.'), findsOneWidget);
+    expect(find.text('이전 기간에서 남은 지출 1건 · 60,000원'), findsOneWidget);
+    expect(
+      find.text('예정일이 지났지만 아직 남은 금액이라 홈 예정 지출에 함께 들어가 있어요.'),
+      findsOneWidget,
+    );
     expect(find.text('수리비'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('plan-carry')));
     await tester.pumpAndSettle();
@@ -219,16 +222,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(_title(tester), '2026년 10월');
     expect(_inRow('월세', 'D-3'), findsOneWidget);
-  });
-
-  testWidgets('남겨둘 돈: 현재 설정액과 직접 연결한 예정 지출만', (tester) async {
-    await _pump(tester, alphaWithReceipt());
-    await tester.tap(find.byKey(const ValueKey('plan-tab-reserves')));
-    await tester.pump();
-    expect(find.text('현재 비상금'), findsOneWidget);
-    expect(find.text('400,000원'), findsOneWidget);
-    expect(find.text('설정액'), findsOneWidget);
-    expect(find.text('60,000원 배정'), findsOneWidget);
   });
 
   testWidgets('320dp·글자 1.3배에서도 넘치지 않는다', (tester) async {

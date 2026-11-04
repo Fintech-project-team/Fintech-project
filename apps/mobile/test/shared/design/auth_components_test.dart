@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:payse/shared/design/code_timer_field.dart';
+import 'package:payse/shared/design/underlined_text.dart';
 import 'package:payse/shared/design/payse_text_field.dart';
 import 'package:payse/shared/design/payse_tokens.dart';
 import 'package:payse/shared/design/pin_pad.dart';
@@ -62,7 +63,8 @@ void main() {
       },
     );
 
-    testWidgets('clear button only with a value; disabled shows dashed line', (
+    testWidgets('clear button always in place: dim and inert when empty, '
+        'clears and focuses when it has a value; disabled shows dashed line', (
       tester,
     ) async {
       final controller = TextEditingController();
@@ -70,15 +72,24 @@ void main() {
       await tester.pumpWidget(
         themed(PayseTextField(label: '이름', controller: controller)),
       );
+      final clear = find.byKey(const ValueKey('payse-text-field-clear'));
+      expect(clear, findsOneWidget, reason: '빈 값에도 같은 자리에 둔다');
+      expect(tester.widget<IconButton>(clear).onPressed, isNull);
       expect(
-        find.byKey(const ValueKey('payse-text-field-clear')),
-        findsNothing,
+        tester
+            .widget<Opacity>(
+              find.ancestor(of: clear, matching: find.byType(Opacity)).first,
+            )
+            .opacity,
+        lessThan(1),
       );
+      final emptyLeft = tester.getTopLeft(clear).dx;
 
       await tester.enterText(find.byType(TextField), '홍길동');
+      FocusManager.instance.primaryFocus?.unfocus();
       await tester.pump();
-      final clear = find.byKey(const ValueKey('payse-text-field-clear'));
-      expect(clear, findsOneWidget);
+      expect(tester.widget<IconButton>(clear).onPressed, isNotNull);
+      expect(tester.getTopLeft(clear).dx, emptyLeft, reason: '자리가 움직이지 않음');
       expect(tester.getSize(clear).height, greaterThanOrEqualTo(48));
       final circle = find.byKey(
         const ValueKey('payse-text-field-clear-circle'),
@@ -101,6 +112,11 @@ void main() {
       await tester.tap(clear);
       await tester.pump();
       expect(controller.text, isEmpty);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus,
+        isTrue,
+        reason: '지운 뒤 그 칸에 포커스',
+      );
 
       controller.text = '신한은행 입출금 ····1234';
       await tester.pumpWidget(
@@ -545,8 +561,10 @@ void main() {
             .color,
         PayseColors.textPrimary,
       );
-      final resend = tester.widget<Text>(find.text('다시 받기'));
-      expect(resend.style!.decoration, TextDecoration.underline);
+      final resend = tester.widget<UnderlinedText>(
+        find.widgetWithText(UnderlinedText, '다시 받기'),
+      );
+      expect(resend.underline, isTrue, reason: '0:00 뒤에만 직접 그린 밑줄');
       await tester.tap(find.byKey(const ValueKey('code-resend')));
       expect(resent, 1);
     });

@@ -11,6 +11,7 @@ import 'home_calculation.dart';
 import 'home_screen.dart' show asOfLabel, insufficientMessage;
 import 'overview_links.dart';
 import 'overview_pages.dart';
+import '../../shared/design/underlined_text.dart';
 
 /// 2026-10-26: 02-2 계산 내역(영수증 v4). 홈과 같은 계산 결과 [calculation]만 표시한다.
 /// 금액·건수·합계는 계산 결과에서 가져오고, 이름·계좌·날짜는 같은 스냅샷의 원천 값을 그대로 쓴다.
@@ -151,6 +152,13 @@ class _CalculationDetailScreenState extends State<CalculationDetailScreen> {
                         onSelectAccounts: links?.writer == null
                             ? null
                             : () => changeSelection(context, links!),
+                        onShowPlan: switch (links?.onShowPlan) {
+                          final show? => (tab) {
+                            Navigator.of(context).popUntil((r) => r.isFirst);
+                            show(tab);
+                          },
+                          null => null,
+                        },
                       ),
                       top: PayseSpace.x5,
                     ),
@@ -549,6 +557,7 @@ class _Receipt extends StatelessWidget {
     required this.target,
     required this.onOpenAccount,
     required this.onSelectAccounts,
+    required this.onShowPlan,
   });
 
   final calc.CurrentAmountResult result;
@@ -559,6 +568,9 @@ class _Receipt extends StatelessWidget {
   final GlobalKey target;
   final ValueChanged<String>? onOpenAccount;
   final VoidCallback? onSelectAccounts;
+
+  /// 2026-11-03: 계산 내역을 닫고 계획 탭의 안쪽 탭을 연다(남겨둘 돈·예정 지출 관리 줄). 없으면 줄을 두지 않는다.
+  final ValueChanged<PlanTab>? onShowPlan;
 
   /// 2026-10-31: [s]가 펼칠 항목이면 위치 키를 반환한다.
   Key? _keyOf(CalcSection s) => section == s ? target : null;
@@ -606,6 +618,12 @@ class _Receipt extends StatelessWidget {
                 today: today,
                 names: names,
                 reserveLines: result.reserveLines,
+              ),
+            if (onShowPlan case final show?)
+              _LinkButton(
+                key: const ValueKey('receipt-manage-scheduled'),
+                label: '예정 지출 관리',
+                onTap: () => show(PlanTab.scheduled),
               ),
           ],
         ),
@@ -719,6 +737,12 @@ class _Receipt extends StatelessWidget {
           const Text(_reserveMeaning, style: DetailTypography.secondary),
           for (final l in lines) _ReserveDetail(line: l, names: names),
         ],
+        if (onShowPlan case final show?)
+          _LinkButton(
+            key: const ValueKey('receipt-manage-reserves'),
+            label: '남겨둘 돈 관리',
+            onTap: () => show(PlanTab.reserves),
+          ),
       ],
     );
     if (lines == null || known || lines.isEmpty) return [row];
@@ -753,9 +777,31 @@ class _Receipt extends StatelessWidget {
 
   /// 2026-10-26: '○○ N원 중 N원은 예정 지출에 쓸 예정이에요.' 문장. 원천 이름에 조사를 붙이지 않고
   /// 어느 지출인지는 펼침 내역에 둔다. 금액은 계산 결과 값이다.
-  String _overlapSummary(calc.ReserveLine line) =>
-      '${names.reserveLabel(line.reserveId)} ${formatKrw(line.amountKrw)} 중 '
-      '${formatKrw(line.usedKrw!)}은 예정 지출에 쓸 예정이에요.';
+  /// 2026-11-03: 분류명 대신 실제 용도를 쓴다. 겹친 예정 지출이 1건이면 '… 중 N원은 수리비에 쓸 금액이에요.', 여러 건이면
+  /// 예정일이 가장 이른 이름 뒤 '외 n건에'. 조사는 받침과 무관한 '에'로 고정한다(이름이 영문·숫자로 끝나도 맞음).
+  String _overlapSummary(calc.ReserveLine line) {
+    final due = {
+      for (final l in result.obligationLines ?? const <calc.ObligationLine>[])
+        l.obligationId: l.dueDate,
+    };
+    final used =
+        [
+          for (final o in line.overlaps!)
+            if (o.unreleasedKrw > 0) o.obligationId,
+        ]..sort(
+          (a, b) => switch ((due[a], due[b])) {
+            (final x?, final y?) => x.compareTo(y),
+            _ => 0,
+          },
+        );
+    final target = used.isEmpty
+        ? '예정 지출'
+        : used.length == 1
+        ? names.obligationLabel(used.single)
+        : '${names.obligationLabel(used.first)} 외 ${used.length - 1}건';
+    return '${names.reserveLabel(line.reserveId)} ${formatKrw(line.amountKrw)} 중 '
+        '${formatKrw(line.usedKrw!)}은 $target에 쓸 금액이에요.';
+  }
 }
 
 /// 2026-10-31: 남겨둘 돈의 뜻. 실제 이체나 별도 입금이 아니다.
@@ -811,13 +857,7 @@ class _LinkButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              label,
-              style: const TextStyle(
-                decoration: TextDecoration.underline,
-                decorationColor: PayseColors.borderStrong,
-              ),
-            ),
+            UnderlinedText(label, lineColor: PayseColors.borderStrong),
             const Icon(Icons.chevron_right, size: 18),
           ],
         ),

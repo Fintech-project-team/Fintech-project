@@ -61,6 +61,54 @@ class AssembledFinancialRepository implements UserFinancialRepository {
     await inner.updateAccountNickname(accountId, nickname, write),
   );
 
+  /// 2026-11-03: POST /obligations 뒤 새 Snapshot을 합친다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> createObligation(
+    ObligationInput obligation,
+    WriteContext write,
+  ) async => _afterWrite(await inner.createObligation(obligation, write));
+
+  /// 2026-11-03: PATCH /obligations/{id} 뒤 새 Snapshot을 합친다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> updateObligation(
+    String obligationId,
+    ObligationPatch patch,
+    WriteContext write,
+  ) async =>
+      _afterWrite(await inner.updateObligation(obligationId, patch, write));
+
+  /// 2026-11-03: POST /obligations/{id}/cancel 뒤 새 Snapshot을 합친다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> cancelObligation(
+    String obligationId,
+    List<DetachAllocation> detach,
+    WriteContext write,
+  ) async =>
+      _afterWrite(await inner.cancelObligation(obligationId, detach, write));
+
+  /// 2026-11-03: POST /reserves 뒤 새 Snapshot을 합친다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> createReserve(
+    ReserveInput reserve,
+    WriteContext write,
+  ) async => _afterWrite(await inner.createReserve(reserve, write));
+
+  /// 2026-11-03: PATCH /reserves/{id} 뒤 새 Snapshot을 합친다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> updateReserve(
+    String reserveId,
+    ReservePatch patch,
+    WriteContext write,
+  ) async => _afterWrite(await inner.updateReserve(reserveId, patch, write));
+
+  /// 2026-11-03: POST /reserves/{id}/cancel 뒤 새 Snapshot을 합친다.
+  @override
+  Future<FinancialOutcome<WriteSuccess>> cancelReserve(
+    String reserveId,
+    List<DetachAllocation> detach,
+    WriteContext write,
+  ) async => _afterWrite(await inner.cancelReserve(reserveId, detach, write));
+
   /// 2026-11-01: 저장 성공 [result]의 Snapshot을 합친다. 저장은 이미 확정됐으므로 합치기에 실패해도 성공을 실패로 바꾸지 않고
   /// 받은 첫 페이지 Snapshot을 그대로 둔다(남은 페이지가 있다는 표시가 유지되어 계산은 정보 부족으로 처리된다).
   Future<FinancialOutcome<WriteSuccess>> _afterWrite(

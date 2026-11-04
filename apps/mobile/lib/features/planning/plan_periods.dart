@@ -272,6 +272,20 @@ List<calc.ObligationLine> carriedOver(
   ]..sort(_byDue);
 }
 
+/// 2026-11-03: 이전 기간에서 남은 지출 [carry]의 설명. 모두 현재 구간 E에 들어갔으면 홈 예정 지출에 함께 들어갔다고, 모두 월급 입금
+/// 확인 대기면 입금 확인 뒤 뺀다고 한다. 섞였거나 위치를 모르면(월급 정보 없음 등) 반영 여부를 말하지 않는다.
+String carryNote(List<calc.ObligationLine> carry) {
+  bool all(calc.ObligationPlacement p) =>
+      carry.isNotEmpty && carry.every((l) => l.placement == p);
+  if (all(calc.ObligationPlacement.inCurrentPeriod)) {
+    return '예정일이 지났지만 아직 남은 금액이라 홈 예정 지출에 함께 들어가 있어요.';
+  }
+  if (all(calc.ObligationPlacement.awaitingSalary)) {
+    return '월급 입금이 확인되면 쓸 수 있는 돈에서 빼요.';
+  }
+  return '받은 정보 기준으로 남은 금액이 있어요.';
+}
+
 /// 2026-11-02: 앞으로 나갈 돈의 날짜 라벨(홈 [dueLabel]과 같은 규칙·문구). 지난 예정일은 '예정일 지남'이다. 예정일 전·당일은
 /// [labelEnd](현재 월급 기간 다음 기간의 끝, 없으면 현재 기간 끝) 전일 때만 'D-n'·'오늘'이며, 월급 기간을 정할 수 없으면
 /// ([labelEnd] null) 붙이지 않는다. 보고 있는 기간과 무관하다.
@@ -295,13 +309,15 @@ calc.BusinessDate? labelEnd(SalaryPeriods? periods) {
 }
 
 /// 2026-11-03: 일부 출금 줄의 출금 문구. [dates]는 유효 정산마다 연결 출금 거래의 출금일(거래를 못 찾았거나 날짜가 없으면 null),
-/// [settledKrw]는 홈 계산의 정산 합계다. 모든 정산이 같은 확인된 날짜일 때만 'M/D 출금 n원'이고, 정산이 하나인데 날짜를 모르면
-/// '출금 n원', 날짜가 여럿이거나 일부를 모르면 '누적 출금 n원'이다. 한 날짜에 합계 전체를 붙이지 않는다.
-String withdrawalNote(List<String?> dates, int settledKrw) {
-  final amount = formatKrw(settledKrw);
+/// [settledKrw]는 홈 계산의 정산 합계, [amountKrw]는 예정 금액이다. 모든 정산이 같은 확인된 날짜일 때만 'n원 중 M/D에 m원
+/// 출금됐어요'이고, 정산이 하나인데 날짜를 모르면 'n원 중 m원 출금됐어요', 날짜가 여럿이거나 일부를 모르면 끝에 '(누적)'을 붙인다.
+/// 한 날짜에 합계 전체를 붙이지 않는다. 2026-11-03 혜연 결정으로 '예정 n원 · M/D 출금 m원'에서 한 문장으로 바꿨고 '만'은 쓰지 않는다.
+String withdrawalNote(List<String?> dates, int settledKrw, int amountKrw) {
+  final head = '${formatKrw(amountKrw)} 중';
+  final paid = formatKrw(settledKrw);
   final known = {for (final d in dates) ?d};
   if (dates.isNotEmpty && !dates.contains(null) && known.length == 1) {
-    return '${mdText(known.single)} 출금 $amount';
+    return '$head ${mdText(known.single)}에 $paid 출금됐어요';
   }
-  return dates.length <= 1 ? '출금 $amount' : '누적 출금 $amount';
+  return dates.length <= 1 ? '$head $paid 출금됐어요' : '$head $paid 출금됐어요 (누적)';
 }

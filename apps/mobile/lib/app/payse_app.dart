@@ -22,6 +22,7 @@ import '../data/http/api_transport.dart';
 import '../data/salary_notice_api.dart';
 import '../data/snapshot_source.dart';
 import '../features/auth/auth_flows.dart';
+import '../features/auth/pin_change_flow.dart';
 import '../features/auth/auth_screens.dart';
 import '../features/auth/auth_services.dart';
 import '../features/auth/auth_view_models.dart';
@@ -505,6 +506,11 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
         devEntryBuilder: _devEntryOrNull,
         onLogout: _logout,
         appVersion: widget.appVersion,
+        onChangePin: (context) => openPinChange(
+          context,
+          services: _auth,
+          onSessionInvalid: _onSessionInvalid,
+        ),
         onSessionInvalid: _onFinancialSessionInvalid,
       ),
     };

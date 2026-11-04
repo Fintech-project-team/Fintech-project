@@ -132,6 +132,168 @@ void main() {
     }
   });
 
+  test(
+    'obligation writes: paths, body W, cancel body with exact detach list',
+    () async {
+      transport.handler = (_) => jsonResponse(200, _saved('8'));
+      await repo.createObligation(
+        const ObligationInput(
+          label: '통신비',
+          withdrawalAccountId: 'a1',
+          amountKrw: 55000,
+          dueDate: '2026-10-22',
+        ),
+        _w,
+      );
+      await repo.updateObligation(
+        'o 1',
+        const ObligationPatch(amountKrw: 62000),
+        _w,
+      );
+      await repo.cancelObligation('o1', const [
+        DetachAllocation(allocationId: 'al1', unreleasedKrw: 30000),
+      ], _w);
+      final [create, update, cancel] = transport.requests;
+      const w = {
+        'expectedDataVersion': '7',
+        'ruleVersion': 'PAYSE-CALC-1',
+        'idempotencyKey': 'key-1',
+      };
+      expect((create.method, create.uri.path), ('POST', '/api/obligations'));
+      expect(create.body, {
+        'amountKRW': 55000,
+        'dueDate': '2026-10-22',
+        'label': '통신비',
+        'withdrawalAccountId': 'a1',
+        ...w,
+      });
+      expect(
+        (update.method, update.uri.path),
+        ('PATCH', '/api/obligations/o%201'),
+      );
+      expect(update.body, {'amountKRW': 62000, ...w}, reason: '바꾼 필드만');
+      expect(
+        (cancel.method, cancel.uri.path),
+        ('POST', '/api/obligations/o1/cancel'),
+        reason: 'DELETE 대신 cancel 경로 하나',
+      );
+      expect(cancel.body, {
+        'detachAllocations': [
+          {'allocationId': 'al1', 'unreleasedKRW': 30000},
+        ],
+        ...w,
+      });
+    },
+  );
+
+  test('reserve writes: empty allocationChanges on create, patch without it, cancel path', () async {
+    transport.handler = (_) => jsonResponse(200, _saved('8'));
+    await repo.createReserve(
+      const ReserveInput(label: '비상금', accountId: 'a1', amountKrw: 400000),
+      _w,
+    );
+    await repo.updateReserve('r 1', const ReservePatch(amountKrw: 300000), _w);
+    await repo.cancelReserve('r1', const [
+      DetachAllocation(allocationId: 'al1', unreleasedKrw: 60000),
+    ], _w);
+    final [create, update, cancel] = transport.requests;
+    const w = {
+      'expectedDataVersion': '7',
+      'ruleVersion': 'PAYSE-CALC-1',
+      'idempotencyKey': 'key-1',
+    };
+    expect((create.method, create.uri.path), ('POST', '/api/reserves'));
+    expect(create.body, {
+      'accountId': 'a1',
+      'allocationChanges': {'create': [], 'remove': [], 'update': []},
+      'amountKRW': 400000,
+      'label': '비상금',
+      ...w,
+    });
+    expect((update.method, update.uri.path), ('PATCH', '/api/reserves/r%201'));
+    expect(update.body, {'amountKRW': 300000, ...w}, reason: '연결은 보내지 않음');
+    expect(
+      (cancel.method, cancel.uri.path),
+      ('POST', '/api/reserves/r1/cancel'),
+    );
+    expect(cancel.body, {
+      'detachAllocations': [
+        {'allocationId': 'al1', 'unreleasedKRW': 60000},
+      ],
+      ...w,
+    });
+  });
+
+  test(
+    'reserve plan changes: allocationChanges arrays on create and patch',
+    () async {
+      transport.handler = (_) => jsonResponse(200, _saved('8'));
+      await repo.createReserve(
+        const ReserveInput(
+          label: '여행 자금',
+          accountId: 'a1',
+          amountKrw: 300000,
+          changes: AllocationChanges(
+            create: [(obligationId: 'o1', amountKrw: 100000)],
+          ),
+        ),
+        _w,
+      );
+      await repo.updateReserve(
+        'r1',
+        const ReservePatch(
+          changes: AllocationChanges(
+            create: [(obligationId: 'o2', amountKrw: 20000)],
+            update: [(allocationId: 'al1', amountKrw: 40000)],
+            remove: ['al2'],
+          ),
+        ),
+        _w,
+      );
+      final [create, update] = transport.requests;
+      expect((create.body! as Map)['allocationChanges'], {
+        'create': [
+          {'amountKRW': 100000, 'obligationId': 'o1'},
+        ],
+        'remove': [],
+        'update': [],
+      });
+      expect(update.body, {
+        'allocationChanges': {
+          'create': [
+            {'amountKRW': 20000, 'obligationId': 'o2'},
+          ],
+          'remove': ['al2'],
+          'update': [
+            {'allocationId': 'al1', 'amountKRW': 40000},
+          ],
+        },
+        'expectedDataVersion': '7',
+        'ruleVersion': 'PAYSE-CALC-1',
+        'idempotencyKey': 'key-1',
+      });
+    },
+  );
+
+  test('409·422 business codes keep their status and code', () async {
+    for (final (status, code) in const [
+      (409, 'HISTORY_LOCKED'),
+      (409, 'RELATION_CONFLICT'),
+      (422, 'LIMIT_EXCEEDED'),
+      (422, 'VALIDATION_FAILED'),
+    ]) {
+      transport.handler = (_) => errorResponse(status, code);
+      final result = await repo.updateObligation(
+        'o1',
+        const ObligationPatch(amountKrw: 1),
+        _w,
+      );
+      expect(result, isA<FinancialInvalid<WriteSuccess>>());
+      final invalid = result as FinancialInvalid<WriteSuccess>;
+      expect((invalid.status, invalid.code), (status, code));
+    }
+  });
+
   test('a TLS failure is a connection failure, not a business error', () async {
     transport.handler = (_) =>
         throw const ApiTransportException(ApiFailureKind.tls, 'handshake');
