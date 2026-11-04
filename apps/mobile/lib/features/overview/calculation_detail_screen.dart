@@ -11,6 +11,7 @@ import 'home_calculation.dart';
 import 'home_screen.dart' show asOfLabel, insufficientMessage;
 import 'overview_links.dart';
 import 'overview_pages.dart';
+import '../../shared/design/underlined_text.dart';
 
 /// 2026-10-26: 02-2 계산 내역(영수증 v4). 홈과 같은 계산 결과 [calculation]만 표시한다.
 /// 금액·건수·합계는 계산 결과에서 가져오고, 이름·계좌·날짜는 같은 스냅샷의 원천 값을 그대로 쓴다.
@@ -856,13 +857,7 @@ class _LinkButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              label,
-              style: const TextStyle(
-                decoration: TextDecoration.underline,
-                decorationColor: PayseColors.borderStrong,
-              ),
-            ),
+            UnderlinedText(label, lineColor: PayseColors.borderStrong),
             const Icon(Icons.chevron_right, size: 18),
           ],
         ),

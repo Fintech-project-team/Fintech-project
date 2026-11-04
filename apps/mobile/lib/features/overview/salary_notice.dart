@@ -6,6 +6,7 @@ import '../../data/financial_snapshot.dart';
 import '../../shared/design/payse_tokens.dart';
 import '../connection/salary_settings_controller.dart';
 import '../connection/salary_settings_screen.dart';
+import '../../shared/design/underlined_text.dart';
 
 /// 2026-10-29: 홈 월급 입금 확인 안내 연결. [onEdit]은 월급 정보 편집 화면 열기다(없으면 버튼이 눌리지 않는다).
 /// 2026-11-01: [isFolded]는 안내가 지금 접혀 보이는지, [onFold]는 '나중에 확인'으로 접기, [onOpen]은 작은 표시를 눌러 이 화면에서만
@@ -130,11 +131,7 @@ class SalaryNoticeBand extends StatelessWidget {
       minimumSize: const Size(44, PayseSize.touchMin),
       padding: const EdgeInsets.symmetric(horizontal: 4),
       foregroundColor: color,
-      textStyle: TextStyle(
-        fontSize: 14,
-        fontWeight: weight,
-        decoration: TextDecoration.underline,
-      ),
+      textStyle: TextStyle(fontSize: 14, fontWeight: weight),
     );
     return Semantics(
       container: true,
@@ -193,7 +190,7 @@ class SalaryNoticeBand extends StatelessWidget {
                           key: const ValueKey('salary-notice-edit'),
                           onPressed: onEdit,
                           style: link(FontWeight.w700, PayseColors.textPrimary),
-                          child: const Text('월급 정보 확인'),
+                          child: const UnderlinedText('월급 정보 확인'),
                         ),
                         TextButton(
                           key: const ValueKey('salary-notice-later'),
@@ -202,7 +199,7 @@ class SalaryNoticeBand extends StatelessWidget {
                             FontWeight.w500,
                             PayseColors.textSecondary,
                           ),
-                          child: const Text('나중에 확인'),
+                          child: const UnderlinedText('나중에 확인'),
                         ),
                       ],
                     ),
