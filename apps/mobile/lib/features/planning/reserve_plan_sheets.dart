@@ -7,6 +7,7 @@ import '../connection/salary_settings_screen.dart' show GroupedDigitsFormatter;
 import '../overview/calculation_detail_screen.dart' show mdText;
 import '../overview/transaction_sheets.dart' show RadioRow;
 import 'reserve_edit.dart';
+import '../../shared/design/underlined_text.dart';
 
 /// 2026-11-04: 지출 선택창에서 고른 결과(예정 지출과 이 돈에서 쓸 금액).
 typedef PlanPick = ({String obligationId, int amountKrw});
@@ -451,13 +452,9 @@ class _PlanRowSheetState extends State<PlanRowSheet> {
         style: TextButton.styleFrom(
           foregroundColor: PayseColors.textPrimary,
           minimumSize: const Size(0, 44),
-          textStyle: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            decoration: TextDecoration.underline,
-          ),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
-        child: const Text('사용 계획 해제'),
+        child: const UnderlinedText('사용 계획 해제'),
       ),
       bottom: _applyButton(
         ok

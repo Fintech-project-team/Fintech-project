@@ -14,6 +14,7 @@ import 'home_skeleton.dart';
 import 'overview_links.dart';
 import 'overview_pages.dart' show openCalculation;
 import 'salary_notice.dart';
+import '../../shared/design/underlined_text.dart';
 
 /// 2026-10-23: 02-1 홈. 공유 계산 결과 [calculation]만 표시하며 금액을 직접 계산하지 않는다.
 /// 데이터 오류·예상하지 못한 오류에서는 이전 금액을 보이지 않고 [onReload]로 다시 불러온다.
@@ -1088,10 +1089,9 @@ class NoticeBand extends StatelessWidget {
                             textStyle: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
-                              decoration: TextDecoration.underline,
                             ),
                           ),
-                          child: Text(action),
+                          child: UnderlinedText(action),
                         ),
                     ],
                   ),
