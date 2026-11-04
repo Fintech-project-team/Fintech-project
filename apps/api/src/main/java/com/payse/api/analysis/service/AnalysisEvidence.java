@@ -188,6 +188,46 @@ public final class AnalysisEvidence {
     }
 
     /**
+     * 인증된 원천의 금액·실제 날짜·부모 ID만 모델 전용으로 투영한다. 분류 정답은 넣지 않는다.
+     * @created 2026-11-03
+     * @usedBy AnalysisJobs.submit
+     */
+    public ObjectNode modelFacts(UUID owner, ObjectNode source, ObjectNode input) {
+        ObjectNode verified = verify(owner, source, input);
+        SourceView view = new SourceView(owner, source);
+        ObjectNode facts = AnalysisJson.JSON.createObjectNode();
+        facts.set(Analysis.AS_OF, required(source, Analysis.AS_OF).deepCopy());
+        var rows = facts.putArray(Analysis.TRANSACTIONS);
+        List<String> fields = List.of(
+            Analysis.TRANSACTION_ID,
+            Analysis.ACCOUNT_ID,
+            Analysis.CARD_ID,
+            ApiFieldConstants.Finance.AMOUNT_KRW,
+            ApiFieldConstants.Finance.PURCHASE_DATE,
+            ApiFieldConstants.Finance.WITHDRAWAL_DATE,
+            ApiFieldConstants.Finance.REFUND_DATE,
+            ApiFieldConstants.Finance.CANCELLATION_DATE,
+            ApiFieldConstants.Finance.BOOKING_DATE,
+            ApiFieldConstants.Finance.OCCURRED_AT,
+            ApiFieldConstants.Finance.OCCURRED_AT_BASIS
+        );
+        for (JsonNode row : verified.path(Analysis.TRANSACTIONS)) {
+            JsonNode stored = view.transaction(row.path(Analysis.TRANSACTION_ID).asString());
+            ObjectNode projection = rows.addObject();
+            for (String field : fields) {
+                JsonNode value = required(stored, field);
+                if (field.equals(Analysis.ACCOUNT_ID) && value.isString()
+                    && !view.publicAccount(value.asString())) {
+                    projection.putNull(field);
+                } else {
+                    projection.set(field, value.deepCopy());
+                }
+            }
+        }
+        return facts;
+    }
+
+    /**
      * 같은 Snapshot의 버전·원천 시각을 요구하고 Flutter epoch·revision은 계약 검사에 맡긴다.
      * @created 2026-11-01
      * @usedBy verify

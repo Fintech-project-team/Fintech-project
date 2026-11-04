@@ -1,0 +1,13 @@
+# Merge into the private server.properties only after explicit gamma setup.
+# All machine paths, source identifiers, project IDs and credentials stay local.
+# portable_server.py configure creates this configuration interactively.
+payse.gamma-local.enabled=
+payse.gamma-local.llm-file=
+payse.gamma-local.key-file=
+payse.gamma-local.state-directory=
+payse.gamma-local.project=
+payse.gamma-local.pricing=
+payse.gamma-local.source-version=
+# Append analysis,gamma-local to the existing profiles only when the above are ready.
+# The llm.properties file uses enabled/provider/model/reasoningEffort/apiKey/apiKeyEnvFile.
+# Never put an API key or a local encryption key in this template.

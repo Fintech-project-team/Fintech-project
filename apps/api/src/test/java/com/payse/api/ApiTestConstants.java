@@ -8,6 +8,134 @@ package com.payse.api;
  */
 public final class ApiTestConstants {
     /**
+     * 제거 가능한 감마 시험 구성의 설정·암호·보고 규격이다.
+     * @created 2026-11-03
+     * @usedBy GammaLocalConfig, GammaLocalKeys, GammaLiveTest
+     */
+    public static final class GammaLocal {
+        public static final String ENV_PARALLEL = "PAYSE_GAMMA_PARALLEL";
+        public static final String PIPELINE_MILLIS = "pipelineElapsedMillis";
+        public static final String MAX_ACTIVE = "maximumConcurrentRequests";
+        public static final String PARALLELISM = "parallelism";
+        public static final String KEY_REFERENCE = "gamma-local-v1:";
+        public static final String HASH_ALGORITHM = "SHA-256";
+        public static final String CIPHER_ALGORITHM = "AES/GCM/NoPadding";
+        public static final String KEY_ALGORITHM = "AES";
+        public static final String REDACTED = "GammaLocalKeys[REDACTED]";
+        public static final String KEY_UNAVAILABLE = "Gamma local key unavailable";
+        public static final String SEEDS = "fixtures/generated-v4/server-seeds.json";
+        public static final String INITIAL_CASE = "initialCase";
+        public static final String GAMMA_CASE = "gamma-life";
+        public static final String IDENTITY_UNAVAILABLE = "Gamma fixture identity unavailable";
+        public static final String DISABLED = "Gamma local configuration disabled";
+        public static final String INCOMPLETE = "Gamma local configuration incomplete";
+        public static final String INVALID_POLICY = "Gamma local policy invalid";
+        public static final String VERSION = "gamma-local-2";
+        public static final String MISSING_SOURCE = "Gamma source version missing";
+        public static final String CONTROLLER_PACKAGE = "com.payse.api.analysis.controller";
+        public static final String SESSION_INVALID = "SESSION_INVALID";
+        public static final String PROFILE_DATABASE = "database";
+        public static final String PROFILE_AUTH = "auth";
+        public static final String PROFILE_FINANCE = "finance";
+        public static final String PROFILE_ANALYSIS = "analysis";
+        public static final String LOOPBACK = "127.0.0.1";
+        public static final String HTTP_LOOPBACK = "http://127.0.0.1:";
+        public static final String APPROVED = "approved";
+        public static final String DATABASE = "payse_auth_test_gamma_local";
+        public static final String SOURCE_TRANSACTIONS = "sourceTransactions";
+        public static final String SOURCE_ACCOUNTS = "sourceAccounts";
+        public static final String OTHERS_BLOCKED = "otherAccountsBlockedBeforeProvider";
+        public static final String CASES = "cases";
+        public static final String SUCCEEDED = "succeeded";
+        public static final String FAILED = "failed";
+        public static final String UNKNOWN = "outcomeUnknown";
+        public static final String COUNT_FAILURE = "Gamma count failure: {}";
+        public static final String COUNT_TOKENS = "Gamma input tokens: {}";
+        public static final String EXPIRED = "expired";
+        public static final String CANCELLED = "cancelled";
+        public static final String AVAILABLE = "available";
+        public static final String AWAITING_INPUT = "awaitingInput";
+        public static final String SUBMIT_INPUT = "submitInput";
+        public static final String ANALYSIS_FAILED =
+            "Live analysis did not succeed; inspect the sanitized summary";
+        public static final String STORED_AND_RETRIEVED = "storedAndRetrieved";
+        public static final String MEANING_CODES = "meaningCodes";
+        public static final String RESTART_RECOVERY = "restartRecoveryWithoutNewCalls";
+        public static final String SOURCES_PRESERVED = "financialSourcesPreserved";
+        public static final String KMS_CALLS = "googleKmsCalls";
+        public static final String PASSED = "passed";
+        public static final String BANNER_OFF = "off";
+        public static final String PEER_DIRECT = "direct";
+        public static final String AUTH_KEY_ID = "gamma-local";
+        public static final String ENABLED_PROPERTY = "payse.gamma-local.enabled";
+        public static final String PREFIX = "payse.gamma-local.";
+        public static final String ENABLED = "true";
+        public static final String KEY_FILE_PROPERTY = "key-file";
+        public static final String LLM_FILE_PROPERTY = "llm-file";
+        public static final String PROJECT_PROPERTY = "project";
+        public static final String PRICING_PROPERTY = "pricing";
+        public static final String SOURCE_PROPERTY = "source-version";
+        public static final String TRIGGER_NORMAL = "A";
+        public static final String STATE_TIMEOUT = "Gamma analysis state timeout";
+        public static final String JSON_TYPE = "application/json";
+        public static final String LAST_HTTP_STATUS = "lastHttpStatus";
+        public static final String HTTP_MISMATCH = "Gamma HTTP status mismatch";
+        public static final String USER_VERSIONS = "userVersions";
+        public static final String EXPENSE_MEANING = "expenseMeaning";
+        public static final String FIELD = "field";
+        public static final String ENV_PREFIX = "PAYSE_GAMMA_";
+        public static final String MISSING_SETTING = "Gamma runner setting missing";
+        public static final String ACCEPT_METHOD = "accept";
+        public static final String ENV_LIVE = "LIVE";
+        public static final String ENV_JDBC_URL = "JDBC_URL";
+        public static final String ENV_ADMIN_USER = "ADMIN_USER";
+        public static final String ENV_ADMIN_PASSWORD = "ADMIN_PASSWORD";
+        public static final String ENV_DB_USER = "DB_USER";
+        public static final String ENV_DB_PASSWORD = "DB_PASSWORD";
+        public static final String ENV_INPUTS = "INPUTS";
+        public static final String ENV_REPORT = "REPORT";
+        public static final String ENV_KEY_FILE = "KEY_FILE";
+        public static final String ENV_LLM_FILE = "LLM_FILE";
+        public static final String ENV_PROJECT = "PROJECT";
+        public static final String ENV_PRICING = "PRICING";
+        public static final String ENV_SOURCE_VERSION = "SOURCE_VERSION";
+        public static final String ENV_EVALUATION = "PAYSE_GAMMA_EVALUATION";
+        public static final String INTERPRETATIONS = "interpretations";
+        public static final String ELAPSED_MILLIS = "elapsedMillis";
+        public static final String EVALUATION_COMPLETE = "evaluationComplete";
+
+        /**
+         * 정적 시험 규격의 인스턴스 생성을 막는다.
+         * @created 2026-11-03
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private GammaLocal() {
+        }
+    }
+    /**
+     * 외부 호출 없는 비용 경계 검사의 독립 기대값이다.
+     * @created 2026-11-03
+     * @usedBy AnalysisPricingTest, AnalysisRuntimeTest, CostedModelTest
+     */
+    public static final class Execution {
+        public static final String MODEL = "test-model-2026-11-01";
+        public static final String PROJECT = "test-project";
+        public static final String VERSION = "test-pricing-v1";
+        public static final String PRICES = """
+            {"model":"test-model-2026-11-01","inputMicrosPerMillion":2000000,
+             "cachedMicrosPerMillion":1000000,"outputMicrosPerMillion":4000000,
+             "countingMicros":7,"kmsMicros":11,"inputLimit":6000,"outputLimit":1000}
+            """;
+
+        /**
+         * 기대값 전용 구간의 생성을 막는다.
+         * @created 2026-11-03
+         * @usedBy 없음: 정적 테스트 상수 전용
+         */
+        private Execution() {
+        }
+    }
+    /**
      * 테스트 계약만 제공하며 인스턴스 생성을 막는다.
      * @created 2026-11-02
      * @usedBy 없음: 정적 상수 전용 타입의 인스턴스화 차단
@@ -506,6 +634,7 @@ public final class ApiTestConstants {
      */
     public static final class AnalysisColumns {
         public static final String DISPATCH_STATE = "dispatch_state";
+        public static final String FINISHED_AT = "finished_at";
         public static final String EXECUTION_EXPIRES_AT = "execution_expires_at";
         public static final String GUARD_EXPIRES_AT = "guard_expires_at";
         public static final String NORMAL_EXPIRES_AT_FIELD = "normal_expires_at";
@@ -567,6 +696,10 @@ public final class ApiTestConstants {
         public static final String ACCOUNTS = "accounts";
         public static final String ACCOUNT_ID = "accountId";
         public static final String ACKNOWLEDGE_DUPLICATE_RISK = "acknowledgeDuplicateRisk";
+        public static final String REVIEW = "review";
+        public static final String ITEMS_AVAILABLE = "itemsAvailable";
+        public static final String REQUIRES_USER_INPUT = "requiresUserInput";
+        public static final String RETRY_REQUIRES_ACKNOWLEDGEMENT = "retryRequiresAcknowledgement";
         public static final String ACTION = "action";
         public static final String ACTIVE = "active";
         public static final String AMOUNT_KRW = "amountKRW";

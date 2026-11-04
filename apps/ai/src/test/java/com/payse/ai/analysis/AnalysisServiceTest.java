@@ -8,6 +8,7 @@ import com.payse.ai.AiTestConstants.ProviderCodes;
 import com.payse.ai.AiTestConstants.ProviderValues;
 import com.payse.ai.AiTestConstants;
 import com.payse.ai.analysis.service.AnalysisService;
+import com.payse.ai.analysis.validation.AnalysisContract;
 import com.payse.ai.analysis.validation.ContractFailure;
 import com.payse.ai.provider.ModelFailure.Stage;
 import com.payse.ai.provider.ModelFailure;
@@ -15,6 +16,7 @@ import com.payse.ai.provider.ModelGateway;
 import com.payse.ai.provider.dto.ModelReply;
 import com.payse.ai.provider.dto.TokenUsage;
 import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +35,95 @@ import tools.jackson.databind.node.ObjectNode;
  * @usedBy JUnit
  */
 class AnalysisServiceTest {
+    /**
+     * 한글·표 형태로 줄인 기준을 복원하면 공개 원문의 값·구조가 모두 일치한다.
+     * @created 2026-11-03
+     * @usedBy JUnit
+     * @modified 2026-11-04 - 공통 근거를 복원하여 41개 의미의 모든 기준 보존 확인
+     */
+    @Test
+    void preservesCriteriaWithoutEscapedUnicode() throws Exception {
+        try (var stream = getClass().getResourceAsStream(AnalysisValues.CRITERIA_RESOURCE)) {
+            assertNotNull(stream);
+            String raw = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            String instructions = new AnalysisContract().instructions();
+            String criteria = instructions.substring(instructions.indexOf('{'));
+            ObjectNode restored = (ObjectNode) JSON.readTree(criteria);
+            JsonNode common = restored.remove("commonEvidence");
+            assertNotNull(common);
+            assertFalse(common.path("requiredEvidence").isEmpty());
+            assertFalse(common.path("insufficientEvidence").isEmpty());
+            JsonNode table = restored.get(AnalysisFields.MEANINGS);
+            JsonNode columns = table.get(AnalysisFields.COLUMNS);
+            var meanings = restored.putArray(AnalysisFields.MEANINGS);
+            for (JsonNode row : table.get(AnalysisFields.ROWS)) {
+                assertEquals(columns.size(), row.size());
+                ObjectNode meaning = meanings.addObject();
+                for (int index = 0; index < columns.size(); index++) {
+                    String column = columns.get(index).asString();
+                    if (common.has(column)) {
+                        var evidence = meaning.putArray(column);
+                        for (JsonNode value : row.get(index)) {
+                            evidence.add(value.isIntegralNumber()
+                                ? common.get(column).get(value.asInt()) : value);
+                        }
+                    } else {
+                        meaning.set(column, row.get(index).deepCopy());
+                    }
+                }
+            }
+            assertEquals(JSON.readTree(raw), restored);
+            assertFalse(criteria.contains("\\u"));
+            assertTrue(criteria.length() < raw.length() / 2);
+        }
+    }
+
+    /**
+     * 서버의 금액·날짜만 결합하고 원래 ID·원천 객체·민감 추가 필드는 외부로 내보내지 않는다.
+     * @created 2026-11-03
+     * @usedBy JUnit
+     * @modified 2026-11-04 - 모델 전용 null 생략과 공개 입력 불변을 구별하여 검사
+     */
+    @Test
+    void usesSourceFactsWithoutChangingPublicInput() throws Exception {
+        ObjectNode payload = input();
+        ObjectNode before = payload.deepCopy();
+        ObjectNode facts = JSON.createObjectNode();
+        facts.set("asOf", payload.path("context").path("asOf"));
+        var rows = facts.putArray("transactions");
+        String account = UUID.randomUUID().toString();
+        for (JsonNode transaction : payload.path("transactions")) {
+            ObjectNode row = rows.addObject();
+            row.set("transactionId", transaction.path("transactionId"));
+            row.put("amountKRW", 123456).put("accountId", account).putNull("cardId");
+            for (String name : List.of(
+                "purchaseDate", "withdrawalDate", "refundDate", "cancellationDate",
+                "bookingDate", "occurredAt", "occurredAtBasis"
+            )) {
+                row.putNull(name);
+            }
+        }
+        AtomicInteger calls = new AtomicInteger();
+        AnalysisService service = new AnalysisService(
+            (instructions, schema) -> model(100, body -> {
+                calls.incrementAndGet();
+                JsonNode target = body.path("items").get(0).path("target");
+                assertEquals(123456, target.path("amountKRW").asInt());
+                assertFalse(body.toString().contains(account));
+                assertEquals("a1", target.path("accountId").asString());
+                assertTrue(target.path("bookingDate").isMissingNode());
+                assertEquals(facts.path("asOf"), body.path("asOf"));
+                return new ModelReply(null, new TokenUsage(100, null, 10), "MODEL_REFUSAL");
+            }),
+            6000
+        );
+        assertEquals("MODEL_REFUSAL", service.analyzeForStorage(payload, facts).failure());
+        assertEquals(before, payload);
+        ((ObjectNode) rows.get(0)).put("expectedMeaning", "never-send-gold");
+        assertThrows(ContractFailure.class, () -> service.analyzeForStorage(payload, facts));
+        assertEquals(1, calls.get());
+    }
+
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     /**

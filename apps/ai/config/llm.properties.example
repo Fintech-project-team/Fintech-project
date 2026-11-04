@@ -1,8 +1,10 @@
 # Copy to llm.properties (Git-ignored) or a private server configuration directory.
-# Supply its path explicitly; PAYSE does not read Codex credentials or OPENAI_API_KEY.
+# Supply its path explicitly; PAYSE does not search process environment or Codex credentials.
+# Use apiKey OR an absolute apiKeyEnvFile containing OPENAI_API_KEY, never both.
 # Loading settings creates no connection. Runtime authorization/budget gates remain required.
 enabled=false
 provider=
 model=
 apiKey=
+apiKeyEnvFile=
 reasoningEffort=

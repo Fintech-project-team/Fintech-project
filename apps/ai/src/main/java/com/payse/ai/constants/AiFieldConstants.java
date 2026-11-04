@@ -7,6 +7,36 @@ package com.payse.ai.constants;
  */
 public final class AiFieldConstants {
     /**
+     * 공급자 공통 프롬프트 교육 자료의 키다. 공개 금융 응답 필드가 아니다.
+     * @created 2026-11-04
+     * @usedBy PromptGuide, AnalysisContract, InputMapper
+     */
+    public static final class Guide {
+        public static final String VERSION = "version";
+        public static final String RULES = "rules";
+        public static final String SECTIONS = "sections";
+        public static final String ID = "id";
+        public static final String TASKS = "tasks";
+        public static final String RECORD_KINDS = "recordKinds";
+        public static final String DIRECTIONS = "directions";
+        public static final String RULE = "rule";
+        public static final String EXAMPLES = "examples";
+        public static final String TARGET = "target";
+        public static final String CANDIDATE = "candidate";
+        public static final String COMMON_EVIDENCE = "commonEvidence";
+        public static final String REQUIRED_EVIDENCE = "requiredEvidence";
+        public static final String INSUFFICIENT_EVIDENCE = "insufficientEvidence";
+
+        /**
+         * 정적 키 구간의 생성을 막는다.
+         * @created 2026-11-04
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private Guide() {
+        }
+    }
+
+    /**
      * 값 참조 전용 클래스의 생성을 막는다.
      * @created 2026-11-02
      * @usedBy 없음: 정적 상수 전용 타입의 인스턴스화 차단
@@ -21,6 +51,19 @@ public final class AiFieldConstants {
      * @usedBy AnalysisContract, InputMapper, StorageContract
      */
     public static final class Analysis {
+        public static final String MEANINGS = "meanings";
+        public static final String COLUMNS = "columns";
+        public static final String ROWS = "rows";
+        public static final String ACCOUNT_ID = "accountId";
+        public static final String CARD_ID = "cardId";
+        public static final String AMOUNT_KRW = "amountKRW";
+        public static final String PURCHASE_DATE = "purchaseDate";
+        public static final String WITHDRAWAL_DATE = "withdrawalDate";
+        public static final String REFUND_DATE = "refundDate";
+        public static final String CANCELLATION_DATE = "cancellationDate";
+        public static final String BOOKING_DATE = "bookingDate";
+        public static final String OCCURRED_AT = "occurredAt";
+        public static final String OCCURRED_AT_BASIS = "occurredAtBasis";
         public static final String SEMANTIC_TASK_KIND = "semanticTaskKind";
         public static final String ITEMS = "items";
         public static final String TRANSACTIONS = "transactions";

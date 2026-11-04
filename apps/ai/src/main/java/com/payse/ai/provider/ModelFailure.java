@@ -12,6 +12,7 @@ import java.util.Set;
  */
 public final class ModelFailure extends RuntimeException {
     private static final Set<String> REASONS = Set.of(
+        AiCodeConstants.Provider.EXECUTION_NOT_AUTHORIZED,
         AiCodeConstants.Provider.CREDENTIAL_UNAVAILABLE,
         AiCodeConstants.Provider.INPUT_TOKEN_LIMIT,
         AiCodeConstants.Provider.INPUT_TOKENS_UNAVAILABLE,
