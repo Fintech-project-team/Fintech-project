@@ -78,3 +78,7 @@ JAR 경로나 설정 파일 경로를 바꾸려면 두 인자를 변경하면 �
 Google Cloud KMS는 로컬 프로그램이 아니라 클라우드 키 서비스다. 설치된 gcloud CLI는 프로젝트·리전·키링·키·실행 주체가 정해진 뒤 사용한다. 프로젝트 미준비 상태에서는 로그인·서비스 활성화·키 생성·권한 부여·유료 호출을 하지 않는다. 실제 활성화 때에는 해당 키에만 암복호화 권한을 주고 갱신 가능한 인증 공급자를 기존 GoogleKms 어댑터에 연결한다. CLI 설치나 JAR 포함만으로 암호화 저장이 활성화되지 않는다.
 
 공식 근거: [Docker 비밀 분리](https://docs.docker.com/build/building/secrets/), [Google CLI 설치](https://docs.cloud.google.com/sdk/docs/downloads-versioned-archives), [KMS 최소 권한](https://docs.cloud.google.com/kms/docs/iam).
+
+## 감마 AI 준비
+
+새 설치는 `portable_server.py configure`의 감마 AI 선택을 사용한다. 같은 구성은 시작 시 준비 기록을 재사용하고 유료 분석/전체 평가는 실행하지 않는다. `status`의 `ai`에서 준비·현재 프로세스·마지막 접근 확인·실제 분석 검증 시각을 구별한다. 설정·키·비용/스키마 전제와 제거 방법은 [AI 시작 안내](../docs/ai-startup.md)를 따른다.

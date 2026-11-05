@@ -22,11 +22,19 @@ public final class AiConfigConstants {
      * @usedBy AnalysisContract, InputMapper
      */
     public static final class Analysis {
+        public static final String COMPACT_FILE = "compact-output.md";
+        public static final String COMPACT_VERSION = "PAYSE-COMPACT-4";
+        public static final String UNKNOWN_PREFIX = "?";
+        public static final String ACCOUNT_PREFIX = "a";
+        public static final String CARD_PREFIX = "b";
         public static final String INPUT_SIDE = "input";
         public static final String OUTPUT_SIDE = "output";
         public static final String SCHEMA_SUFFIX = ".schema.json";
         public static final String INSTRUCTIONS_FILE = "instructions.txt";
         public static final String CRITERIA_FILE = "criteria.json";
+        public static final String GUIDE_FILE = "prompt-guide.json";
+        public static final String GUIDE_MARKDOWN = "guidance.md";
+        public static final String PROMPT_RENDERER = "PAYSE-PROMPT-4";
         public static final String RULES_PATH = "/com/payse/ai/rules/";
         public static final String TRANSACTION_PREFIX = "t";
         public static final String ITEM_PREFIX = "i";
@@ -80,10 +88,13 @@ public final class AiConfigConstants {
      * @usedBy LlmSettings
      */
     public static final class Llm {
+        public static final String FINGERPRINT_ALGORITHM = "SHA-256";
         public static final String ENABLED = "enabled";
         public static final String PROVIDER = "provider";
         public static final String MODEL = "model";
         public static final String API_KEY = "apiKey";
+        public static final String API_KEY_ENV_FILE = "apiKeyEnvFile";
+        public static final String API_KEY_ENV_NAME = "OPENAI_API_KEY";
         public static final String REASONING_EFFORT = "reasoningEffort";
         public static final String EFFORT_NONE = "none";
         public static final String EFFORT_LOW = "low";
@@ -113,6 +124,15 @@ public final class AiConfigConstants {
      * @usedBy OpenAiGateway
      */
     public static final class OpenAi {
+        public static final String SERVICE_DEFAULT = "default";
+        public static final String COMMENTARY = "commentary";
+        public static final String FINAL_ANSWER = "final_answer";
+        public static final String SERVICE_FAST = "fast";
+        public static final String VERBOSITY_LOW = "low";
+        public static final String INCOMPLETE_OUTPUT_LIMIT = "max_output_tokens";
+        public static final String VERBOSITY_MEDIUM = "medium";
+        public static final String VERBOSITY_HIGH = "high";
+        public static final String SERVICE_PRIORITY = "priority";
         public static final String API_ENDPOINT = "https://api.openai.com/v1/";
         public static final String EFFORT_NONE = "none";
         public static final String EFFORT_LOW = "low";

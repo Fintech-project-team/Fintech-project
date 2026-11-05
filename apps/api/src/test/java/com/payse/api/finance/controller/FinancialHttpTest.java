@@ -8,6 +8,7 @@ import com.payse.api.ApiTestConstants.FinanceConfig;
 import com.payse.api.ApiTestConstants.FinanceFields;
 import com.payse.api.ApiTestConstants.FinanceHttp;
 import com.payse.api.ApiTestConstants.FinancePaths;
+import com.payse.api.ApiTestConstants.Recurring;
 import com.payse.api.PayseApiApplication;
 import com.payse.api.auth.crypto.AuthCrypto;
 import com.payse.api.auth.error.AuthStoreException;
@@ -1252,6 +1253,298 @@ class FinancialHttpTest {
     }
 
     /**
+     * 저장된 중복은 거절하되 서로 다른 준비금의 합법적인 분할 배정은 보존한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void rejectsStoredDuplicateAllocation() throws Exception {
+        String obligation = createObligation();
+        String reserve = createReserve(obligation);
+        String before = version();
+        JsonNode original = allocationFor(reserve);
+        error(
+            send(
+                FinanceHttp.PATCH,
+                FinancePaths.RESERVE_PATH + reserve,
+                allocationCreate(obligation, 1000)
+            ),
+            409,
+            FinanceCodes.RELATION_CONFLICT
+        );
+        assertEquals(before, version());
+        assertEquals(original, allocationFor(reserve));
+
+        String another = createReserve(null);
+        ObjectNode split = allocationCreate(obligation, 1000);
+        ok(FinanceHttp.PATCH, FinancePaths.RESERVE_PATH + another, split);
+        assertEquals(1000, allocationFor(another).path(FinanceFields.AMOUNT_KRW).asLong());
+        assertEquals(original, allocationFor(reserve));
+    }
+
+    /**
+     * 같은 배정 요청의 동시 재전송·응답 유실 복구와 다른 키의 버전 경합을 구분한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void concurrentAllocationRequests() throws Exception {
+        String obligation = createObligation();
+        String reserve = createReserve(null);
+        String path = FinancePaths.RESERVE_PATH + reserve;
+        ObjectNode first = allocationCreate(obligation, 1000);
+        long before = Long.parseLong(version());
+        List<HttpResponse<String>> responses = parallel(path, first, first.deepCopy());
+        assertTrue(responses.stream().allMatch(value -> value.statusCode() == 200));
+        assertEquals(before + 1, Long.parseLong(version()));
+        JsonNode original = allocationFor(reserve);
+        JsonNode replay = ok(FinanceHttp.PATCH, path, first);
+        assertTrue(replay.path(FinanceFields.REPLAYED).asBoolean());
+        assertEquals(original, allocationFor(reserve));
+
+        String another = createReserve(null);
+        String otherPath = FinancePaths.RESERVE_PATH + another;
+        ObjectNode left = allocationCreate(obligation, 1000);
+        ObjectNode right = left.deepCopy()
+            .put(FinanceFields.IDEMPOTENCY_KEY, UUID.randomUUID().toString());
+        List<HttpResponse<String>> competing = parallel(otherPath, left, right);
+        assertEquals(
+            Set.of(200, 409),
+            Set.of(competing.get(0).statusCode(), competing.get(1).statusCode())
+        );
+        for (HttpResponse<String> response : competing) {
+            if (response.statusCode() == 409) {
+                error(response, 409, FinanceCodes.STALE_DATA);
+            }
+        }
+        JsonNode saved = allocationFor(another);
+        error(
+            send(FinanceHttp.PATCH, otherPath, allocationCreate(obligation, 1000)),
+            409,
+            FinanceCodes.RELATION_CONFLICT
+        );
+        assertEquals(saved, allocationFor(another));
+    }
+
+    /**
+     * 생성 뒤 제거하는 기존 실행 순서에서도 최종 연결 하나만 남기고 두 변경을 기록한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void replacesUnusedAllocationAtomically() throws Exception {
+        String obligation = createObligation();
+        String reserve = createReserve(obligation);
+        JsonNode original = allocationFor(reserve);
+        String oldId = original.path(FinanceFields.ALLOCATION_ID).asString();
+        ObjectNode body = allocationCreate(obligation, 15000);
+        ((ArrayNode) body.path(FinanceFields.ALLOCATION_CHANGES).path("remove")).add(oldId);
+        JsonNode saved = ok(FinanceHttp.PATCH, FinancePaths.RESERVE_PATH + reserve, body);
+        JsonNode replacement = allocationFor(reserve);
+        String newId = replacement.path(FinanceFields.ALLOCATION_ID).asString();
+        assertNotEquals(oldId, newId);
+        assertEquals(15000, replacement.path(FinanceFields.AMOUNT_KRW).asLong());
+        Set<String> refs = new HashSet<>();
+        for (JsonNode ref : saved.path(FinanceFields.RECEIPT).path(FinanceFields.CHANGED_REFS)) {
+            refs.add(ref.path("resource").asString() + ":" + ref.path("id").asString());
+        }
+        assertEquals(
+            Set.of("allocation:" + oldId, "allocation:" + newId),
+            refs
+        );
+    }
+
+    /**
+     * 사용한 배정은 해제 누계까지 줄여 보존하며 새 연결과 과거 이력의 재활성 충돌을 구분한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void preservesReleasedAllocationHistory() throws Exception {
+        JsonNode partial = single(
+            source.path(FinanceFields.ALLOCATIONS),
+            value -> value.path(FinanceFields.RELEASED_KRW).asLong() > 0
+        );
+        String reserve = partial.path(FinanceFields.RESERVE_ID).asString();
+        String allocation = partial.path(FinanceFields.ALLOCATION_ID).asString();
+        String obligation = partial.path(FinanceFields.OBLIGATION_ID).asString();
+        String path = FinancePaths.RESERVE_PATH + reserve;
+        long released = partial.path(FinanceFields.RELEASED_KRW).asLong();
+        ObjectNode body = allocationCreate(obligation, 1000);
+        ((ArrayNode) body.path(FinanceFields.ALLOCATION_CHANGES).path("update")).addObject()
+            .put(FinanceFields.ALLOCATION_ID, allocation)
+            .put(FinanceFields.AMOUNT_KRW, released);
+        ok(FinanceHttp.PATCH, path, body);
+        JsonNode historical = single(
+            ok(FinanceHttp.GET, FinancePaths.SNAPSHOT_PATH, null).path(FinanceFields.ALLOCATIONS),
+            row -> allocation.equals(row.path(FinanceFields.ALLOCATION_ID).asString())
+        );
+        assertEquals(released, historical.path(FinanceFields.AMOUNT_KRW).asLong());
+        assertEquals(partial.path("releaseEvidence"), historical.path("releaseEvidence"));
+
+        ObjectNode reactivate = command();
+        ObjectNode changes = allocations();
+        ((ArrayNode) changes.path("update")).addObject()
+            .put(FinanceFields.ALLOCATION_ID, allocation)
+            .put(FinanceFields.AMOUNT_KRW, released + 1);
+        reactivate.set(FinanceFields.ALLOCATION_CHANGES, changes);
+        String before = version();
+        error(send(FinanceHttp.PATCH, path, reactivate), 409, FinanceCodes.RELATION_CONFLICT);
+        ((ObjectNode) changes.path("update").get(0)).put(FinanceFields.AMOUNT_KRW, released - 1);
+        reactivate.put(FinanceFields.IDEMPOTENCY_KEY, UUID.randomUUID().toString());
+        error(send(FinanceHttp.PATCH, path, reactivate), 409, FinanceCodes.HISTORY_LOCKED);
+        ObjectNode remove = command();
+        ObjectNode removal = allocations();
+        ((ArrayNode) removal.path("remove")).add(allocation);
+        remove.set(FinanceFields.ALLOCATION_CHANGES, removal);
+        error(send(FinanceHttp.PATCH, path, remove), 409, FinanceCodes.HISTORY_LOCKED);
+        assertEquals(before, version());
+    }
+
+    /**
+     * 과거 중복 자료를 자동 삭제하지 않고 명시 제거로만 단일 연결 상태를 복구한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void repairsLegacyDuplicateExplicitly() throws Exception {
+        String obligation = createObligation();
+        String reserve = createReserve(obligation);
+        JsonNode original = allocationFor(reserve);
+        UUID duplicate = UUID.randomUUID();
+        assertEquals(
+            1,
+            admin.update(
+                """
+                INSERT INTO payse.reserve_allocations
+                    (id, user_id, reserve_id, obligation_id, amount_krw, released_krw, release_evidence)
+                VALUES (?, ?, ?, ?, 1000, 0, '[]'::jsonb)
+                """,
+                duplicate,
+                owner,
+                UUID.fromString(reserve),
+                UUID.fromString(obligation)
+            )
+        );
+        String path = FinancePaths.RESERVE_PATH + reserve;
+        error(
+            send(FinanceHttp.PATCH, path, allocationCreate(obligation, 1000)),
+            409,
+            FinanceCodes.RELATION_CONFLICT
+        );
+        ObjectNode repair = command();
+        ObjectNode changes = allocations();
+        ((ArrayNode) changes.path("remove")).add(duplicate.toString());
+        repair.set(FinanceFields.ALLOCATION_CHANGES, changes);
+        ok(FinanceHttp.PATCH, path, repair);
+        assertEquals(original, allocationFor(reserve));
+    }
+
+    /**
+     * 형식·버전·접근 권한 순서를 유지하며 같은 요청의 UUID 중복도 정규 비교한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void allocationValidationOrder() throws Exception {
+        String obligation = createObligation();
+        String reserve = createReserve(null);
+        String path = FinancePaths.RESERVE_PATH + reserve;
+        ObjectNode stale = allocationCreate(obligation, 1000);
+        ok(FinanceHttp.PATCH, path, command().put(FinanceFields.LABEL, "버전 변경"));
+        ObjectNode malformed = stale.deepCopy();
+        ((ObjectNode) malformed.at("/allocationChanges/create/0"))
+            .put(FinanceFields.OBLIGATION_ID, "invalid-uuid");
+        error(send(FinanceHttp.PATCH, path, malformed), 422, FinanceCodes.VALIDATION_FAILED);
+        ObjectNode hidden = stale.deepCopy();
+        ((ObjectNode) hidden.at("/allocationChanges/create/0"))
+            .put(FinanceFields.OBLIGATION_ID, UUID.randomUUID().toString());
+        error(send(FinanceHttp.PATCH, path, hidden), 409, FinanceCodes.STALE_DATA);
+        hidden.put(FinanceFields.EXPECTED_DATA_VERSION, version());
+        error(send(FinanceHttp.PATCH, path, hidden), 403, FinanceCodes.RESOURCE_FORBIDDEN);
+        ObjectNode repeated = allocationCreate(obligation, 1000);
+        ((ArrayNode) repeated.at("/allocationChanges/create")).addObject()
+            .put(FinanceFields.OBLIGATION_ID, obligation.toUpperCase(java.util.Locale.ROOT))
+            .put(FinanceFields.AMOUNT_KRW, 1000);
+        error(send(FinanceHttp.PATCH, path, repeated), 422, FinanceCodes.VALIDATION_FAILED);
+    }
+
+    /**
+     * 현재 출금 계좌가 공개여도 고정된 반복 버전의 계좌가 숨겨지면 배정을 거절한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void allocationRequiresFixedRevisionAccess() throws Exception {
+        JsonNode recurring = single(
+            source.path(FinanceFields.OBLIGATIONS),
+            row -> row.path("planRevisionId").isString()
+        );
+        JsonNode other = single(
+            source.path(FinanceFields.ACCOUNTS),
+            row -> row.path(FinanceFields.INCLUDED).asBoolean()
+                && !row.path(FinanceFields.ACCOUNT_ID)
+                    .equals(recurring.path(FinanceFields.WITHDRAWAL_ACCOUNT_ID))
+        );
+        String obligation = recurring.path(FinanceFields.OBLIGATION_ID).asString();
+        ObjectNode move = command()
+            .put(
+                FinanceFields.WITHDRAWAL_ACCOUNT_ID,
+                other.path(FinanceFields.ACCOUNT_ID).asString()
+            );
+        ok(FinanceHttp.PATCH, FinancePaths.OBLIGATION_PATH + obligation, move);
+        ObjectNode reserveBody = command()
+            .put(FinanceFields.ACCOUNT_ID, other.path(FinanceFields.ACCOUNT_ID).asString())
+            .put(FinanceFields.LABEL, "연결 권한 확인")
+            .put(FinanceFields.AMOUNT_KRW, 10000);
+        reserveBody.set(FinanceFields.ALLOCATION_CHANGES, allocations());
+        JsonNode created = ok(FinanceHttp.POST, FinancePaths.RESERVES_PATH, reserveBody);
+        String reserve = changed(created, "reserve");
+        ObjectNode links = command();
+        links.putArray(FinanceFields.INSTITUTION_CODES)
+            .add(other.path(FinanceFields.INSTITUTION_CODE).asString());
+        ok(FinanceHttp.POST, FinancePaths.INSTITUTION_LINKS_PATH, links);
+        String before = version();
+        error(
+            send(
+                FinanceHttp.PATCH,
+                FinancePaths.RESERVE_PATH + reserve,
+                allocationCreate(obligation, 1000)
+            ),
+            403,
+            FinanceCodes.RESOURCE_FORBIDDEN
+        );
+        assertEquals(before, version());
+    }
+
+    /**
+     * 배정 하나를 추가하는 실제 저장 요청을 현재 버전으로 만든다.
+     * @created 2026-11-04
+     * @usedBy 배정 중복·경합·이력 검사
+     */
+    private ObjectNode allocationCreate(String obligation, long amount) {
+        ObjectNode body = command();
+        ObjectNode changes = allocations();
+        ((ArrayNode) changes.path("create")).addObject()
+            .put(FinanceFields.OBLIGATION_ID, obligation)
+            .put(FinanceFields.AMOUNT_KRW, amount);
+        body.set(FinanceFields.ALLOCATION_CHANGES, changes);
+        return body;
+    }
+
+    /**
+     * 준비금의 단일 배정을 검증된 실제 응답에서 찾으며 중복을 첫 행으로 숨기지 않는다.
+     * @created 2026-11-04
+     * @usedBy 배정 중복·경합·이력 검사
+     */
+    private JsonNode allocationFor(String reserve) throws Exception {
+        return single(
+            ok(FinanceHttp.GET, FinancePaths.SNAPSHOT_PATH, null).path(FinanceFields.ALLOCATIONS),
+            row -> reserve.equals(row.path(FinanceFields.RESERVE_ID).asString())
+        );
+    }
+
+    /**
      * 미지급 배정 목록을 빠뜨리면 전부 거절하고 정확한 확인 목록에서만 의무를 취소한다.
      * @created 2026-10-29
      * @usedBy JUnit
@@ -2001,5 +2294,263 @@ class FinancialHttpTest {
             422,
             FinanceCodes.VALIDATION_FAILED
         );
+    }
+
+    /**
+     * 기존 결정과 겹치지 않는 최근 세 달의 확인된 계좌 지출 근거를 준비한다.
+     * @created 2026-11-04
+     * @usedBy 반복 계획 HTTP 검사
+     */
+    private ObjectNode recurringCommand() {
+        var rows = admin.queryForList("""
+            SELECT id::text, account_id::text FROM payse.financial_transactions
+            WHERE user_id=? AND record_kind='account_entry' AND direction='out'
+              AND payse_transaction_type='expense' AND description='자동이체'
+              AND booking_date BETWEEN '2026-07-20' AND '2026-10-19'
+            ORDER BY booking_date
+            """, owner);
+        assertEquals(3, rows.size());
+        assertEquals(1L, rows.stream().map(row -> row.get("account_id")).distinct().count());
+        ObjectNode body = command()
+            .put(Recurring.KEY, "recurring-test/confirmed-source")
+            .put(Recurring.SOURCE, source.path(Recurring.SOURCE).asString())
+            .put(Recurring.NAME, "확인한 월간 지출")
+            .put(Recurring.DECISION, Recurring.APPROVED);
+        ArrayNode refs = body.putArray(Recurring.EVIDENCE);
+        rows.forEach(row -> refs.add((String) row.get("id")));
+        body.putObject(Recurring.PLAN)
+            .put(Recurring.MONTH, "2026-11")
+            .put(FinanceFields.LABEL, "월간 지출")
+            .put(FinanceFields.AMOUNT_KRW, 100000)
+            .put(Recurring.DAY, 31)
+            .put(Recurring.TIMING, "immediate")
+            .put(Recurring.BASIS, "withdrawal")
+            .put(FinanceFields.WITHDRAWAL_ACCOUNT_ID, (String) rows.getFirst().get("account_id"))
+            .putNull(Recurring.CARD);
+        return body;
+    }
+
+    /**
+     * 계획·첫 버전·결정을 한 번 저장하고 재로그인 후에도 복원하며 미래 의무를 만들지 않는다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void recurringApproval() throws Exception {
+        ObjectNode body = recurringCommand();
+        String before = version();
+        int obligations = admin.queryForObject(
+            "SELECT count(*) FROM payse.obligations WHERE user_id=?", Integer.class, owner
+        );
+        JsonNode saved = ok(FinanceHttp.POST, Recurring.PATH, body);
+        String planId = changed(saved, "recurringPlan");
+        String revisionId = changed(saved, "recurringPlanRevision");
+        String decisionId = changed(saved, "recurringDecision");
+        assertEquals(Long.parseLong(before) + 1, Long.parseLong(version()));
+        JsonNode replay = ok(FinanceHttp.POST, Recurring.PATH, body);
+        assertTrue(replay.path(FinanceFields.REPLAYED).asBoolean());
+        assertEquals(saved.path(FinanceFields.RECEIPT), replay.path(FinanceFields.RECEIPT));
+        assertEquals(obligations, admin.queryForObject(
+            "SELECT count(*) FROM payse.obligations WHERE user_id=?", Integer.class, owner
+        ));
+        assertEquals(1, admin.queryForObject("""
+            SELECT count(*) FROM payse.recurring_decisions d
+            JOIN payse.recurring_plans p ON p.id=d.plan_id AND p.user_id=d.user_id
+            JOIN payse.recurring_plan_revisions r ON r.plan_id=p.id AND r.user_id=p.user_id
+            WHERE d.id=? AND p.id=? AND r.id=? AND r.is_current
+              AND r.amount_krw=100000 AND r.monthly_day=31
+              AND p.first_occurrence_month='2026-11-01'
+              AND r.effective_from_month=p.first_occurrence_month
+            """, Integer.class, UUID.fromString(decisionId), UUID.fromString(planId),
+            UUID.fromString(revisionId)));
+        ObjectNode duplicate = recurringCommand().put(Recurring.KEY, "different-order-and-key");
+        var original = body.path(Recurring.EVIDENCE);
+        ArrayNode reversed = duplicate.putArray(Recurring.EVIDENCE);
+        for (int index = original.size() - 1; index >= 0; index--) {
+            reversed.add(original.get(index));
+        }
+        error(send(FinanceHttp.POST, Recurring.PATH, duplicate), 409, FinanceCodes.RELATION_CONFLICT);
+        assertEquals(204, send(FinanceHttp.DELETE, FinancePaths.CURRENT_SESSION_PATH, null).statusCode());
+        token = login();
+        JsonNode snapshot = ok(FinanceHttp.GET, FinancePaths.SNAPSHOT_PATH, null);
+        assertEquals(planId, single(snapshot.path("recurringPlans"),
+            row -> row.path("planId").asString().equals(planId)).path("planId").asString());
+        assertEquals(revisionId, single(snapshot.path("recurringPlanRevisions"),
+            row -> row.path("revisionId").asString().equals(revisionId))
+            .path("revisionId").asString());
+        assertEquals(decisionId, single(snapshot.path("recurringDecisions"),
+            row -> row.path("decisionId").asString().equals(decisionId))
+            .path("decisionId").asString());
+    }
+
+    /**
+     * 제외·구 원천·다른 사용자·미지원 필드를 구분하고 제외만으로 계획을 생성하지 않는다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void recurringBoundaries() throws Exception {
+        ObjectNode body = recurringCommand();
+        error(send(FinanceHttp.POST, Recurring.PATH,
+            body.deepCopy().put(Recurring.SOURCE, "old-source")), 409, FinanceCodes.STALE_DATA);
+        error(send(FinanceHttp.POST, Recurring.PATH,
+            body.deepCopy().put("aiAmount", 500)), 422, FinanceCodes.VALIDATION_FAILED);
+        ObjectNode foreign = body.deepCopy();
+        ((ArrayNode) foreign.path(Recurring.EVIDENCE)).set(0,
+            foreignSource.path(FinanceFields.TRANSACTIONS).get(0).path("transactionId"));
+        error(send(FinanceHttp.POST, Recurring.PATH, foreign), 403, FinanceCodes.RESOURCE_FORBIDDEN);
+        int count = admin.queryForObject(
+            "SELECT count(*) FROM payse.recurring_plans WHERE user_id=?", Integer.class, owner
+        );
+        body.put(Recurring.DECISION, Recurring.EXCLUDED).putNull(Recurring.PLAN);
+        JsonNode saved = ok(FinanceHttp.POST, Recurring.PATH, body);
+        assertEquals(1, saved.path(FinanceFields.RECEIPT).path(FinanceFields.CHANGED_REFS).size());
+        assertEquals(count, admin.queryForObject(
+            "SELECT count(*) FROM payse.recurring_plans WHERE user_id=?", Integer.class, owner
+        ));
+        error(send(FinanceHttp.POST, Recurring.PATH, recurringCommand()),
+            409, FinanceCodes.RELATION_CONFLICT);
+    }
+
+    /**
+     * 합성 원천 키로 확인한 같은 카드의 세 월별 거래를 사용한다. 표시명으로 선택하지 않는다.
+     * @created 2026-11-04
+     * @usedBy recurringCardBoundaries
+     */
+    private ObjectNode recurringCardCommand(JsonNode card) {
+        String cardId = card.path(Recurring.CARD).asString();
+        List<JsonNode> purchases = new ArrayList<>();
+        for (JsonNode transaction : source.path(FinanceFields.TRANSACTIONS)) {
+            if (transaction.path(Recurring.CARD).asString("").equals(cardId)
+                && transaction.path("sourceRef").asString().matches(
+                    "fixture/alpha/transaction/card-purchase/[0-9]+/2026-(08|09|10)"
+                )) {
+                assertEquals("card_purchase", transaction.path("recordKind").asString());
+                assertEquals(owner.toString(), transaction.path(FinanceFields.USER_ID).asString());
+                purchases.add(transaction);
+            }
+        }
+        assertEquals(3, purchases.size());
+        ObjectNode body = recurringCommand().put(Recurring.KEY, "recurring-card/" + cardId);
+        ArrayNode refs = body.putArray(Recurring.EVIDENCE);
+        purchases.forEach(row -> refs.add(row.path("transactionId")));
+        ObjectNode plan = (ObjectNode) body.path(Recurring.PLAN);
+        plan.put(Recurring.TIMING, "card_bill").put(Recurring.BASIS, "purchase");
+        plan.put(Recurring.CARD, cardId);
+        plan.set(FinanceFields.WITHDRAWAL_ACCOUNT_ID, card.path(FinanceFields.WITHDRAWAL_ACCOUNT_ID));
+        return body;
+    }
+
+    /**
+     * 취소·전체/부분 환불 원구매와 체크카드 계획은 거절하고 정상 신용카드만 저장한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void recurringCardBoundaries() throws Exception {
+        String before = version();
+        ObjectNode valid = null;
+        for (String suffix : List.of("partial", "full", "cancel")) {
+            JsonNode reversal = single(
+                source.path(FinanceFields.TRANSACTIONS),
+                row -> row.path("sourceRef").asString().equals(
+                    "fixture/alpha/transaction/card-return/" + suffix
+                )
+            );
+            JsonNode card = single(
+                source.path("cards"),
+                row -> row.path(Recurring.CARD).equals(reversal.path(Recurring.CARD))
+            );
+            assertEquals("credit", card.path("cardType").asString());
+            valid = recurringCardCommand(card);
+            ObjectNode reversed = valid.deepCopy();
+            ((ArrayNode) reversed.path(Recurring.EVIDENCE)).set(
+                0,
+                reversal.path("originalTransactionId")
+            );
+            error(
+                send(FinanceHttp.POST, Recurring.PATH, reversed),
+                409,
+                FinanceCodes.RELATION_CONFLICT
+            );
+        }
+        JsonNode debit = single(
+            source.path("cards"),
+            row -> row.path("cardType").asString().equals("debit")
+        );
+        error(
+            send(FinanceHttp.POST, Recurring.PATH, recurringCardCommand(debit)),
+            409,
+            FinanceCodes.RELATION_CONFLICT
+        );
+        assertEquals(before, version());
+        assertNotNull(valid);
+        JsonNode saved = ok(FinanceHttp.POST, Recurring.PATH, valid);
+        String planId = changed(saved, "recurringPlan");
+        assertEquals(1, admin.queryForObject(
+            """
+            SELECT count(*) FROM payse.recurring_plan_revisions
+            WHERE user_id=? AND plan_id=? AND payment_timing='card_bill'
+              AND schedule_basis='purchase' AND card_id IS NOT NULL
+            """,
+            Integer.class,
+            owner,
+            UUID.fromString(planId)
+        ));
+    }
+
+    /**
+     * 마지막 결정 저장이 실패하면 앞선 계획·첫 버전·영수증·자료 버전도 롤백한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void recurringRollback() throws Exception {
+        ObjectNode body = recurringCommand();
+        String before = version();
+        int count = admin.queryForObject(
+            "SELECT count(*) FROM payse.recurring_plans WHERE user_id=?", Integer.class, owner
+        );
+        admin.execute("""
+            CREATE FUNCTION payse.test_recurring_failure() RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN RAISE EXCEPTION 'isolated failure' USING ERRCODE = '57014'; END $$;
+            CREATE TRIGGER test_recurring_failure BEFORE INSERT ON payse.recurring_decisions
+              FOR EACH ROW EXECUTE FUNCTION payse.test_recurring_failure();
+            """);
+        try {
+            error(send(FinanceHttp.POST, Recurring.PATH, body),
+                503, FinanceCodes.TEMPORARILY_UNAVAILABLE);
+            assertEquals(before, version());
+            assertEquals(count, admin.queryForObject(
+                "SELECT count(*) FROM payse.recurring_plans WHERE user_id=?", Integer.class, owner
+            ));
+            assertEquals(0, admin.queryForObject("""
+                SELECT count(*) FROM payse.write_receipts WHERE user_id=? AND operation_key=?
+                """, Integer.class, owner, body.path(FinanceFields.IDEMPOTENCY_KEY).asString()));
+        } finally {
+            admin.execute("DROP TRIGGER test_recurring_failure ON payse.recurring_decisions");
+            admin.execute("DROP FUNCTION payse.test_recurring_failure()");
+        }
+        ok(FinanceHttp.POST, Recurring.PATH, body);
+    }
+
+    /**
+     * 실행 역할에는 명시 열 INSERT만 추가하며 계획 UPDATE·DELETE 권한을 열지 않는다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void recurringPrivileges() {
+        for (String table : List.of("recurring_plans", "recurring_plan_revisions", "recurring_decisions")) {
+            assertTrue(admin.queryForObject(
+                "SELECT has_column_privilege('payse_runtime', ?, 'id', 'INSERT')",
+                Boolean.class, "payse." + table));
+            assertFalse(admin.queryForObject(
+                "SELECT has_table_privilege('payse_runtime', ?, 'INSERT,UPDATE,DELETE')",
+                Boolean.class, "payse." + table));
+            assertFalse(admin.queryForObject(
+                "SELECT has_any_column_privilege('payse_runtime', ?, 'UPDATE')",
+                Boolean.class, "payse." + table));
+        }
     }
 }

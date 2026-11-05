@@ -8,12 +8,15 @@ import com.payse.ai.analysis.validation.SchemaRules;
 import com.payse.ai.analysis.validation.StorageContract;
 import com.payse.ai.constants.AiCodeConstants;
 import com.payse.ai.constants.AiConfigConstants;
-import com.payse.ai.constants.AiFieldConstants.Schema;
 import com.payse.ai.constants.AiFieldConstants;
+import com.payse.ai.constants.AiFieldConstants.Analysis;
+import com.payse.ai.constants.AiFieldConstants.Guide;
+import com.payse.ai.constants.AiFieldConstants.Schema;
 import com.payse.ai.provider.dto.TokenUsage;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiFunction;
@@ -40,10 +43,20 @@ public final class InputMapper {
      * 호출 입력의 사본을 검증하고 모델용 최소 필드와 요청 내부 ID만 준비한다.
      * @created 2026-11-01
      * @usedBy AnalysisService.analyze, 계약 테스트
+     * @modified 2026-11-03 - 내부 원천 보충 투영과 생성 경로 공유
      * @modified 2026-11-02 - 긴 식 지역변수 분리
      * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조
      */
     public InputMapper(ObjectNode payload, AnalysisContract contract) {
+        this(payload, contract, null);
+    }
+
+    /**
+     * 공개 입력을 바꾸지 않고 서버 전용 금액·날짜 근거를 최소 투영에 결합한다.
+     * @created 2026-11-03
+     * @usedBy AnalysisService.analyzeForStorage, InputMapper
+     */
+    public InputMapper(ObjectNode payload, AnalysisContract contract, ObjectNode facts) {
         this.contract = contract;
         require(payload != null, AiCodeConstants.Analysis.INVALID_INPUT);
         original = payload.deepCopy();
@@ -80,10 +93,88 @@ public final class InputMapper {
             }
         }
 
+        if (facts != null) {
+            enrich(projected, facts);
+        }
         input = (ObjectNode) transform(projected, null, this::shorten);
         String task = original.get(AiFieldConstants.Analysis.SEMANTIC_TASK_KIND).asString();
         ObjectNode outputSchema = contract.outputSchema(task);
         schema = (ObjectNode) aliasSchema(outputSchema, null);
+    }
+
+    /**
+     * 요청에 있던 거래만 보충한다. 다른 거래·정답·민감 추가 필드는 외부 전송 전에 거절한다.
+     * @created 2026-11-03
+     * @usedBy InputMapper
+     * @modified 2026-11-04 - 검증 후 null 보충 필드만 생략하고 필드 순서를 고정
+     */
+    private void enrich(ObjectNode projected, ObjectNode facts) {
+        require(
+            facts.propertyNames().equals(Set.of(
+                AiFieldConstants.Analysis.AS_OF,
+                AiFieldConstants.Analysis.TRANSACTIONS
+            ))
+                && facts.path(AiFieldConstants.Analysis.AS_OF).equals(
+                    original.path(AiFieldConstants.Analysis.CONTEXT)
+                        .path(AiFieldConstants.Analysis.AS_OF)
+                )
+                && facts.path(AiFieldConstants.Analysis.TRANSACTIONS).isArray(),
+            AiCodeConstants.Analysis.INVALID_INPUT
+        );
+        List<String> fields = List.of(
+            AiFieldConstants.Analysis.TRANSACTION_ID,
+            AiFieldConstants.Analysis.ACCOUNT_ID,
+            AiFieldConstants.Analysis.CARD_ID,
+            AiFieldConstants.Analysis.AMOUNT_KRW,
+            AiFieldConstants.Analysis.PURCHASE_DATE,
+            AiFieldConstants.Analysis.WITHDRAWAL_DATE,
+            AiFieldConstants.Analysis.REFUND_DATE,
+            AiFieldConstants.Analysis.CANCELLATION_DATE,
+            AiFieldConstants.Analysis.BOOKING_DATE,
+            AiFieldConstants.Analysis.OCCURRED_AT,
+            AiFieldConstants.Analysis.OCCURRED_AT_BASIS
+        );
+        Map<String, JsonNode> byId = new HashMap<>();
+        for (JsonNode row : facts.path(AiFieldConstants.Analysis.TRANSACTIONS)) {
+            require(
+                row.isObject() && row.propertyNames().equals(Set.copyOf(fields))
+                    && row.path(AiFieldConstants.Analysis.TRANSACTION_ID).isString()
+                    && row.path(AiFieldConstants.Analysis.AMOUNT_KRW).isIntegralNumber()
+                    && row.path(AiFieldConstants.Analysis.AMOUNT_KRW).canConvertToLong()
+                    && row.path(AiFieldConstants.Analysis.AMOUNT_KRW).asLong() >= 0,
+                AiCodeConstants.Analysis.INVALID_INPUT
+            );
+            for (String field : fields) {
+                JsonNode value = row.path(field);
+                require(
+                    value.isNull() || value.isString()
+                        || field.equals(AiFieldConstants.Analysis.AMOUNT_KRW),
+                    AiCodeConstants.Analysis.INVALID_INPUT
+                );
+            }
+            JsonNode previous = byId.put(
+                row.path(AiFieldConstants.Analysis.TRANSACTION_ID).asString(),
+                row
+            );
+            require(previous == null, AiCodeConstants.Analysis.INVALID_INPUT);
+        }
+        for (JsonNode transaction : projected.path(AiFieldConstants.Analysis.TRANSACTIONS)) {
+            JsonNode row = byId.remove(
+                transaction.path(AiFieldConstants.Analysis.TRANSACTION_ID).asString()
+            );
+            require(row != null, AiCodeConstants.Analysis.INVALID_INPUT);
+            for (String field : fields) {
+                JsonNode value = row.get(field);
+                if (!value.isNull()) {
+                    ((ObjectNode) transaction).set(field, value.deepCopy());
+                }
+            }
+        }
+        require(byId.isEmpty(), AiCodeConstants.Analysis.INVALID_INPUT);
+        projected.set(
+            AiFieldConstants.Analysis.AS_OF,
+            facts.get(AiFieldConstants.Analysis.AS_OF).deepCopy()
+        );
     }
 
     /**
@@ -93,6 +184,62 @@ public final class InputMapper {
      */
     public ObjectNode input() {
         return input.deepCopy();
+    }
+
+    /**
+     * 전송할 근거를 항목별로 묶어 다른 대상의 종류·적요·관계 혼동을 줄인다.
+     * @created 2026-11-04
+     * @usedBy AnalysisService.generate
+     */
+    public ObjectNode groupedInput() {
+        ObjectNode grouped = JSON.createObjectNode();
+        grouped.set(Analysis.SEMANTIC_TASK_KIND, input.get(Analysis.SEMANTIC_TASK_KIND));
+        if (input.has(Analysis.AS_OF)) {
+            grouped.set(Analysis.AS_OF, input.get(Analysis.AS_OF));
+        }
+        grouped.set(
+            Analysis.UNAVAILABLE_REFERENCES,
+            input.get(Analysis.UNAVAILABLE_REFERENCES)
+        );
+        var items = grouped.putArray(Analysis.ITEMS);
+        for (JsonNode item : input.get(Analysis.ITEMS)) {
+            ObjectNode packet = (ObjectNode) item.deepCopy();
+            Set<JsonNode> references = new HashSet<>();
+            item.get(Analysis.EVIDENCE_TRANSACTION_IDS).forEach(references::add);
+            var evidence = packet.putArray(Analysis.TRANSACTIONS);
+            for (JsonNode transaction : input.get(Analysis.TRANSACTIONS)) {
+                JsonNode id = transaction.get(Analysis.TRANSACTION_ID);
+                if (!references.contains(id)) {
+                    continue;
+                }
+                if (id.equals(item.get(Analysis.TARGET_TRANSACTION_ID))) {
+                    packet.set(Guide.TARGET, transaction.deepCopy());
+                } else {
+                    evidence.add(transaction.deepCopy());
+                }
+            }
+            var relations = packet.putArray(Analysis.RELATIONS);
+            for (JsonNode relation : input.get(Analysis.RELATIONS)) {
+                if (references.contains(relation.get(Analysis.FROM_ID))
+                    && references.contains(relation.get(Analysis.TO_ID))) {
+                    relations.add(relation.deepCopy());
+                }
+            }
+            var classifications = packet.putArray(Analysis.EXISTING_CLASSIFICATIONS);
+            for (JsonNode classification : input.get(Analysis.EXISTING_CLASSIFICATIONS)) {
+                if (references.contains(classification.get(Analysis.TRANSACTION_ID))) {
+                    classifications.add(classification.deepCopy());
+                }
+            }
+            for (JsonNode candidate : input.get(Analysis.CANDIDATES)) {
+                if (candidate.get(Analysis.CANDIDATE_KEY)
+                    .equals(item.get(Analysis.CANDIDATE_KEY))) {
+                    packet.set(Guide.CANDIDATE, candidate.deepCopy());
+                }
+            }
+            items.add(packet);
+        }
+        return grouped.deepCopy();
     }
 
     /**
@@ -265,6 +412,7 @@ public final class InputMapper {
      * ID의 명목 종류를 구분하며 임의의 이름을 식별자로 해석하지 않는다.
      * @created 2026-11-01
      * @usedBy transform, aliasSchema
+     * @modified 2026-11-03 - 원천 계좌·카드 ID를 요청별 대체 ID로만 전송
      * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조; 제어문 본문 구분
      */
     private String kind(String field) {
@@ -279,6 +427,8 @@ public final class InputMapper {
             AiFieldConstants.Analysis.EVIDENCE_TRANSACTION_IDS ->
             AiConfigConstants.Analysis.TRANSACTION_PREFIX;
         case AiFieldConstants.Analysis.ITEM_KEY -> AiConfigConstants.Analysis.ITEM_PREFIX;
+        case AiFieldConstants.Analysis.ACCOUNT_ID -> AiConfigConstants.Analysis.ACCOUNT_PREFIX;
+        case AiFieldConstants.Analysis.CARD_ID -> AiConfigConstants.Analysis.CARD_PREFIX;
         case AiFieldConstants.Analysis.CANDIDATE_KEY -> AiConfigConstants.Analysis.CANDIDATE_PREFIX;
         default -> null;
         };

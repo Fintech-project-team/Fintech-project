@@ -7,6 +7,74 @@ package com.payse.api.constants;
  */
 public final class ApiCodeConstants {
     /**
+     * 사용자 반복 계획 결정과 일정 출처의 고정 값이다.
+     * @created 2026-11-04
+     * @usedBy RecurringInput, RecurringWrites, FinancialService
+     */
+    public static final class Recurring {
+        public static final String CREDIT = "credit";
+        public static final String APPROVED = "approved";
+        public static final String EXCLUDED = "excluded";
+        public static final String IMMEDIATE = "immediate";
+        public static final String CARD_BILL = "card_bill";
+        public static final String WITHDRAWAL = "withdrawal";
+        public static final String PURCHASE = "purchase";
+        public static final String PLAN_RESOURCE = "recurringPlan";
+        public static final String REVISION_RESOURCE = "recurringPlanRevision";
+        public static final String DECISION_RESOURCE = "recurringDecision";
+
+        /**
+         * 정적 상태 규격만 제공한다.
+         * @created 2026-11-04
+         * @usedBy 없음: 인스턴스화 금지
+         */
+        private Recurring() {
+        }
+    }
+
+    /**
+     * 비공개 AI 준비와 상태의 고정 규격이다.
+     * @created 2026-11-04
+     * @usedBy AnalysisReadiness, AnalysisRuntime, GammaDeployment
+     */
+    public static final class Readiness {
+        public static final String DIRECT = "direct";
+        public static final String READY = "READY";
+        public static final String DIRECT_BUNDLED = "DIRECT_BUNDLED";
+        public static final String PROVIDER_SUCCESS = "providerSuccess";
+        public static final String PROVIDER_FAILURE = "providerFailure";
+        public static final String ANALYSIS_VALIDATED = "analysisValidated";
+        public static final String ANALYSIS_FAILURE = "analysisFailure";
+
+        /**
+         * 정적 상수 구간의 인스턴스 생성을 막는다.
+         * @created 2026-11-04
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private Readiness() {
+        }
+    }
+
+    /**
+     * 분석 실행 구성·비용 경계의 고정 문자열이다.
+     * @created 2026-11-03
+     * @usedBy AnalysisSettings, AnalysisPricing, AnalysisCosts, AnalysisConfiguration
+     */
+    public static final class Execution {
+        public static final String MODEL = "model";
+        public static final String COUNTING = "counting";
+        public static final String KMS = "kms";
+
+        /**
+         * 정적 상수 구간의 인스턴스 생성을 막는다.
+         * @created 2026-11-03
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private Execution() {
+        }
+    }
+
+    /**
      * 상수 컨테이너의 인스턴스 생성을 막는다.
      * @created 2026-11-02
      * @usedBy 없음: 정적 상수 전용 타입의 인스턴스화 차단

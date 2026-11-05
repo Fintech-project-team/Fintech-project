@@ -19,6 +19,8 @@ import com.payse.api.PayseApiApplication;
 import com.payse.api.analysis.crypto.EnvelopeCipher;
 import com.payse.api.analysis.crypto.KeyProtector;
 import com.payse.api.analysis.crypto.WrappedKey;
+import com.payse.api.analysis.mapper.AnalysisCosts;
+import com.payse.api.analysis.service.AnalysisEvidence;
 import com.payse.api.analysis.service.AnalysisIdentity;
 import com.payse.api.analysis.service.AnalysisJobs;
 import com.payse.api.analysis.service.AnalysisRuntime;
@@ -55,6 +57,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -65,6 +68,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
@@ -72,6 +77,8 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
@@ -85,6 +92,121 @@ import tools.jackson.databind.node.ObjectNode;
  * @usedBy test_analysis_service.py의 Gradle JUnit
  */
 class AnalysisHttpTest {
+    /**
+     * 완료·실패·완료 불명을 같은 HTTP 계약으로 알리고 작업별 대기 요청은 하나로 제한한다.
+     * @created 2026-11-04
+     * @usedBy 격리 DB JUnit
+     */
+    @ParameterizedTest
+    @CsvSource({"none,succeeded", "invalid,failed", "unknown,outcomeUnknown"})
+    void observesCompletion(String failure, String expected) throws Exception {
+        String job = accept(input, key()).path(AnalysisFields.JOB_ID).asString();
+        model.failure = failure;
+        model.block();
+        submit(job, input, key(), false, false);
+        assertTrue(model.entered.await(10, TimeUnit.SECONDS));
+        var first = waitingStatus(job);
+        var second = waitingStatus(job);
+        CompletableFuture.anyOf(first, second).get(3, TimeUnit.SECONDS);
+        var immediate = first.isDone() ? first : second;
+        var waiting = first.isDone() ? second : first;
+        assertEquals("running", body(immediate.get(), 200).path(AnalysisFields.STATE).asString());
+        assertFalse(waiting.isDone());
+        assertEquals(1, model.calls.get());
+        model.release.countDown();
+        assertEquals(expected, body(waiting.get(5, TimeUnit.SECONDS), 200)
+            .path(AnalysisFields.STATE).asString());
+        assertEquals(expected, body(waitingStatus(job).get(2, TimeUnit.SECONDS), 200)
+            .path(AnalysisFields.STATE).asString());
+        assertEquals(1, model.calls.get());
+    }
+
+    /**
+     * 5초 대기는 실행을 다시 보내지 않으며 대기 중 종료된 인증으로 결과를 공개하지 않는다.
+     * @created 2026-11-04
+     * @usedBy 격리 DB JUnit
+     */
+    @Test
+    void boundsObservationAndRechecksSession() throws Exception {
+        String job = accept(input, key()).path(AnalysisFields.JOB_ID).asString();
+        model.block();
+        submit(job, input, key(), false, false);
+        assertTrue(model.entered.await(10, TimeUnit.SECONDS));
+        var running = waitingStatus(job).get(8, TimeUnit.SECONDS);
+        assertEquals("running", body(running, 200).path(AnalysisFields.STATE).asString());
+        assertEquals(1, model.calls.get());
+
+        var first = waitingStatus(job);
+        var second = waitingStatus(job);
+        CompletableFuture.anyOf(first, second).get(3, TimeUnit.SECONDS);
+        var waiting = first.isDone() ? second : first;
+        assertFalse(waiting.isDone());
+        assertEquals(204, send(AnalysisHttp.DELETE, AnalysisPaths.CURRENT_SESSION_PATH,
+            null, token, null).statusCode());
+        model.release.countDown();
+        assertEquals(401, waiting.get(5, TimeUnit.SECONDS).statusCode());
+        assertEquals(1, model.calls.get());
+    }
+
+    /**
+     * 본문 없이 실제 HTTP 비동기 상태 관찰을 요청한다.
+     * @created 2026-11-04
+     * @usedBy observesCompletion, boundsObservationAndRechecksSession
+     */
+    private CompletableFuture<HttpResponse<String>> waitingStatus(String job) {
+        var request = HttpRequest.newBuilder(URI.create(base + AnalysisPaths.ANALYSIS_JOB_PATH + job))
+            .timeout(Duration.ofSeconds(10))
+            .header(AnalysisHttp.AUTHORIZATION, AnalysisHttp.BEARER_PREFIX + token)
+            .header(AnalysisHttp.PREFER, AnalysisHttp.WAIT)
+            .GET()
+            .build();
+        return client.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    /**
+     * 실제 JPA 최소 권한 연결에서 비용 예약·전송권·별도 정산과 업무 롤백을 확인한다.
+     * @created 2026-11-03
+     * @usedBy 격리 DB JUnit
+     */
+    @Test
+    void persistsCostsOutsideFinancialTransaction() {
+        String project = UUID.randomUUID().toString();
+        String version = "test-policy";
+        admin.update("""
+            INSERT INTO payse.analysis_cost_projects (
+              project_id, pricing_version, pricing, opening_micros, limit_micros,
+              baseline_verified_at, enabled
+            ) VALUES (?, ?, '{}'::jsonb, 0, 45000000000, now(), true)
+            """, project, version);
+        AnalysisCosts costs = context.getBean(AnalysisCosts.class);
+        AuthTransactions transactions = context.getBean(AuthTransactions.class);
+        assertTrue(costs.policy(project, version).isEmpty());
+        UUID call = UUID.randomUUID();
+        transactions.run(() -> {
+            costs.reserve(project, call, version, "model", 100);
+            return null;
+        });
+        assertTrue(costs.start(project, call));
+        assertFalse(costs.start(project, call));
+        costs.settle(project, call, 41);
+        UUID rolledBack = UUID.randomUUID();
+        assertThrows(IllegalStateException.class, () -> transactions.run(() -> {
+            costs.reserve(project, rolledBack, version, "model", 100);
+            throw new IllegalStateException("test-rollback");
+        }));
+        costs.releaseUnstarted(project, call);
+        assertEquals(41L, admin.queryForObject(
+            "SELECT actual_micros FROM payse.analysis_cost_calls WHERE id=?",
+            Long.class,
+            call
+        ));
+        assertEquals(0, admin.queryForObject(
+            "SELECT count(*) FROM payse.analysis_cost_calls WHERE id=?",
+            Integer.class,
+            rolledBack
+        ));
+    }
+
     private static final String RESULT_TEXT = "검증용 분석 본문은 암호화 저장됩니다";
     private final JsonMapper json = JsonMapper.builder().build();
     private ConfigurableApplicationContext context;
@@ -580,6 +702,7 @@ class AnalysisHttpTest {
      * 검증 실패 응답은 저장 성공으로 바꾸지 않고 사용자 재시도에서만 다시 생성한다.
      * @created 2026-11-01
      * @usedBy JUnit
+     * @modified 2026-11-04 - 실패 목록과 반복 조회·수동 복구 후 목록 해제 검사
      * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
@@ -589,7 +712,18 @@ class AnalysisHttpTest {
             .path(AnalysisFields.JOB_ID)
             .asString();
         submit(job, input, key(), false, false);
-        await(job, "failed");
+        ObjectNode failed = await(job, "failed");
+        JsonNode review = failed.path(AnalysisFields.REVIEW);
+        assertTrue(review.path(AnalysisFields.REQUIRES_USER_INPUT).asBoolean());
+        assertFalse(review.path(AnalysisFields.RETRY_REQUIRES_ACKNOWLEDGEMENT).asBoolean());
+        assertEquals(input.path(AnalysisFields.ITEMS).size(),
+            review.path(AnalysisFields.ITEMS).size());
+        assertEquals(input.path(AnalysisFields.ITEMS).get(0).path(AnalysisFields.ITEM_KEY),
+            review.path(AnalysisFields.ITEMS).get(0).path(AnalysisFields.ITEM_KEY));
+        assertEquals(1, review.path(AnalysisFields.ITEMS).get(0).size());
+        for (int poll = 0; poll < 10; poll++) {
+            assertEquals(review, await(job, "failed").path(AnalysisFields.REVIEW));
+        }
         assertEquals(
             0,
             admin.queryForObject(
@@ -601,7 +735,7 @@ class AnalysisHttpTest {
         assertEquals(1, model.calls.get());
         model.failure = "none";
         submit(job, input, key(), true, false);
-        await(job, "succeeded");
+        assertFalse(await(job, "succeeded").has(AnalysisFields.REVIEW));
         assertEquals(2, model.calls.get());
     }
 
@@ -609,6 +743,7 @@ class AnalysisHttpTest {
      * 전송 결과 불명은 중복 위험 확인 없이 재전송하지 않고 명시 확인 후 한 번 재시도한다.
      * @created 2026-11-01
      * @usedBy JUnit
+     * @modified 2026-11-04 - 완료 불명 확인 목록과 동의 요구를 상태 응답에서 검사
      * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
     @Test
@@ -618,7 +753,11 @@ class AnalysisHttpTest {
             .path(AnalysisFields.JOB_ID)
             .asString();
         submit(job, input, key(), false, false);
-        await(job, "outcomeUnknown");
+        ObjectNode unknown = await(job, "outcomeUnknown");
+        assertTrue(unknown.path(AnalysisFields.REVIEW)
+            .path(AnalysisFields.RETRY_REQUIRES_ACKNOWLEDGEMENT).asBoolean());
+        assertEquals(input.path(AnalysisFields.ITEMS).size(), unknown.path(AnalysisFields.REVIEW)
+            .path(AnalysisFields.ITEMS).size());
         ObjectNode noConsent = submission(input, key(), null)
             .put(AnalysisFields.ACKNOWLEDGE_DUPLICATE_RISK, false);
         assertEquals(
@@ -786,12 +925,16 @@ class AnalysisHttpTest {
      * 한 건은 60초 전에 전송하지 않고 경계 도달 시에만 같은 작업의 제출 허가를 발급한다.
      * @created 2026-11-01
      * @usedBy JUnit
+     * @modified 2026-11-04 - 최초 연결과 EX-B의 1건·9건 대기 경계를 함께 검사
      * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
      */
-    @Test
-    void waitsForSingleItemThreshold() throws Exception {
-        ObjectNode single = subset(input, 0, 1);
-        String job = accept(single, key())
+    @ParameterizedTest
+    @CsvSource({"A,1", "B,1", "A,9", "B,9"})
+    void waitsForSingleItemThreshold(String trigger, int count) throws Exception {
+        ObjectNode single = subset(input, 0, count);
+        ObjectNode request = descriptor(single, key()).put(AnalysisFields.TRIGGER_KIND, trigger);
+        String job = body(send(AnalysisHttp.POST, AnalysisPaths.ANALYSIS_JOBS_PATH,
+            request.toString(), token, null), 202)
             .path(AnalysisFields.JOB_ID)
             .asString();
         ObjectNode waiting = body(
@@ -822,12 +965,45 @@ class AnalysisHttpTest {
         await(job, "succeeded");
         assertEquals(1, model.calls.get());
         assertEquals(
-            1,
+            count,
             query(single, null, token)
                 .path(AnalysisFields.RESULT)
                 .path(AnalysisFields.ITEMS)
                 .size()
         );
+    }
+
+    /**
+     * EX-B 10건은 즉시 실행하고 동일 원천의 재접수·재조회는 저장 결과를 재사용한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     * @modified 2026-11-04 - descriptor 접수 후 본문 검증 단계에서 재사용을 확인
+     */
+    @Test
+    void refreshReusesSuccessWithoutNewCall() throws Exception {
+        ObjectNode request = descriptor(input, key()).put(AnalysisFields.TRIGGER_KIND, "B");
+        String job = body(send(AnalysisHttp.POST, AnalysisPaths.ANALYSIS_JOBS_PATH,
+            request.toString(), token, null), 202).path(AnalysisFields.JOB_ID).asString();
+        assertEquals("submitInput", permit(job).path(AnalysisFields.ACTION).asString());
+        submit(job, input, key(), false, false);
+        String result = await(job, "succeeded").path(AnalysisFields.RESULT_ID).asString();
+        request.put(AnalysisFields.IDEMPOTENCY_KEY, key());
+        ObjectNode accepted = body(send(AnalysisHttp.POST, AnalysisPaths.ANALYSIS_JOBS_PATH,
+            request.toString(), token, null), 202);
+        String repeatedJob = accepted.path(AnalysisFields.JOB_ID).asString();
+        ObjectNode verified = submission(input, key(),
+            permit(repeatedJob).path(AnalysisFields.PERMIT).asString());
+        ObjectNode reused = body(send(AnalysisHttp.POST,
+            AnalysisPaths.ANALYSIS_JOB_PATH + repeatedJob + AnalysisPaths.INPUT_SUFFIX,
+            verified.toString(), token, null), 200);
+        assertEquals("succeeded", reused.path(AnalysisFields.STATE).asString());
+        assertEquals(result, reused.path(AnalysisFields.RESULT_ID).asString());
+        for (int repeat = 0; repeat < 3; repeat++) {
+            assertEquals("available", query(input, result, token)
+                .path(AnalysisFields.RESULT_AVAILABILITY).asString());
+        }
+        assertEquals(1, model.calls.get());
+        assertEquals(financialBefore, fingerprint());
     }
 
     /**
@@ -1202,6 +1378,216 @@ class AnalysisHttpTest {
     }
 
     /**
+     * 분석 중 수동 일정·급여 설정·부분 지급이 바뀌어도 후보가 최신 금융 상태를 덮어쓰지 않는다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void preservesEditsAndPaymentDuringAnalysis() throws Exception {
+        String job = accept(input, key())
+            .path(AnalysisFields.JOB_ID)
+            .asString();
+        model.block();
+        submit(job, input, key(), false, false);
+        assertTrue(model.entered.await(10, TimeUnit.SECONDS));
+        JsonNode rent = rentTransaction("2026-07");
+        JsonNode obligation = unique(
+            source.path(AnalysisFields.OBLIGATIONS),
+            row -> row.path("amountKRW").asLong() == 300000
+                && row.path("withdrawalAccountId").equals(rent.path(AnalysisFields.ACCOUNT_ID))
+                && row.path("recurringPlanId").isString()
+        );
+        String obligationId = obligation.path("obligationId").asString();
+        ObjectNode edit = financialCommand().put("dueDate", "2026-11-22");
+        body(send("PATCH", "/obligations/" + obligationId, edit.toString(), token, null), 200);
+        ObjectNode salary = financialCommand();
+        salary.putObject("salary").put("salaryDay", 20);
+        body(send("PATCH", "/settings", salary.toString(), token, null), 200);
+
+        // 아직 지급 저장 HTTP는 없다. 폐기 DB에서 부분 지급 도착 상태만 명시 준비한다.
+        var transaction = new TransactionTemplate(new DataSourceTransactionManager(adminPool));
+        transaction.executeWithoutResult(status -> {
+            assertEquals(
+                owner,
+                admin.queryForObject(
+                    "SELECT id FROM payse.users WHERE id=? FOR UPDATE",
+                    UUID.class,
+                    owner
+                )
+            );
+            assertEquals(
+                1,
+                admin.update(
+                    """
+                    INSERT INTO payse.settlement_links
+                        (id, user_id, obligation_id, transaction_id, allocated_krw, method, evidence)
+                    VALUES (?, ?, ?, ?, 40000, 'manual', '["synthetic-payment-arrival"]'::jsonb)
+                    """,
+                    UUID.randomUUID(),
+                    owner,
+                    UUID.fromString(obligationId),
+                    UUID.fromString(rent.path(AnalysisFields.TRANSACTION_ID).asString())
+                )
+            );
+            assertEquals(
+                1,
+                admin.update("UPDATE payse.users SET data_version=data_version+1 WHERE id=?", owner)
+            );
+        });
+        financialBefore = fingerprint();
+        model.release.countDown();
+        await(job, "succeeded");
+        assertEquals(financialBefore, fingerprint());
+        HttpResponse<String> stale = send(
+            AnalysisHttp.POST,
+            AnalysisPaths.ANALYSIS_QUERY_PATH,
+            queryBody(input, null).toString(),
+            token,
+            null
+        );
+        assertEquals(409, stale.statusCode());
+        assertEquals(
+            AnalysisCodes.STALE_DATA,
+            json.readTree(stale.body())
+                .path(AnalysisFields.ERROR)
+                .path(AnalysisFields.CODE)
+                .asString()
+        );
+        ObjectNode current = meaningInput(source(token), 10);
+        ObjectNode result = query(current, null, token);
+        assertEquals("available", result.path(AnalysisFields.RESULT_AVAILABILITY).asString());
+        assertEquals(financialBefore, fingerprint());
+    }
+
+    /**
+     * 모델이 실패해도 금융 수동 저장은 가능하며 분석 실패가 설정·지급·배정을 초기화하지 않는다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void manualEditAfterAnalysisFailure() throws Exception {
+        model.failure = "invalid";
+        String job = accept(input, key())
+            .path(AnalysisFields.JOB_ID)
+            .asString();
+        submit(job, input, key(), false, false);
+        await(job, "failed");
+        assertEquals(financialBefore, fingerprint());
+        ObjectNode edit = financialCommand();
+        edit.putObject("salary").put("salaryDay", 21);
+        ObjectNode saved = body(send("PATCH", "/settings", edit.toString(), token, null), 200);
+        assertEquals(21, saved.at("/snapshot/settings/salary/salaryDay").asInt());
+        financialBefore = fingerprint();
+        assertEquals(
+            "missing",
+            query(meaningInput(source(token), 10), null, token)
+                .path(AnalysisFields.RESULT_AVAILABILITY)
+                .asString()
+        );
+    }
+
+    /**
+     * 기존 월세 의무와 겹치는 반복 후보도 해석만 저장하며 의무·배정을 중복 생성하지 않는다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void recurringCandidateDoesNotCreateObligation() throws Exception {
+        ObjectNode recurring = rentInput();
+        JsonNode existing = unique(
+            source.path(AnalysisFields.OBLIGATIONS),
+            row -> row.path("amountKRW").asLong() == 300000
+                && row.path("recurringPlanId").isString()
+        );
+        assertEquals("active", existing.path(AnalysisFields.STATUS).asString());
+        String job = accept(recurring, key())
+            .path(AnalysisFields.JOB_ID)
+            .asString();
+        clock.advance(Duration.ofSeconds(60));
+        submit(job, recurring, key(), false, false);
+        await(job, "succeeded");
+        ObjectNode response = query(recurring, null, token);
+        assertEquals("available", response.path("resultAvailability").asString());
+        JsonNode interpretation = response.at("/result/items/0/interpretation");
+        assertEquals("candidate", interpretation.at("/meaning/status").asString());
+        assertEquals("rent", interpretation.at("/meaning/value").asString());
+        assertEquals(financialBefore, fingerprint());
+    }
+
+    /**
+     * 지급·일정 경합 검사의 명시 금융 쓰기에 현재 저장 버전과 기존 규칙만 제공한다.
+     * @created 2026-11-04
+     * @usedBy preservesEditsAndPaymentDuringAnalysis, manualEditAfterAnalysisFailure
+     */
+    private ObjectNode financialCommand() {
+        return json.createObjectNode()
+            .put("expectedDataVersion", source(token).path(AnalysisFields.DATA_VERSION).asString())
+            .put(AnalysisFields.RULE_VERSION, source.path(AnalysisFields.RULE_VERSION).asString())
+            .put(AnalysisFields.IDEMPOTENCY_KEY, key());
+    }
+
+    /**
+     * 실제 합성 월세 세 달의 공개 근거와 이미 계산한 후보 수치를 제공한다.
+     * @created 2026-11-04
+     * @usedBy recurringCandidateDoesNotCreateObligation
+     */
+    private ObjectNode rentInput() {
+        ObjectNode recurring = meaningInput(source, 0);
+        recurring.put(AnalysisFields.SEMANTIC_TASK_KIND, "recurringMeaning");
+        for (String month : List.of("2026-05", "2026-06", "2026-07")) {
+            JsonNode rent = rentTransaction(month);
+            assertEquals(300000, rent.path("amountKRW").asLong());
+            appendMeaning(recurring, rent);
+        }
+        String candidateKey = key();
+        ObjectNode item = recurring.putArray(AnalysisFields.ITEMS).addObject()
+            .put(AnalysisFields.ITEM_KEY, key())
+            .putNull(AnalysisFields.TARGET_TRANSACTION_ID)
+            .put(AnalysisFields.CANDIDATE_KEY, candidateKey);
+        ArrayNode evidence = item.putArray(AnalysisFields.EVIDENCE_TRANSACTION_IDS);
+        for (JsonNode row : recurring.path(AnalysisFields.TRANSACTIONS)) {
+            evidence.add(row.path(AnalysisFields.TRANSACTION_ID).asString());
+        }
+        ObjectNode candidate = recurring.putArray(AnalysisFields.CANDIDATES).addObject()
+            .put(AnalysisFields.CANDIDATE_KEY, candidateKey)
+            .put(AnalysisFields.NORMALIZED_NAME, "월세")
+            .put(AnalysisFields.SUGGESTED_AMOUNT_KRW, 300000)
+            .put(AnalysisFields.SUGGESTED_DAY, 22);
+        candidate.set(AnalysisFields.EVIDENCE_TRANSACTION_IDS, evidence.deepCopy());
+        for (String field : List.of(AnalysisFields.RULE_VERSION, AnalysisFields.SOURCE_VERSION)) {
+            candidate.set(field, source.get(field));
+        }
+        ObjectNode features = candidate.putObject(AnalysisFields.FEATURES)
+            .put(AnalysisFields.OCCURRENCE_COUNT, 3)
+            .put(AnalysisFields.DAY_WITHIN_RULE, true)
+            .put(AnalysisFields.AMOUNT_WITHIN_RULE, true)
+            .put(AnalysisFields.HAS_UNRESOLVED_REVERSAL, false);
+        features.putArray(AnalysisFields.OBSERVED_MONTHS)
+            .add("2026-05")
+            .add("2026-06")
+            .add("2026-07");
+        return recurring;
+    }
+
+    /**
+     * 합성 시드의 월별 확장·초기 거래 참조를 대조하며 중복 또는 누락이면 준비를 실패시킨다.
+     * @created 2026-11-04
+     * @usedBy rentInput, preservesEditsAndPaymentDuringAnalysis
+     */
+    private JsonNode rentTransaction(String month) {
+        JsonNode rent = unique(
+            source.path(AnalysisFields.TRANSACTIONS),
+            row -> {
+                String ref = row.path(AnalysisFields.SOURCE_REF).asString();
+                return ref.endsWith("/life/rent/" + month)
+                    || ref.endsWith("/demo-ready/rent/" + month + "-22");
+            }
+        );
+        assertEquals(month + "-22", rent.path("bookingDate").asString());
+        return rent;
+    }
+
+    /**
      * 실행 중 관련 거래의 사용자 분류가 바뀌면 늦은 응답을 저장·적용하지 않는다.
      * @created 2026-11-01
      * @usedBy JUnit
@@ -1373,6 +1759,7 @@ class AnalysisHttpTest {
      * @created 2026-11-01
      * @usedBy JUnit
      * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
+     * @modified 2026-11-03 - 작업 원천 보충 필드 추가에 맞춰 중복 콜백 검사 유지
      */
     @Test
     void settledUsageSurvivesLateFailureCallback() throws Exception {
@@ -1405,6 +1792,7 @@ class AnalysisHttpTest {
             UUID.class,
             String.class,
             String.class,
+            ObjectNode.class,
             ObjectNode.class
         );
         constructor.setAccessible(true);
@@ -1415,7 +1803,8 @@ class AnalysisHttpTest {
             UUID.fromString(before.path(AnalysisFields.ID).asString()),
             hash,
             new AnalysisIdentity().sourceHash(source, input),
-            input.deepCopy()
+            input.deepCopy(),
+            new AnalysisEvidence().modelFacts(owner, source, input)
         );
         var callback = AnalysisJobs.class
             .getDeclaredMethod("fail", workType, boolean.class, String.class, TokenUsage.class);
@@ -2672,11 +3061,15 @@ class AnalysisHttpTest {
      * @created 2026-11-01
      * @usedBy accept, serializesIdempotentSubmissions, disabledProfile
      * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
+     * @modified 2026-11-04 - 반복 후보의 단일 candidateKey와 작업 종류를 접수에 보존
      */
     private ObjectNode descriptor(ObjectNode meaning, String requestKey) {
         ObjectNode value = json.createObjectNode()
             .put(AnalysisFields.TRIGGER_KIND, "A")
-            .put(AnalysisFields.SEMANTIC_TASK_KIND, "transactionMeaning")
+            .put(
+                AnalysisFields.SEMANTIC_TASK_KIND,
+                meaning.path(AnalysisFields.SEMANTIC_TASK_KIND).asString()
+            )
             .put(AnalysisFields.INPUT_HASH_HINT, new AnalysisIdentity().hint(meaning))
             .put(AnalysisFields.IDEMPOTENCY_KEY, requestKey);
         value.set(AnalysisFields.CONTEXT, meaning.path(AnalysisFields.CONTEXT).deepCopy());
@@ -2689,7 +3082,10 @@ class AnalysisHttpTest {
                 AnalysisFields.EVIDENCE_TRANSACTION_IDS,
                 item.path(AnalysisFields.EVIDENCE_TRANSACTION_IDS).deepCopy()
             );
-            descriptor.putArray(AnalysisFields.CANDIDATE_IDS);
+            ArrayNode candidates = descriptor.putArray(AnalysisFields.CANDIDATE_IDS);
+            if (item.path(AnalysisFields.CANDIDATE_KEY).isString()) {
+                candidates.add(item.path(AnalysisFields.CANDIDATE_KEY).asString());
+            }
         }
 
         return value;
@@ -2835,10 +3231,14 @@ class AnalysisHttpTest {
      * @created 2026-11-01
      * @usedBy query, isolatesUsers
      * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-04 - 반복 의미 결과 조회도 입력의 작업 종류를 보존
      */
     private ObjectNode queryBody(ObjectNode meaning, String resultId) {
         ObjectNode value = json.createObjectNode()
-            .put(AnalysisFields.SEMANTIC_TASK_KIND, "transactionMeaning");
+            .put(
+                AnalysisFields.SEMANTIC_TASK_KIND,
+                meaning.path(AnalysisFields.SEMANTIC_TASK_KIND).asString()
+            );
         value.set(AnalysisFields.CONTEXT, meaning.path(AnalysisFields.CONTEXT).deepCopy());
         value.set(AnalysisFields.INPUT, meaning.deepCopy());
         if (resultId != null) {
@@ -3269,6 +3669,7 @@ class AnalysisHttpTest {
      * @created 2026-11-01
      * @usedBy start, stop
      * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조
+     * @modified 2026-11-04 - 정산 연결·개별 회차 예외의 분석 전후 불변도 대조
      */
     private Map<String, String> fingerprint() {
         Map<String, String> result = new HashMap<>();
@@ -3284,6 +3685,8 @@ class AnalysisHttpTest {
             AnalysisFields.OBLIGATIONS,
             "reserves",
             "reserve_allocations",
+            "settlement_links",
+            "occurrence_overrides",
             "write_receipts",
             "recurring_plans",
             "recurring_plan_revisions",
@@ -3434,6 +3837,7 @@ class AnalysisHttpTest {
                  * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조; 단일 제어문 본문 중괄호 명시
                  * @modified 2026-11-02 - 원천 갱신과 응답의 순서를 명시 gate로 동기화
                  * @modified 2026-11-02 - 기억 검사의 판단 유보·일부 응답 근거 제어를 추가하고 명시 대기 유지
+                 * @modified 2026-11-04 - 반복 월세 후보의 검증 가능한 모의 출력 제공
                  */
                 @Override
                 public ModelReply generate(JsonNode input) {
@@ -3488,7 +3892,18 @@ class AnalysisHttpTest {
                             .put(AnalysisFields.STATUS, "unknown")
                             .putNull(AnalysisFields.VALUE)
                             .put(AnalysisFields.REASON_CODE, "insufficient_evidence");
-                        if (unknownClassification) {
+                        if (input.path(AnalysisFields.SEMANTIC_TASK_KIND)
+                            .asString().equals("recurringMeaning")) {
+                            row.set(
+                                AnalysisFields.CANDIDATE_KEY,
+                                requested.get(AnalysisFields.CANDIDATE_KEY)
+                            );
+                            row.put(AnalysisFields.NAME, "월세");
+                            row.putObject(AnalysisFields.MEANING)
+                                .put(AnalysisFields.STATUS, "candidate")
+                                .put(AnalysisFields.VALUE, "rent")
+                                .put(AnalysisFields.REASON_CODE, "supported");
+                        } else if (unknownClassification) {
                             row.putObject(AnalysisFields.CLASSIFICATION)
                                 .put(AnalysisFields.STATUS, "unknown")
                                 .putNull(AnalysisFields.VALUE)

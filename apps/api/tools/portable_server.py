@@ -18,12 +18,13 @@ import uuid
 import javaproperties
 import psutil
 
+import ai_setup
 import release_server as release
 import server_runtime as runtime
 
 
 FORMAT = 'payse-portable-install-v1'
-TOOLS = ('portable_server.py', 'server_runtime.py', 'release_server.py', 'package_server.py', 'requirements.txt')
+TOOLS = ('portable_server.py', 'server_runtime.py', 'release_server.py', 'package_server.py', 'ai_setup.py', 'requirements.txt')
 PROFILES = ('database', 'auth', 'finance', 'salary-notices')
 SECRET_KEYS = ('PAYSE_DB_PASSWORD', 'PAYSE_AUTH_CODE_KEY_BASE64',
                'PAYSE_AUTH_LIMIT_KEY_BASE64', 'PAYSE_FINANCE_CURSOR_KEY_BASE64')
@@ -80,8 +81,10 @@ def validate_settings(settings, properties, schema):
     """2026-11-02: 필수 설정·키·단위와 현재 지원 프로필을 검증한다. 기본 키 생성이나 프로필 활성화는 하지 않는다."""
     profiles = [part.strip() for part in properties.get('spring.profiles.active', '').split(',')]
     if (schema.get('format') != 'payse-schema-prerequisites-v1'
-            or set(profiles) != set(PROFILES) or set(profiles) - set(schema['supportedProfiles'])):
-        raise ValueError('Only the reviewed database/auth/finance/salary-notices profiles are supported')
+            or set(profiles) not in (set(PROFILES), set(PROFILES) | {'analysis', 'gamma-local'})
+            or set(profiles) - set(schema['supportedProfiles'])):
+        raise ValueError('Use the base profiles or the explicitly configured analysis,gamma-local extension')
+    ai_setup.validate(properties)
     if properties.get('PAYSE_BIND_ADDRESS') != '127.0.0.1':
         raise ValueError('Keep the API on loopback; configure approved HTTPS separately')
     if properties.get('spring.config.import'):
@@ -134,6 +137,14 @@ def schema_query(schema):
             raise ValueError('Invalid schema function')
         conditions.append("EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace=n.oid "
                           f"WHERE n.nspname='payse' AND p.proname='{function}')")
+    if 'analysisPolicy' in schema:
+        project, version = schema['analysisPolicy']
+        if any(not re.fullmatch(r'[A-Za-z0-9_.-]{1,120}', value) for value in (project, version)):
+            raise ValueError('Invalid analysis policy identity')
+        policy = f"payse.analysis_cost_policy('{project}', '{version}')"
+        for name, value in (('model', 'gpt-6-luna'), ('inputLimit', '12000'),
+                            ('outputLimit', '4000'), ('kmsMicros', '0')):
+            conditions.append(f"({policy}->>'{name}')='{value}'")
     return ("BEGIN READ ONLY; SET LOCAL ROLE payse_runtime; SELECT CASE WHEN (" + ') AND ('.join(conditions)
             + ") THEN 'READY' ELSE 'INCOMPATIBLE' END FROM pg_roles WHERE rolname=session_user; ROLLBACK;")
 
@@ -174,7 +185,15 @@ def preflight(settings, properties, schema):
     available = runtime.memory()
     if min(available.values()) < minimum:
         raise RuntimeError('Insufficient physical or commit memory; server unchanged')
-    database_check(settings, properties, schema)
+    checked_schema = dict(schema)
+    if ai_setup.selected(properties):
+        optional = schema.get('analysisPrerequisites')
+        if not optional:
+            raise ValueError('Release does not declare AI database prerequisites')
+        checked_schema = {key: list(schema.get(key, [])) + list(optional.get(key, []))
+                          for key in ('tables', 'columns', 'functions')}
+        checked_schema['analysisPolicy'] = [properties[ai_setup.PREFIX + key] for key in ('project', 'pricing')]
+    database_check(settings, properties, checked_schema)
     return {'port': port, 'maxHeapMiB': heap, 'memory': available, 'dbPrerequisites': 'PASS_READ_ONLY_CATALOG'}
 
 
@@ -213,6 +232,8 @@ def configure(directory):
         properties[name] = getpass.getpass(name + ' (existing value; not displayed): ')
     validate_settings(settings, properties, {'format': 'payse-schema-prerequisites-v1', 'supportedProfiles': PROFILES})
     runtime.private_directory(directory)
+    if input('감마 전용 AI 성능 구성을 함께 준비할까요? 동의하면 YES: ').strip() == 'YES':
+        ai_setup.configure(directory, properties)
     for name, values in (('deployment.properties', settings), ('server.properties', properties)):
         target = directory / name
         descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -267,6 +288,7 @@ def start_locked(home, state, settings, properties):
         return
     if not runtime.port_free(port):
         raise RuntimeError('API port occupied by an unrelated process')
+    ai_setup.probe(properties)
     heap = int(settings['deployment.maxHeapMiB'])
     argv = [settings['server.java'], '-Xms128m', f'-Xmx{heap}m', '-XX:MaxMetaspaceSize=384m',
             '-XX:ReservedCodeCacheSize=128m', '-XX:ActiveProcessorCount=2', '-jar', str(home / 'server.jar'),
@@ -327,6 +349,10 @@ def deploy_locked(home, state, settings, properties, package, metadata, starter=
     backup.mkdir(mode=0o700)
     for name in ('server.jar', 'release-schema.json', 'runtime.json'):
         shutil.copyfile(home / name, backup / name)
+    (backup / 'tools').mkdir(mode=0o700)
+    for name in TOOLS:
+        if (home / 'tools' / name).exists():
+            shutil.copyfile(home / 'tools' / name, backup / 'tools' / name)
     stopped = False
     try:
         if (release.sha256(home / 'server.jar') != old['jarSha256']
@@ -347,6 +373,10 @@ def deploy_locked(home, state, settings, properties, package, metadata, starter=
         if release.sha256(pending_schema) != metadata['sha256']['release-schema.json']:
             raise ValueError('Candidate schema changed after preflight')
         os.replace(pending_schema, home / 'release-schema.json')
+        for name in TOOLS:
+            if release.sha256(package / name) != metadata['sha256'][name]:
+                raise ValueError('Candidate control tool changed after preflight')
+            shutil.copyfile(package / name, home / 'tools' / name)
         state.update(jarSha256=metadata['sha256']['server.jar'],
                      schemaSha256=metadata['sha256']['release-schema.json'],
                      sourceCommit=metadata['commit'], process=None)
@@ -365,6 +395,12 @@ def deploy_locked(home, state, settings, properties, package, metadata, starter=
                 restore = home / (name + '.' + uuid.uuid4().hex + '.restore')
                 shutil.copyfile(backup / name, restore)
                 os.replace(restore, home / name)
+            for name in TOOLS:
+                saved = backup / 'tools' / name
+                if saved.exists():
+                    shutil.copyfile(saved, home / 'tools' / name)
+                else:
+                    (home / 'tools' / name).unlink(missing_ok=True)
             old['process'] = None
             runtime.write_json(home / 'runtime.json', old)
             starter(home, old, settings, properties)
@@ -382,7 +418,8 @@ def operate(command, home, package=None, commit=None, apply=False):
             process = runtime.owned_process(state.get('process'))
             return {'status': 'RUNNING' if process else 'STOPPED', 'commit': state['sourceCommit'],
                     'health': bool(process and runtime.owns_listener(state['process'], properties['PAYSE_PORT'])
-                                   and health(int(properties['PAYSE_PORT']))), 'memory': runtime.memory()}
+                                   and health(int(properties['PAYSE_PORT']))), 'memory': runtime.memory(),
+                    'ai': ai_setup.status(properties, process.pid if process else None)}
         if command == 'stop':
             runtime.stop(state.get('process'), home)
             state['process'] = None
@@ -391,7 +428,8 @@ def operate(command, home, package=None, commit=None, apply=False):
         if command == 'start':
             preflight(settings, properties, schema)
             start_locked(home, state, settings, properties)
-            return {'status': 'RUNNING', 'commit': state['sourceCommit']}
+            return {'status': 'RUNNING', 'commit': state['sourceCommit'],
+                    'ai': ai_setup.status(properties, state['process']['pid'])}
         metadata = release.verify(package, commit, require_ci=apply)
         candidate_schema = json.loads((Path(package) / 'release-schema.json').read_text(encoding='utf-8'))
         checked = preflight(settings, properties, candidate_schema)

@@ -40,11 +40,51 @@ tasks.register('compileDocTools', JavaCompile) {
     }
 }
 tasks.named('test') {
+    exclude '**/GammaLiveTest*'
     dependsOn 'compileDocTools'
     systemProperty 'payse.docToolClasspath', docToolOutput.get().asFile.absolutePath
     useJUnitPlatform()
     testLogging { events 'failed', 'skipped' }
 }
+
+// Explicit, removable synthetic-gamma runner. Normal tests and CI never make paid calls.
+tasks.register('gammaLiveTest', Test) {
+    dependsOn 'testClasses'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    include '**/GammaLiveTest.class'
+    useJUnitPlatform()
+    maxHeapSize = '512m'
+    maxParallelForks = 1
+    outputs.upToDateWhen { false }
+    doFirst {
+        if (System.getenv('PAYSE_GAMMA_LIVE') != 'approved') {
+            throw new GradleException('Use the explicit gamma_local.py live runner')
+        }
+    }
+    testLogging { events 'failed'; showStandardStreams = false }
+}
+
+tasks.register('gammaLocalServer', JavaExec) {
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.payse.api.analysis.service.GammaLocalServer'
+    maxHeapSize = '512m'
+}
+
+// Test-only classpath for the isolated frontend protocol server; no mock in bootJar.
+tasks.register('protocolClasspath') {
+    dependsOn 'testClasses'
+    doLast {
+        def output = layout.buildDirectory.file('protocol-classpath.txt').get().asFile
+        output.text = sourceSets.test.runtimeClasspath.asPath
+    }
+}
+tasks.register('protocolContracts', Exec) {
+    commandLine 'python', '-B', '-m', 'unittest', 'discover',
+        '-s', 'testing/protocol', '-p', 'test_*.py'
+}
+tasks.named('test') { dependsOn 'protocolContracts' }
 tasks.register('apiDocsCheck', Exec) {
     dependsOn 'compileDocTools'
     def launcher = javaToolchains.launcherFor {
@@ -70,6 +110,9 @@ tasks.register('aiArchiveCheck') {
     doLast {
         def archive = tasks.named('bootJar').get().archiveFile.get().asFile
         new java.util.zip.ZipFile(archive).withCloseable { boot ->
+            if (boot.entries().toList().any { it.name.contains('/GammaLocalConfig') || it.name.contains('/GammaLocalServer') || it.name.contains('/GammaLive') || it.name.contains('/ProtocolMock') || it.name.endsWith('Test.class') }) {
+                throw new GradleException('Gamma-only test code entered the deployment JAR')
+            }
             def aiEntries = boot.entries().toList().findAll { it.name.startsWith('BOOT-INF/lib/ai-') && it.name.endsWith('.jar') }
             if (aiEntries.size() != 1) throw new GradleException('Expected one shared AI module in Boot JAR')
             def names = []
@@ -88,8 +131,28 @@ tasks.register('aiArchiveCheck') {
                 throw new GradleException('Private evaluation material entered AI deployment')
             }
             def publicFiles = names.findAll { it.startsWith('com/payse/ai/rules/') && !it.endsWith('/') }
-            if (publicFiles.size() != 6) throw new GradleException('Unexpected AI public resource set')
+            def expectedPublic = ['criteria.json', 'instructions.txt', 'guidance.md', 'compact-output.md', 'performance.json', 'prompt-guide.json',
+                'transactionMeaning.input.schema.json', 'transactionMeaning.output.schema.json',
+                'recurringMeaning.input.schema.json', 'recurringMeaning.output.schema.json']
+                .collect { 'com/payse/ai/rules/' + it }.toSet()
+            if (publicFiles.toSet() != expectedPublic) throw new GradleException('Unexpected AI public resource set')
         }
     }
 }
 tasks.named('check') { dependsOn 'aiArchiveCheck' }
+
+// Only the public canonical gamma identity is bundled; no test source, key or financial row.
+def gammaIdentityDir = layout.buildDirectory.dir('generated/gamma-identity')
+tasks.register('gammaIdentity') {
+    inputs.file('fixtures/generated-v4/server-seeds.json')
+    outputs.dir(gammaIdentityDir)
+    doLast {
+        def seeds = new groovy.json.JsonSlurper().parse(file('fixtures/generated-v4/server-seeds.json'))
+        def gamma = seeds.users.findAll { it.initialCase == 'gamma-life' }
+        if (gamma.size() != 1) { throw new GradleException('Unique gamma identity required') }
+        def output = gammaIdentityDir.get().asFile
+        output.mkdirs()
+        new File(output, 'gamma-identity.json').text = groovy.json.JsonOutput.toJson([userId: gamma[0].userId])
+    }
+}
+tasks.named('processResources') { dependsOn 'gammaIdentity'; from(gammaIdentityDir) }

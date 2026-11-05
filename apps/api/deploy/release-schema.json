@@ -1,6 +1,6 @@
 {
   "format": "payse-schema-prerequisites-v1",
-  "supportedProfiles": ["database", "auth", "finance", "salary-notices"],
+  "supportedProfiles": ["database", "auth", "finance", "salary-notices", "analysis", "gamma-local"],
   "requiredProfiles": ["database", "auth", "finance", "salary-notices"],
   "tables": [
     "users",
@@ -36,5 +36,32 @@
     "financial_transactions.id",
     "statement_items.id"
   ],
-  "functions": ["auth_credentials", "auth_authorize", "auth_require_transaction", "auth_ip_request"]
+  "functions": [
+    "auth_credentials",
+    "auth_authorize",
+    "auth_require_transaction",
+    "auth_ip_request"
+  ],
+  "analysisPrerequisites": {
+    "tables": [
+      "analysis_results",
+      "analysis_jobs",
+      "analysis_attempts",
+      "analysis_items",
+      "analysis_commands",
+      "analysis_suppressions",
+      "analysis_cost_projects",
+      "analysis_cost_calls"
+    ],
+    "columns": ["analysis_cost_projects.pricing"],
+    "functions": [
+      "analysis_capacity",
+      "analysis_source_guard",
+      "analysis_cost_policy",
+      "analysis_cost_reserve",
+      "analysis_cost_start",
+      "analysis_cost_release",
+      "analysis_cost_finish"
+    ]
+  }
 }

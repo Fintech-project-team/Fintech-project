@@ -1,0 +1,18 @@
+{
+  "format": "payse-ai-performance-v1",
+  "profile": "gamma-year-v1",
+  "model": "gpt-6-luna",
+  "reasoningEffort": "none",
+  "inputLimit": 12000,
+  "outputLimit": 4000,
+  "requestTimeoutSeconds": 20,
+  "parallelism": 6,
+  "batchSize": 15,
+  "automaticRetries": 0,
+  "agent": {
+    "mode": "direct",
+    "version": "direct-v1",
+    "installation": "bundled"
+  },
+  "validatedPrompt": "PAYSE-PROMPT-4:e5593707375b39f4db426c8e193dba08feea29e694b973178b5f4da83b562908"
+}

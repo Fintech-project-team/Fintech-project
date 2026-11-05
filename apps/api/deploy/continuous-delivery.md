@@ -64,3 +64,7 @@ DB는 먼저 별도로 준비되어 있어야 한다. 이 도구는 사용자·�
 새 OS의 CI가 아직 실행되지 않았다면 해당 OS를 실측 통과로 보고하지 않는다. 실제 서버에 Apply하지 않은 점검 결과와 원격 CI 실행도 구분한다. 키·DB는 변경하지 않으므로 이 도구의 rollback 대상에 포함하지 않는다.
 
 근거: [GitHub 산출물](https://docs.github.com/en/enterprise-cloud%40latest/actions/tutorials/store-and-share-data), [GitHub CLI](https://cli.github.com/manual/gh_run_download), [PostgreSQL 공식 Ubuntu 패키지](https://www.postgresql.org/download/linux/ubuntu/), [psutil 프로세스·신호 API](https://psutil.readthedocs.io/stable/).
+
+## 감마 AI 준비
+
+새 설치는 `portable_server.py configure`의 감마 AI 선택을 사용한다. 같은 구성은 시작 시 준비 기록을 재사용하고 유료 분석/전체 평가는 실행하지 않는다. `status`의 `ai`에서 준비·현재 프로세스·마지막 접근 확인·실제 분석 검증 시각을 구별한다. 설정·키·비용/스키마 전제와 제거 방법은 [AI 시작 안내](../docs/ai-startup.md)를 따른다.

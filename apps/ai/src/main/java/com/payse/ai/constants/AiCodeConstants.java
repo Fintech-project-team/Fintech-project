@@ -108,6 +108,7 @@ public final class AiCodeConstants {
      * @usedBy AnalysisService, ModelFailure, ModelReply, OpenAiGateway, ProviderHttp
      */
     public static final class Provider {
+        public static final String EXECUTION_NOT_AUTHORIZED = "EXECUTION_NOT_AUTHORIZED";
         public static final String INVALID_MODEL_OUTPUT = "INVALID_MODEL_OUTPUT";
         public static final String INVALID_TOKEN_COUNT = "INVALID_TOKEN_COUNT";
         public static final String INPUT_TOKEN_LIMIT = "INPUT_TOKEN_LIMIT";
