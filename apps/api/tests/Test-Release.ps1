@@ -148,3 +148,5 @@ try {
     }
     Remove-Item -LiteralPath $resolved -Recurse -Force
 }
+
+& (Join-Path $PSScriptRoot 'Test-Dashboard.ps1')

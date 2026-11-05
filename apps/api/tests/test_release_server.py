@@ -68,6 +68,20 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             release.verify(self.output, require_ci=True)
 
+    def test_dashboard_files_are_packaged_and_integrity_checked(self):
+        for name in ('Dashboard.psm1', 'Watch-Payse.ps1'):
+            with self.subTest(name=name):
+                path = self.output / name
+                self.assertEqual(path.read_bytes(), (release.API / 'deploy' / name).read_bytes())
+                original = path.read_bytes()
+                path.unlink()
+                with self.assertRaises(ValueError):
+                    release.verify(self.output, COMMIT)
+                path.write_bytes(original + b'\n# modified')
+                with self.assertRaises(ValueError):
+                    release.verify(self.output, COMMIT)
+                path.write_bytes(original)
+
     def test_tampered_jar_rejected(self):
         with (self.output / 'server.jar').open('ab') as stream:
             stream.write(b'changed')

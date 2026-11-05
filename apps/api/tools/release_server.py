@@ -55,7 +55,8 @@ def build(jar, output, commit, repository, branch, run_id):
     for name in ('portable_server.py', 'server_runtime.py', 'release_server.py', 'package_server.py', 'ai_setup.py'):
         (output / name).write_bytes((API / 'tools' / name).read_bytes())
     for name in ('requirements.txt', 'deployment.properties.example', 'portable.properties.example',
-                 'continuous-delivery.md', 'Deploy-Payse.ps1', 'Release-Control.psm1', 'ai.properties.example'):
+                 'continuous-delivery.md', 'Deploy-Payse.ps1', 'Release-Control.psm1', 'ai.properties.example',
+                 'Dashboard.psm1', 'Watch-Payse.ps1'):
         (output / name).write_bytes((API / 'deploy' / name).read_bytes())
     release = {
         'format': FORMAT, 'commit': commit, 'repository': repository,
