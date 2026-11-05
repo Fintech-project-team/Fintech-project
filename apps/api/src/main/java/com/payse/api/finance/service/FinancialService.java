@@ -284,6 +284,7 @@ public final class FinancialService {
      * @usedBy write
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-04 - 저장된 반복 결정·계획·버전의 공개 참조 보존
      */
     private ArrayNode visibleRefs(ArrayNode refs, ObjectNode snapshot, ObjectNode audit) {
         ArrayNode result = json.createArrayNode();
@@ -296,6 +297,12 @@ public final class FinancialService {
             case ApiCodeConstants.Finance.OBLIGATION -> ApiFieldConstants.Finance.OBLIGATIONS;
             case ApiCodeConstants.Finance.RESERVE -> ApiFieldConstants.Finance.RESERVES;
             case ApiCodeConstants.Finance.ALLOCATION -> ApiFieldConstants.Finance.ALLOCATIONS;
+            case ApiCodeConstants.Recurring.PLAN_RESOURCE ->
+                ApiFieldConstants.Finance.RECURRING_PLANS;
+            case ApiCodeConstants.Recurring.REVISION_RESOURCE ->
+                ApiFieldConstants.Finance.RECURRING_PLAN_REVISIONS;
+            case ApiCodeConstants.Recurring.DECISION_RESOURCE ->
+                ApiFieldConstants.Finance.RECURRING_DECISIONS;
             default -> "";
             };
             boolean visible = ApiCodeConstants.Finance.SETTINGS.equals(resource)
@@ -306,6 +313,11 @@ public final class FinancialService {
             case ApiCodeConstants.Finance.OBLIGATION -> ApiFieldConstants.Finance.OBLIGATION_ID;
             case ApiCodeConstants.Finance.RESERVE -> ApiFieldConstants.Finance.RESERVE_ID;
             case ApiCodeConstants.Finance.ALLOCATION -> ApiFieldConstants.Finance.ALLOCATION_ID;
+            case ApiCodeConstants.Recurring.PLAN_RESOURCE -> ApiFieldConstants.Recurring.PLAN_ID;
+            case ApiCodeConstants.Recurring.REVISION_RESOURCE ->
+                ApiFieldConstants.Recurring.REVISION_ID;
+            case ApiCodeConstants.Recurring.DECISION_RESOURCE ->
+                ApiFieldConstants.Recurring.DECISION_ID;
             default -> FinanceDb.ID;
             };
             for (JsonNode item : snapshot.path(array)) {

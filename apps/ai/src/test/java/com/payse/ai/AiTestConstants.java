@@ -22,6 +22,9 @@ public final class AiTestConstants {
      * OpenAiGatewayTest
      */
     public static final class AnalysisFields {
+        public static final String MEANINGS = "meanings";
+        public static final String COLUMNS = "columns";
+        public static final String ROWS = "rows";
         public static final String EXPECTED_BASIC_TYPE = "expectedBasicType";
         public static final String EXPECTED_MEANING = "expectedMeaning";
         public static final String COUNTEREXAMPLE = "counterexample";
@@ -90,6 +93,7 @@ public final class AiTestConstants {
      * @usedBy AnalysisServiceTest, AnalysisStorageTest, AnalysisSubsetTest
      */
     public static final class AnalysisValues {
+        public static final String CRITERIA_RESOURCE = "/com/payse/ai/rules/criteria.json";
         public static final String MEANING_VERSION = "PAYSE-MEANING-1";
         public static final String CANDIDATE = "candidate";
         public static final String CARD_PAYMENT = "card_payment";
@@ -231,6 +235,7 @@ public final class AiTestConstants {
         public static final String PROVIDER = "provider";
         public static final String MODEL = "model";
         public static final String API_KEY = "apiKey";
+        public static final String API_KEY_ENV_FILE = "apiKeyEnvFile";
         public static final String REASONING_EFFORT = "reasoningEffort";
         public static final String REDACTED_SETTINGS = "LlmSettings[REDACTED]";
         public static final String INVALID_CONFIGURATION =
@@ -252,6 +257,9 @@ public final class AiTestConstants {
      * @usedBy OpenAiGatewayTest
      */
     public static final class OpenAiFields {
+        public static final String SERVICE_TIER = "service_tier";
+        public static final String VERBOSITY = "verbosity";
+        public static final String PHASE = "phase";
         public static final String INSTRUCTIONS = "instructions";
         public static final String TEXT = "text";
         public static final String FORMAT = "format";

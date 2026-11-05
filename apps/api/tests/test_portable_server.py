@@ -7,11 +7,12 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import javaproperties
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+import ai_setup
 import portable_server as server
 import release_server as release
 from test_release_server import COMMIT, bundle, receipt
@@ -59,6 +60,16 @@ class PortableTests(unittest.TestCase):
             with self.subTest(heap=heap), self.assertRaises(ValueError):
                 server.validate_settings(dict(self.settings, **{'deployment.maxHeapMiB': heap}),
                                          self.properties, self.schema)
+
+    def test_analysis_policy_preflight_is_read_only_and_validated(self):
+        schema = dict(self.schema, analysisPolicy=['gamma-test', 'version-1'])
+        query = server.schema_query(schema)
+        self.assertIn("BEGIN READ ONLY", query)
+        self.assertIn("analysis_cost_policy('gamma-test', 'version-1')", query)
+        self.assertIn("'inputLimit')='12000'", query)
+        self.assertNotIn('INSERT', query)
+        with self.assertRaises(ValueError):
+            server.schema_query(dict(self.schema, analysisPolicy=["bad'identity", 'version-1']))
 
     def test_remote_db_requires_verified_tls_and_secrets_stay_off_argv(self):
         remote = dict(self.properties, PAYSE_JDBC_URL='jdbc:postgresql://db.example.invalid/test_database')
@@ -180,6 +191,63 @@ class PortableTests(unittest.TestCase):
                 server.start_locked(self.home, state, self.settings, self.properties)
         stop.assert_called_once_with(identity, self.home)
         self.assertIsNone(server.read_installation(self.home)[1]['process'])
+
+
+class AiSetupTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix='payse-ai-setup-')
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name).resolve()
+        self.key = self.root / 'master.key'
+        self.key.write_bytes(bytes(range(32)))
+        self.llm = self.root / 'llm.properties'
+        self.values = dict(enabled='true', provider='openai', model='gpt-6-luna',
+                           reasoningEffort='none', apiKey='synthetic-key-12345')
+        self.llm.write_text(javaproperties.dumps(self.values, timestamp=False))
+        self.properties = {'spring.profiles.active': 'database,auth,finance,analysis,gamma-local'}
+        self.properties.update({ai_setup.PREFIX + key: value for key, value in {
+            'enabled': 'true', 'llm-file': str(self.llm), 'key-file': str(self.key),
+            'state-directory': str(self.root), 'project': 'test', 'pricing': 'v1',
+            'source-version': 'fixture:gamma-fresh:holdout:100'}.items()})
+        self.opener = MagicMock()
+        response = self.opener.open.return_value.__enter__.return_value
+        response.status = 200
+        response.read.return_value = b'{"id":"gpt-6-luna"}'
+
+    def test_cached_access_is_not_generation_or_runtime_readiness(self):
+        first = ai_setup.probe(self.properties, opener=self.opener)
+        again = ai_setup.probe(self.properties, opener=self.opener)
+        self.assertFalse(first['generationPerformed'])
+        self.assertFalse(first['responsesPermissionVerified'])
+        self.assertTrue(again['reused'])
+        self.assertEqual(self.opener.open.call_count, 1)
+        status = ai_setup.status(self.properties)
+        self.assertEqual(status['modelAccess'], 'MODEL_ACCESSIBLE')
+        self.assertEqual(status['preparation'], 'PENDING')
+        self.assertFalse(status['runtimeReady'])
+        self.assertNotIn('synthetic-key', json.dumps(status))
+
+    def test_rotation_and_forced_check_do_not_reuse_old_success(self):
+        ai_setup.probe(self.properties, opener=self.opener)
+        self.values['apiKey'] = 'synthetic-replacement-key'
+        self.llm.write_text(javaproperties.dumps(self.values, timestamp=False))
+        self.assertEqual(ai_setup.status(self.properties)['modelAccess'], 'NOT_CHECKED')
+        self.assertFalse(ai_setup.probe(self.properties, opener=self.opener)['reused'])
+        ai_setup.probe(self.properties, force=True, opener=self.opener)
+        self.assertEqual(self.opener.open.call_count, 3)
+
+    def test_failed_probe_is_not_cached_as_connected(self):
+        self.opener.open.side_effect = TimeoutError()
+        self.assertEqual(ai_setup.probe(self.properties, opener=self.opener)['status'], 'UNAVAILABLE')
+        ai_setup.probe(self.properties, opener=self.opener)
+        self.assertEqual(self.opener.open.call_count, 2)
+
+    def test_disabled_and_invalid_scope_never_contact_provider(self):
+        self.assertEqual(ai_setup.probe({})['status'], 'DISABLED')
+        self.properties[ai_setup.PREFIX + 'source-version'] = 'real-data'
+        with self.assertRaises(ValueError):
+            ai_setup.probe(self.properties, opener=self.opener)
+        self.opener.open.assert_not_called()
 
 
 if __name__ == '__main__':

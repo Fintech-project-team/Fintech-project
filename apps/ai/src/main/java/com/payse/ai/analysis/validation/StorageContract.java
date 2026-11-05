@@ -146,6 +146,7 @@ public final class StorageContract {
      * 의미 판단과 독립된 보존 제안을 한 응답에서 받으며 추가 공급자 호출을 요구하지 않는다.
      * @created 2026-11-01
      * @usedBy AnalysisService.analyzeForStorage
+     * @modified 2026-11-03 - 현재 결과의 활성과 사용자 승인·장기 참고 여부를 구분
      */
     public static String instructions() {
         return """
@@ -153,6 +154,8 @@ public final class StorageContract {
             응답은 output과 memories만 가진 객체다. output은 기존 의미 출력 규격을 그대로 따른다.
             memories에는 각 입력 itemKey마다 정확히 한 항목을 둔다. 현재 요청의 같은 별칭을 사용한다.
             active는 현재 해석의 참조 활성 여부, isReference는 이후 판단에 쓸 AI 참고자료 여부다.
+            active는 사용자 승인 여부가 아니다. 현재 유효한 후보와 근거 부족의 unknown은 active=true로 제공한다.
+            현재 사용에 부적합한 명시 근거가 있을 때만 active=false와 사유를 제안한다. isReference·important와 별개다.
             important는 일반 3개월 폐기에서 제외할 장기 참고자료의 보존 제안이며 true이면 isReference도 true여야 한다.
             referencePolicy는 optional 또는 required다. required도 활성·권한·유효 근거가 있을 때만 적용된다.
             reason에 해당 항목의 보존·참조 제안을 뒷받침하는 이유를 240자 이하로 적는다.

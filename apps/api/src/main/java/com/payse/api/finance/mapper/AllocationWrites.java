@@ -40,6 +40,7 @@ final class AllocationWrites {
      * @modified 2026-10-29 - JPA 관리 엔티티와 같은 영속성 문맥으로 저장 경계 유지
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-04 - 생성·수정·제거의 최종 미해제 배정 중복 거절
      */
     void change(UUID owner, UUID reserveId, JsonNode changes, WriteStore.Journal journal) {
         for (JsonNode input : changes.get(ApiFieldConstants.Finance.CREATE)) {
@@ -88,6 +89,33 @@ final class AllocationWrites {
 
             store.remove(store.entity(owner, AllocationEntity.class, id));
             journal.add(ApiCodeConstants.Finance.ALLOCATION, id, allocation, null);
+        }
+        requireUnique(owner, reserveId);
+    }
+
+    /**
+     * 같은 사용자 잠금 안에서 최종 미해제 연결만 유일하게 하며 완전 해제 이력을 보존한다.
+     * @created 2026-11-04
+     * @usedBy AllocationWrites.change
+     */
+    private void requireUnique(UUID owner, UUID reserveId) {
+        Boolean duplicate = store.scalar(
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM payse.reserve_allocations
+                WHERE user_id = ? AND reserve_id = ? AND amount_krw > released_krw
+                GROUP BY obligation_id HAVING count(*) > 1
+            )
+            """,
+            Boolean.class,
+            owner,
+            reserveId
+        );
+        if (duplicate == null) {
+            throw WriteStore.unavailable();
+        }
+        if (duplicate) {
+            throw WriteStore.conflict();
         }
     }
 

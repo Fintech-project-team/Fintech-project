@@ -95,7 +95,7 @@ function Read-ReleasePackage {
     return [pscustomobject]@{ root = $root; jar = $jar; release = $release }
 }
 
-# Created 2026-11-02: permit only the explicitly supported existing profile set; never enable analysis.
+# Created 2026-11-02; modified 2026-11-04: AI requires the portable installation with status and preparation support.
 function Test-ReleaseProfiles {
     param($Properties, $Schema)
     if ($Schema.format -ne 'payse-schema-prerequisites-v1') { throw 'Unsupported schema prerequisites.' }
@@ -103,6 +103,9 @@ function Test-ReleaseProfiles {
     if (@($profiles | Where-Object { $_ -notin $Schema.supportedProfiles }).Count -or
         @($Schema.requiredProfiles | Where-Object { $_ -notin $profiles }).Count) {
         throw 'Profile compatibility is not established. No automatic profile or DB migration is allowed.'
+    }
+    if ('analysis' -in $profiles -or 'gamma-local' -in $profiles) {
+        throw 'AI profiles require portable_server.py; the legacy adapter does not prepare or monitor AI.'
     }
     return $profiles
 }
