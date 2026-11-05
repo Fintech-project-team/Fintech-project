@@ -18,6 +18,14 @@ const List<(AnalysisArt, String)> _waitCycle = [
   (AnalysisArt.preparing, '첫 계산을 준비하고 있어요'),
 ];
 
+/// 2026-11-05: 서버 입력 수신 확인 전·후 설명(시안 v3, 혜연·A 확정). 두 번째 문구는 서버 응답이 running 이후를
+/// 알려 준 뒤에만 쓴다. 설명 칸은 가장 긴 [_receivedSubtitle]과 같은 세 줄 높이로 고정해 단계가 바뀌어도 그림이 움직이지
+/// 않게 한다.
+const String _preparingSubtitle = '분석을 준비하고 있어요.\n잠시만 기다려 주세요.';
+const String _receivedSubtitle =
+    '보통 3~5분 걸려요.\n앱을 나가도 분석은 계속돼요.\n나중에 돌아와 결과를 확인할 수 있어요.';
+const String _slowSubtitle = '생각보다 오래 걸리고 있어요.\n조금만 더 기다려주세요.';
+
 /// 2026-11-04: 그림·문구 한 쌍을 보이는 시간(시안 v2 확정값).
 const Duration _cycleStep = Duration(seconds: 10);
 
@@ -31,6 +39,7 @@ const int _bandDelayMs = 120;
 const int _bandRiseMs = 320;
 
 /// 2026-11-04: 01-2 다음, 01-3 전에 첫 분석을 기다리는 화면(시안 v2, E-1 제외).
+/// 2026-11-05: 시안 v3. 서버 입력 수신 전·후 설명을 나누고, 끝난 결과를 실패·결과 확인 불가·이전 요청 만료로 나눈다.
 /// 기다리는 동안에는 완료 표시·건수 없이 그림·문구 세 쌍을 10초씩 바꾸고, 끝나면 결과 세 줄과 '다음'을 보인다.
 /// 자동으로 넘어가지 않는다. 기기의 움직임 줄이기 설정이 켜져 있으면 그림·줄·버튼이 움직이지 않는다.
 class AnalysisWaitScreen extends StatefulWidget {
@@ -177,13 +186,24 @@ class _AnalysisWaitScreenState extends State<AnalysisWaitScreen>
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ConnectionHeading(
-            finished != null ? '첫 계산 준비를\n마쳤어요' : '$who거래를\n살펴보고 있어요',
-            subtitle: finished != null
-                ? '이제 쓸 수 있는 돈을 확인해 보세요.'
-                : _slow
-                ? '생각보다 오래 걸리고 있어요.\n조금만 더 기다려주세요.'
-                : '보통 3~5분 걸려요.\n앱을 나가도 분석은 계속돼요.',
+          Stack(
+            children: [
+              const ExcludeSemantics(
+                child: Visibility(
+                  visible: false,
+                  maintainSize: true,
+                  maintainAnimation: true,
+                  maintainState: true,
+                  child: ConnectionHeading(' \n ', subtitle: ' \n \n '),
+                ),
+              ),
+              ConnectionHeading(
+                finished != null ? '첫 계산 준비를\n마쳤어요' : '$who거래를\n살펴보고 있어요',
+                subtitle: finished != null
+                    ? '이제 쓸 수 있는 돈을 확인해 보세요.'
+                    : _waitSubtitle(current),
+              ),
+            ],
           ),
           Expanded(
             child: Center(
@@ -247,16 +267,45 @@ class _AnalysisWaitScreenState extends State<AnalysisWaitScreen>
     );
   }
 
+  /// 2026-11-05: 기다리는 동안의 설명. 서버 입력 수신을 확인하기 전에는 준비 문구이고, 5분 넘음 문구는 수신 확인 뒤에만 쓴다.
+  String _waitSubtitle(AnalysisWaitState state) {
+    final received = state is AnalysisRunning && state.inputReceived;
+    if (!received) return _preparingSubtitle;
+    return _slow ? _slowSubtitle : _receivedSubtitle;
+  }
+
+  /// 2026-11-05: 결과 줄의 다시 시도. 결과 확인 불가면 중복 실행 안내 창에서 '다시 분석하기'를 누를 때만, 이전 요청 만료면
+  /// 다시 분석을 시작한 뒤 짧게 알린다.
+  Future<void> _retry(AnalysisFinished result) async {
+    switch (result.outcome) {
+      case AnalysisOutcome.outcomeUnknown:
+        if (await _confirmDuplicateRetry(context) && mounted) widget.onRetry();
+      case AnalysisOutcome.expired:
+        widget.onRetry();
+        ScaffoldMessenger.maybeOf(
+          context,
+        )?.showSnackBar(const SnackBar(content: Text('현재 거래 내역으로 다시 분석해요.')));
+      case AnalysisOutcome.failed || AnalysisOutcome.interpreted:
+        widget.onRetry();
+    }
+  }
+
   /// 2026-11-04: 끝난 결과 [result]의 그림 장면을 반환한다.
   static AnalysisArt _finishedArt(AnalysisFinished result) {
-    if (result.candidateCount == 0) return AnalysisArt.empty;
-    return result.interpreted ? AnalysisArt.done : AnalysisArt.unfinished;
+    if (!result.interpreted) return AnalysisArt.unfinished;
+    return result.candidateCount == 0 ? AnalysisArt.empty : AnalysisArt.done;
   }
 
   /// 2026-11-04: 결과 세 줄을 반환한다. 후보 0개(F)와 분석을 마치지 못함(G)을 다른 줄로 보인다.
   Widget _results(AnalysisFinished result) {
     final count = result.candidateCount;
-    final candidate = count == 0
+    final (detail, action) = switch (result.outcome) {
+      AnalysisOutcome.interpreted => (null, null),
+      AnalysisOutcome.failed => ('내용 분석은 마치지 못했어요.', '다시 시도'),
+      AnalysisOutcome.outcomeUnknown => ('분석 결과를 확인하지 못했어요.', '다시 시도'),
+      AnalysisOutcome.expired => ('이전 요청이 만료됐어요.', '다시 분석'),
+    };
+    final candidate = count == 0 && result.interpreted
         ? const _ResultRow(
             key: ValueKey('analysis-row-candidates'),
             kind: AnalysisMarkKind.lens,
@@ -266,14 +315,16 @@ class _AnalysisWaitScreenState extends State<AnalysisWaitScreen>
         : _ResultRow(
             key: const ValueKey('analysis-row-candidates'),
             kind: AnalysisMarkKind.lens,
-            title: '반복 후보 ${formatKrwDigits(count)}개를 찾았어요',
-            detail: result.interpreted ? null : '내용 분석은 마치지 못했어요.',
-            trailing: result.interpreted
+            title: count == 0
+                ? '반복 후보를 확인하지 못했어요'
+                : '반복 후보 ${formatKrwDigits(count)}개를 찾았어요',
+            detail: detail,
+            trailing: action == null
                 ? null
                 : SecondaryButton(
                     key: const ValueKey('analysis-retry'),
-                    label: '다시 시도',
-                    onPressed: widget.onRetry,
+                    label: action,
+                    onPressed: () => _retry(result),
                   ),
           );
     final rows = [
@@ -410,4 +461,125 @@ class _ResultRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 2026-11-05: 결과 확인 불가(G-1a)의 다시 시도 확인 창. '다시 분석하기'를 누르면 true다. 비용은 사용자에게 청구되는
+/// 비용이 아니므로 말하지 않는다.
+Future<bool> _confirmDuplicateRetry(BuildContext context) async {
+  final confirmed = await showModalBottomSheet<bool>(
+    context: context,
+    useSafeArea: true,
+    backgroundColor: PayseColors.background,
+    barrierColor: const Color(0x80242629),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(PayseRadius.lg)),
+    ),
+    builder: (sheet) => Padding(
+      padding: const EdgeInsets.fromLTRB(
+        PayseSpace.screenHorizontal,
+        PayseSpace.x6,
+        PayseSpace.screenHorizontal,
+        PayseSpace.x5,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            header: true,
+            child: const Text(
+              '다시 분석할까요?',
+              style: TextStyle(
+                fontSize: 18,
+                height: 26 / 18,
+                fontWeight: FontWeight.w700,
+                color: PayseColors.textPrimary,
+              ),
+            ),
+          ),
+          const SizedBox(height: PayseSpace.x2),
+          const Text(
+            '이전 분석이 이미 진행됐을 수 있어요.\n다시 시도하면 같은 분석이 중복 실행될 수 있어요.',
+            style: TextStyle(
+              fontSize: 15,
+              height: 22 / 15,
+              color: PayseColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: PayseSpace.x5),
+          PrimaryButton(
+            key: const ValueKey('analysis-retry-confirm'),
+            label: '다시 분석하기',
+            onPressed: () => Navigator.of(sheet).pop(true),
+          ),
+          const SizedBox(height: PayseSpace.x2),
+          TextButton(
+            key: const ValueKey('analysis-retry-cancel'),
+            onPressed: () => Navigator.of(sheet).pop(false),
+            child: const Text('취소'),
+          ),
+        ],
+      ),
+    ),
+  );
+  return confirmed ?? false;
+}
+
+/// 2026-11-05: 분석 대기 화면과 그 추적의 소유자. 들어올 때 추적을 시작하고, 앱이 백그라운드로 가면 반복 조회를 멈추고
+/// 돌아오면 다시 확인한다. '다음'은 기기 기록을 지운 뒤 [onNext]로 간다. 떠나면 추적을 폐기한다(서버 작업은 취소하지 않음).
+class AnalysisWaitHost extends StatefulWidget {
+  /// 2026-11-05: 추적 시작 [session], 제목 이름 [userName], 끝난 뒤 '다음' [onNext]로 만든다.
+  const AnalysisWaitHost({
+    super.key,
+    required this.session,
+    required this.onNext,
+    this.userName,
+  });
+
+  final AnalysisWaitSession Function() session;
+  final VoidCallback onNext;
+  final String? userName;
+
+  /// 2026-11-05: 추적을 보관하는 상태 객체를 반환한다.
+  @override
+  State<AnalysisWaitHost> createState() => _AnalysisWaitHostState();
+}
+
+/// 2026-11-05: 이 화면 동안의 분석 추적과 앱 수명 감시를 보관한다.
+class _AnalysisWaitHostState extends State<AnalysisWaitHost> {
+  late final AnalysisWaitSession _session = widget.session();
+  late final AppLifecycleListener _lifecycle = AppLifecycleListener(
+    onHide: _session.pause,
+    onShow: _session.resume,
+  );
+
+  /// 2026-11-05: 앱 수명 감시를 시작한다.
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle;
+  }
+
+  /// 2026-11-05: 수명 감시와 추적을 폐기한다.
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    _session.dispose();
+    super.dispose();
+  }
+
+  /// 2026-11-05: 기기 기록을 지우고 다음 화면으로 간다.
+  Future<void> _next() async {
+    await _session.forget();
+    if (mounted) widget.onNext();
+  }
+
+  /// 2026-11-05: 분석 대기 화면을 반환한다.
+  @override
+  Widget build(BuildContext context) => AnalysisWaitScreen(
+    state: _session.state,
+    onRetry: _session.retry,
+    onNext: _next,
+    userName: widget.userName,
+  );
 }

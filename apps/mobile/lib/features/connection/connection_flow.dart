@@ -302,7 +302,7 @@ class _ReviewHostState extends State<_ReviewHost> {
     }
     Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => _AnalysisHost(
+        builder: (_) => AnalysisWaitHost(
           session: () => start(snapshot),
           userName: widget.userName,
           onNext: () => widget.onFinished(snapshot, deferred: false),
@@ -328,43 +328,4 @@ class _ReviewHostState extends State<_ReviewHost> {
       ),
     );
   }
-}
-
-/// 2026-11-04: 분석 대기 화면의 추적 소유자. 화면에 들어올 때 추적을 시작하고 떠날 때 폐기한다.
-class _AnalysisHost extends StatefulWidget {
-  /// 2026-11-04: 추적 시작 [session], 제목 이름 [userName], 끝난 뒤 '다음' [onNext]로 만든다.
-  const _AnalysisHost({
-    required this.session,
-    required this.onNext,
-    this.userName,
-  });
-
-  final AnalysisWaitSession Function() session;
-  final VoidCallback onNext;
-  final String? userName;
-
-  /// 2026-11-04: 추적을 보관하는 상태 객체를 반환한다.
-  @override
-  State<_AnalysisHost> createState() => _AnalysisHostState();
-}
-
-/// 2026-11-04: 이 화면 동안의 분석 추적을 보관한다.
-class _AnalysisHostState extends State<_AnalysisHost> {
-  late final AnalysisWaitSession _session = widget.session();
-
-  /// 2026-11-04: 추적을 폐기한다. 반복 조회만 멈추고 서버 작업은 취소하지 않는다.
-  @override
-  void dispose() {
-    _session.dispose();
-    super.dispose();
-  }
-
-  /// 2026-11-04: 분석 대기 화면을 반환한다.
-  @override
-  Widget build(BuildContext context) => AnalysisWaitScreen(
-    state: _session.state,
-    onRetry: _session.retry,
-    onNext: widget.onNext,
-    userName: widget.userName,
-  );
 }
