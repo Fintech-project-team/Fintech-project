@@ -1,5 +1,6 @@
 """2026-11-02: 신규 설치 점검·DB 접근 조건·복구 경계를 임시 폴더에서 검증한다."""
 import base64
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -235,6 +236,33 @@ class AiSetupTests(unittest.TestCase):
         self.assertFalse(ai_setup.probe(self.properties, opener=self.opener)['reused'])
         ai_setup.probe(self.properties, force=True, opener=self.opener)
         self.assertEqual(self.opener.open.call_count, 3)
+
+    def test_java_standard_service_preparation_is_current_only_for_its_process(self):
+        profile = {'format': 'payse-ai-performance-v1', 'model': 'gpt-6-luna'}
+        # LlmSettings.configurationFingerprint includes the explicit standard service tier.
+        llm_hash = hashlib.sha256(b'gpt-6-luna\nnone\ndefault\nsynthetic-key-12345').hexdigest()
+        key_hash = 'gamma-local-v1:' + hashlib.sha256(bytes(range(32))).hexdigest()
+        material = json.dumps(profile, separators=(',', ':')) + llm_hash + key_hash
+        material += 'test:v1fixture:gamma-fresh:holdout:100'
+        saved = {'fingerprint': hashlib.sha256(material.encode()).hexdigest(),
+                 'profile': profile, 'preparedAt': '2026-11-05T00:00:00Z',
+                 'preparation': 'READY', 'preparationCount': 1, 'processId': 71}
+        (self.root / 'ai-profile.json').write_text(json.dumps(profile))
+        (self.root / 'ai-status.json').write_text(json.dumps(saved))
+        self.assertTrue(ai_setup.status(self.properties, process_id=71)['runtimeReady'])
+        self.assertFalse(ai_setup.status(self.properties, process_id=72)['runtimeReady'])
+        self.values['apiKey'] = 'synthetic-replacement-key'
+        self.llm.write_text(javaproperties.dumps(self.values, timestamp=False))
+        status = ai_setup.status(self.properties, process_id=71)
+        self.assertEqual(status['preparation'], 'PENDING')
+        self.assertFalse(status['runtimeReady'])
+
+    def test_missing_required_empty_key_is_rejected_before_access_probe(self):
+        self.values.pop('apiKey')
+        self.llm.write_text(javaproperties.dumps(self.values, timestamp=False))
+        with self.assertRaises(ValueError):
+            ai_setup.probe(self.properties, opener=self.opener)
+        self.opener.open.assert_not_called()
 
     def test_failed_probe_is_not_cached_as_connected(self):
         self.opener.open.side_effect = TimeoutError()

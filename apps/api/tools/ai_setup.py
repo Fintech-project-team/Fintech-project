@@ -76,7 +76,9 @@ def validate(properties):
     if not state.is_dir():
         raise ValueError('Prepare the private AI state directory first')
     llm = release.properties(regular(properties[PREFIX + 'llm-file']))
-    if (llm.get('enabled') != 'true' or llm.get('provider') != 'openai'
+    required = {'enabled', 'provider', 'model', 'apiKey', 'reasoningEffort'}
+    if (set(llm) - {'apiKeyEnvFile'} != required
+            or llm.get('enabled') != 'true' or llm.get('provider') != 'openai'
             or llm.get('model') != 'gpt-6-luna' or llm.get('reasoningEffort') != 'none'):
         raise ValueError('AI settings differ from the validated gamma profile')
     credential(llm)
@@ -140,7 +142,7 @@ def status(properties, process_id=None):
     installed = read(config['state'] / 'ai-profile.json')
     connection = read(config['state'] / 'ai-connection.json')
     llm = config['llm']
-    llm_fingerprint = hashlib.sha256((llm['model'] + '\n' + llm['reasoningEffort'] + '\n'
+    llm_fingerprint = hashlib.sha256((llm['model'] + '\n' + llm['reasoningEffort'] + '\ndefault\n'
                                       + credential(llm)).encode()).hexdigest()
     key_fingerprint = 'gamma-local-v1:' + hashlib.sha256(regular(properties[PREFIX + 'key-file']).read_bytes()).hexdigest()
     configuration = llm_fingerprint + key_fingerprint + properties[PREFIX + 'project'] + ':' + properties[PREFIX + 'pricing'] + properties[PREFIX + 'source-version']
