@@ -1,0 +1,39 @@
+{
+  "id": "PAYSE-SERVER-START-STATUS-20261105",
+  "role": "data",
+  "baseCommit": "b83c23a23b4453e9fc489f7dad13051c0c91d3ec",
+  "branch": "fix/api/server-start-status",
+  "allowedPaths": [
+    "docs/tasks/PAYSE-SERVER-START-STATUS-20261105.json",
+    "apps/api/deploy/Dashboard.psm1",
+    "apps/api/deploy/Watch-Payse.ps1",
+    "apps/api/deploy/continuous-delivery.md",
+    "apps/api/tests/Test-Dashboard.ps1",
+    "apps/api/tests/Test-Release.ps1",
+    "apps/api/tools/release_server.py",
+    "apps/api/tests/test_release_server.py"
+  ],
+  "readBefore": [
+    "AGENTS.md",
+    "apps/api/AGENTS.md",
+    "docs/mvp-scope.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/harness/AGENT_REVIEW.md",
+    "docs/harness/COMMIT_PR_POLICY.md",
+    "docs/ownership.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/development-workflow.md",
+    "docs/toolchain.md",
+    "apps/api/deploy/README.md",
+    "apps/api/deploy/continuous-delivery.md",
+    "apps/api/docs/ai-startup.md"
+  ],
+  "acceptance": [
+    "사용자가 보고한 시작 직후 ai 속성 누락 오류를 재현하고 초기/조회 실패/구버전 상태에서도 모니터가 종료되지 않게 수정한다. 미확인을 준비 완료나 비활성으로 바꾸지 않는다.",
+    "설치 폴더에만 있던 비밀값 없는 Dashboard/Watch 화면 소스를 저장소에 관리하고 기존 CI의 Windows 검사와 성공 CI 배포 묶음에 포함한다. 기존 시작/종료/프로세스 소유권 정책과 공개 API/AI 규격은 바꾸지 않는다.",
+    "초기 화면·조회 실패 화면·AI 누락/null/빈 값·AI 활성/비활성·성공/실패 모의 상태 조회를 회귀 검사한다. 묶음의 화면 파일 누락/변조를 확인하고 기존 필수 하네스를 수행한다.",
+    "현재 서버에는 확인한 화면 두 파일만 백업 후 명시 반영한다. 실행 API/DB/HTTPS/설정/키는 보존하며 시작 명령의 기존 프로세스 재사용과 상태 조회를 검증한다. 메모리 상한을 유지하고 유료 LLM 호출은 하지 않는다.",
+    "검증된 수정은 최신 develop 기준 새 수정 브랜치에 commit/push한다. 사용자가 요청한 커밋 제목/본문을 제공한다. 로컬 경로/설정/키/운영 기록은 Git에서 제외한다. 이번 요청은 PR/merge 실행을 포함하지 않는다."
+  ]
+}
