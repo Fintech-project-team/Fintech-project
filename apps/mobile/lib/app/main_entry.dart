@@ -10,6 +10,7 @@ import '../data/coachmark_record_store.dart';
 import '../data/financial_snapshot.dart';
 import '../data/financial_snapshot_repository.dart';
 import '../data/http/api_transport.dart';
+import '../features/connection/analysis_wait_screen.dart';
 import '../features/connection/connection_flow.dart';
 import '../features/connection/connection_illustration.dart';
 import '../features/connection/connection_page.dart';
@@ -36,6 +37,8 @@ class MainEntry extends StatefulWidget {
   /// 2026-11-02: [onLogout]은 내 정보 탭의 로그아웃이다(성공이면 null, 실패면 안내 문구). 없으면 버튼을 두지 않는다.
   /// 2026-11-01: [salaryNoticeApi]는 이 세션의 급여 안내 API다. 없으면 회차를 아는 안내도 조회·저장하지 않는다(실패로 처리).
   /// 2026-11-04: [startAnalysis]는 01-2 뒤 첫 분석 추적 시작이다. 없으면 분석 대기 화면 없이 01-3으로 간다.
+  /// 2026-11-05: [analysis]로 바꿨다. 앱을 다시 켰을 때 '다음'을 누르지 않은 첫 분석 기록이 있으면 홈 대신 분석 대기
+  /// 화면부터 이어 보인다.
   const MainEntry({
     super.key,
     required this.financial,
@@ -50,7 +53,7 @@ class MainEntry extends StatefulWidget {
     this.onLogout,
     this.appVersion,
     this.onChangePin,
-    this.startAnalysis,
+    this.analysis,
   });
 
   final UserFinancialRepository financial;
@@ -70,7 +73,7 @@ class MainEntry extends StatefulWidget {
   /// 2026-11-04: 내 정보의 앱 비밀번호 바꾸기 열기(#213). 없으면 줄을 두지 않는다.
   final Future<bool> Function(BuildContext context)? onChangePin;
 
-  final AnalysisWaitStarter? startAnalysis;
+  final AnalysisLauncher? analysis;
 
   /// 2026-10-21: 조회 상태 객체를 반환한다.
   @override
@@ -112,6 +115,7 @@ class _MainEntryState extends State<MainEntry> {
   int _refreshes = 0;
   TransactionHistoryReady? _history;
   Future<PullRefreshResult>? _pulling;
+  bool _analysisPending = false;
 
   /// 2026-10-21: 현재 스냅샷을 조회한다.
   /// 2026-10-22: 예상하지 못한 예외는 Flutter 오류로 보고한 뒤 다시 던져 다시 시도 화면을 보인다.
@@ -125,6 +129,8 @@ class _MainEntryState extends State<MainEntry> {
       if (result is SnapshotLoaded) {
         _record = await _records.read(result.snapshot.userId);
         _coachmark = await _coachmarks?.read(result.snapshot.userId);
+        _analysisPending =
+            await widget.analysis?.pending(result.snapshot.userId) ?? false;
         _salaryNoticesFor(result.snapshot.userId);
       }
       return result;
@@ -379,6 +385,14 @@ class _MainEntryState extends State<MainEntry> {
   Widget _fromResult(BuildContext context, SnapshotLoadResult result) {
     return switch (result) {
       SnapshotLoaded(:final snapshot) => switch (entryDestination(snapshot)) {
+        EntryDestination.home
+            when _analysisPending && widget.analysis != null =>
+          AnalysisWaitHost(
+            key: ValueKey(('analysis-resume', snapshot.userId)),
+            session: () => widget.analysis!.start(snapshot),
+            userName: widget.userName,
+            onNext: () => setState(() => _analysisPending = false),
+          ),
         EntryDestination.home => Builder(
           builder: (context) => AppShell(
             key: ValueKey(('app-shell', snapshot.userId)),
@@ -417,7 +431,7 @@ class _MainEntryState extends State<MainEntry> {
             onSessionInvalid: widget.onSessionInvalid,
             devEntry: widget.devEntryBuilder(context),
             userName: widget.userName,
-            startAnalysis: widget.startAnalysis,
+            startAnalysis: widget.analysis?.start,
           ),
         ),
         EntryDestination.unreadable => _LoadError(onRetry: _reload),

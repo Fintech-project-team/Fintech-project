@@ -23,6 +23,9 @@ class _FakeSession implements AnalysisWaitSession {
     const AnalysisRunning(),
   );
   int retries = 0;
+  int pauses = 0;
+  int resumes = 0;
+  int forgets = 0;
   bool disposed = false;
 
   /// 2026-11-04: 현재 상태 알림을 반환한다.
@@ -33,8 +36,20 @@ class _FakeSession implements AnalysisWaitSession {
   @override
   void retry() {
     retries++;
-    notifier.value = const AnalysisRunning();
+    notifier.value = const AnalysisRunning(inputReceived: true);
   }
+
+  /// 2026-11-05: 멈춤 횟수를 센다.
+  @override
+  void pause() => pauses++;
+
+  /// 2026-11-05: 재개 횟수를 센다.
+  @override
+  void resume() => resumes++;
+
+  /// 2026-11-05: 기록 삭제 횟수를 센다.
+  @override
+  Future<void> forget() async => forgets++;
 
   /// 2026-11-04: 폐기됐다고 표시한다.
   @override
@@ -45,6 +60,7 @@ class _FakeSession implements AnalysisWaitSession {
 Future<void> _toReview(
   WidgetTester tester, {
   AnalysisWaitStarter? startAnalysis,
+  bool pending = false,
 }) async {
   final unchosen = alphaWithReceipt();
   for (final a in rows(unchosen, 'accounts')) {
@@ -66,7 +82,12 @@ Future<void> _toReview(
         onSessionInvalid: () {},
         firstCalcRecords: MemoryFirstCalcRecordStore(),
         userName: '데모알파',
-        startAnalysis: startAnalysis,
+        analysis: startAnalysis == null
+            ? null
+            : AnalysisLauncher(
+                start: startAnalysis,
+                pending: (_) async => pending,
+              ),
       ),
     ),
   );
@@ -122,7 +143,7 @@ void main() {
     sessions.single.notifier.value = AnalysisFinished(
       transactionCount: 40,
       candidateCount: 2,
-      interpreted: false,
+      outcome: AnalysisOutcome.failed,
     );
     await _pass(tester);
     expect(find.byKey(first), findsNothing, reason: '끝나도 자동으로 넘어가지 않음');
@@ -131,7 +152,7 @@ void main() {
     sessions.single.notifier.value = AnalysisFinished(
       transactionCount: 40,
       candidateCount: 2,
-      interpreted: true,
+      outcome: AnalysisOutcome.interpreted,
     );
     await _pass(tester);
 
@@ -139,6 +160,32 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(first), findsOneWidget);
     expect(sessions.single.disposed, isTrue);
+    expect(sessions.single.forgets, 1, reason: '다음을 누르면 기기 기록을 지움');
+  });
+
+  testWidgets('background pauses polling and coming back resumes it', (
+    tester,
+  ) async {
+    final sessions = <_FakeSession>[];
+    await _toReview(
+      tester,
+      startAnalysis: (snapshot) {
+        final s = _FakeSession(snapshot);
+        sessions.add(s);
+        return s;
+      },
+    );
+    await tester.tap(find.byKey(const ValueKey('review-calculate')));
+    await _pass(tester);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    await tester.pump();
+    expect(sessions.single.pauses, 1);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(sessions.single.resumes, 1);
+    expect(sessions.single.disposed, isFalse, reason: '나가도 추적을 버리지 않음');
   });
 
   testWidgets('back from the wait returns to 01-2 and drops the tracker', (
@@ -159,5 +206,85 @@ void main() {
     await _pass(tester);
     expect(find.byKey(const ValueKey('review-calculate')), findsOneWidget);
     expect(sessions.single.disposed, isTrue);
+  });
+
+  testWidgets(
+    'a relaunch with an unfinished analysis resumes the wait before home',
+    (tester) async {
+      final sessions = <_FakeSession>[];
+      tester.view.physicalSize = const Size(1170, 2532);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildPayseTheme(),
+          home: MainEntry(
+            financial: ScriptedRepository()
+              ..loadResults.add(FinancialOk(alphaWithReceipt())),
+            policy: instantPolicy(),
+            reloadKey: 0,
+            devEntryBuilder: (_) => null,
+            onSessionInvalid: () {},
+            firstCalcRecords: MemoryFirstCalcRecordStore(),
+            userName: '데모알파',
+            analysis: AnalysisLauncher(
+              start: (snapshot) {
+                final s = _FakeSession(snapshot);
+                sessions.add(s);
+                return s;
+              },
+              pending: (userId) async => userId == alphaWithReceipt()['userId'],
+            ),
+          ),
+        ),
+      );
+      await _pass(tester);
+      expect(find.byType(AnalysisWaitScreen), findsOneWidget);
+      expect(sessions, hasLength(1));
+
+      sessions.single.notifier.value = AnalysisFinished(
+        transactionCount: 40,
+        candidateCount: 2,
+        outcome: AnalysisOutcome.interpreted,
+      );
+      await _pass(tester);
+      await tester.tap(find.byKey(const ValueKey('analysis-next')));
+      await _pass(tester);
+      expect(find.byType(AnalysisWaitScreen), findsNothing);
+      expect(sessions.single.forgets, 1);
+    },
+  );
+
+  testWidgets('without an unfinished analysis a relaunch goes home directly', (
+    tester,
+  ) async {
+    var started = 0;
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPayseTheme(),
+        home: MainEntry(
+          financial: ScriptedRepository()
+            ..loadResults.add(FinancialOk(alphaWithReceipt())),
+          policy: instantPolicy(),
+          reloadKey: 0,
+          devEntryBuilder: (_) => null,
+          onSessionInvalid: () {},
+          firstCalcRecords: MemoryFirstCalcRecordStore(),
+          analysis: AnalysisLauncher(
+            start: (snapshot) {
+              started++;
+              return _FakeSession(snapshot);
+            },
+            pending: (_) async => false,
+          ),
+        ),
+      ),
+    );
+    await _pass(tester);
+    expect(find.byType(AnalysisWaitScreen), findsNothing);
+    expect(started, 0);
   });
 }

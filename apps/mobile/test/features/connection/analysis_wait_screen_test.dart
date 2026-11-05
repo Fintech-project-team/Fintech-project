@@ -13,18 +13,16 @@ Future<void> _pump(
   Map<String, int> taps, {
   String? userName = '데모알파',
   bool still = false,
+  double width = 360,
 }) async {
-  tester.view.physicalSize = const Size(1080, 2340);
+  tester.view.physicalSize = Size(width * 3, 2340);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
     MaterialApp(
       theme: buildPayseTheme(),
       home: MediaQuery(
-        data: MediaQueryData(
-          size: const Size(360, 780),
-          disableAnimations: still,
-        ),
+        data: MediaQueryData(size: Size(width, 780), disableAnimations: still),
         child: AnalysisWaitScreen(
           state: state,
           userName: userName,
@@ -64,12 +62,17 @@ void main() {
   testWidgets('waiting shows no done marks and cycles every 10 seconds', (
     tester,
   ) async {
-    final state = ValueNotifier<AnalysisWaitState>(const AnalysisRunning());
+    final state = ValueNotifier<AnalysisWaitState>(
+      const AnalysisRunning(inputReceived: true),
+    );
     addTearDown(state.dispose);
     await _pump(tester, state, {});
 
     expect(find.text('데모알파님의 거래를\n살펴보고 있어요'), findsOneWidget);
-    expect(find.text('보통 3~5분 걸려요.\n앱을 나가도 분석은 계속돼요.'), findsOneWidget);
+    expect(
+      find.text('보통 3~5분 걸려요.\n앱을 나가도 분석은 계속돼요.\n나중에 돌아와 결과를 확인할 수 있어요.'),
+      findsOneWidget,
+    );
     expect(find.text('거래 내역을 정리하고 있어요'), findsOneWidget);
     expect(_art(tester), AnalysisArt.sorting);
     expect(find.textContaining('건'), findsNothing, reason: '기다리는 동안 건수 없음');
@@ -93,13 +96,18 @@ void main() {
   });
 
   testWidgets('after 5 minutes only the explanation changes', (tester) async {
-    final state = ValueNotifier<AnalysisWaitState>(const AnalysisRunning());
+    final state = ValueNotifier<AnalysisWaitState>(
+      const AnalysisRunning(inputReceived: true),
+    );
     addTearDown(state.dispose);
     await _pump(tester, state, {}, userName: null);
     expect(find.text('거래를\n살펴보고 있어요'), findsOneWidget, reason: '이름 없으면 이름 없이');
 
     await tester.pump(const Duration(minutes: 4, seconds: 59));
-    expect(find.text('보통 3~5분 걸려요.\n앱을 나가도 분석은 계속돼요.'), findsOneWidget);
+    expect(
+      find.text('보통 3~5분 걸려요.\n앱을 나가도 분석은 계속돼요.\n나중에 돌아와 결과를 확인할 수 있어요.'),
+      findsOneWidget,
+    );
     await tester.pump(const Duration(seconds: 1));
     expect(find.text('생각보다 오래 걸리고 있어요.\n조금만 더 기다려주세요.'), findsOneWidget);
     expect(find.text('거래를\n살펴보고 있어요'), findsOneWidget);
@@ -108,7 +116,9 @@ void main() {
   testWidgets('finished with candidates rises three rows then next', (
     tester,
   ) async {
-    final state = ValueNotifier<AnalysisWaitState>(const AnalysisRunning());
+    final state = ValueNotifier<AnalysisWaitState>(
+      const AnalysisRunning(inputReceived: true),
+    );
     addTearDown(state.dispose);
     final taps = <String, int>{};
     await _pump(tester, state, taps);
@@ -116,7 +126,7 @@ void main() {
     state.value = AnalysisFinished(
       transactionCount: 1284,
       candidateCount: 7,
-      interpreted: true,
+      outcome: AnalysisOutcome.interpreted,
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
@@ -141,13 +151,15 @@ void main() {
   testWidgets('zero candidates is its own result, not a failure', (
     tester,
   ) async {
-    final state = ValueNotifier<AnalysisWaitState>(const AnalysisRunning());
+    final state = ValueNotifier<AnalysisWaitState>(
+      const AnalysisRunning(inputReceived: true),
+    );
     addTearDown(state.dispose);
     await _pump(tester, state, {});
     state.value = AnalysisFinished(
       transactionCount: 32,
       candidateCount: 0,
-      interpreted: false,
+      outcome: AnalysisOutcome.interpreted,
     );
     await _settleResult(tester);
 
@@ -160,7 +172,9 @@ void main() {
   });
 
   testWidgets('unfinished analysis offers retry and next', (tester) async {
-    final state = ValueNotifier<AnalysisWaitState>(const AnalysisRunning());
+    final state = ValueNotifier<AnalysisWaitState>(
+      const AnalysisRunning(inputReceived: true),
+    );
     addTearDown(state.dispose);
     final taps = <String, int>{};
     await _pump(tester, state, taps);
@@ -168,7 +182,7 @@ void main() {
     state.value = AnalysisFinished(
       transactionCount: 1284,
       candidateCount: 7,
-      interpreted: false,
+      outcome: AnalysisOutcome.failed,
     );
     await _settleResult(tester);
 
@@ -179,12 +193,12 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('analysis-retry')));
     expect(taps['retry'], 1);
-    state.value = const AnalysisRunning();
+    state.value = const AnalysisRunning(inputReceived: true);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('거래 내역을 정리하고 있어요'), findsOneWidget);
     expect(
-      find.text('보통 3~5분 걸려요.\n앱을 나가도 분석은 계속돼요.'),
+      find.text('보통 3~5분 걸려요.\n앱을 나가도 분석은 계속돼요.\n나중에 돌아와 결과를 확인할 수 있어요.'),
       findsOneWidget,
       reason: '다시 시도하면 5분 기준도 처음부터',
     );
@@ -197,7 +211,7 @@ void main() {
       AnalysisFinished(
         transactionCount: 1284,
         candidateCount: 7,
-        interpreted: true,
+        outcome: AnalysisOutcome.interpreted,
       ),
     );
     addTearDown(state.dispose);
@@ -221,7 +235,7 @@ void main() {
       () => AnalysisFinished(
         transactionCount: -1,
         candidateCount: 0,
-        interpreted: true,
+        outcome: AnalysisOutcome.interpreted,
       ),
       throwsArgumentError,
     );
@@ -229,9 +243,101 @@ void main() {
       () => AnalysisFinished(
         transactionCount: 0,
         candidateCount: -1,
-        interpreted: true,
+        outcome: AnalysisOutcome.interpreted,
       ),
       throwsArgumentError,
     );
+  });
+
+  testWidgets('preparing copy until the server confirms the input', (
+    tester,
+  ) async {
+    final state = ValueNotifier<AnalysisWaitState>(const AnalysisRunning());
+    addTearDown(state.dispose);
+    await _pump(tester, state, {});
+    expect(find.text('분석을 준비하고 있어요.\n잠시만 기다려 주세요.'), findsOneWidget);
+    expect(find.textContaining('앱을 나가도'), findsNothing);
+
+    await tester.pump(const Duration(minutes: 6));
+    expect(
+      find.textContaining('생각보다 오래'),
+      findsNothing,
+      reason: '5분 문구는 서버 입력 수신 확인 뒤에만',
+    );
+
+    state.value = const AnalysisRunning(inputReceived: true);
+    await tester.pump();
+    expect(find.textContaining('생각보다 오래'), findsOneWidget);
+    expect(find.textContaining('분석을 준비하고'), findsNothing);
+  });
+
+  testWidgets(
+    'the description box keeps three lines so the art does not move',
+    (tester) async {
+      final state = ValueNotifier<AnalysisWaitState>(const AnalysisRunning());
+      addTearDown(state.dispose);
+      // 테스트 글꼴은 기기 글꼴보다 넓어 360폭에서 셋째 줄이 넘어간다. 기기처럼 세 줄에 들어가는 폭으로 본다.
+      await _pump(tester, state, {}, width: 480);
+      final before = tester.getTopLeft(find.byType(AnalysisIllustration).last);
+      state.value = const AnalysisRunning(inputReceived: true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(tester.getTopLeft(find.byType(AnalysisIllustration).last), before);
+    },
+  );
+
+  testWidgets('unknown outcome asks before retrying', (tester) async {
+    final state = ValueNotifier<AnalysisWaitState>(
+      AnalysisFinished(
+        transactionCount: 40,
+        candidateCount: 3,
+        outcome: AnalysisOutcome.outcomeUnknown,
+      ),
+    );
+    addTearDown(state.dispose);
+    final taps = <String, int>{};
+    await _pump(tester, state, taps);
+    await _settleResult(tester);
+    expect(find.text('분석 결과를 확인하지 못했어요.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('analysis-retry')));
+    await tester.pumpAndSettle();
+    expect(find.text('다시 분석할까요?'), findsOneWidget);
+    expect(
+      find.text('이전 분석이 이미 진행됐을 수 있어요.\n다시 시도하면 같은 분석이 중복 실행될 수 있어요.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('비용'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('analysis-retry-cancel')));
+    await tester.pumpAndSettle();
+    expect(taps['retry'], isNull, reason: '취소면 다시 보내지 않음');
+
+    await tester.tap(find.byKey(const ValueKey('analysis-retry')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('analysis-retry-confirm')));
+    await tester.pumpAndSettle();
+    expect(taps['retry'], 1);
+  });
+
+  testWidgets('expired offers analysing again and says so once', (
+    tester,
+  ) async {
+    final state = ValueNotifier<AnalysisWaitState>(
+      AnalysisFinished(
+        transactionCount: 40,
+        candidateCount: 3,
+        outcome: AnalysisOutcome.expired,
+      ),
+    );
+    addTearDown(state.dispose);
+    final taps = <String, int>{};
+    await _pump(tester, state, taps);
+    await _settleResult(tester);
+    expect(find.text('이전 요청이 만료됐어요.'), findsOneWidget);
+    expect(find.text('다시 분석'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('analysis-retry')));
+    await tester.pump();
+    expect(taps['retry'], 1);
+    expect(find.text('현재 거래 내역으로 다시 분석해요.'), findsOneWidget);
   });
 }

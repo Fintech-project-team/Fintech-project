@@ -77,7 +77,7 @@ lib/data/analysis/analysis_identity.dart         canonicalJson·canonicalDigest�
 
 ## 7. 3단계 참고: 만료 처리
 
-3단계 작업 추적이 따를 기준이다. 이 작업에서는 구현하지 않는다. 근거는 `AnalysisJobs.effectiveState`·`status`와 `AnalysisHttpTest.expiresPermitAndExecutionWindow`다.
+3단계 작업 추적의 기준이다. 구현은 [분석 작업 추적](analysis-tracking.md)에 있다. 근거는 `AnalysisJobs.effectiveState`·`status`와 `AnalysisHttpTest.expiresPermitAndExecutionWindow`다.
 
 | 경우                           | 서버 응답                                          | 앱 처리                                                                                            |
 | ------------------------------ | -------------------------------------------------- | -------------------------------------------------------------------------------------------------- |

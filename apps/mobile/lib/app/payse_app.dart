@@ -1,13 +1,20 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../data/analysis/analysis_api.dart';
+import '../data/analysis/analysis_job_store.dart';
+import '../data/analysis/analysis_tracker.dart';
+import '../data/analysis/analysis_wait_session.dart';
+import '../data/analysis/fake_analysis_api.dart';
 import '../data/auth/auth_repository.dart';
 import '../data/auth/credential_stores.dart';
 import '../data/auth/fake_auth_repository.dart';
 import '../data/auth/http_auth_repository.dart';
+import '../data/auth/random_id.dart';
 import '../data/auth/session_cleanup.dart';
 import '../data/connection/fake_financial_server.dart';
 import '../data/connection/financial_api.dart';
@@ -62,6 +69,9 @@ class PayseApp extends StatefulWidget {
   /// 2026-11-01: [server]는 실제 서버 연결(빌드 설정 주소·통신)이다. 있으면 빌드 모드와 무관하게 실제 인증·금융·급여 안내
   /// 저장소를 쓰고, 가짜 서버·개발용 실패 연출·개발 설정 진입점을 쓰지 않는다. 없으면 기존처럼 개발 빌드는 가짜, 릴리스는
   /// 서비스 불가다.
+  /// 2026-11-05: [analysisJobs]는 첫 분석 작업 기록 저장소다(기본은 기기 저장소라 앱을 다시 켜도 이어 본다).
+  /// [analysisServer]는 가짜 서버 모드의 가짜 분석 서버다(기본은 앱 수명 동안의 새 가짜 서버). 실제 서버 연결이 있으면
+  /// 쓰지 않는다.
   const PayseApp({
     super.key,
     this.snapshotSource,
@@ -78,6 +88,8 @@ class PayseApp extends StatefulWidget {
     this.coachmarkRecords,
     this.server,
     this.appVersion,
+    this.analysisJobs,
+    this.analysisServer,
   });
 
   final SnapshotSource? snapshotSource;
@@ -98,6 +110,9 @@ class PayseApp extends StatefulWidget {
   final FirstCalcRecordStore? firstCalcRecords;
   final CoachmarkRecordStore? coachmarkRecords;
   final ({ApiConfig config, ApiTransport transport})? server;
+
+  final AnalysisJobStore? analysisJobs;
+  final FakeAnalysisServer? analysisServer;
 
   /// 2026-11-03: 설치된 앱 버전 읽기(앱 시작 지점이 넘김). 없으면 내 정보 탭에 버전 줄을 두지 않는다.
   final AppVersionReader? appVersion;
@@ -132,6 +147,13 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
   UserFinancialRepository _financial =
       const UnavailableUserFinancialRepository();
   SalaryNoticeApi _salaryNoticeApi = const UnavailableSalaryNoticeApi();
+  late final AnalysisJobStore _analysisJobs =
+      widget.analysisJobs ?? DeviceAnalysisJobStore();
+  late final FakeAnalysisServer? _analysisServer =
+      kReleaseMode || widget.server != null
+      ? null
+      : widget.analysisServer ?? FakeAnalysisServer();
+  AnalysisApi? _analysisApi;
   int _financialSession = 0;
   String? _userName;
   late final ValueNotifier<bool> _failurePresentation = ValueNotifier(
@@ -251,6 +273,8 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
     final fake = _financialServer;
     final notices = _salaryNoticeServer;
     _financial.close();
+    _analysisApi?.close();
+    _analysisApi = null;
     _userName = stored?.name;
     if (stored == null) {
       _financial = const UnavailableUserFinancialRepository();
@@ -264,6 +288,11 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
         ),
       );
       _salaryNoticeApi = HttpSalaryNoticeApi(
+        config: real.config,
+        transport: real.transport,
+        accessToken: stored.accessToken,
+      );
+      _analysisApi = HttpAnalysisApi(
         config: real.config,
         transport: real.transport,
         accessToken: stored.accessToken,
@@ -283,6 +312,7 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
               server: notices,
               accessToken: stored.accessToken,
             );
+      _analysisApi = _analysisServer?.api(stored.accessToken);
     }
     _financialSession++;
   }
@@ -401,6 +431,9 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
     _financial.close();
     _financial = const UnavailableUserFinancialRepository();
     _salaryNoticeApi = const UnavailableSalaryNoticeApi();
+    _analysisApi?.close();
+    _analysisApi = null;
+    unawaited(_analysisJobs.clearAll());
     _financialSession++;
     _userName = null;
     setState(() {
@@ -512,8 +545,27 @@ class _PayseAppState extends State<PayseApp> with WidgetsBindingObserver {
           onSessionInvalid: _onSessionInvalid,
         ),
         onSessionInvalid: _onFinancialSessionInvalid,
+        analysis: _analysisLauncher(),
       ),
     };
+  }
+
+  /// 2026-11-05: 이번 세션의 첫 분석 연결을 반환한다. 분석 API가 없으면(릴리스 가짜 모드·세션 없음) null이며 01-2 뒤
+  /// 분석 대기 없이 01-3으로 간다. 멱등 키는 UUID, 화면 세션 번호는 시작 시각(밀리초)이다.
+  AnalysisLauncher? _analysisLauncher() {
+    final api = _analysisApi;
+    if (api == null) return null;
+    return AnalysisLauncher(
+      start: (snapshot) => AnalysisTracker(
+        snapshot: snapshot,
+        api: api,
+        store: _analysisJobs,
+        newKey: randomUuidV4,
+        newEpoch: () => _now().millisecondsSinceEpoch,
+        onSessionInvalid: _onFinancialSessionInvalid,
+      ),
+      pending: (userId) async => await _analysisJobs.read(userId) != null,
+    );
   }
 
   /// 2026-10-20: 개발용 진입점을 반환한다. 컴파일 시점 상수 kReleaseMode로 갈라 두어 릴리스 빌드에서는
