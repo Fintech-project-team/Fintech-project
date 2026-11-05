@@ -52,8 +52,11 @@ def build(jar, output, commit, repository, branch, run_id):
     output = package(jar, output)
     schema = API / 'deploy/release-schema.json'
     (output / schema.name).write_bytes(schema.read_bytes())
-    for name in ('portable_server.py', 'server_runtime.py', 'release_server.py', 'package_server.py', 'ai_setup.py'):
+    for name in ('portable_server.py', 'server_runtime.py', 'release_server.py', 'package_server.py',
+                 'ai_setup.py', 'backup_crypto.py', 'secure_backup.py', 'storage_protection.ps1',
+                 'recovery_setup.py', 'efs_recovery.ps1', 'restore_guard.py', 'storage_admin.ps1'):
         (output / name).write_bytes((API / 'tools' / name).read_bytes())
+    (output / 'storage-protection.md').write_bytes((API / 'docs/storage-protection.md').read_bytes())
     for name in ('requirements.txt', 'deployment.properties.example', 'portable.properties.example',
                  'continuous-delivery.md', 'Deploy-Payse.ps1', 'Release-Control.psm1', 'ai.properties.example',
                  'Dashboard.psm1', 'Watch-Payse.ps1'):
@@ -123,7 +126,7 @@ def extract(archive_bytes, output):
     with ZipFile(io.BytesIO(archive_bytes)) as archive:
         entries = archive.infolist()
         names = [entry.filename for entry in entries]
-        if len(names) != len({name.casefold() for name in names}) or len(names) > 30:
+        if len(names) != len({name.casefold() for name in names}) or len(names) > 40:
             raise ValueError('Duplicate or excessive artifact entries')
         for entry in entries:
             if (not re.fullmatch(r'[A-Za-z0-9_.-]+', entry.filename)

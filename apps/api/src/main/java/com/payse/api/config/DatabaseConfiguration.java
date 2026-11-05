@@ -42,12 +42,14 @@ public class DatabaseConfiguration {
      * @return 아직 DB에 연결하지 않은 구성; 자격을 포함하므로 직렬화·로그 금지
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조
+     * @modified 2026-11-05 - 직접 실행에도 원격 DB 인증서 검증과 안전한 URL 경계 적용
      */
     public HikariConfig poolConfig(Environment environment) {
         String url = requireProperty(environment, ApiConfigConstants.Server.PAYSE_JDBC_URL);
         if (!url.startsWith(ApiConfigConstants.Server.POSTGRES_URL_PREFIX)) {
             throw new IllegalArgumentException(ApiMessageConstants.Server.INVALID_JDBC_URL);
         }
+        DatabaseTransport.verify(url);
 
         String username = requireProperty(environment, ApiConfigConstants.Server.PAYSE_DB_USER);
         String password = requireProperty(environment, ApiConfigConstants.Server.PAYSE_DB_PASSWORD);

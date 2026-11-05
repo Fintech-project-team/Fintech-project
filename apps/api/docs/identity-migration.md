@@ -6,6 +6,11 @@
 
 ## 초기 생성과 기존 DB 전환
 
+새 계획은 `--backup-key-file <Git-밖-백업키-절대경로>`를 필수로 받으며 같은 옵션을
+apply에도 전달한다. `--expected-sha256`은 암호문 파일 지문이다. 키 준비와 복구는
+[저장 보호 문서](storage-protection.md)를 따른다. 기존 평문 계획을 적용할 때만
+`--allow-legacy-plaintext`를 명시하며 새 평문 계획 생성은 지원하지 않는다.
+
 - 빈 DB는 `database/001_initial.sql`과 `002_storage_guards.sql`, 검증된 초기 INSERT 시드를 사용한다. 기존 payse 스키마에 초기 SQL을 재실행하지 않는다.
 - 기존 DB는 `database/migrate_identity.py`의 `--plan`과 `--apply`를 분리한다. Python 표준 라이브러리와 PostgreSQL `psql`을 사용하며 별도 패키지나 DB 확장을 설치하지 않는다.
 - 이 도구는 준비된 23테이블의 합성 개발 DB와 세 지정 UUID의 검토된 이름/전화번호를 대상으로 한다. 계정 수를 제품의 영구 한도로 정하지 않는다. 다른 사용자·부분 스키마·추가 업무 테이블이 있는 DB는 확장 검토 없이 변환하지 않는다.

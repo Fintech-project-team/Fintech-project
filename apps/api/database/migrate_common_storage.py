@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import re
 from migrate_identity import MigrationError, require, run_psql, sql_literal, sql_digest, transaction_prefix
+from migrate_identity import save_archive, read_archive, backup_crypto
 
 HERE=Path(__file__).resolve().parent
 FORMAT='PAYSE-COMMON-STORAGE-1'
@@ -75,26 +76,25 @@ def validate(snapshot, legacy):
     require(all(row['rls'] and row['forced'] for row in snapshot['catalog'] if row['kind']=='r' and row['name']!='institutions'),'Owner RLS missing')
 
 
-def create_plan(psql,database,backup,timeout_seconds,lock_timeout_ms):
+def create_plan(psql,database,backup,timeout_seconds,lock_timeout_ms, *, backup_key=None):
     """2026-10-23: Read and archive the exact legacy source; no source mutation occurs."""
     path=Path(backup)
     require(not path.exists() and not path.is_symlink(),'Archive must be a new regular file')
+    require(backup_key is not None, 'An explicit backup key is required')
+    backup_crypto().read_key(backup_key)
     raw=run_psql(psql,database,transaction_prefix(lock_timeout_ms,True)+snapshot_query(True)+';COMMIT;',timeout_seconds)
     state=json.loads(raw);validate(state,True)
     body=(json.dumps({'format':FORMAT,'sourceState':raw,'stateDigest':hashlib.sha256(raw.encode()).hexdigest()},ensure_ascii=False,indent=2)+'\n').encode()
-    descriptor=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
-    with os.fdopen(descriptor,'wb') as stream:
-        stream.write(body);stream.flush();os.fsync(stream.fileno())
-    require(path.read_bytes()==body,'Archive verification failed')
-    return hashlib.sha256(body).hexdigest()
+    return save_archive(backup, body, backup_key)
 
 
-def apply_plan(psql,database,backup,expected_sha256,timeout_seconds,lock_timeout_ms):
+def apply_plan(psql,database,backup,expected_sha256,timeout_seconds,lock_timeout_ms,
+               *, backup_key=None, allow_legacy_plaintext=False):
     """2026-10-23: Rename under frozen v2 guards, preserving salary facts for separate v3 review."""
     path=Path(backup)
     require(path.is_file() and not path.is_symlink(),'Archive must be a regular file')
-    body=path.read_bytes()
-    require(re.fullmatch('[0-9a-f]{64}',expected_sha256 or '') is not None and hashlib.sha256(body).hexdigest()==expected_sha256,'Archive hash mismatch')
+    body=read_archive(backup, expected_sha256, backup_key=backup_key,
+                       allow_legacy_plaintext=allow_legacy_plaintext)
     plan=json.loads(body)
     require(set(plan)=={'format','sourceState','stateDigest'} and plan['format']==FORMAT,'Unsupported archive')
     require(hashlib.sha256(plan['sourceState'].encode()).hexdigest()==plan['stateDigest'],'Source digest mismatch')
@@ -116,7 +116,7 @@ def apply_plan(psql,database,backup,expected_sha256,timeout_seconds,lock_timeout
     sql+='\n'.join(changes)+'\n'+snapshot_query(False)+' INTO result;\n'
     sql+="IF original->'data' IS DISTINCT FROM result->'data' THEN RAISE EXCEPTION 'Retained rows changed'; END IF;\n"
     sql+="PERFORM payse.assert_user_storage(id) FROM payse.users; END $migration$;\nCOMMIT;SELECT 'APPLIED';"
-    require(path.read_bytes()==body,'Archive changed before apply')
+    require(hashlib.sha256(path.read_bytes()).hexdigest()==expected_sha256,'Archive changed before apply')
     result=run_psql(psql,database,sql,timeout_seconds)
     require(result=='APPLIED','Unexpected result; inspect DB before retrying')
     return result
@@ -131,13 +131,16 @@ def main():
     parser.add_argument('--backup',type=Path,required=True)
     parser.add_argument('--timeout-seconds',type=int,required=True);parser.add_argument('--lock-timeout-ms',type=int,required=True)
     parser.add_argument('--expected-sha256')
+    parser.add_argument('--backup-key-file', type=Path)
+    parser.add_argument('--allow-legacy-plaintext', action='store_true')
     args=parser.parse_args()
     try:
         if args.plan:
+            require(not args.allow_legacy_plaintext, 'New plaintext plans are not supported')
             require(args.expected_sha256 is None,'Hash is accepted only for apply')
-            result={'status':'PLANNED','sha256':create_plan(args.psql,args.database,args.backup,args.timeout_seconds,args.lock_timeout_ms)}
+            result={'status':'PLANNED','sha256':create_plan(args.psql,args.database,args.backup,args.timeout_seconds,args.lock_timeout_ms,backup_key=args.backup_key_file)}
         else:
-            result={'status':apply_plan(args.psql,args.database,args.backup,args.expected_sha256,args.timeout_seconds,args.lock_timeout_ms)}
+            result={'status':apply_plan(args.psql,args.database,args.backup,args.expected_sha256,args.timeout_seconds,args.lock_timeout_ms,backup_key=args.backup_key_file,allow_legacy_plaintext=args.allow_legacy_plaintext)}
         print(json.dumps(result));return 0
     except (ValueError,KeyError,TypeError,OSError):
         print(json.dumps({'status':'REJECTED','reason':'Schema/state/archive validation failed; no success reported'}));return 1

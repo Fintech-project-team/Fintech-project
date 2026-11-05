@@ -10,6 +10,11 @@
 
 ## 기존 DB 이행
 
+모든 새 이행 계획은 `--backup-key-file <Git-밖-백업키-절대경로>`를 필수로 받는다.
+apply에도 같은 키를 전달하고 암호문 파일의 SHA-256을 검토한다. 구 평문 계획은
+`--allow-legacy-plaintext`를 명시한 apply만 허용한다. 복구 키 준비와 인증 복호화는
+[저장 보호와 복구](storage-protection.md)를 따른다. 새 평문 계획을 생성하지 않는다.
+
 새 빈 DB에는 현재 `001_initial.sql` → `002_storage_guards.sql` → 기관 기준정보 → 기본 사용자/금융 SQL 순서로 적재한다. 기존 DB에는 초기 DDL이나 INSERT 시드를 재실행하지 않는다.
 
 기존 DB의 은행 기준 행 보완은 [기관 기준정보 도구](../reference_data/docs/README.md)의 `--synchronize-reviewed` SQL로 별도 실행한다. 사용자·금융 스키마 이행은 기관의 이름이나 기존 행을 바꾸지 않는다. 새 금융 준비 자료를 사용하려면 공통 스키마와 기관 기준정보가 모두 맞아야 한다.

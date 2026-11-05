@@ -1,5 +1,9 @@
 # 분석 저장 구조
 
+분석 결과 암호화와 별개로 원천 DB·설정·마스터키·백업 보호는
+[저장 보호와 복구](storage-protection.md)를 따른다. 현재 DB의 삭제만으로 과거 백업의
+래핑 키까지 파쇄됐다고 보지 않는다. 복원본은 최신 삭제 결정을 재적용하기 전 공개하지 않는다.
+
 상태: **008 분석 저장·API 연결과 011 기억 원천 메타 구조의 격리 DB 검증 완료**. [008 진입 SQL](../database/008_analysis_storage.sql)·[분석 저장 SQL](../database/analysis/storage.sql), [011 추가 이행](../database/011_analysis_memory_refs.sql)·[기억 원천 메타 SQL](../database/analysis/memory_refs.sql)이 실행 정의다. 이 문서는 분석 컬럼의 의미·수명 사전이며 [공통 DB 사전](../../../docs/database-schema.md)의 초기 금융 DDL 22개 테이블·188개 컬럼을 재정의하지 않는다. 기존 운영 DB 적용·배포 완료를 뜻하지 않는다. [분석 API](analysis-api.md), [실행 상세](llm-execution.md), [서비스 경계](service-boundaries.md)를 함께 읽는다.
 
 ## 1. 분리 이유

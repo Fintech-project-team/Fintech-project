@@ -1,6 +1,7 @@
 """Run only in a dedicated localhost payse_fixture_common_* PostgreSQL database."""
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -29,6 +30,8 @@ class CommonStorageMigrationTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory(dir=OPTIONS.temp)
         self.addCleanup(self.temp.cleanup)
         self.backup=Path(self.temp.name)/'archive.json'
+        self.backup_key=Path(self.temp.name).resolve()/'backup.key'
+        migration.backup_crypto().write_key(self.backup_key, os.urandom(32), 'file')
         self.sql('DROP SCHEMA IF EXISTS payse CASCADE;')
         for name in ('001_initial.sql','002_storage_guards.sql'):
             self.sql((API/'tests/legacy'/name).read_text(encoding='utf-8'))
@@ -47,11 +50,11 @@ class CommonStorageMigrationTests(unittest.TestCase):
 
     def plan(self):
         """2026-10-29: 현재 원천을 변경하지 않고 이행 계획을 만든다. 사용: unittest."""
-        return migration.create_plan(OPTIONS.psql,OPTIONS.database,self.backup,60,3000)
+        return migration.create_plan(OPTIONS.psql,OPTIONS.database,self.backup.resolve(),60,3000,backup_key=self.backup_key)
 
     def apply(self,digest):
         """2026-10-29: 확인한 해시에 해당하는 이행만 실행한다. 사용: unittest."""
-        return migration.apply_plan(OPTIONS.psql,OPTIONS.database,self.backup,digest,60,3000)
+        return migration.apply_plan(OPTIONS.psql,OPTIONS.database,self.backup.resolve(),digest,60,3000,backup_key=self.backup_key)
 
     def test_migration_preserves_rows_and_archive(self):
         """2026-10-29: 행·보관 자료·과거 175개 컬럼을 유지한다. 사용: unittest."""
@@ -60,7 +63,8 @@ class CommonStorageMigrationTests(unittest.TestCase):
         self.assertEqual(self.apply(digest),'APPLIED')
         after=self.state(False);migration.validate(after,False)
         self.assertEqual(before['data'],after['data'])
-        self.assertEqual(len(json.loads(json.loads(archive)['sourceState'])['events']),1)
+        document=migration.read_archive(self.backup.resolve(),digest,backup_key=self.backup_key)
+        self.assertEqual(len(json.loads(json.loads(document)['sourceState'])['events']),1)
         self.assertEqual(self.backup.read_bytes(),archive)
         self.assertEqual(len(after['columns']),22)
         self.assertEqual(sum(map(len,after['columns'].values())),175)

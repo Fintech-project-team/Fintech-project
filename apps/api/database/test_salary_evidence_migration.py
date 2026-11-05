@@ -2,6 +2,7 @@
 import argparse
 import copy
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -77,11 +78,16 @@ class SalaryEvidenceMigrationTests(unittest.TestCase):
     def plan(self):
         """2026-10-23: Write explicit input and invoke the read-only planning step."""
         self.mapping_path.write_text(json.dumps(self.mapping), encoding='utf-8')
-        return migration.create_plan(OPTIONS.psql, OPTIONS.database, self.mapping_path, self.archive, 60, 3000)
+        if not hasattr(self, 'backup_key'):
+            self.backup_key = self.archive.resolve().parent / 'backup.key'
+            migration.backup_crypto().write_key(self.backup_key, os.urandom(32), 'file')
+        return migration.create_plan(OPTIONS.psql, OPTIONS.database, self.mapping_path,
+                                     self.archive.resolve(), 60, 3000, backup_key=self.backup_key)
 
     def apply(self, digest):
         """2026-10-23: Apply only the reviewed archive and its exact SHA-256."""
-        return migration.apply_plan(OPTIONS.psql, OPTIONS.database, self.archive, digest, 60, 3000)
+        return migration.apply_plan(OPTIONS.psql, OPTIONS.database, self.archive.resolve(),
+                                    digest, 60, 3000, backup_key=self.backup_key)
 
     def test_migration_preserves_source_facts(self):
         """2026-10-23: All old IDs, dates, amounts, user versions and historical source versions survive."""

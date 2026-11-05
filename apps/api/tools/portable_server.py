@@ -149,20 +149,42 @@ def schema_query(schema):
             + ") THEN 'READY' ELSE 'INCOMPATIBLE' END FROM pg_roles WHERE rolname=session_user; ROLLBACK;")
 
 
-def database_check(settings, properties, schema):
-    """2026-11-02: 지정한 기존 DB의 구조·최소 역할만 읽기 전용으로 확인한다. 비밀번호는 자식 환경에만 넣는다."""
-    jdbc = properties['PAYSE_JDBC_URL']
+def database_target(jdbc):
+    """2026-11-05: Java와 같은 단일 호스트·명시 TLS URL만 검사하고 자격은 반환하지 않는다."""
+    try:
+        return parse_database_target(jdbc)
+    except (ValueError, TypeError, AttributeError):
+        raise ValueError('Database URL must use one explicit host and remote TLS certificate verification') from None
+
+
+def parse_database_target(jdbc):
+    """2026-11-05: 내부 파싱 예외는 database_target에서 값 없는 진단으로 바꾼다."""
     if not jdbc.startswith('jdbc:postgresql://'):
         raise ValueError('Expected a PostgreSQL JDBC URL')
+    if any(ord(char) <= 32 or ord(char) == 127 for char in jdbc):
+        raise ValueError('Unsupported database URL')
     target = urlsplit(jdbc[5:])
     database = target.path.removeprefix('/')
-    if not target.hostname or target.username or target.password or target.fragment or not re.fullmatch(r'[A-Za-z0-9_]+', database):
+    authority = r'(?:[A-Za-z0-9.-]+|\[[0-9A-Fa-f:]+\])(?::[0-9]{1,5})?'
+    if (not re.fullmatch(authority, target.netloc) or target.port == 0
+            or '#' in jdbc or not re.fullmatch(r'[A-Za-z0-9_]+', database)):
         raise ValueError('Unsupported database URL')
-    query = parse_qs(target.query, strict_parsing=True)
-    if set(query) - {'sslmode', 'sslrootcert', 'sslcert', 'sslkey'} or any(len(v) != 1 for v in query.values()):
+    allowed = {'sslmode', 'sslrootcert', 'sslcert', 'sslkey'}
+    fields = target.query.split('&') if '?' in jdbc else []
+    if any(field.count('=') != 1 or field.split('=')[0] not in allowed for field in fields):
+        raise ValueError('Only explicit PostgreSQL TLS query options are supported')
+    query = parse_qs(target.query, strict_parsing=True, keep_blank_values=True)
+    if (any(len(v) != 1 or not v[0].strip() or any(ord(c) < 32 or ord(c) == 127 for c in v[0])
+            for v in query.values())):
         raise ValueError('Only explicit PostgreSQL TLS query options are supported')
     if target.hostname not in ('127.0.0.1', 'localhost', '::1') and query.get('sslmode') != ['verify-full']:
         raise ValueError('Remote database connections require sslmode=verify-full')
+    return target, database, query
+
+
+def database_check(settings, properties, schema):
+    """2026-11-02: 지정한 기존 DB를 읽기 전용 검사한다. 2026-11-05: Java와 URL 검증 경계를 맞춘다."""
+    target, database, query = database_target(properties['PAYSE_JDBC_URL'])
     environment = {key: value for key, value in os.environ.items() if not key.upper().startswith('PG')}
     environment.update(PGPASSWORD=properties['PAYSE_DB_PASSWORD'], PGCONNECT_TIMEOUT='5',
                        PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=5000 -c lock_timeout=1000')

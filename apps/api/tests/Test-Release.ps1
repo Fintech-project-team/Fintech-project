@@ -150,3 +150,4 @@ try {
 }
 
 & (Join-Path $PSScriptRoot 'Test-Dashboard.ps1')
+& (Join-Path $PSScriptRoot 'Test-StorageProtection.ps1')

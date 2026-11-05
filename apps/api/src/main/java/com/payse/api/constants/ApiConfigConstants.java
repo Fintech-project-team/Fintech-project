@@ -207,6 +207,16 @@ public final class ApiConfigConstants {
         public static final String SALARY_NOTICES = "salary-notices";
         public static final String PAYSE_JDBC_URL = "PAYSE_JDBC_URL";
         public static final String POSTGRES_URL_PREFIX = "jdbc:postgresql:";
+        public static final String JDBC_PREFIX = "jdbc:";
+        public static final String POSTGRES_NETWORK_PREFIX = "jdbc:postgresql://";
+        public static final String LOCALHOST = "localhost";
+        public static final String LOOPBACK_IPV4 = "127.0.0.1";
+        public static final String LOOPBACK_IPV6 = "[::1]";
+        public static final String SSL_MODE = "sslmode";
+        public static final String SSL_ROOT_CERT = "sslrootcert";
+        public static final String SSL_CERT = "sslcert";
+        public static final String SSL_KEY = "sslkey";
+        public static final String SSL_VERIFY_FULL = "verify-full";
         public static final String PAYSE_DB_USER = "PAYSE_DB_USER";
         public static final String PAYSE_DB_PASSWORD = "PAYSE_DB_PASSWORD";
         public static final String PAYSE_DB_MAX_POOL_SIZE = "PAYSE_DB_MAX_POOL_SIZE";

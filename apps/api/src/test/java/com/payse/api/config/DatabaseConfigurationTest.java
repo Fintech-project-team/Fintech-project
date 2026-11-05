@@ -18,6 +18,21 @@ import org.springframework.mock.env.MockEnvironment;
  */
 class DatabaseConfigurationTest {
     /**
+     * 직접 실행하는 모든 DB 풀에도 원격 인증서 검사 정책이 적용되는지 확인한다.
+     * @created 2026-11-05
+     * @usedBy JUnit test
+     */
+    @Test
+    void checksTransportBeforeConnecting() {
+        var environment = validEnvironment()
+            .withProperty(DatabaseConfig.PAYSE_JDBC_URL, "jdbc:postgresql://db.example.test/payse");
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new DatabaseConfiguration().poolConfig(environment)
+        );
+    }
+
+    /**
      * DB 설정 누락 시 임의 내장 DB로 대체하지 않는지 검사한다.
      * @created 2026-10-20
      * @usedBy JUnit test

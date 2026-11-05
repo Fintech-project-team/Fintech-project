@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -261,31 +262,64 @@ def read_state(psql, database, timeout_seconds, lock_timeout_ms):
     return raw, snapshot, actions
 
 
-def create_plan(psql, database, backup, timeout_seconds, lock_timeout_ms):
-    """Write a new review/backup file exclusively after a read-only preflight."""
-    backup = Path(backup)
-    require(not backup.exists() and not backup.is_symlink(), 'Backup must be a new regular file')
+def backup_crypto():
+    """2026-11-05: 기존 합성 데이터 검사에는 불필요한 암호 의존성을 백업 시에만 읽는다."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+    import backup_crypto as crypto
+    return crypto
+
+
+def save_archive(backup, body, backup_key):
+    """2026-11-05: 역사적 이행 도구가 공통으로 쓰는 인증 암호문과 검토 지문을 만든다."""
+    require(backup_key is not None, 'An explicit backup key is required')
+    require(not Path(backup).exists() and not Path(backup).is_symlink(), 'Backup must be a new regular file')
+    crypto = backup_crypto()
+    key = crypto.read_key(backup_key)
+    crypto.encrypt_stream(io.BytesIO(body), backup, key)
+    require(crypto.read_encrypted(backup, key) == body, 'Backup verification failed')
+    return hashlib.sha256(Path(backup).read_bytes()).hexdigest()
+
+
+def read_archive(backup, expected_sha256, *, backup_key=None, allow_legacy_plaintext=False):
+    """2026-11-05: 검토 지문과 인증을 먼저 확인하며 암호 실패를 평문 처리로 바꾸지 않는다."""
+    path = Path(backup)
+    require(path.is_file() and not path.is_symlink(), 'Plan must be a regular preserved file')
+    require(path.stat().st_size <= 32 * 1024**2, 'Archive exceeds the review document limit')
+    body = path.read_bytes()
+    require(re.fullmatch(r'[0-9a-f]{64}', expected_sha256 or '') is not None
+            and hashlib.sha256(body).hexdigest() == expected_sha256, 'Backup hash mismatch')
+    if backup_key is None:
+        require(allow_legacy_plaintext, 'Legacy plaintext requires explicit permission')
+        return body
+    try:
+        crypto = backup_crypto()
+        return crypto.read_encrypted(path, crypto.read_key(backup_key))
+    except Exception:
+        raise MigrationError('Encrypted plan authentication failed') from None
+
+
+def create_plan(psql, database, backup, timeout_seconds, lock_timeout_ms, *, backup_key=None):
+    """2026-11-05: 읽기 전용 사전 검사 후 암호화된 새 이행 문서만 보존한다."""
+    require(backup_key is not None, 'An explicit backup key is required')
+    require(not Path(backup).exists() and not Path(backup).is_symlink(), 'Backup must be a new regular file')
+    crypto = backup_crypto()
+    key = crypto.read_key(backup_key)
+    backup = crypto.private_path(backup)
     raw, snapshot, actions = read_state(psql, database, timeout_seconds, lock_timeout_ms)
     document = {'format': FORMAT, 'sourceState': raw, 'stateDigest': hashlib.sha256(raw.encode('utf-8')).hexdigest(), 'actions': actions}
     body = (json.dumps(document, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
     try:
-        descriptor = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(descriptor, 'wb') as stream:
-            stream.write(body)
-            stream.flush()
-            os.fsync(stream.fileno())
-        require(backup.read_bytes() == body, 'Backup verification failed')
+        crypto.encrypt_stream(io.BytesIO(body), backup, key)
+        require(crypto.read_encrypted(backup, key) == body, 'Backup verification failed')
     except OSError as error:
         raise MigrationError('Backup could not be preserved; do not apply') from error
-    return hashlib.sha256(body).hexdigest(), actions
+    return hashlib.sha256(backup.read_bytes()).hexdigest(), actions
 
 
-def load_plan(backup, expected_sha256):
-    """Verify the explicitly reviewed file hash before trusting any archive content."""
-    path = Path(backup)
-    require(path.is_file() and not path.is_symlink(), 'Plan must be a regular preserved file')
-    body = path.read_bytes()
-    require(re.fullmatch(r'[0-9a-f]{64}', expected_sha256) is not None and hashlib.sha256(body).hexdigest() == expected_sha256, 'Backup hash mismatch')
+def load_plan(backup, expected_sha256, *, backup_key=None, allow_legacy_plaintext=False):
+    """2026-11-05: 검토한 암호문 지문·인증을 확인하며 기존 평문은 명시 허용 때만 읽는다."""
+    body = read_archive(backup, expected_sha256, backup_key=backup_key,
+                         allow_legacy_plaintext=allow_legacy_plaintext)
     try:
         plan = json.loads(body)
         require(type(plan) is dict, 'Plan must be an object')
@@ -305,9 +339,11 @@ def load_plan(backup, expected_sha256):
     return plan, snapshot
 
 
-def apply_plan(psql, database, backup, expected_sha256, timeout_seconds, lock_timeout_ms):
+def apply_plan(psql, database, backup, expected_sha256, timeout_seconds, lock_timeout_ms,
+               *, backup_key=None, allow_legacy_plaintext=False):
     """Atomically apply only the reviewed state and preserve all nonidentity data."""
-    plan, snapshot = load_plan(backup, expected_sha256)
+    plan, snapshot = load_plan(backup, expected_sha256, backup_key=backup_key,
+                               allow_legacy_plaintext=allow_legacy_plaintext)
     require(snapshot['database']['name'] == database, 'Plan targets a different database')
     actions = plan['actions']
     changes = []
@@ -356,15 +392,22 @@ def main():
     parser.add_argument('--timeout-seconds', required=True, type=int)
     parser.add_argument('--lock-timeout-ms', required=True, type=int)
     parser.add_argument('--expected-sha256')
+    parser.add_argument('--backup-key-file', type=Path)
+    parser.add_argument('--allow-legacy-plaintext', action='store_true')
     args = parser.parse_args()
     try:
         if args.plan:
+            require(not args.allow_legacy_plaintext, 'New plaintext plans are not supported')
             require(args.expected_sha256 is None, 'Hash is only accepted with apply')
-            digest, actions = create_plan(args.psql, args.database, args.backup, args.timeout_seconds, args.lock_timeout_ms)
+            digest, actions = create_plan(args.psql, args.database, args.backup, args.timeout_seconds,
+                                          args.lock_timeout_ms, backup_key=args.backup_key_file)
             print(json.dumps({'status': 'PLANNED', 'sha256': digest, 'actions': actions}))
         else:
             require(args.expected_sha256 is not None, 'Apply requires the separately reviewed SHA-256')
-            print(json.dumps({'status': apply_plan(args.psql, args.database, args.backup, args.expected_sha256, args.timeout_seconds, args.lock_timeout_ms)}))
+            print(json.dumps({'status': apply_plan(args.psql, args.database, args.backup,
+                              args.expected_sha256, args.timeout_seconds, args.lock_timeout_ms,
+                              backup_key=args.backup_key_file,
+                              allow_legacy_plaintext=args.allow_legacy_plaintext)}))
     except (MigrationError, OSError, ValueError) as error:
         # Do not print SQL/stderr, raw source data, connection details or exception values.
         print(json.dumps({'status': 'REJECTED', 'reason': str(error) if isinstance(error, MigrationError) else 'Tool input or archive failure'}))

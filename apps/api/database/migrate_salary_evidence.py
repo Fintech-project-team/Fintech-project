@@ -21,6 +21,7 @@ from uuid import UUID
 
 import migrate_common_storage as common
 from migrate_identity import MigrationError, require, run_psql, sql_literal, sql_digest, transaction_prefix
+from migrate_identity import save_archive, read_archive, backup_crypto
 
 HERE = Path(__file__).resolve().parent
 FORMAT = 'PAYSE-SALARY-EVIDENCE-PLAN-1'
@@ -143,10 +144,12 @@ def target_guards():
     return hashlib.sha256(raw).hexdigest(), [function.replace('CREATE FUNCTION', 'CREATE OR REPLACE FUNCTION', 1) for function in functions]
 
 
-def create_plan(psql, database, mapping_path, backup, timeout_seconds, lock_timeout_ms):
+def create_plan(psql, database, mapping_path, backup, timeout_seconds, lock_timeout_ms, *, backup_key=None):
     """2026-10-23: Archive source hashes and reviewed complete mappings without modifying the DB."""
     path = Path(backup)
     require(not path.exists() and not path.is_symlink(), 'Archive must be a new regular file')
+    require(backup_key is not None, 'An explicit backup key is required')
+    backup_crypto().read_key(backup_key)
     mapping = strict_json(read_regular(mapping_path))
     guard_digest, _ = target_guards()
     sql = transaction_prefix(lock_timeout_ms, True) + "SET LOCAL client_encoding='UTF8';\n" + snapshot_query() + ';COMMIT;'
@@ -156,19 +159,14 @@ def create_plan(psql, database, mapping_path, backup, timeout_seconds, lock_time
     transformed_sources(state, mapping)
     archive = {'format': FORMAT, 'sourceState': raw, 'stateDigest': hashlib.sha256(raw.encode('utf-8')).hexdigest(), 'mapping': mapping, 'targetGuardSha256': guard_digest}
     body = (json.dumps(archive, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(descriptor, 'wb') as stream:
-        stream.write(body)
-        stream.flush()
-        os.fsync(stream.fileno())
-    require(path.read_bytes() == body, 'Archive verification failed')
-    return hashlib.sha256(body).hexdigest()
+    return save_archive(backup, body, backup_key)
 
 
-def apply_plan(psql, database, backup, expected_sha256, timeout_seconds, lock_timeout_ms):
+def apply_plan(psql, database, backup, expected_sha256, timeout_seconds, lock_timeout_ms,
+               *, backup_key=None, allow_legacy_plaintext=False):
     """2026-10-23: Lock and recheck all reviewed state; change only month/schema/source versions."""
-    body = read_regular(backup)
-    require(re.fullmatch('[0-9a-f]{64}', expected_sha256 or '') is not None and hashlib.sha256(body).hexdigest() == expected_sha256, 'Archive hash mismatch')
+    body = read_archive(backup, expected_sha256, backup_key=backup_key,
+                         allow_legacy_plaintext=allow_legacy_plaintext)
     archive = strict_json(body)
     require(isinstance(archive, dict) and set(archive) == {'format', 'sourceState', 'stateDigest', 'mapping', 'targetGuardSha256'} and archive['format'] == FORMAT, 'Unsupported archive')
     require(isinstance(archive['sourceState'], str) and hashlib.sha256(archive['sourceState'].encode('utf-8')).hexdigest() == archive['stateDigest'], 'Source digest mismatch')
@@ -197,7 +195,7 @@ def apply_plan(psql, database, backup, expected_sha256, timeout_seconds, lock_ti
     sql += "IF result->'sourceRows' IS DISTINCT FROM " + sql_literal(json.dumps(updated, ensure_ascii=False)) + "::jsonb THEN RAISE EXCEPTION 'Salary source transition differs'; END IF;\n"
     sql += 'END;'
     sql = prefix + 'DO ' + sql_literal(sql) + ";\nCOMMIT;SELECT 'APPLIED';"
-    require(read_regular(backup) == body, 'Archive changed before application')
+    require(hashlib.sha256(read_regular(backup)).hexdigest() == expected_sha256, 'Archive changed before application')
     result = run_psql(psql, database, sql, timeout_seconds)
     require(result == 'APPLIED', 'Unexpected result; inspect DB before retrying')
     return result
@@ -216,14 +214,17 @@ def main():
     parser.add_argument('--timeout-seconds', type=int, required=True)
     parser.add_argument('--lock-timeout-ms', type=int, required=True)
     parser.add_argument('--expected-sha256')
+    parser.add_argument('--backup-key-file', type=Path)
+    parser.add_argument('--allow-legacy-plaintext', action='store_true')
     args = parser.parse_args()
     try:
         if args.plan:
+            require(not args.allow_legacy_plaintext, 'New plaintext plans are not supported')
             require(args.mapping is not None and args.expected_sha256 is None, 'Plan requires a mapping and no apply hash')
-            result = {'status': 'PLANNED', 'sha256': create_plan(args.psql, args.database, args.mapping, args.backup, args.timeout_seconds, args.lock_timeout_ms)}
+            result = {'status': 'PLANNED', 'sha256': create_plan(args.psql, args.database, args.mapping, args.backup, args.timeout_seconds, args.lock_timeout_ms, backup_key=args.backup_key_file)}
         else:
             require(args.mapping is None, 'Apply reads only the reviewed archive mapping')
-            result = {'status': apply_plan(args.psql, args.database, args.backup, args.expected_sha256, args.timeout_seconds, args.lock_timeout_ms)}
+            result = {'status': apply_plan(args.psql, args.database, args.backup, args.expected_sha256, args.timeout_seconds, args.lock_timeout_ms, backup_key=args.backup_key_file, allow_legacy_plaintext=args.allow_legacy_plaintext)}
         print(json.dumps(result))
         return 0
     except (ValueError, KeyError, TypeError, OSError):

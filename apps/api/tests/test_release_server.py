@@ -45,6 +45,14 @@ def receipt(directory, metadata):
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_recovery_tools_are_packaged_without_private_state(self):
+        names = ('backup_crypto.py', 'secure_backup.py', 'recovery_setup.py', 'restore_guard.py',
+                 'efs_recovery.ps1', 'storage_protection.ps1', 'storage_admin.ps1')
+        for name in names:
+            self.assertEqual((self.output / name).read_bytes(), (release.API / 'tools' / name).read_bytes())
+        self.assertTrue((self.output / 'storage-protection.md').is_file())
+        self.assertFalse(any(path.suffix in ('.key', '.dpapi', '.pfx', '.enc') for path in self.output.iterdir()))
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix='payse-release-test-')
         self.addCleanup(self.temporary.cleanup)
@@ -185,6 +193,13 @@ class ReleaseTests(unittest.TestCase):
         with patch.object(release.subprocess, 'run', side_effect=responses), self.assertRaises(ValueError):
             release.fetch(settings, RUN_ID, self.root / 'download')
         self.assertFalse((self.root / 'download').exists())
+
+
+def load_tests(loader, tests, pattern):
+    """2026-11-05: 기존 Windows/Linux 배포 CI에서 동봉한 암호화·복구 도구도 실행한다."""
+    for name in ('test_backup_crypto', 'test_secure_backup', 'test_recovery_setup', 'test_restore_guard'):
+        tests.addTests(loader.loadTestsFromName(name))
+    return tests
 
 
 if __name__ == '__main__':

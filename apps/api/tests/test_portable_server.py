@@ -20,6 +20,24 @@ from test_release_server import COMMIT, bundle, receipt
 
 
 class PortableTests(unittest.TestCase):
+    def test_ambiguous_database_urls_are_rejected_before_process_launch(self):
+        suffixes = ('//localhost,db.example.test/payse', '//localhost:0/payse',
+                    '//localhost:65536/payse', '//localhost:private-marker/payse',
+                    '//localhost/payse?', '//localhost/payse#', '//localhost/a%2Fb',
+                    '//localhost/payse?sslmode=', '//localhost/payse?sslmode=disable&',
+                    '//db.example.test/payse?sslmode=verify-full&sslmode=disable',
+                    '//db.example.test/payse?sslmode=verify-full&%73slmode=disable',
+                    '//db.example.test/payse?sslmode=verify-full&sslfactory=Ignore',
+                    '//localhost/payse?sslrootcert=a%0Ab', '//local\nhost/payse',
+                    '//localhost@db.example.test/payse?sslmode=verify-full')
+        for suffix in suffixes:
+            with self.subTest(suffix=suffix), self.assertRaises(ValueError) as failure:
+                server.database_target('jdbc:postgresql:' + suffix)
+            self.assertNotIn('private-marker', str(failure.exception))
+        for suffix in ('//localhost/payse', '//127.0.0.1:5432/payse', '//[::1]/payse',
+                       '//db.example.test/payse?sslmode=verify-full&sslrootcert=C%3A%2Fca.pem'):
+            self.assertTrue(server.database_target('jdbc:postgresql:' + suffix))
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix='payse-portable-test-')
         self.addCleanup(self.temporary.cleanup)

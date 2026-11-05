@@ -189,6 +189,8 @@ public final class ApiMessageConstants {
     public static final class Server {
         // 진단 문구
         public static final String INVALID_JDBC_URL = "PAYSE_JDBC_URL must use PostgreSQL";
+        public static final String INVALID_DATABASE_TRANSPORT =
+            "Database URL must use one explicit host and remote TLS certificate verification";
         public static final String INVALID_VALIDATION_TIMEOUT =
             "PAYSE_DB_VALIDATION_TIMEOUT_MS must be at least 250 and less than PAYSE_DB_CONNECTION_TIMEOUT_MS";
         public static final String UNRESOLVED_SETTING = " could not be resolved";

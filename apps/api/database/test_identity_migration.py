@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -21,7 +23,7 @@ from run_sql_tests import require_disposable_database
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'fixtures'))
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from testing.scenarios.export_state import export
+from legacy_seed import export
 from reference_data.export_sql import export as export_reference
 
 def legacy_sql(sql):
@@ -49,6 +51,8 @@ class IdentityMigrationTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix='payse-identity-', dir=OPTIONS.temp)
         self.addCleanup(self.temp.cleanup)
         self.backup = Path(self.temp.name) / 'identity-plan.json'
+        self.backup_key = Path(self.temp.name).resolve() / 'backup.key'
+        migration.backup_crypto().write_key(self.backup_key, os.urandom(32), 'file')
         migration.require(OPTIONS.database.startswith('payse_fixture_identity_'), 'Identity test database required')
         self.sql("DO $$ BEGIN IF current_database() NOT LIKE 'payse_fixture_identity_%' THEN RAISE EXCEPTION 'Test database required'; END IF; END $$; DROP SCHEMA IF EXISTS payse CASCADE;")
         self.sql((DATABASE.parent/'tests/legacy/001_initial.sql').read_text(encoding='utf-8'))
@@ -87,17 +91,33 @@ class IdentityMigrationTests(unittest.TestCase):
 
     def plan(self):
         """Create and verify a real external source backup for this test."""
-        return migration.create_plan(OPTIONS.psql, OPTIONS.database, self.backup, OPTIONS.timeout_seconds, OPTIONS.lock_timeout_ms)[0]
+        return migration.create_plan(OPTIONS.psql, OPTIONS.database, self.backup.resolve(),
+                                     OPTIONS.timeout_seconds, OPTIONS.lock_timeout_ms,
+                                     backup_key=self.backup_key)[0]
 
     def apply(self, digest, lock_timeout_ms=None):
         """Apply only the exact file chosen by the test with its original hash."""
-        return migration.apply_plan(OPTIONS.psql, OPTIONS.database, self.backup, digest, OPTIONS.timeout_seconds, lock_timeout_ms or OPTIONS.lock_timeout_ms)
+        return migration.apply_plan(OPTIONS.psql, OPTIONS.database, self.backup.resolve(), digest,
+                                    OPTIONS.timeout_seconds, lock_timeout_ms or OPTIONS.lock_timeout_ms,
+                                    backup_key=self.backup_key)
+
+    def archived_document(self):
+        """2026-11-05: 이행 문서를 평문 디스크 파일 없이 인증 후 읽는다."""
+        crypto = migration.backup_crypto()
+        return json.loads(crypto.read_encrypted(self.backup.resolve(), crypto.read_key(self.backup_key)))
+
+    def replace_archive(self, body):
+        """2026-11-05: 실패 사례의 유효한 암호문을 만들어 내부 문서 검증까지 도달시킨다."""
+        crypto = migration.backup_crypto()
+        self.backup.unlink()
+        crypto.encrypt_stream(io.BytesIO(body), self.backup.resolve(), crypto.read_key(self.backup_key))
+        return hashlib.sha256(self.backup.read_bytes()).hexdigest()
 
     def test_migration_preserves_account_state(self):
         self.legacy()
         before = self.state()
         digest = self.plan()
-        archived = migration.load_plan(self.backup, digest)[1]
+        archived = migration.load_plan(self.backup.resolve(), digest, backup_key=self.backup_key)[1]
         archived_bytes = self.backup.read_bytes()
         self.assertEqual(archived, before)
         self.assertEqual(len(archived['legacyInstallations']), 2)
@@ -206,7 +226,7 @@ class IdentityMigrationTests(unittest.TestCase):
     def test_invalid_plan_error_omits_values(self):
         self.plan()
         before = self.state()
-        original = json.loads(self.backup.read_text(encoding='utf-8'))
+        original = self.archived_document()
         cases = [None, [], {**original, 'sourceState': None}, {**original, 'sourceState': 7},
                  {**original, 'stateDigest': 7}, {**original, 'actions': 7},
                  {**original, 'actions': {'rename': 1, 'dropInstallation': False}},
@@ -214,10 +234,11 @@ class IdentityMigrationTests(unittest.TestCase):
         for value in cases:
             with self.subTest(kind=type(value).__name__):
                 body = json.dumps(value).encode('utf-8')
-                self.backup.write_bytes(body)
+                digest = self.replace_archive(body)
                 command = [sys.executable, '-B', str(DATABASE / 'migrate_identity.py'), '--apply',
                            '--psql', str(OPTIONS.psql), '--database', OPTIONS.database,
-                           '--backup', str(self.backup), '--expected-sha256', hashlib.sha256(body).hexdigest(),
+                           '--backup', str(self.backup), '--expected-sha256', digest,
+                           '--backup-key-file', str(self.backup_key),
                            '--timeout-seconds', str(OPTIONS.timeout_seconds), '--lock-timeout-ms', str(OPTIONS.lock_timeout_ms)]
                 result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', timeout=OPTIONS.timeout_seconds)
                 self.assertEqual(result.returncode, 1)
@@ -236,14 +257,14 @@ class IdentityMigrationTests(unittest.TestCase):
 
     def test_wrong_database_fingerprint_rejected(self):
         digest = self.plan()
-        plan = json.loads(self.backup.read_text(encoding='utf-8'))
+        plan = self.archived_document()
         source = json.loads(plan['sourceState'])
         source['database']['systemIdentifier'] = 'different-cluster'
         plan['sourceState'] = json.dumps(source)
         plan['stateDigest'] = hashlib.sha256(plan['sourceState'].encode()).hexdigest()
         body = json.dumps(plan).encode()
-        self.backup.write_bytes(body)
-        with self.assertRaises(migration.MigrationError): self.apply(hashlib.sha256(body).hexdigest())
+        digest = self.replace_archive(body)
+        with self.assertRaises(migration.MigrationError): self.apply(digest)
 
     def test_mid_update_failure_rolls_back_all_changes(self):
         self.legacy()
