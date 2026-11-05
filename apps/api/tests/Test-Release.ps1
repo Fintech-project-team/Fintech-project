@@ -5,6 +5,7 @@ $temporaryRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $testRoot = Join-Path $temporaryRoot ('payse-release-test-' + [Guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($testRoot)
 $checks = 0
+$controlMock = $null
 
 function Assert-True {
     param([bool]$Condition, [string]$Message)
@@ -29,6 +30,60 @@ try {
     $rejected = $false
     try { Test-ReleaseProfiles $profiles $schema } catch { $rejected = $true }
     Assert-True $rejected 'Unreviewed analysis profile was accepted.'
+
+    $identity = [pscustomobject]@{ pid = 71; path = 'java.exe'; command = 'java -jar server.jar';
+        started = '2026-11-05T01:00:00Z' }
+    $controlState = [pscustomobject]@{ target = $null; process = $null; rejectPlan = $false }
+    $controlMock = New-Module -Name ReleaseControlMock -ArgumentList $controlState -ScriptBlock {
+        param($State)
+        $script:state = $State
+        function Read-PayseStopProcess { throw 'Private installation function must not be called.' }
+        function Get-PayseStopPlan {
+            param($Config)
+            if ($script:state.rejectPlan) { throw 'Listener or installation identity differs.' }
+            return [pscustomobject]@{ api = $script:state.target }
+        }
+        function Get-CimInstance {
+            param($ClassName, $Filter)
+            return $script:state.process
+        }
+        function Test-PayseStopIdentity {
+            param($Process, $Identity)
+            return ($null -ne $Process -and $Process.ProcessId -eq $Identity.pid -and
+                $Process.ExecutablePath -eq $Identity.path -and $Process.CommandLine -eq $Identity.command -and
+                $Process.CreationDate.ToUniversalTime() -eq ([DateTimeOffset]$Identity.started).UtcDateTime)
+        }
+        Export-ModuleMember -Function Get-PayseStopPlan, Get-CimInstance, Test-PayseStopIdentity
+    }
+    Import-Module $controlMock -Global -Force
+    Assert-True ($null -eq (Get-Command Read-PayseStopProcess -ErrorAction SilentlyContinue)) 'Private helper leaked.'
+    foreach ($case in @('same', 'exited', 'reused-pid', 'other-pid', 'path', 'command', 'unrecorded', 'listener')) {
+        $controlState.target = [pscustomobject]@{ name = 'API'; identity = $identity.PSObject.Copy(); port = 18083 }
+        $controlState.process = [pscustomobject]@{ ProcessId = 71; ExecutablePath = 'java.exe';
+            CommandLine = 'java -jar server.jar'; CreationDate = ([DateTimeOffset]$identity.started).UtcDateTime }
+        $controlState.rejectPlan = $false
+        switch ($case) {
+            'exited' { $controlState.target = $null; $controlState.process = $null }
+            'reused-pid' { $controlState.process.CreationDate = $controlState.process.CreationDate.AddSeconds(1) }
+            'other-pid' { $controlState.target.identity.pid = 72 }
+            'path' { $controlState.process.ExecutablePath = 'another-java.exe' }
+            'command' { $controlState.process.CommandLine = 'java -jar another.jar' }
+            'unrecorded' { $controlState.target = $null }
+            'listener' { $controlState.rejectPlan = $true }
+        }
+        $rejected = $false
+        $target = $null
+        try { $target = Get-ReleaseApiTarget -Config 'test-launch.json' -Identity $identity } catch { $rejected = $true }
+        if ($case -eq 'same') {
+            Assert-True (-not $rejected -and $target.identity.pid -eq 71) 'Public installation control failed.'
+        } elseif ($case -eq 'exited') {
+            Assert-True (-not $rejected -and $null -eq $target) 'Clean exit was not recognized.'
+        } else {
+            Assert-True $rejected ('Unsafe API target was accepted: ' + $case)
+        }
+    }
+    Remove-Module $controlMock -Force
+    $controlMock = $null
 
     foreach ($scenario in @('success', 'start-fails', 'stop-fails', 'recovery-fails', 'tampered')) {
         $scenarioRoot = Join-Path $testRoot $scenario
@@ -85,6 +140,7 @@ try {
     }
     Write-Output ("PASS: " + $checks + " Windows deployment assertions.")
 } finally {
+    if ($null -ne $controlMock) { Remove-Module $controlMock -Force }
     $resolved = [IO.Path]::GetFullPath($testRoot)
     if (-not $resolved.StartsWith($temporaryRoot, [StringComparison]::OrdinalIgnoreCase) -or
         [IO.Path]::GetFileName($resolved) -notlike 'payse-release-test-*') {
