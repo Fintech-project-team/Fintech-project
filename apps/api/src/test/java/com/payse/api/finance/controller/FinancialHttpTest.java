@@ -116,6 +116,7 @@ class FinancialHttpTest {
      * @created 2026-10-29
      * @usedBy JUnit BeforeEach
      * @modified 2026-11-02 - 계약 문자열 상수 분리 및 테스트 통합 파일 참조; 순회 대상 지역변수 분리
+     * @modified 2026-11-03 - 합성 원천 준비에만 별도 제한과 통계 갱신 적용; 준비 파일 명시
      */
     @BeforeEach
     void start() throws Exception {
@@ -133,7 +134,7 @@ class FinancialHttpTest {
         // 전용 실행기가 만든 DB에서만 각 검사를 독립 준비한다. 기관 기준정보는 유지한다.
         admin.execute("TRUNCATE payse.users CASCADE");
         admin.execute("TRUNCATE payse.auth_rate_limits");
-        admin.execute(Files.readString(Path.of(setting("SEED_FILE"))));
+        prepareSeed("SEED_FILE");
         source = json
             .readTree(Files.readString(Path.of("fixtures/generated/snapshots/alpha-ready.json")));
         foreignSource = json
@@ -204,6 +205,40 @@ class FinancialHttpTest {
             .build();
         token = login();
         sourceBefore = fingerprint();
+    }
+
+    /**
+     * 연간 자료 준비의 통계·제약 검사를 마친 뒤 제품 요청 제한으로 복구한다.
+     * @created 2026-11-03
+     * @usedBy start, gammaImport
+     * @modified 2026-11-03 - 일반 사례와 감마 미연결 원천의 준비 파일을 명시 선택
+     */
+    private void prepareSeed(String fileSetting) throws Exception {
+        String seed = Files.readString(Path.of(setting(fileSetting)));
+        var boundary = java.util.regex.Pattern.compile("(?m)^SET CONSTRAINTS ALL IMMEDIATE;\\r?$");
+        assertEquals(
+            1L,
+            boundary.matcher(seed)
+                .results()
+                .count(),
+            "Expected one final seed validation boundary"
+        );
+        String prepared = boundary.matcher(seed).replaceFirst("ANALYZE;\n$0");
+        admin.execute(
+            (org.springframework.jdbc.core.ConnectionCallback<Void>) connection -> {
+                try (var statement = connection.createStatement()) {
+                    statement.execute("SET statement_timeout = '120s'");
+                    try {
+                        statement.execute(prepared);
+                    } finally {
+                        statement.execute("ROLLBACK");
+                        statement.execute("SET statement_timeout = '12s'");
+                    }
+                }
+
+                return null;
+            }
+        );
     }
 
     /**
@@ -856,6 +891,159 @@ class FinancialHttpTest {
             ok(FinanceHttp.POST, FinancePaths.INSTITUTION_LINKS_PATH, addCard)
                 .path(FinanceFields.SNAPSHOT)
         );
+    }
+
+    /**
+     * 감마만 연간 원천으로 준비하고 일반 로그인·기관 연결·전체 페이지·재로그인을 검사한다.
+     * @created 2026-11-03
+     * @usedBy JUnit
+     */
+    @Test
+    void gammaImport() throws Exception {
+        admin.execute("TRUNCATE payse.users CASCADE");
+        admin.execute("TRUNCATE payse.auth_rate_limits");
+        prepareSeed("GAMMA_SEED_FILE");
+        source = json.readTree(Files.readString(Path.of(setting("GAMMA_SOURCE_FILE"))));
+        owner = UUID.fromString(source.path(FinanceFields.USER_ID).asString());
+        JsonNode users = json
+            .readTree(Files.readString(Path.of("fixtures/generated/server-seeds.json")))
+            .path(FinanceFields.USERS);
+        credentials = single(
+            users,
+            entry -> entry.path(FinanceFields.USER_ID).equals(source.path(FinanceFields.USER_ID))
+        );
+        assertEquals(
+            1,
+            admin.update(
+                "UPDATE payse.users SET code_verifier=? WHERE id=?",
+                context.getBean(AuthCrypto.class).codeVerifier(owner, code),
+                owner
+            )
+        );
+        sourceBefore = fingerprint();
+        Map<String, String> others = otherState();
+        token = login();
+        long before = Long.parseLong(version());
+        JsonNode first = ok(FinanceHttp.GET, FinancePaths.SNAPSHOT_PATH, null);
+        assertTrue(first.path(FinanceFields.INSTITUTION_LINKS).isEmpty());
+        assertFalse(first.has(FinanceFields.ACCOUNTS));
+        assertEquals(1L, before);
+        capture("gamma-unconnected", first);
+
+        ObjectNode body = command();
+        ArrayNode codes = body.putArray(FinanceFields.INSTITUTION_CODES);
+        source.path(FinanceFields.INSTITUTIONS)
+            .forEach(institution -> codes.add(institution.path(FinanceFields.CODE).asString()));
+        JsonNode connected = ok(FinanceHttp.POST, FinancePaths.INSTITUTION_LINKS_PATH, body)
+            .path(FinanceFields.SNAPSHOT);
+        assertEquals(Long.toString(before + 1), version());
+        assertEquals(9, connected.path(FinanceFields.ACCOUNTS).size());
+        assertEquals(4, connected.path(FinanceFields.CARDS).size());
+        assertEquals(codes.size(), connected.path(FinanceFields.INSTITUTION_LINKS).size());
+        assertEquals(
+            source.path(FinanceFields.SOURCE_VERSION),
+            connected.path(FinanceFields.SOURCE_VERSION)
+        );
+        Instant asOf = java.time.OffsetDateTime.parse(source.path(FinanceFields.AS_OF).asString())
+            .toInstant();
+        assertEquals(asOf, Instant.parse(connected.path(FinanceFields.AS_OF).asString()));
+        for (JsonNode account : connected.path(FinanceFields.ACCOUNTS)) {
+            assertFalse(account.path(FinanceFields.INCLUDED).asBoolean());
+            assertEquals(asOf, Instant.parse(account.path(FinanceFields.AS_OF).asString()));
+        }
+        assertTrue(
+            connected.path(FinanceFields.SETTINGS)
+                .path(FinanceFields.SALARY)
+                .path(FinanceFields.SALARY_ACCOUNT_ID)
+                .isNull()
+        );
+        capture("gamma-connected", connected);
+
+        Set<String> received = new HashSet<>();
+        JsonNode page = connected;
+        int pages = 0;
+        while (true) {
+            pages++;
+            assertEquals(owner.toString(), page.path(FinanceFields.USER_ID).asString());
+            assertEquals(
+                connected.path(FinanceFields.DATA_VERSION),
+                page.path(FinanceFields.DATA_VERSION)
+            );
+            for (JsonNode transaction : page.path(FinanceFields.TRANSACTIONS)) {
+                assertTrue(received.add(transaction.path(FinanceFields.TRANSACTION_ID).asString()));
+            }
+            JsonNode cursor = page.path(FinanceFields.PAGE).path(FinanceFields.NEXT_CURSOR);
+            if (cursor.isNull()) {
+                break;
+            }
+            assertTrue(pages < 100, "Unbounded annual cursor chain");
+            page = ok(
+                FinanceHttp.GET,
+                FinancePaths.TRANSACTION_CURSOR_PATH + cursor.asString(),
+                null
+            );
+        }
+        Set<String> expected = new HashSet<>();
+        source.path(FinanceFields.TRANSACTIONS)
+            .forEach(row -> expected.add(row.path(FinanceFields.TRANSACTION_ID).asString()));
+        assertEquals(1825, received.size());
+        assertEquals(expected, received);
+        assertTrue(pages > 1);
+        HttpResponse<String> logout = send(
+            FinanceHttp.DELETE,
+            FinancePaths.CURRENT_SESSION_PATH,
+            null
+        );
+        assertEquals(204, logout.statusCode());
+        token = login();
+        JsonNode restored = ok(FinanceHttp.GET, FinancePaths.SNAPSHOT_PATH, null);
+        for (String field : List.of(
+            FinanceFields.ACCOUNTS,
+            FinanceFields.INSTITUTION_LINKS,
+            FinanceFields.SETTINGS,
+            FinanceFields.SOURCE_VERSION
+        )) {
+            assertEquals(connected.path(field), restored.path(field));
+        }
+        assertEquals(
+            0,
+            admin.queryForObject(
+                "SELECT count(*) FROM payse.financial_transactions "
+                    + "WHERE user_id=? AND payse_transaction_type IS NOT NULL",
+                Integer.class,
+                owner
+            )
+        );
+        assertEquals(Long.toString(before + 1), version());
+        assertEquals(others, otherState());
+    }
+
+    /**
+     * 감마 이외 계정의 인증·버전·설정·연결·계좌 상태가 변하지 않았는지 대조한다.
+     * @created 2026-11-03
+     * @usedBy gammaImport
+     */
+    private Map<String, String> otherState() {
+        Map<String, String> result = new HashMap<>();
+        for (String table : List.of(
+            "users",
+            "user_attributes",
+            "institution_links",
+            "financial_accounts"
+        )) {
+            String key = "users".equals(table) ? "id" : "user_id";
+            result.put(
+                table,
+                admin.queryForObject(
+                    "SELECT md5(coalesce(string_agg(value,E'\\n' ORDER BY value),'')) "
+                        + "FROM (SELECT to_jsonb(record)::text AS value FROM payse." + table
+                        + " record WHERE " + key + "<>?) rows",
+                    String.class,
+                    owner
+                )
+            );
+        }
+        return result;
     }
 
     /**

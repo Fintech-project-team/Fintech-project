@@ -1,0 +1,33 @@
+{
+  "id": "PAYSE-GAMMA-IMPORT-20261103",
+  "role": "data",
+  "baseCommit": "c7426cb9842ee944b85a64e4dc202fa5b3e7e1b9",
+  "branch": "fix/api/data-refresh-consistency",
+  "allowedPaths": [
+    "apps/api/testing/scenarios/first_login_links.py",
+    "apps/api/database/test_gamma_login.py",
+    "apps/api/database/test_analysis_service.py",
+    "apps/api/database/test_financial_service.py",
+    "apps/api/src/test/java/com/payse/api/finance/controller/FinancialHttpTest.java",
+    "apps/api/docs/gamma-llm-test.md"
+  ],
+  "acceptance": [
+    "사용자 추가 지시: 감마만 외부 마이데이터 수집 대신 사전 적재한 연간 합성 DB 원천을 사용하며 로그인 → 기존 기관 연결·계좌 가져오기 → 원천 조회 흐름을 유지한다. 다른 계정의 원천·설정·연결 상태는 변경하지 않는다.",
+    "이전 작업의 첫 로그인 자동 연결 요구를 대체한다. 별도 로그인 트리거·함수·대기 테이블 설치 도구와 전용 검사를 제거하고 일반 로그인·금융 API·영구 DDL에는 감마 분기를 추가하지 않는다.",
+    "실행 중 개발 DB는 소유 확인·변경 전후 원천/설정/인증 대조 후 기존 테스트 장치만 원자적으로 제거한다. 서버·Caddy·원격 연결은 재시작하지 않는다. 감마 원천을 다시 초기화하거나 현재 사용자 연결을 대신 실행하지 않는다.",
+    "새 폐기 PostgreSQL의 실제 HTTP 검사에서 로그인 후 미연결, 명시적 기관 연결 후 9계좌·4카드·1825거래 전체 페이지, 소유권·버전·원천 불변·다른 계정 보존·재로그인 상태 보존을 확인한다.",
+    "합성 원천 생성·평가 파일은 별도 테스트 경로에만 유지하며 테스트 종료 후 제거할 파일·참조와 데이터 정리 경계를 문서화한다. 운영 JAR·시작 설정·마이그레이션은 테스트 도구를 참조하지 않는다.",
+    "실제 LLM 활성화·앱 분석 통신·사용자 확인과 모의 공급자 검증을 구분해 보고한다. 모바일 변경은 하지 않고 프론트 반영 지점만 전달한다. 비밀값·접속 properties·인증자료·DB 덤프는 Git에 포함하지 않는다."
+  ],
+  "readBefore": [
+    "apps/api/AGENTS.md",
+    "docs/data-contracts.md",
+    "docs/database-schema.md",
+    "apps/api/docs/database-tests.md",
+    "apps/api/docs/history/2026-10-29-financial-api-handoff.md",
+    "apps/api/docs/gamma-llm-test.md",
+    "docs/payse-execution-contract.md",
+    "apps/api/docs/llm-execution.md",
+    "docs/harness/AGENT_REVIEW.md"
+  ]
+}

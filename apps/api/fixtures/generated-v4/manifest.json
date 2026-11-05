@@ -29,7 +29,7 @@
     "snapshots/alpha-billing-items.json": "c3f4f425a8adfa22c8ca8545a8b3b8c3418feb3b3cd0e9e4a56e19ae6267d482",
     "snapshots/beta-billing-items.json": "87a9b82339b81b48b5af34e70813a2a9fdf5ebc7a47dc709f7036fc73a606941",
     "snapshots/gamma-billing-items.json": "441c46efe374c1567abff7572675a600acb32238d30fef223fe17274eb1679e2",
-    "server-seeds.json": "7529af4d49685c921745557e685530b0922d36215860513d8d9639b2679e1946",
+    "server-seeds.json": "d2e6673ab159df466313983601979a7fb0154f53835f4b565d86be250e8c90d2",
     "catalog.json": "e097d05f2e2ffb8bae20a76ce269251d3b29b5f59511349d587a9c8d7f65a44d",
     "bank-directory.json": "097a9a5100f4d6a19c37b60f49ba5f6fc8075bb3fc00456433000294b7513640"
   }
