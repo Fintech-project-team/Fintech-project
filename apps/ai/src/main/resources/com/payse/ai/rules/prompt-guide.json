@@ -1,0 +1,186 @@
+{
+  "version": "PAYSE-GUIDE-5",
+  "rules": [
+    "meaning과 classification은 독립된 판단이다. 아래 예시는 실제 객체 형식을 사용한다. 각 판단은 candidate/값/supported 또는 unknown/null/유보사유 중 하나다. 기존 비null 기본 분류는 보존한다.",
+    "새 income은 명시된 근로/용역 대가·상여·연금·지원금·이자·배당, expense는 확인된 구매·서비스·세금·기부·수수료의 후보다. 대출·개인 송금·경비 정산·환불·원금/보증금/현금 이동은 의미를 알아도 기본 unknown이다.",
+    "unknown의 사유: 목적/관계 없음=insufficient_evidence, 양립 불가한 근거=conflicting_evidence, 명확한 복합 목적·목록 밖=outside_taxonomy. 금액/날짜 유사성은 관계 증명이 아니다.",
+    "명시된 짧은 적요를 이유 없이 유보하지 않는다. 이유는 결정적 근거/부족 정보를 한국어 한 문장으로 짧게 쓰고 별칭은 근거 ID 필드에만 쓴다. 아래 가상 예시는 현재 거래/정답이 아니다."
+  ],
+  "sections": [
+    {
+      "id": "receipt",
+      "tasks": ["transactionMeaning"],
+      "recordKinds": ["account_entry"],
+      "directions": ["in"],
+      "rule": "정기급여·급여이체는 급여 목적이다. 회사명만 있으면 부족하다. 직원 대여금도 loan_proceeds이며 income이 아니다. 부정/예정/문의는 실행 목적과 구별한다.",
+      "examples": [
+        {
+          "source": "계좌 입금; 적요 정기 급여이체; 반대 근거 없음",
+          "classification": {
+            "status": "candidate",
+            "value": "income",
+            "reasonCode": "supported"
+          },
+          "meaning": {
+            "status": "candidate",
+            "value": "salary",
+            "reasonCode": "supported"
+          }
+        },
+        {
+          "source": "계좌 입금; 월급이 아닌 출장비 실비 반환",
+          "classification": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          },
+          "meaning": {
+            "status": "candidate",
+            "value": "reimbursement",
+            "reasonCode": "supported"
+          }
+        }
+      ]
+    },
+    {
+      "id": "transfer",
+      "tasks": ["transactionMeaning"],
+      "recordKinds": ["account_entry"],
+      "directions": ["in", "out"],
+      "rule": "item.relations의 internal_transfer는 해당 양끝의 확인된 본인 이동이다. 일반 적요와 달라도 관계를 우선하고 양끝 ID를 근거로 반환한다. 관계/기존 분류 없이는 새 internal_transfer 금지. card_account_pair는 카드대금 납부가 아니다.",
+      "examples": [
+        {
+          "source": "대상 출금; 양끝 명시 internal_transfer 관계; 적요에는 급여",
+          "classification": {
+            "status": "candidate",
+            "value": "internal_transfer",
+            "reasonCode": "supported"
+          },
+          "meaning": {
+            "status": "candidate",
+            "value": "self_transfer",
+            "reasonCode": "supported"
+          }
+        },
+        {
+          "source": "같은 날 동일 금액 입출금; 일반이체 적요; 관계 없음",
+          "classification": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          },
+          "meaning": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          }
+        }
+      ]
+    },
+    {
+      "id": "payment",
+      "tasks": ["transactionMeaning"],
+      "recordKinds": ["account_entry"],
+      "directions": ["out"],
+      "rule": "원리금 상환은 loan_repayment 의미와 기본 unknown이다. CMS는 처리 방식일 뿐 목적이 아니다. 통신료/수강료 합산처럼 목적 둘이 모두 명확하면 단일 의미 밖이며 충돌은 아니다.",
+      "examples": [
+        {
+          "source": "계좌 출금; 이동통신 사용료",
+          "classification": {
+            "status": "candidate",
+            "value": "expense",
+            "reasonCode": "supported"
+          },
+          "meaning": {
+            "status": "candidate",
+            "value": "telecom",
+            "reasonCode": "supported"
+          }
+        },
+        {
+          "source": "계좌 출금; 주거회사 CMS; 지급 목적 없음",
+          "classification": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          },
+          "meaning": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          }
+        }
+      ]
+    },
+    {
+      "id": "card",
+      "tasks": ["transactionMeaning"],
+      "recordKinds": ["card_purchase", "card_refund", "card_cancellation"],
+      "directions": ["in", "out"],
+      "rule": "target의 card_refund/refund와 card_cancellation/cancellation을 구별하고 원거래 ID도 근거에 포함한다. 원래 card_purchase까지 취소로 바꾸지 않는다. 일반 생활 물품 구매는 retail이다. 품목 없는 승인은 기본 expense/의미 unknown. 신청·거절만으로 환불 완료가 아니다.",
+      "examples": [
+        {
+          "source": "대상 card_purchase; 생활용품 구매 승인; 별도 취소가 이 구매를 참조",
+          "classification": {
+            "status": "candidate",
+            "value": "expense",
+            "reasonCode": "supported"
+          },
+          "meaning": {
+            "status": "candidate",
+            "value": "retail",
+            "reasonCode": "supported"
+          }
+        },
+        {
+          "source": "대상 card_refund; 일부 반환; 적요는 급여",
+          "classification": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          },
+          "meaning": {
+            "status": "candidate",
+            "value": "refund",
+            "reasonCode": "supported"
+          }
+        }
+      ]
+    },
+    {
+      "id": "recurring",
+      "tasks": ["recurringMeaning"],
+      "recordKinds": [],
+      "directions": [],
+      "rule": "candidateKey/features를 보존하고 반복 수치·미래 일정을 만들지 않는다. 통신/보험/월세를 구독으로 뭉뚱그리지 않는다. 출력에 classification은 없다.",
+      "examples": [
+        {
+          "source": "로컬 반복 후보; 이동통신료; features 충족",
+          "classification": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          },
+          "meaning": {
+            "status": "candidate",
+            "value": "telecom",
+            "reasonCode": "supported"
+          }
+        },
+        {
+          "source": "로컬 반복 후보; 결제대행사 출금; 목적 없음",
+          "classification": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          },
+          "meaning": {
+            "status": "unknown",
+            "value": null,
+            "reasonCode": "insufficient_evidence"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -30,6 +30,8 @@ public final class OpenAiGateway implements ModelGateway {
     private final String model;
     private final String instructions;
     private final String effort;
+    private final String serviceTier;
+    private final String verbosity;
     private final JsonNode schema;
     private final int inputLimit;
     private final int outputLimit;
@@ -68,6 +70,7 @@ public final class OpenAiGateway implements ModelGateway {
      * 같은 패키지의 모의 HTTP 테스트만 다른 endpoint를 전달할 수 있다.
      * @created 2026-10-29
      * @usedBy OpenAiGatewayTest
+     * @modified 2026-11-04 - 기존 생성자는 표준 처리로 위임
      * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조
      */
     OpenAiGateway(
@@ -81,6 +84,125 @@ public final class OpenAiGateway implements ModelGateway {
         int outputLimit,
         URI endpoint
     ) {
+        this(http, credentials, model, instructions, effort, schema, inputLimit, outputLimit,
+            endpoint, AiConfigConstants.OpenAi.SERVICE_DEFAULT);
+    }
+
+    /**
+     * 공식 주소에서 요청 단위 처리 등급을 명시한다. 프로젝트 설정을 바꾸지 않는다.
+     * @created 2026-11-04
+     * @usedBy LlmSettings.factory
+     */
+    public OpenAiGateway(
+        ProviderHttp http,
+        Supplier<String> credentials,
+        String model,
+        String instructions,
+        String effort,
+        JsonNode schema,
+        int inputLimit,
+        int outputLimit,
+        String serviceTier
+    ) {
+        this(http, credentials, model, instructions, effort, schema, inputLimit, outputLimit,
+            URI.create(AiConfigConstants.OpenAi.API_ENDPOINT), serviceTier);
+    }
+
+    /**
+     * 비교 실행에서만 응답 길이 정책을 명시하며 키·상한·처리 등급은 기존 검증을 따른다.
+     * @created 2026-11-04
+     * @usedBy LlmSettings.factory
+     */
+    public OpenAiGateway(
+        ProviderHttp http,
+        Supplier<String> credentials,
+        String model,
+        String instructions,
+        String effort,
+        JsonNode schema,
+        int inputLimit,
+        int outputLimit,
+        String serviceTier,
+        String verbosity
+    ) {
+        this(
+            http,
+            credentials,
+            model,
+            instructions,
+            effort,
+            schema,
+            inputLimit,
+            outputLimit,
+            URI.create(AiConfigConstants.OpenAi.API_ENDPOINT),
+            serviceTier,
+            verbosity
+        );
+    }
+
+    /**
+     * 명시된 표준·Fast 설정만 수용하며 비용 정책과 연결은 호출 계층에서 검증한다.
+     * @created 2026-11-04
+     * @usedBy OpenAiGateway 생성자, OpenAiGatewayTest
+     */
+    OpenAiGateway(
+        ProviderHttp http,
+        Supplier<String> credentials,
+        String model,
+        String instructions,
+        String effort,
+        JsonNode schema,
+        int inputLimit,
+        int outputLimit,
+        URI endpoint,
+        String serviceTier
+    ) {
+        this(
+            http,
+            credentials,
+            model,
+            instructions,
+            effort,
+            schema,
+            inputLimit,
+            outputLimit,
+            endpoint,
+            serviceTier,
+            null
+        );
+    }
+
+    /**
+     * 미지정 길이 정책은 생략하고 공식 세 단계만 허용한다. 업무 검증을 대신하지 않는다.
+     * @created 2026-11-04
+     * @usedBy OpenAiGateway 생성자, OpenAiGatewayTest
+     */
+    OpenAiGateway(
+        ProviderHttp http,
+        Supplier<String> credentials,
+        String model,
+        String instructions,
+        String effort,
+        JsonNode schema,
+        int inputLimit,
+        int outputLimit,
+        URI endpoint,
+        String serviceTier,
+        String verbosity
+    ) {
+        if (serviceTier == null || !java.util.Set.of(AiConfigConstants.OpenAi.SERVICE_DEFAULT,
+            AiConfigConstants.OpenAi.SERVICE_FAST).contains(serviceTier)) {
+            throw new IllegalArgumentException(AiMessageConstants.OpenAi.INVALID_PROFILE);
+        }
+        this.serviceTier = serviceTier;
+        if (verbosity != null && !java.util.Set.of(
+            AiConfigConstants.OpenAi.VERBOSITY_LOW,
+            AiConfigConstants.OpenAi.VERBOSITY_MEDIUM,
+            AiConfigConstants.OpenAi.VERBOSITY_HIGH
+        ).contains(verbosity)) {
+            throw new IllegalArgumentException(AiMessageConstants.OpenAi.INVALID_PROFILE);
+        }
+        this.verbosity = verbosity;
         this.http = Objects.requireNonNull(http, AiMessageConstants.OpenAi.HTTP_PARAMETER);
         this.credentials = Objects
             .requireNonNull(credentials, AiMessageConstants.OpenAi.CREDENTIALS_PARAMETER);
@@ -151,6 +273,7 @@ public final class OpenAiGateway implements ModelGateway {
      * 한 전송의 원시 구조화 응답과 사용량을 반환한다. 업무 스키마·ID·소유권 검증은 후속 계층 책임이다.
      * @created 2026-10-29
      * @usedBy AnalysisService.analyze, OpenAiGatewayTest
+     * @modified 2026-11-04 - 생성에만 요청 단위 처리 등급을 명시
      * @modified 2026-11-01 - 메시지 완료 상태 검증과 오류 시 관측 사용량 보존
      * @modified 2026-11-01 - HTTP 실패를 공급자 중립 생성 실패로 변환
      * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조
@@ -161,6 +284,7 @@ public final class OpenAiGateway implements ModelGateway {
             .put(AiFieldConstants.OpenAi.BACKGROUND, false)
             .put(AiFieldConstants.OpenAi.STREAM, false);
         request.put(AiFieldConstants.OpenAi.MAX_OUTPUT_TOKENS, outputLimit);
+        request.put(AiFieldConstants.OpenAi.SERVICE_TIER, serviceTier);
 
         try {
             JsonNode response = http.post(
@@ -182,18 +306,29 @@ public final class OpenAiGateway implements ModelGateway {
      * OpenAI 완료·거절·본문·사용량을 공급자 공통 결과로 변환한다.
      * @created 2026-11-01
      * @usedBy generate
+     * @modified 2026-11-04 - Fast 실제 처리 여부만 본문 없는 고정 코드로 관측
+     * @modified 2026-11-04 - 잘못된 응답의 메시지·텍스트 개수만 진단
+     * @modified 2026-11-04 - 명시된 중간 commentary를 최종 업무 응답과 구분
      * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조; 상수 타입 명시 참조; 제어문 본문 구분
      */
     private ModelReply reply(JsonNode response) {
+        if (serviceTier.equals(AiConfigConstants.OpenAi.SERVICE_FAST)) {
+            String actual = response.path(AiFieldConstants.OpenAi.SERVICE_TIER).asString("");
+            boolean confirmed = java.util.Set.of(AiConfigConstants.OpenAi.SERVICE_FAST,
+                AiConfigConstants.OpenAi.SERVICE_PRIORITY).contains(actual);
+            System.getLogger(OpenAiGateway.class.getName()).log(System.Logger.Level.INFO,
+                confirmed ? AiMessageConstants.OpenAi.FAST_CONFIRMED
+                    : AiMessageConstants.OpenAi.FAST_NOT_CONFIRMED);
+        }
         TokenUsage usage = usage(response.path(AiFieldConstants.OpenAi.USAGE_FIELD));
         String status = response.path(AiFieldConstants.OpenAi.STATUS).asString("");
         if (!AiConfigConstants.OpenAi.COMPLETED.equals(status)) {
-            return new ModelReply(null, usage, Provider.INCOMPLETE_RESPONSE);
+            return incomplete(response, usage);
         }
 
         String text = null;
         if (!response.path(AiFieldConstants.OpenAi.OUTPUT).isArray()) {
-            return new ModelReply(null, usage, Provider.INVALID_PROVIDER_RESPONSE);
+            return rejectedEnvelope(response, usage);
         }
 
         for (JsonNode output : response.get(AiFieldConstants.OpenAi.OUTPUT)) {
@@ -208,7 +343,7 @@ public final class OpenAiGateway implements ModelGateway {
                     output.get(AiFieldConstants.OpenAi.STATUS)
                         .asString("")
                 )) {
-                return new ModelReply(null, usage, Provider.INCOMPLETE_RESPONSE);
+                return incomplete(response, usage);
             }
             if (!AiConfigConstants.OpenAi.ASSISTANT.equals(
                 output.path(AiFieldConstants.OpenAi.ROLE)
@@ -216,7 +351,13 @@ public final class OpenAiGateway implements ModelGateway {
             )
                 || !output.path(AiFieldConstants.OpenAi.CONTENT)
                     .isArray()) {
-                return new ModelReply(null, usage, Provider.INVALID_PROVIDER_RESPONSE);
+                return rejectedEnvelope(response, usage);
+            }
+            JsonNode phase = output.path(AiFieldConstants.OpenAi.PHASE);
+            boolean commentary = AiConfigConstants.OpenAi.COMMENTARY.equals(phase.asString(""));
+            if (!phase.isMissingNode() && !phase.isNull() && !commentary
+                && !AiConfigConstants.OpenAi.FINAL_ANSWER.equals(phase.asString(""))) {
+                return rejectedEnvelope(response, usage);
             }
             for (JsonNode part : output.get(AiFieldConstants.OpenAi.CONTENT)) {
                 String type = part.path(AiFieldConstants.OpenAi.TYPE_KEY).asString("");
@@ -225,15 +366,24 @@ public final class OpenAiGateway implements ModelGateway {
                 }
                 if (!AiConfigConstants.OpenAi.OUTPUT_TEXT.equals(type)
                     || !part.path(AiFieldConstants.OpenAi.TEXT)
-                        .isString()
-                    || text != null) {
-                    return new ModelReply(null, usage, Provider.INVALID_PROVIDER_RESPONSE);
+                        .isString()) {
+                    return rejectedEnvelope(response, usage);
+                }
+                if (commentary) {
+                    continue;
+                }
+                if (text != null) {
+                    return rejectedEnvelope(response, usage);
                 }
                 text = part.get(AiFieldConstants.OpenAi.TEXT).asString();
             }
+            if (commentary) {
+                System.getLogger(OpenAiGateway.class.getName()).log(System.Logger.Level.INFO,
+                    AiMessageConstants.OpenAi.COMMENTARY_IGNORED);
+            }
         }
         if (text == null) {
-            return new ModelReply(null, usage, Provider.INVALID_PROVIDER_RESPONSE);
+            return rejectedEnvelope(response, usage);
         }
 
         try {
@@ -245,6 +395,73 @@ public final class OpenAiGateway implements ModelGateway {
         } catch (RuntimeException failure) {
             return new ModelReply(null, usage, Provider.INVALID_MODEL_OUTPUT);
         }
+    }
+
+    /**
+     * 메시지·텍스트 개수만 남겨 잘못된 공급자 구조를 원문 노출 없이 진단한다.
+     * @created 2026-11-04
+     * @usedBy reply
+     */
+    private ModelReply rejectedEnvelope(JsonNode response, TokenUsage usage) {
+        int messages = 0;
+        int texts = 0;
+        for (JsonNode output : response.path(AiFieldConstants.OpenAi.OUTPUT)) {
+            if (!AiConfigConstants.OpenAi.MESSAGE.equals(
+                output.path(AiFieldConstants.OpenAi.TYPE_KEY).asString(""))) {
+                continue;
+            }
+            messages++;
+            for (JsonNode part : output.path(AiFieldConstants.OpenAi.CONTENT)) {
+                if (AiConfigConstants.OpenAi.OUTPUT_TEXT.equals(
+                    part.path(AiFieldConstants.OpenAi.TYPE_KEY).asString(""))) {
+                    texts++;
+                }
+            }
+        }
+        System.getLogger(OpenAiGateway.class.getName()).log(System.Logger.Level.WARNING,
+            AiMessageConstants.OpenAi.ENVELOPE_REJECTED, messages, texts);
+        return new ModelReply(null, usage, Provider.INVALID_PROVIDER_RESPONSE);
+    }
+
+    /**
+     * 미완료 원인은 숫자·불리언으로만 관측하며 부분 본문과 공급자 문장을 남기지 않는다.
+     * @created 2026-11-04
+     * @usedBy reply
+     */
+    private ModelReply incomplete(JsonNode response, TokenUsage usage) {
+        boolean limited = AiConfigConstants.OpenAi.INCOMPLETE_OUTPUT_LIMIT.equals(
+            response.path(AiFieldConstants.OpenAi.INCOMPLETE_DETAILS)
+                .path(AiFieldConstants.OpenAi.INCOMPLETE_REASON).asString("")
+        );
+        JsonNode reasoning = response.path(AiFieldConstants.OpenAi.USAGE_FIELD)
+            .path(AiFieldConstants.OpenAi.OUTPUT_TOKENS_DETAILS)
+            .path(AiFieldConstants.OpenAi.REASONING_TOKENS);
+        long reasoningTokens = reasoning.isIntegralNumber() && reasoning.canConvertToLong()
+            && reasoning.asLong() >= 0 ? reasoning.asLong() : -1;
+        int messages = 0;
+        int characters = 0;
+        for (JsonNode output : response.path(AiFieldConstants.OpenAi.OUTPUT)) {
+            if (!AiConfigConstants.OpenAi.MESSAGE.equals(
+                output.path(AiFieldConstants.OpenAi.TYPE_KEY).asString(""))) {
+                continue;
+            }
+            messages++;
+            for (JsonNode part : output.path(AiFieldConstants.OpenAi.CONTENT)) {
+                JsonNode text = part.path(AiFieldConstants.OpenAi.TEXT);
+                if (text.isString()) {
+                    characters += text.asString().length();
+                }
+            }
+        }
+        System.getLogger(OpenAiGateway.class.getName()).log(
+            System.Logger.Level.WARNING,
+            AiMessageConstants.OpenAi.INCOMPLETE_DIAGNOSTIC,
+            limited,
+            reasoningTokens,
+            characters,
+            messages
+        );
+        return new ModelReply(null, usage, Provider.INCOMPLETE_RESPONSE);
     }
 
     /**
@@ -277,8 +494,11 @@ public final class OpenAiGateway implements ModelGateway {
             .put(AiFieldConstants.OpenAi.EFFORT, effort);
         request.putArray(AiFieldConstants.OpenAi.TOOLS);
 
-        ObjectNode format = request.putObject(AiFieldConstants.OpenAi.TEXT)
-            .putObject(AiFieldConstants.OpenAi.FORMAT);
+        ObjectNode text = request.putObject(AiFieldConstants.OpenAi.TEXT);
+        if (verbosity != null) {
+            text.put(AiFieldConstants.OpenAi.VERBOSITY, verbosity);
+        }
+        ObjectNode format = text.putObject(AiFieldConstants.OpenAi.FORMAT);
         format.put(AiFieldConstants.OpenAi.TYPE_KEY, AiConfigConstants.OpenAi.JSON_SCHEMA)
             .put(AiFieldConstants.OpenAi.NAME, AiConfigConstants.OpenAi.PAYSE_ANALYSIS)
             .put(AiFieldConstants.OpenAi.STRICT, true);

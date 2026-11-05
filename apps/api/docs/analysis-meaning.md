@@ -33,7 +33,7 @@
 공통 입력은 `contractVersion`, `semanticTaskKind`, `context`, `items`, `transactions`, `relations`, `unavailableReferences`, `currentClassifications`, `candidates`다. itemKey는 응답 대응용이며 분석 기억의 영구 식별이 아니다. 현재 의미 입력은 본문 제출의 `input` 규격이다. 접수 descriptor의 `candidateIds`와 의미 본문의 단일 `candidateKey`는 서버가 같은 대상인지 대조한다.
 
 - `context`: 금융 v4, 10진 문자열 dataVersion, sourceVersion, ruleVersion, 오프셋 있는 asOf, 정수 inputRevision/localSessionEpoch, 선택 계좌 집합. dataVersion의 bigint 상한을 검사한다. 세션은 인증 헤더로 검증하며 사용자 ID를 본문에서 받지 않는다.
-- `transactions`: 거래 ID·원천 종류·방향·상태·반영 이유·nullable 거래명/적요·원거래 ID만 사용한다. 이 A/B 의미 판단에 불필요한 계좌번호·잔액·금액·날짜 전체를 모델에 전달하지 않는다. 서버는 현재 권한과 실제 DB 값에 대조해야 한다. 모델 입력 절약을 이유로 관계를 지우지는 않는다.
+- `transactions`: 거래 ID·원천 종류·방향·상태·반영 이유·nullable 거래명/적요·원거래 ID만 사용한다. 공개 앱 입력은 유지하고, 서버가 현재 권한을 확인한 요청 거래의 금액·실제 날짜·계좌/카드 대체 ID·asOf를 모델 전용으로 보충한다. 계좌번호·잔액·인증·비공개 정답은 전달하지 않는다. 세부 경계는 [실행 설정](analysis-runtime.md#원천-입력과-앱-호환성)을 따른다. 서버는 현재 권한과 실제 DB 값에 대조해야 한다. 모델 입력 절약을 이유로 관계를 지우지는 않는다.
 - `relations`: 현재 공개된 명시 관계의 kind/fromId/toId만 투영한다. 서버가 원천의 evidenceRef·소유권을 확인한다. 공개된 미확보 원거래는 unavailableReferences로 구분하며 숨겨진 타 사용자/미연결 ID를 복원하지 않는다.
 - `currentClassifications`: 해당 거래의 기존 값이다. 출처를 검증하지 않은 값을 정답/사용자 확인으로 표시하지 않는다. 출력이 기존 비null 값과 충돌하면 적용을 막고 확인 대상으로 남긴다. unknown을 기존 DB 분류를 null로 덮는 명령으로 쓰지 않는다.
 - `features`: occurrenceCount, observedMonths, dayWithinRule, amountWithinRule, hasUnresolvedReversal. 모두 **Flutter 산출**이다. 서버는 허용 타입·버전·근거·로컬 판정의 준비 상태만 확인하며 중앙값/일자 편차/회차를 계산하지 않는다. 3개월·3회·기존 날짜/금액 편차 규칙은 [계산 기준](../../../docs/calculation-rules.md)이 원본이다.
@@ -49,10 +49,10 @@
 - 작업 상태와 resultAvailability, 현재 응답 context와 최초 분석 provenance를 분리한다. 원래 sourceVersion/asOf를 현재 값으로 덮어 쓰지 않는다. 최초 화면의 선택 계좌·epoch/revision은 공개 provenance에 포함하지 않는다. Flutter는 세션 epoch·revision·현재 입력·권한에 맞는 결과만 사용한다.
 - 기본 분류와 세부 의미는 독립 표시 후보다. 금액·급여 확인·청구 의무·계획을 자동 변경하지 않는다. 후보 이름·설명은 식별자나 실행 명령으로 쓰지 않는다.
 - 재사용 지문은 의미 작업·관련 원천/관계·관련 분류·로컬 특징·정책/모델/프롬프트/응답 버전에 의존한다. 전체 dataVersion 상승만으로 유효 결과를 일괄 폐기하지 않는다. 현재 권한/원천은 매번 재검증한다.
-- 정규 JSON·UTF-8 SHA-256의 기억/근거 지문과 개별 기억 응답은 [분석 API](analysis-api.md#21-입력-지문기억-식별)를 따른다. itemKey·epoch/revision·전체 dataVersion·조회 시각은 동일 기억 식별을 바꾸지 않고, 모델/프롬프트 버전은 캐시 자격에만 반영한다. 모든 항목이 불가하면 최상위 missing과 개별 실제 사유를 반환한다. B는 공개 최소 입력의 inputHashHint를 재현하며 서버의 실제 DB 결합 지문은 제출하지 않는다. 서버는 관련 금액·날짜 변경도 캐시/삭제 근거에 반영하지만 모델 입력 필드를 늘리지 않는다. B의 같은 직렬화·응답 파서는 아직 공동 실행 검증 전이다.
+- 정규 JSON·UTF-8 SHA-256의 기억/근거 지문과 개별 기억 응답은 [분석 API](analysis-api.md#21-입력-지문기억-식별)를 따른다. itemKey·epoch/revision·전체 dataVersion·조회 시각은 동일 기억 식별을 바꾸지 않고, 모델/프롬프트 버전은 캐시 자격에만 반영한다. 모든 항목이 불가하면 최상위 missing과 개별 실제 사유를 반환한다. B는 공개 최소 입력의 inputHashHint를 재현하며 서버의 실제 DB 결합 지문은 제출하지 않는다. 서버는 관련 금액·날짜 변경을 캐시/삭제 근거에 반영한다. 모델 전용 원천 보충은 공개 입력 지문 계약을 바꾸지 않으며 별도 프롬프트 버전으로 구분한다. B의 같은 직렬화·응답 파서는 아직 공동 실행 검증 전이다.
 - B는 Snapshot+전체 거래 페이지의 버전·asOf·coverage·관계·제한 정보를 유지하고 첫 Snapshot/후속 페이지의 같은 ID·다른 원천을 거절해야 한다. `nextCursor=null`만으로 완전 자료라고 간주하지 않는다.
 
-읽기 검사에서 확인한 B 보완 대상: [financial_snapshot.dart](../../mobile/lib/data/financial_snapshot.dart)의 nullable merchantName·관계/coverage 보존·enum 검사와 [transaction_history.dart](../../mobile/lib/data/connection/transaction_history.dart)의 첫 Snapshot 중복 대조. 실제 수정·Dart 입력 생성/응답 parser 테스트는 B 담당이다. 현재 반복 features 생성기도 미구현이다.
+읽기 검사에서 확인한 B 보완 대상: [financial_snapshot.dart](../../mobile/lib/data/financial_snapshot.dart)의 nullable merchantName·관계/coverage 보존·enum 검사와 [transaction_history.dart](../../mobile/lib/data/connection/transaction_history.dart)의 첫 Snapshot 중복 대조. 실제 수정·앱 입력 생성/응답 parser 테스트는 B 담당이다. 2026-11-04 공유 순수 Dart에 반복 후보·features·의미 결과 결합·확정 계획 투영을 추가했다([계산 연결](../../../packages/payse_calculation/docs/recurring.md)). 모바일 원천 어댑터와 HTTP 연결은 별도 인수 대상이며, [Java·Dart 공통 합의](../../../docs/analysis-protocol.md)의 30개 지문 사례와 모의 서버로 대조한다.
 
 ## 평가·정확도·비용
 

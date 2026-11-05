@@ -8,4 +8,8 @@ export 'src/ledger.dart' show InsufficientReason;
 export 'src/money.dart'
     show maxAbsKrw, InputErrorCode, CalculationInputException;
 export 'src/projection.dart';
+export 'src/recurring.dart';
+export 'src/recurring_input.dart';
+export 'src/recurring_review.dart';
+export 'src/recurring_schedule.dart';
 export 'src/salary_cycle.dart';

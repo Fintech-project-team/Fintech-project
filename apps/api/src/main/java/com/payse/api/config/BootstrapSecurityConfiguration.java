@@ -40,6 +40,7 @@ public class BootstrapSecurityConfiguration {
      * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리
      * @modified 2026-11-02 - 같은 보안 구성기 호출을 람다로 명시하여 null 수신자 추론 경고 해소
      * @modified 2026-11-02 - 기존 인증 경계에 AI 기억 관리 목록 GET 추가
+     * @modified 2026-11-04 - 금융 서비스 인증을 거치는 반복 결정 POST 경로 추가
      */
     @Bean
     public SecurityFilterChain bootstrapSecurity(HttpSecurity http, Environment environment)
@@ -102,6 +103,7 @@ public class BootstrapSecurityConfiguration {
                                 Finance.LINKS_PATH,
                                 Finance.OBLIGATIONS_PATH,
                                 Finance.RESERVES_PATH,
+                                Finance.RECURRING_DECISIONS_PATH,
                                 Finance.CANCEL_OBLIGATION_PATH,
                                 Finance.CANCEL_RESERVE_PATH
                             )

@@ -24,17 +24,20 @@ public final class FinancialWrites {
     private final WriteStore store;
     private final SettingsWrites settings;
     private final PlanWrites plans;
+    private final RecurringWrites recurring;
 
     /**
      * 기존 인증과 같은 EntityManager의 상태 없는 저장 구성요소를 만든다.
      * @created 2026-10-29
      * @usedBy Spring 생성자 주입
      * @modified 2026-10-29 - JPA 관리 엔티티와 같은 영속성 문맥으로 저장 경계 유지
+     * @modified 2026-11-04 - 같은 저장 문맥의 반복 결정 쓰기 구성
      */
     public FinancialWrites(EntityManager entityManager) {
         store = new WriteStore(entityManager);
         settings = new SettingsWrites(store);
         plans = new PlanWrites(store);
+        recurring = new RecurringWrites(store);
     }
 
     /**
@@ -45,6 +48,7 @@ public final class FinancialWrites {
      * @modified 2026-11-02 - 긴 식 지역변수 분리
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-04 - 사용자 확인 반복 결정 저장 경로 연결
      */
     public WriteChange apply(UUID owner, String method, String path, ObjectNode body) {
         store.requireOwner(owner);
@@ -62,6 +66,9 @@ public final class FinancialWrites {
             && path.startsWith(ApiConfigConstants.Finance.ACCOUNT_PATH_PREFIX)) {
             UUID accountId = FinancialInput.id(path.substring(10));
             settings.nickname(owner, accountId, body, journal);
+        } else if (method.equals(ApiCodeConstants.Finance.POST)
+            && path.equals(ApiConfigConstants.Finance.RECURRING_DECISIONS_PATH)) {
+            recurring.decide(owner, body, journal);
         } else if (method.equals(ApiCodeConstants.Finance.POST)
             && path.equals(ApiConfigConstants.Finance.OBLIGATIONS_PATH)) {
             plans.obligation(owner, null, body, journal);

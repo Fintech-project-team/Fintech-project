@@ -7,6 +7,80 @@ package com.payse.api.constants;
  */
 public final class ApiConfigConstants {
     /**
+     * 비공개 AI 준비와 상태의 고정 규격이다.
+     * @created 2026-11-04
+     * @usedBy AnalysisReadiness
+     */
+    public static final class Readiness {
+        public static final String LOCK_FILE = "ai.lock";
+        public static final String STATUS_FILE = "ai-status.json";
+        public static final String PROFILE_FILE = "ai-profile.json";
+        public static final String PERFORMANCE_FORMAT = "payse-ai-performance-v1";
+        public static final String READINESS_FORMAT = "payse-ai-readiness-v1";
+        public static final String GIT_MARKER = ".git";
+        public static final String NEXT_SUFFIX = ".next";
+
+        /**
+         * 정적 상수 구간의 인스턴스 생성을 막는다.
+         * @created 2026-11-04
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private Readiness() {
+        }
+    }
+
+    /**
+     * 명시적인 폐기용 감마 배포의 설정 및 암호 규격이다.
+     * @created 2026-11-04
+     * @usedBy GammaDeployment, GammaLocalKeys, AnalysisReadiness
+     */
+    public static final class GammaLocal {
+        public static final String KEY_REFERENCE = "gamma-local-v1:";
+        public static final String HASH_ALGORITHM = "SHA-256";
+        public static final String CIPHER_ALGORITHM = "AES/GCM/NoPadding";
+        public static final String KEY_ALGORITHM = "AES";
+        public static final String VERSION = "gamma-local-2";
+        public static final String CONTROLLER_PACKAGE = "com.payse.api.analysis.controller";
+        public static final String PERFORMANCE = "/com/payse/ai/rules/performance.json";
+        public static final String IDENTITY = "/gamma-identity.json";
+
+        /**
+         * 정적 설정 구간의 인스턴스 생성을 막는다.
+         * @created 2026-11-04
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private GammaLocal() {
+        }
+    }
+
+    /**
+     * 분석 실행 구성·비용 경계의 고정 문자열이다.
+     * @created 2026-11-03
+     * @usedBy AnalysisSettings, AnalysisPricing, AnalysisCosts, AnalysisConfiguration
+     * @modified 2026-11-04 - 프롬프트 버전의 중복 상수를 실제 지문으로 대체
+     */
+    public static final class Execution {
+        public static final String SETTINGS_PROPERTY = "payse.analysis.settings-file";
+        public static final String SETTINGS_BINDING = "${payse.analysis.settings-file:}";
+        public static final String ENABLED = "enabled";
+        public static final String LLM_FILE = "llmSettingsFile";
+        public static final String KMS_FILE = "kmsTokenFile";
+        public static final String KMS_KEY = "kmsKey";
+        public static final String PROJECT = "projectId";
+        public static final String PRICING = "pricingVersion";
+        public static final String COUNT_PREFIX = "analysis-count:";
+        public static final String RESPONSE_VERSION = "PAYSE-analysis-storage-1";
+
+        /**
+         * 정적 상수 구간의 인스턴스 생성을 막는다.
+         * @created 2026-11-03
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private Execution() {
+        }
+    }
+
+    /**
      * 상수 컨테이너의 인스턴스 생성을 막는다.
      * @created 2026-11-02
      * @usedBy 없음: 정적 상수 전용 타입의 인스턴스화 차단
@@ -23,6 +97,8 @@ public final class ApiConfigConstants {
     public static final class Analysis {
         // 업무·프로토콜 값
         public static final String NO_STORE = "no-store";
+        public static final String PREFER = "Prefer";
+        public static final String WAIT_PREFERENCE = "wait=5";
         public static final String ENCRYPT_ACTION = ":encrypt";
         public static final String DECRYPT_ACTION = ":decrypt";
         public static final String API_V4 = "PAYSE-API-0.6-4";
@@ -183,6 +259,7 @@ public final class ApiConfigConstants {
         public static final String TRANSACTIONS_PATH = "/transactions";
         public static final String LINKS_PATH = "/institution-links";
         public static final String OBLIGATIONS_PATH = "/obligations";
+        public static final String RECURRING_DECISIONS_PATH = "/recurring-decisions";
         public static final String RESERVES_PATH = "/reserves";
         public static final String CANCEL_OBLIGATION_PATH = "/obligations/{id}/cancel";
         public static final String CANCEL_RESERVE_PATH = "/reserves/{id}/cancel";

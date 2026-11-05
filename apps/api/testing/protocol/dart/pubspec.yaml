@@ -1,0 +1,8 @@
+name: payse_protocol_vectors
+description: Standalone public Java-Dart identity reference, outside the mobile app.
+publish_to: none
+version: 1.0.0
+environment:
+  sdk: '>=3.13.5 <3.14.0'
+dependencies:
+  crypto: 3.0.8

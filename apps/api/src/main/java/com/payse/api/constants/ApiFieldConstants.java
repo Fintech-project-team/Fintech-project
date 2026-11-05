@@ -7,6 +7,105 @@ package com.payse.api.constants;
  */
 public final class ApiFieldConstants {
     /**
+     * 반복 후보의 사용자 승인·제외 명령 필드다.
+     * @created 2026-11-04
+     * @usedBy RecurringInput, RecurringWrites
+     */
+    public static final class Recurring {
+        public static final String CANDIDATE_KEY = "candidateKey";
+        public static final String SOURCE_VERSION = "sourceVersion";
+        public static final String EVIDENCE_IDS = "evidenceTransactionIds";
+        public static final String NAME = "normalizedName";
+        public static final String DECISION = "decision";
+        public static final String PLAN = "plan";
+        public static final String PLAN_ID = "planId";
+        public static final String REVISION_ID = "revisionId";
+        public static final String DECISION_ID = "decisionId";
+        public static final String FIRST_MONTH = "firstOccurrenceMonth";
+        public static final String MONTHLY_DAY = "monthlyDay";
+        public static final String PAYMENT_TIMING = "paymentTiming";
+        public static final String SCHEDULE_BASIS = "scheduleBasis";
+        public static final String CARD_ID = "cardId";
+        public static final String AS_OF = "asOf";
+        public static final String INSTRUMENT_ID = "instrumentId";
+        public static final String RECORD_KIND = "recordKind";
+        public static final String ELIGIBLE = "eligible";
+        public static final String DUPLICATE = "duplicate";
+        public static final String CARD_TYPE = "cardType";
+
+        /**
+         * 정적 필드 규격만 제공한다.
+         * @created 2026-11-04
+         * @usedBy 없음: 인스턴스화 금지
+         */
+        private Recurring() {
+        }
+    }
+
+    /**
+     * 비공개 AI 준비와 상태의 고정 규격이다.
+     * @created 2026-11-04
+     * @usedBy AnalysisReadiness, GammaDeployment
+     */
+    public static final class Readiness {
+        public static final String FORMAT = "format";
+        public static final String AGENT = "agent";
+        public static final String MODE = "mode";
+        public static final String AUTOMATIC_RETRIES = "automaticRetries";
+        public static final String VALIDATED_PROMPT = "validatedPrompt";
+        public static final String FINGERPRINT = "fingerprint";
+        public static final String PREPARED_AT = "preparedAt";
+        public static final String PREPARATION_COUNT = "preparationCount";
+        public static final String PREPARATION = "preparation";
+        public static final String PREPARATION_REUSED = "preparationReused";
+        public static final String RUNTIME_STARTED_AT = "runtimeStartedAt";
+        public static final String PROCESS_ID = "processId";
+        public static final String PROFILE = "profile";
+        public static final String LAST_EVENT = "lastEvent";
+        public static final String AT_SUFFIX = "At";
+        public static final String COUNT_SUFFIX = "Count";
+        public static final String PARALLELISM = "parallelism";
+        public static final String MODEL = "model";
+        public static final String REASONING_EFFORT = "reasoningEffort";
+        public static final String INPUT_LIMIT = "inputLimit";
+        public static final String OUTPUT_LIMIT = "outputLimit";
+        public static final String REQUEST_TIMEOUT_SECONDS = "requestTimeoutSeconds";
+        public static final String USER_ID = "userId";
+
+        /**
+         * 정적 상수 구간의 인스턴스 생성을 막는다.
+         * @created 2026-11-04
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private Readiness() {
+        }
+    }
+
+    /**
+     * 분석 실행 구성·비용 경계의 고정 문자열이다.
+     * @created 2026-11-03
+     * @usedBy AnalysisSettings, AnalysisPricing, AnalysisCosts, AnalysisConfiguration
+     */
+    public static final class Execution {
+        public static final String MODEL = "model";
+        public static final String INPUT_RATE = "inputMicrosPerMillion";
+        public static final String CACHED_RATE = "cachedMicrosPerMillion";
+        public static final String OUTPUT_RATE = "outputMicrosPerMillion";
+        public static final String COUNT_COST = "countingMicros";
+        public static final String KMS_COST = "kmsMicros";
+        public static final String INPUT_LIMIT = "inputLimit";
+        public static final String OUTPUT_LIMIT = "outputLimit";
+
+        /**
+         * 정적 상수 구간의 인스턴스 생성을 막는다.
+         * @created 2026-11-03
+         * @usedBy 없음: 정적 상수 전용
+         */
+        private Execution() {
+        }
+    }
+
+    /**
      * 상수 컨테이너의 인스턴스 생성을 막는다.
      * @created 2026-11-02
      * @usedBy 없음: 정적 상수 전용 타입의 인스턴스화 차단
@@ -157,6 +256,10 @@ public final class ApiFieldConstants {
         public static final String DETAIL = "detail";
         public static final String PERMIT = "permit";
         public static final String ACKNOWLEDGE_DUPLICATE_RISK = "acknowledgeDuplicateRisk";
+        public static final String REVIEW = "review";
+        public static final String ITEMS_AVAILABLE = "itemsAvailable";
+        public static final String REQUIRES_USER_INPUT = "requiresUserInput";
+        public static final String RETRY_REQUIRES_ACKNOWLEDGEMENT = "retryRequiresAcknowledgement";
         public static final String ACTION = "action";
         public static final String PERMIT_EXPIRES_AT = "permitExpiresAt";
         public static final String USAGE_KNOWN = "usageKnown";

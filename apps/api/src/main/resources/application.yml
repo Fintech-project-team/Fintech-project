@@ -25,3 +25,6 @@ server:
   error:
     include-message: never
     include-stacktrace: never
+payse:
+  analysis:
+    settings-file: ${PAYSE_ANALYSIS_SETTINGS_FILE:}

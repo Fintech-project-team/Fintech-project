@@ -4,6 +4,10 @@
 
 ## 1. 기존 API와의 경계
 
+2026-11-04 확정한 [Java·Dart 연동 합의](../../../docs/analysis-protocol.md)에 공통 HTTP Schema, 공개 지문 30개 사례, tracker·조회 규칙 및 A/B 인수 순서를 기록했다. [모의 공급자 서버](analysis-mock.md)에서 실제 인증·DB 경로로 공동 연동한다.
+
+`GET /analysis-jobs/{id}`에 단일 `Prefer: wait=5` 헤더를 보내면 실행 중인 작업의 완료를 최대 5초 비동기로 기다린다. 기본 조회는 즉시 반환하며 다른 선호 값은 무시한다. 완료·실패 신호 또는 대기 시간 종료 후 같은 상태 봉투를 반환하고 인증·소유권을 다시 검사한다. 작업마다 대기 관찰자는 하나이며 추가 조회는 즉시 상태를 반환한다. DB 트랜잭션과 요청 처리 스레드를 대기 동안 붙잡지 않고 모델을 재호출하지 않는다. 시간 종료의 `running`은 실패나 후보 0개가 아니다. 앱 종료 후 알림·자동 복구 기능은 이 선택적 대기와 별개다. 모바일 반영·실기기 검증은 아직 완료하지 않았다.
+
 - Bearer·HTTPS·UTF-8 JSON·`Cache-Control: no-store`와 [공통 오류 봉투](../../../docs/api-contract.md#6-오류-응답)를 재사용한다. userId는 서버 세션에서 정한다. 요청에 userId·PIN·설치 ID를 받지 않는다.
 - ID/Time/Version은 [공통 타입](../../../docs/data-model.md#1-읽는-방법과-공통-규칙)을 따른다. 분석 진행은 금융 `dataVersion`·원천·설정·`write_receipts`를 바꾸지 않는다.
 - 아래 `contractVersion`은 분석 통신 버전 `PAYSE-ANALYSIS-1`이다. 금융 `PAYSE-API-0.6-4`, `PAYSE-DRAFT-4`, `PAYSE-CALC-1`은 유지한다. API 구현과 별도로 B의 입력 생성·파서·상태 복구를 공동 확인한다. 기존 금융 v4 소비자가 분석 API까지 지원한다는 뜻은 아니다.
@@ -77,6 +81,8 @@ API 요청 JSON의 지문과 모델 전송용 짧은 ID 별칭은 다르다. 별
 작업의 succeeded/progress는 당시 입력 처리 완료를 뜻한다. 이후 기억 삭제로 과거 작업을 실패로 바꾸거나 progress를 재계산하지 않는다. 모델 응답의 전체 항목을 검증한 뒤 저장 시점의 삭제 차단 항목은 본문 없이 제외 사실만 남긴다. 이것은 불완전한 모델 응답을 부분 채택하는 것과 다르다. 삭제/차단 때문에 제공하지 않는 항목은 자동 재시도 대상으로 삼지 않고 사용자 재시도에서도 차단을 먼저 검사한다.
 
 ## 5. 사용자 재시도와 늦은 응답
+
+실패·완료 불명·취소·만료 응답에는 선택 필드 `review`를 제공한다. `reason`은 해당 작업 state, `requiresUserInput:true`, `itemsAvailable`은 항목 키 목록의 보관 여부, `retryRequiresAcknowledgement`는 `outcomeUnknown`일 때 true다. 상세가 남아 있으면 `items:[{itemKey}]`를 제공하고 종료 후 7일 또는 상세 정리 후에는 `items`를 생략한다. 목록 부재는 해결 완료가 아니다. 거래 원문·거래 ID·후보 본문·공급자 오류를 상태 응답에 추가하지 않는다. `action`과 재시도 요청 규격은 유지한다. [화면 연결 및 검증 기준](analysis-recovery.md)을 따른다.
 
 - 로그아웃은 해당 세션의 queued/awaitingInput 작업과 제출 허가를 취소한다. 새 세션은 상태를 조회할 수 있지만 옛 허가로 실행할 수 없다. 현재 권한·같은 근거 검증을 통과한 사용자 명시 retry만 다시 실행한다. 이미 전송된 작업은 로그아웃을 미전송 근거로 삼지 않으며 옛 세션의 응답 채택을 차단한다.
 - 실패 후 관련 DB 금액·날짜·분류 등 근거가 바뀌면 공개 inputHashHint가 같아도 같은 작업 retry는409 STALE_DATA로 거절하고 시도를 추가하지 않는다. 현재 원천의 기존 A/B 동작은 별도 접수로 구분한다.

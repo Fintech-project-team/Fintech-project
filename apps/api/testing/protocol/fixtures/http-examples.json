@@ -1,0 +1,576 @@
+{
+  "format": "PAYSE-HTTP-EXAMPLES-1",
+  "synthetic": true,
+  "executableAgainstMockDatabase": false,
+  "examples": [
+    {
+      "name": "accept",
+      "schema": "acceptRequest",
+      "value": {
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "triggerKind": "B",
+        "semanticTaskKind": "recurringMeaning",
+        "items": [
+          {
+            "itemKey": "recurring-item",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ],
+            "candidateIds": ["candidate-1"]
+          }
+        ],
+        "inputHashHint": "sha256:ce58d1045045d3b0f5800f676a4a5d48f2c7ed21a8209fc933d3f41129531d12",
+        "reasonCodes": [],
+        "idempotencyKey": "public-example-accept"
+      }
+    },
+    {
+      "name": "input",
+      "schema": "inputRequest",
+      "value": {
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "input": {
+          "contractVersion": "PAYSE-ANALYSIS-1",
+          "semanticTaskKind": "recurringMeaning",
+          "context": {
+            "schemaVersion": "PAYSE-API-0.6-4",
+            "dataVersion": "1",
+            "sourceVersion": "public-protocol-source-1",
+            "ruleVersion": "PAYSE-CALC-1",
+            "asOf": "2026-11-04T12:00:00+09:00",
+            "inputRevision": 0,
+            "localSessionEpoch": 1,
+            "selectedAccountIds": []
+          },
+          "items": [
+            {
+              "itemKey": "recurring-item",
+              "targetTransactionId": null,
+              "candidateKey": "candidate-1",
+              "evidenceTransactionIds": [
+                "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+                "71e9d50d-642d-54d3-b112-20a5745d249c",
+                "1a9312bd-0976-53ad-9a38-6db950697904"
+              ]
+            }
+          ],
+          "transactions": [
+            {
+              "transactionId": "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "recordKind": "account_entry",
+              "direction": "out",
+              "status": "posted",
+              "reflectionReason": "reflected",
+              "merchantName": "합성 거래처",
+              "description": "확인용 입금",
+              "originalTransactionId": null
+            },
+            {
+              "transactionId": "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "recordKind": "account_entry",
+              "direction": "out",
+              "status": "posted",
+              "reflectionReason": "reflected",
+              "merchantName": "합성 거래처",
+              "description": "확인용 입금",
+              "originalTransactionId": null
+            },
+            {
+              "transactionId": "1a9312bd-0976-53ad-9a38-6db950697904",
+              "recordKind": "account_entry",
+              "direction": "out",
+              "status": "posted",
+              "reflectionReason": "reflected",
+              "merchantName": "합성 거래처",
+              "description": "확인용 입금",
+              "originalTransactionId": null
+            }
+          ],
+          "relations": [],
+          "unavailableReferences": [],
+          "currentClassifications": [],
+          "candidates": [
+            {
+              "candidateKey": "candidate-1",
+              "ruleVersion": "PAYSE-CALC-1",
+              "sourceVersion": "public-protocol-source-1",
+              "evidenceTransactionIds": [
+                "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+                "71e9d50d-642d-54d3-b112-20a5745d249c",
+                "1a9312bd-0976-53ad-9a38-6db950697904"
+              ],
+              "normalizedName": "합성 통신요금",
+              "suggestedAmountKRW": 50000,
+              "suggestedDay": 20,
+              "features": {
+                "occurrenceCount": 3,
+                "observedMonths": ["2026-08", "2026-09", "2026-10"],
+                "dayWithinRule": true,
+                "amountWithinRule": true,
+                "hasUnresolvedReversal": false
+              }
+            }
+          ]
+        },
+        "permit": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "idempotencyKey": "public-example-input"
+      }
+    },
+    {
+      "name": "retry_after_acknowledgement",
+      "schema": "retryRequest",
+      "value": {
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "input": {
+          "contractVersion": "PAYSE-ANALYSIS-1",
+          "semanticTaskKind": "recurringMeaning",
+          "context": {
+            "schemaVersion": "PAYSE-API-0.6-4",
+            "dataVersion": "1",
+            "sourceVersion": "public-protocol-source-1",
+            "ruleVersion": "PAYSE-CALC-1",
+            "asOf": "2026-11-04T12:00:00+09:00",
+            "inputRevision": 0,
+            "localSessionEpoch": 1,
+            "selectedAccountIds": []
+          },
+          "items": [
+            {
+              "itemKey": "recurring-item",
+              "targetTransactionId": null,
+              "candidateKey": "candidate-1",
+              "evidenceTransactionIds": [
+                "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+                "71e9d50d-642d-54d3-b112-20a5745d249c",
+                "1a9312bd-0976-53ad-9a38-6db950697904"
+              ]
+            }
+          ],
+          "transactions": [
+            {
+              "transactionId": "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "recordKind": "account_entry",
+              "direction": "out",
+              "status": "posted",
+              "reflectionReason": "reflected",
+              "merchantName": "합성 거래처",
+              "description": "확인용 입금",
+              "originalTransactionId": null
+            },
+            {
+              "transactionId": "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "recordKind": "account_entry",
+              "direction": "out",
+              "status": "posted",
+              "reflectionReason": "reflected",
+              "merchantName": "합성 거래처",
+              "description": "확인용 입금",
+              "originalTransactionId": null
+            },
+            {
+              "transactionId": "1a9312bd-0976-53ad-9a38-6db950697904",
+              "recordKind": "account_entry",
+              "direction": "out",
+              "status": "posted",
+              "reflectionReason": "reflected",
+              "merchantName": "합성 거래처",
+              "description": "확인용 입금",
+              "originalTransactionId": null
+            }
+          ],
+          "relations": [],
+          "unavailableReferences": [],
+          "currentClassifications": [],
+          "candidates": [
+            {
+              "candidateKey": "candidate-1",
+              "ruleVersion": "PAYSE-CALC-1",
+              "sourceVersion": "public-protocol-source-1",
+              "evidenceTransactionIds": [
+                "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+                "71e9d50d-642d-54d3-b112-20a5745d249c",
+                "1a9312bd-0976-53ad-9a38-6db950697904"
+              ],
+              "normalizedName": "합성 통신요금",
+              "suggestedAmountKRW": 50000,
+              "suggestedDay": 20,
+              "features": {
+                "occurrenceCount": 3,
+                "observedMonths": ["2026-08", "2026-09", "2026-10"],
+                "dayWithinRule": true,
+                "amountWithinRule": true,
+                "hasUnresolvedReversal": false
+              }
+            }
+          ]
+        },
+        "acknowledgeDuplicateRisk": true,
+        "idempotencyKey": "public-example-retry"
+      }
+    },
+    {
+      "name": "query",
+      "schema": "queryRequest",
+      "value": {
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "semanticTaskKind": "recurringMeaning",
+        "input": {
+          "contractVersion": "PAYSE-ANALYSIS-1",
+          "semanticTaskKind": "recurringMeaning",
+          "context": {
+            "schemaVersion": "PAYSE-API-0.6-4",
+            "dataVersion": "1",
+            "sourceVersion": "public-protocol-source-1",
+            "ruleVersion": "PAYSE-CALC-1",
+            "asOf": "2026-11-04T12:00:00+09:00",
+            "inputRevision": 0,
+            "localSessionEpoch": 1,
+            "selectedAccountIds": []
+          },
+          "items": [
+            {
+              "itemKey": "recurring-item",
+              "targetTransactionId": null,
+              "candidateKey": "candidate-1",
+              "evidenceTransactionIds": [
+                "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+                "71e9d50d-642d-54d3-b112-20a5745d249c",
+                "1a9312bd-0976-53ad-9a38-6db950697904"
+              ]
+            }
+          ],
+          "transactions": [
+            {
+              "transactionId": "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "recordKind": "account_entry",
+              "direction": "out",
+              "status": "posted",
+              "reflectionReason": "reflected",
+              "merchantName": "합성 거래처",
+              "description": "확인용 입금",
+              "originalTransactionId": null
+            },
+            {
+              "transactionId": "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "recordKind": "account_entry",
+              "direction": "out",
+              "status": "posted",
+              "reflectionReason": "reflected",
+              "merchantName": "합성 거래처",
+              "description": "확인용 입금",
+              "originalTransactionId": null
+            },
+            {
+              "transactionId": "1a9312bd-0976-53ad-9a38-6db950697904",
+              "recordKind": "account_entry",
+              "direction": "out",
+              "status": "posted",
+              "reflectionReason": "reflected",
+              "merchantName": "합성 거래처",
+              "description": "확인용 입금",
+              "originalTransactionId": null
+            }
+          ],
+          "relations": [],
+          "unavailableReferences": [],
+          "currentClassifications": [],
+          "candidates": [
+            {
+              "candidateKey": "candidate-1",
+              "ruleVersion": "PAYSE-CALC-1",
+              "sourceVersion": "public-protocol-source-1",
+              "evidenceTransactionIds": [
+                "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+                "71e9d50d-642d-54d3-b112-20a5745d249c",
+                "1a9312bd-0976-53ad-9a38-6db950697904"
+              ],
+              "normalizedName": "합성 통신요금",
+              "suggestedAmountKRW": 50000,
+              "suggestedDay": 20,
+              "features": {
+                "occurrenceCount": 3,
+                "observedMonths": ["2026-08", "2026-09", "2026-10"],
+                "dayWithinRule": true,
+                "amountWithinRule": true,
+                "hasUnresolvedReversal": false
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "queued",
+      "schema": "jobResponse",
+      "value": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "jobId": "181034c7-65cd-533b-92be-260d059ce1e6",
+        "state": "queued",
+        "action": "wait",
+        "resultAvailability": "unchecked"
+      }
+    },
+    {
+      "name": "awaitingInput",
+      "schema": "jobResponse",
+      "value": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "jobId": "181034c7-65cd-533b-92be-260d059ce1e6",
+        "state": "awaitingInput",
+        "action": "submitInput",
+        "resultAvailability": "unchecked",
+        "permit": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "permitExpiresAt": "2026-11-04T00:01:00Z"
+      }
+    },
+    {
+      "name": "running",
+      "schema": "jobResponse",
+      "value": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "jobId": "181034c7-65cd-533b-92be-260d059ce1e6",
+        "state": "running",
+        "action": "wait",
+        "resultAvailability": "unchecked"
+      }
+    },
+    {
+      "name": "succeeded",
+      "schema": "jobResponse",
+      "value": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "jobId": "181034c7-65cd-533b-92be-260d059ce1e6",
+        "state": "succeeded",
+        "action": "readResult",
+        "resultAvailability": "unchecked",
+        "resultId": "76a9070c-18eb-5094-907c-e6ccd940cafd"
+      }
+    },
+    {
+      "name": "failed",
+      "schema": "jobResponse",
+      "value": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "jobId": "181034c7-65cd-533b-92be-260d059ce1e6",
+        "state": "failed",
+        "action": "retry",
+        "resultAvailability": "unchecked",
+        "review": {
+          "reason": "failed",
+          "requiresUserInput": true,
+          "itemsAvailable": true,
+          "retryRequiresAcknowledgement": false,
+          "items": [
+            {
+              "itemKey": "recurring-item"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "outcomeUnknown",
+      "schema": "jobResponse",
+      "value": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "jobId": "181034c7-65cd-533b-92be-260d059ce1e6",
+        "state": "outcomeUnknown",
+        "action": "retry",
+        "resultAvailability": "unchecked",
+        "review": {
+          "reason": "outcomeUnknown",
+          "requiresUserInput": true,
+          "itemsAvailable": true,
+          "retryRequiresAcknowledgement": true,
+          "items": [
+            {
+              "itemKey": "recurring-item"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "available_candidate",
+      "schema": "queryResponse",
+      "value": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "resultAvailability": "available",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "resultId": "76a9070c-18eb-5094-907c-e6ccd940cafd",
+        "result": {
+          "meaningPolicyVersion": "PAYSE-MEANING-1",
+          "items": [
+            {
+              "itemId": "c712566d-81f5-5d05-8c79-d31a38ce2efe",
+              "interpretation": {
+                "itemKey": "recurring-item",
+                "candidateKey": "candidate-1",
+                "name": "통신 요금",
+                "evidenceTransactionIds": [
+                  "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+                  "71e9d50d-642d-54d3-b112-20a5745d249c",
+                  "1a9312bd-0976-53ad-9a38-6db950697904"
+                ],
+                "reason": "월별 통신료 근거를 확인했습니다.",
+                "meaning": {
+                  "status": "candidate",
+                  "value": "telecom",
+                  "reasonCode": "supported"
+                }
+              },
+              "retentionReason": "합성 예제",
+              "active": true,
+              "important": false,
+              "isReference": true,
+              "referencePolicy": "optional",
+              "storedAt": "2026-11-04T00:00:00Z",
+              "normalExpiresAt": "2027-02-04T00:00:00Z"
+            }
+          ],
+          "itemAvailability": [
+            {
+              "itemKey": "recurring-item",
+              "state": "available",
+              "itemId": "c712566d-81f5-5d05-8c79-d31a38ce2efe"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "available_unknown",
+      "schema": "queryResponse",
+      "value": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "resultAvailability": "available",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "resultId": "76a9070c-18eb-5094-907c-e6ccd940cafd",
+        "result": {
+          "meaningPolicyVersion": "PAYSE-MEANING-1",
+          "items": [
+            {
+              "itemId": "c712566d-81f5-5d05-8c79-d31a38ce2efe",
+              "interpretation": {
+                "itemKey": "recurring-item",
+                "candidateKey": "candidate-1",
+                "name": null,
+                "evidenceTransactionIds": [
+                  "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+                  "71e9d50d-642d-54d3-b112-20a5745d249c",
+                  "1a9312bd-0976-53ad-9a38-6db950697904"
+                ],
+                "reason": "출금 목적을 사용자에게 확인해 주세요.",
+                "meaning": {
+                  "status": "unknown",
+                  "value": null,
+                  "reasonCode": "insufficient_evidence"
+                }
+              },
+              "retentionReason": "합성 예제",
+              "active": true,
+              "important": false,
+              "isReference": true,
+              "referencePolicy": "optional",
+              "storedAt": "2026-11-04T00:00:00Z",
+              "normalExpiresAt": "2027-02-04T00:00:00Z"
+            }
+          ],
+          "itemAvailability": [
+            {
+              "itemKey": "recurring-item",
+              "state": "available",
+              "itemId": "c712566d-81f5-5d05-8c79-d31a38ce2efe"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "missing",
+      "schema": "queryResponse",
+      "value": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "resultAvailability": "missing",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        }
+      }
+    },
+    {
+      "name": "stale_data",
+      "schema": "errorResponse",
+      "value": {
+        "error": {
+          "code": "STALE_DATA",
+          "message": "최신 자료로 다시 확인해 주세요.",
+          "requestId": "932c539a-df55-5e5b-96c4-8fe669299a0a",
+          "details": []
+        }
+      }
+    }
+  ]
+}

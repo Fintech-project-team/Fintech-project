@@ -22,6 +22,7 @@ BASE_MIGRATIONS = (
     '003_auth_access.sql',
     '004_auth_sessions.sql',
     '007_financial_access.sql',
+    '013_recurring_access.sql',
 )
 
 
@@ -33,6 +34,7 @@ def create_database(cluster, base_sql_root, database):
     cluster.load(DIRECTORY / '008_analysis_storage.sql', database)
     cluster.load(base_sql_root / '009_salary_notices.sql', database)
     cluster.load(DIRECTORY / '011_analysis_memory_refs.sql', database)
+    cluster.load(DIRECTORY / '012_analysis_costs.sql', database)
     # 005/006/010은 구 DB용이다. 신규 001에 포함된 현재 구조 위에 중복 적용하지 않는다.
     checks = cluster.sql('''
       SELECT
@@ -185,6 +187,12 @@ def main():
         cluster.report.update({'sourceRefreshChecks': refresh_result.testsRun,
                               'sourceRefreshPassed': refresh_result.wasSuccessful()})
         if not refresh_result.wasSuccessful():
+            return 1
+        from test_analysis_costs import run_checks as cost_checks
+        cost_result = cost_checks(cluster, base_sql_root)
+        cluster.report.update({'costChecks': cost_result.testsRun,
+                              'costPassed': cost_result.wasSuccessful()})
+        if not cost_result.wasSuccessful():
             return 1
         environment = {key: value for key, value in os.environ.items()
                        if not key.upper().startswith(('PAYSE_', 'SPRING_', 'PG'))}

@@ -26,8 +26,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.springframework.context.annotation.Profile;
@@ -55,12 +60,15 @@ public final class AnalysisJobs {
     private final AnalysisIdentity identity = new AnalysisIdentity();
     private final AnalysisEvidence evidence = new AnalysisEvidence();
     private final MemoryPolicy retention = new MemoryPolicy();
-    private final ExecutorService workers = Executors.newFixedThreadPool(2);
+    private final AnalysisCapacity capacityLimits;
+    private final ExecutorService workers;
+    private final Map<UUID, Completion> completions = new ConcurrentHashMap<>();
 
     /**
      * API의 기존 인증·저장소와 요청별 분석 실행 경계를 연결한다.
      * @created 2026-11-01
      * @usedBy Spring 생성자 주입
+     * @modified 2026-11-04 - 승인된 용량 구성에 맞춰 작업자와 접수 상한을 함께 사용
      */
     public AnalysisJobs(
         AuthTransactions transactions,
@@ -70,7 +78,8 @@ public final class AnalysisJobs {
         AnalysisRepository repository,
         AnalysisRuntime runtime,
         AnalysisResults results,
-        Clock clock
+        Clock clock,
+        AnalysisCapacity capacityLimits
     ) {
         this.transactions = transactions;
         this.auth = auth;
@@ -80,12 +89,15 @@ public final class AnalysisJobs {
         this.runtime = runtime;
         this.results = results;
         this.clock = clock;
+        this.capacityLimits = capacityLimits;
+        workers = Executors.newFixedThreadPool(capacityLimits.runningTotal());
     }
 
     /**
      * 본문 없는 descriptor를 접수한다. recovery만 현재 입력 검증과 기존 결과 재사용을 먼저 한다.
      * @created 2026-11-01
      * @usedBy AnalysisController.accept
+     * @modified 2026-11-04 - 기존 잠금 안에서 주입된 대기 용량을 검사
      * @modified 2026-11-02 - 긴 식 지역변수 분리
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
@@ -211,7 +223,7 @@ public final class AnalysisJobs {
 
                 if (cachedResult == null) {
                     long[] capacity = repository.capacity(session.userId());
-                    if (capacity[0] >= 2 || capacity[1] >= 20) {
+                    if (capacityLimits.waitingFull(capacity[0], capacity[1])) {
                         throw new FinancialException(429, ApiCodeConstants.Analysis.RATE_LIMITED);
                     }
                 }
@@ -271,12 +283,37 @@ public final class AnalysisJobs {
     }
 
     /**
+     * 실행 중인 작업마다 관찰자 하나만 비동기로 기다리고 반환 전에 인증을 다시 확인한다.
+     * @created 2026-11-04
+     * @usedBy AnalysisController.status
+     */
+    public CompletionStage<Reply> awaitRead(String token, String id, Runnable requestCheck) {
+        Reply current = read(token, id, requestCheck);
+        if (!ApiCodeConstants.Analysis.RUNNING.equals(
+            current.body().path(ApiFieldConstants.Analysis.STATE).asString()
+        )) {
+            return CompletableFuture.completedFuture(current);
+        }
+        Completion completion = completions.get(parseId(id));
+        if (completion == null || !completion.observing.compareAndSet(false, true)) {
+            return CompletableFuture.completedFuture(current);
+        }
+        return completion.finished.copy()
+            .completeOnTimeout(null, 5, TimeUnit.SECONDS)
+            .thenApplyAsync(ignored -> read(token, id, () -> {}))
+            .whenComplete((reply, failure) -> completion.observing.set(false));
+    }
+
+    /**
      * 사용자 입력·재시도만 접수하며 중복 요청으로 전송을 늘리지 않는다.
      * @created 2026-11-01
      * @usedBy AnalysisController.input, retry
      * @modified 2026-11-02 - 긴 식 지역변수 분리
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-03 - 분석 시도와 비용 예약을 원자 접수하고 DB 원천을 별도 투영
+     * @modified 2026-11-04 - 주입된 실행 상한 적용, 일반 API 기본값 유지
+     * @modified 2026-11-04 - 실행 시도별 완료 신호를 등록하고 거절 시 관찰자를 정리
      */
     public Reply submit(String token, String id, boolean retry, Supplier<JsonNode> request) {
         Submission submission = authenticated(
@@ -487,7 +524,7 @@ public final class AnalysisJobs {
                 }
                 runtime.requireReady();
                 long[] capacity = repository.capacity(session.userId());
-                if (capacity[2] >= 1 || capacity[3] >= 2) {
+                if (capacityLimits.runningFull(capacity[2], capacity[3])) {
                     ObjectNode waiting = status(session.userId(), uuid(current, AnalysisDb.ID));
                     waiting.put(ApiFieldConstants.Analysis.ACTION, ApiCodeConstants.Analysis.WAIT);
                     waiting.remove(ApiFieldConstants.Analysis.PERMIT);
@@ -503,6 +540,7 @@ public final class AnalysisJobs {
                     .put(AnalysisDb.DISPATCH_STATE, ApiCodeConstants.Analysis.NOT_SENT)
                     .put(AnalysisDb.CREATED_AT, now.toString());
                 repository.insert(ATTEMPTS, session.userId(), row);
+                runtime.reserve(attempt);
                 ObjectNode change = AnalysisJson.JSON.createObjectNode()
                     .put(ApiFieldConstants.Analysis.STATE, ApiCodeConstants.Analysis.RUNNING)
                     .put(AnalysisDb.INPUT_HASH, hash)
@@ -536,7 +574,8 @@ public final class AnalysisJobs {
                     attempt,
                     hash,
                     identity.sourceHash(source, input),
-                    input
+                    input,
+                    evidence.modelFacts(session.userId(), source, input)
                 );
                 return new Submission(
                     new Reply(202, status(session.userId(), uuid(current, AnalysisDb.ID))),
@@ -545,15 +584,26 @@ public final class AnalysisJobs {
             }
         );
         if (submission.work() != null) {
+            Work work = submission.work();
+            Completion completion = new Completion();
+            completions.put(work.job(), completion);
             try {
-                workers.execute(() -> execute(submission.work()));
+                workers.execute(() -> {
+                    try {
+                        execute(work);
+                    } finally {
+                        completions.remove(work.job(), completion);
+                        completion.finished.complete(null);
+                    }
+                });
             } catch (java.util.concurrent.RejectedExecutionException rejected) {
-                fail(
-                    submission.work(),
-                    false,
-                    ApiCodeConstants.Analysis.DISPATCH_NOT_STARTED,
-                    null
-                );
+                try {
+                    runtime.cancel(work.attempt());
+                    fail(work, false, ApiCodeConstants.Analysis.DISPATCH_NOT_STARTED, null);
+                } finally {
+                    completions.remove(work.job(), completion);
+                    completion.finished.complete(null);
+                }
                 throw new FinancialException(
                     503,
                     ApiCodeConstants.Analysis.TEMPORARILY_UNAVAILABLE
@@ -569,10 +619,12 @@ public final class AnalysisJobs {
      * @usedBy submit의 worker
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-03 - 비용을 독립 정산하는 실행 경계와 전송 전 예약 취소 연결
      */
     private void execute(Work work) {
         com.payse.ai.provider.dto.TokenUsage observedUsage = null;
         boolean responseReceived = false;
+        boolean runtimeEntered = false;
         try {
             boolean dispatch = authenticated(
                 work.token(),
@@ -610,7 +662,12 @@ public final class AnalysisJobs {
                 return;
             }
 
-            AnalysisResult result = runtime.analyze(work.input());
+            runtimeEntered = true;
+            AnalysisResult result = runtime.analyze(
+                work.attempt(),
+                work.input(),
+                work.modelFacts()
+            );
             responseReceived = true;
             observedUsage = result.usage();
             if (result.failure() != null) {
@@ -683,6 +740,10 @@ public final class AnalysisJobs {
                     : ApiCodeConstants.Analysis.EXECUTION_UNCONFIRMED,
                 observedUsage
             );
+        } finally {
+            if (!runtimeEntered) {
+                runtime.cancel(work.attempt());
+            }
         }
     }
 
@@ -1103,6 +1164,7 @@ public final class AnalysisJobs {
      * 진행 상태와 Q2 조건에 따른 60초 입력 허용 식별을 반환한다. 별도 인증 수단이 아니다.
      * @created 2026-11-01
      * @usedBy read, accept, submit
+     * @modified 2026-11-04 - 실패 확인 목록을 결과 본문 없이 상세 보관 기한 안에서 제공
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조·참조 개행 정리; 단일 제어문 본문 중괄호 명시
      * @modified 2026-11-02 - 동일 구현의 Jackson 문자열 노드 생성 메서드로 교체
@@ -1133,6 +1195,10 @@ public final class AnalysisJobs {
                 ApiFieldConstants.Analysis.RESULT_AVAILABILITY,
                 ApiCodeConstants.Analysis.UNCHECKED
             );
+        ObjectNode review = AnalysisReview.describe(current, state, clock.instant());
+        if (review != null) {
+            response.set(ApiFieldConstants.Analysis.REVIEW, review);
+        }
         if (current.path(ApiFieldConstants.Analysis.DETAIL)
             .path(ApiFieldConstants.Analysis.ITEMS)
             .isArray()
@@ -1542,10 +1608,23 @@ public final class AnalysisJobs {
      * 서버 종료는 새 실행을 막지만 DB의 전송/미확인 기록을 삭제하지 않는다.
      * @created 2026-11-01
      * @usedBy Spring 종료
+     * @modified 2026-11-04 - 완료 관찰자를 해제하되 DB 실행 상태는 변경하지 않음
      */
     @PreDestroy
     public void close() {
         workers.shutdownNow();
+        completions.values().forEach(completion -> completion.finished.complete(null));
+        completions.clear();
+    }
+
+    /**
+     * 본문·토큰 없이 한 실행의 완료 신호와 단일 관찰권만 보관한다.
+     * @created 2026-11-04
+     * @usedBy submit, awaitRead, close
+     */
+    private static final class Completion {
+        private final CompletableFuture<Void> finished = new CompletableFuture<>();
+        private final AtomicBoolean observing = new AtomicBoolean();
     }
 
     /**
@@ -1569,6 +1648,7 @@ public final class AnalysisJobs {
      * 메모리 안에서만 전달하는 작업 입력이다. 토큰·본문을 DB나 로그에 남기지 않는다.
      * @created 2026-11-01
      * @usedBy submit, execute
+     * @modified 2026-11-03 - 공개 입력과 모델 전용 원천 근거를 분리 보관
      */
     private record Work(
         String token,
@@ -1577,7 +1657,8 @@ public final class AnalysisJobs {
         UUID attempt,
         String hash,
         String basisHash,
-        ObjectNode input
+        ObjectNode input,
+        ObjectNode modelFacts
     ) {
         /**
          * 자동 문자열 표현에 자격·금융 본문을 노출하지 않는다.
