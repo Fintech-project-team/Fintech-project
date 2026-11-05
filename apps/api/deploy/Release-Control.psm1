@@ -167,6 +167,20 @@ function Test-ReleaseDatabase {
     }
 }
 
+# Created 2026-11-05: use the installation's public plan and verify the caller's exact API identity.
+function Get-ReleaseApiTarget {
+    param([string]$Config, $Identity)
+    if ($null -eq $Identity) { throw 'API process identity is missing.' }
+    $fresh = Get-PayseStopPlan -Config $Config
+    $current = Get-CimInstance Win32_Process -Filter ('ProcessId=' + [int]$Identity.pid)
+    if ($null -eq $fresh.api -and $null -eq $current) { return $null }
+    if ($null -eq $fresh.api -or $fresh.api.identity.pid -ne $Identity.pid -or
+        -not (Test-PayseStopIdentity $current $Identity)) {
+        throw 'API identity changed after preflight; no signal was sent.'
+    }
+    return $fresh.api
+}
+
 # Created 2026-11-02: apply under caller-held locks; restore old bytes and a new old-release process on startup failure.
 function Invoke-ReleaseTransaction {
     param([string]$JarPath, [string]$RuntimePath, [string]$CandidatePath, [string]$Commit,
@@ -217,4 +231,4 @@ function Invoke-ReleaseTransaction {
 }
 
 Export-ModuleMember -Function Read-ReleaseProperties, Write-ReleaseJson, Read-ReleasePackage,
-    Test-ReleaseProfiles, Test-ReleaseDatabase, Invoke-ReleaseTransaction
+    Test-ReleaseProfiles, Test-ReleaseDatabase, Get-ReleaseApiTarget, Invoke-ReleaseTransaction

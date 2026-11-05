@@ -93,7 +93,7 @@ try {
     }
     $stopApi = {
         param($identity)
-        $target = Read-PayseStopProcess 'API' $identity $settings.javaPath $settings.apiPort '127.0.0.1'
+        $target = Get-ReleaseApiTarget -Config $configPath -Identity $identity
         if ($null -ne $target) {
             Send-PayseStopSignal $plan $target -ProbeOnly
             Send-PayseStopSignal $plan $target
@@ -125,7 +125,7 @@ try {
         param($identity)
         $deadline = [DateTimeOffset]::UtcNow.AddSeconds(60)
         do {
-            $target = Read-PayseStopProcess 'API' $identity $settings.javaPath $settings.apiPort '127.0.0.1'
+            $target = Get-ReleaseApiTarget -Config $configPath -Identity $identity
             if ($null -eq $target) { throw 'API exited before readiness.' }
             try { if ((Invoke-RestMethod -Uri $url -NoProxy -TimeoutSec 2).status -eq 'UP') { return } } catch { }
             Start-Sleep -Milliseconds 500
