@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.payse.ai.analysis.service.PromptGuide;
+import com.payse.ai.analysis.validation.AnalysisContract;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,19 @@ import org.junit.jupiter.api.io.TempDir;
 class AnalysisReadinessTest {
     @TempDir
     Path directory;
+
+    /**
+     * 실제 번들 지침의 변경을 준비 프로필에 빠뜨리면 시작 전에 발견한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void acceptsBundledPrompt() throws Exception {
+        String version = new PromptGuide(new AnalysisContract().instructions()).version();
+        try (var readiness = new AnalysisReadiness(directory)) {
+            readiness.prepare(version, "config-a");
+        }
+    }
 
     /**
      * 재시작은 준비 시각과 설치 횟수를 유지하고 유료 호출을 만들지 않는다.

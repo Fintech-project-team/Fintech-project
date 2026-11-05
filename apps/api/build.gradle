@@ -71,6 +71,20 @@ tasks.register('gammaLocalServer', JavaExec) {
     mainClass = 'com.payse.api.analysis.service.GammaLocalServer'
     maxHeapSize = '512m'
 }
+
+// Test-only classpath for the isolated frontend protocol server; no mock in bootJar.
+tasks.register('protocolClasspath') {
+    dependsOn 'testClasses'
+    doLast {
+        def output = layout.buildDirectory.file('protocol-classpath.txt').get().asFile
+        output.text = sourceSets.test.runtimeClasspath.asPath
+    }
+}
+tasks.register('protocolContracts', Exec) {
+    commandLine 'python', '-B', '-m', 'unittest', 'discover',
+        '-s', 'testing/protocol', '-p', 'test_*.py'
+}
+tasks.named('test') { dependsOn 'protocolContracts' }
 tasks.register('apiDocsCheck', Exec) {
     dependsOn 'compileDocTools'
     def launcher = javaToolchains.launcherFor {
@@ -96,7 +110,7 @@ tasks.register('aiArchiveCheck') {
     doLast {
         def archive = tasks.named('bootJar').get().archiveFile.get().asFile
         new java.util.zip.ZipFile(archive).withCloseable { boot ->
-            if (boot.entries().toList().any { it.name.contains('/GammaLocalConfig') || it.name.contains('/GammaLocalServer') || it.name.contains('/GammaLive') || it.name.endsWith('Test.class') }) {
+            if (boot.entries().toList().any { it.name.contains('/GammaLocalConfig') || it.name.contains('/GammaLocalServer') || it.name.contains('/GammaLive') || it.name.contains('/ProtocolMock') || it.name.endsWith('Test.class') }) {
                 throw new GradleException('Gamma-only test code entered the deployment JAR')
             }
             def aiEntries = boot.entries().toList().findAll { it.name.startsWith('BOOT-INF/lib/ai-') && it.name.endsWith('.jar') }
@@ -117,7 +131,7 @@ tasks.register('aiArchiveCheck') {
                 throw new GradleException('Private evaluation material entered AI deployment')
             }
             def publicFiles = names.findAll { it.startsWith('com/payse/ai/rules/') && !it.endsWith('/') }
-            def expectedPublic = ['criteria.json', 'instructions.txt', 'guidance.md', 'performance.json', 'prompt-guide.json',
+            def expectedPublic = ['criteria.json', 'instructions.txt', 'guidance.md', 'compact-output.md', 'performance.json', 'prompt-guide.json',
                 'transactionMeaning.input.schema.json', 'transactionMeaning.output.schema.json',
                 'recurringMeaning.input.schema.json', 'recurringMeaning.output.schema.json']
                 .collect { 'com/payse/ai/rules/' + it }.toSet()

@@ -12,6 +12,8 @@ import com.payse.api.finance.error.FinancialException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -61,10 +63,22 @@ public final class AnalysisController {
      * 상태와 단기 입력 허용만 전달하며 모델·금융 저장을 실행하지 않는다.
      * @created 2026-11-01
      * @usedBy GET /analysis-jobs/{id}
+     * @modified 2026-11-04 - 명시적인 상태 대기 요청만 최대 5초 비동기 관찰
      */
     @GetMapping("/analysis-jobs/{id}")
-    public ResponseEntity<ObjectNode> status(@PathVariable String id, HttpServletRequest request) {
-        return response(jobs.read(auth.bearer(request), id, () -> input.cursor(request, false)));
+    public CompletionStage<ResponseEntity<ObjectNode>> status(
+        @PathVariable String id,
+        HttpServletRequest request
+    ) {
+        String token = auth.bearer(request);
+        var preferences = Collections.list(request.getHeaders(ApiConfigConstants.Analysis.PREFER));
+        if (preferences.equals(java.util.List.of(ApiConfigConstants.Analysis.WAIT_PREFERENCE))) {
+            return jobs.awaitRead(token, id, () -> input.cursor(request, false))
+                .thenApply(this::response);
+        }
+        return CompletableFuture.completedFuture(
+            response(jobs.read(token, id, () -> input.cursor(request, false)))
+        );
     }
 
     /**

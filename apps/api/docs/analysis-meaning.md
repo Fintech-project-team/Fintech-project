@@ -52,7 +52,7 @@
 - 정규 JSON·UTF-8 SHA-256의 기억/근거 지문과 개별 기억 응답은 [분석 API](analysis-api.md#21-입력-지문기억-식별)를 따른다. itemKey·epoch/revision·전체 dataVersion·조회 시각은 동일 기억 식별을 바꾸지 않고, 모델/프롬프트 버전은 캐시 자격에만 반영한다. 모든 항목이 불가하면 최상위 missing과 개별 실제 사유를 반환한다. B는 공개 최소 입력의 inputHashHint를 재현하며 서버의 실제 DB 결합 지문은 제출하지 않는다. 서버는 관련 금액·날짜 변경을 캐시/삭제 근거에 반영한다. 모델 전용 원천 보충은 공개 입력 지문 계약을 바꾸지 않으며 별도 프롬프트 버전으로 구분한다. B의 같은 직렬화·응답 파서는 아직 공동 실행 검증 전이다.
 - B는 Snapshot+전체 거래 페이지의 버전·asOf·coverage·관계·제한 정보를 유지하고 첫 Snapshot/후속 페이지의 같은 ID·다른 원천을 거절해야 한다. `nextCursor=null`만으로 완전 자료라고 간주하지 않는다.
 
-읽기 검사에서 확인한 B 보완 대상: [financial_snapshot.dart](../../mobile/lib/data/financial_snapshot.dart)의 nullable merchantName·관계/coverage 보존·enum 검사와 [transaction_history.dart](../../mobile/lib/data/connection/transaction_history.dart)의 첫 Snapshot 중복 대조. 실제 수정·Dart 입력 생성/응답 parser 테스트는 B 담당이다. 현재 반복 features 생성기도 미구현이다.
+읽기 검사에서 확인한 B 보완 대상: [financial_snapshot.dart](../../mobile/lib/data/financial_snapshot.dart)의 nullable merchantName·관계/coverage 보존·enum 검사와 [transaction_history.dart](../../mobile/lib/data/connection/transaction_history.dart)의 첫 Snapshot 중복 대조. 실제 수정·앱 입력 생성/응답 parser 테스트는 B 담당이다. 2026-11-04 공유 순수 Dart에 반복 후보·features·의미 결과 결합·확정 계획 투영을 추가했다([계산 연결](../../../packages/payse_calculation/docs/recurring.md)). 모바일 원천 어댑터와 HTTP 연결은 별도 인수 대상이며, [Java·Dart 공통 합의](../../../docs/analysis-protocol.md)의 30개 지문 사례와 모의 서버로 대조한다.
 
 ## 평가·정확도·비용
 

@@ -46,6 +46,7 @@ public final class FinancialInput {
      * @usedBy FinancialService.write
      * @modified 2026-11-02 - 계약·업무 문자열 상수 분리
      * @modified 2026-11-02 - 용도별 상수 파일 참조; 단일 제어문 본문 중괄호 명시
+     * @modified 2026-11-04 - 반복 결정의 허용 필드 검증 연결
      */
     public static ObjectNode validate(String method, String path, JsonNode body) {
         if (!(body instanceof ObjectNode object)) {
@@ -96,6 +97,9 @@ public final class FinancialInput {
         } else if (method.equals(ApiCodeConstants.Finance.PATCH)
             && path.equals(ApiConfigConstants.Finance.SETTINGS_PATH)) {
             settings(object);
+        } else if (path.equals(ApiConfigConstants.Finance.RECURRING_DECISIONS_PATH)
+            && method.equals(ApiCodeConstants.Finance.POST)) {
+            RecurringInput.validate(object);
         } else if (path.equals(ApiConfigConstants.Finance.OBLIGATIONS_PATH)
             && method.equals(ApiCodeConstants.Finance.POST)) {
             obligation(object, true);

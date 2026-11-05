@@ -205,11 +205,15 @@ public final class LlmSettings {
      * 자격 회전 시 연결 확인을 무효화하며 자격 자체를 노출하지 않는다.
      * @created 2026-11-04
      * @usedBy GammaDeployment.deployedGammaRuntime
+     * @modified 2026-11-04 - 명시 표준 처리 정책을 일회성 준비 지문에 포함
      */
     public String configurationFingerprint() {
         try {
-            byte[] hash = java.security.MessageDigest.getInstance(AiConfigConstants.Llm.FINGERPRINT_ALGORITHM)
-                .digest((model + "\n" + effort + "\n" + apiKey).getBytes(StandardCharsets.UTF_8));
+            String material = model + "\n" + effort + "\n"
+                + AiConfigConstants.OpenAi.SERVICE_DEFAULT + "\n" + apiKey;
+            byte[] hash = java.security.MessageDigest
+                .getInstance(AiConfigConstants.Llm.FINGERPRINT_ALGORITHM)
+                .digest(material.getBytes(StandardCharsets.UTF_8));
             return java.util.HexFormat.of().formatHex(hash);
         } catch (java.security.NoSuchAlgorithmException failure) {
             throw invalid();
@@ -220,9 +224,39 @@ public final class LlmSettings {
      * 기존 게이트웨이를 생성할 팩토리를 반환한다. 모델·키는 파일, 호출 상한은 API 정책에서 받는다.
      * @created 2026-11-01
      * @usedBy API 분석 실행 구성, LlmSettingsTest
+     * @modified 2026-11-04 - 기본 요청의 표준 처리 등급을 명시
      * @modified 2026-11-02 - 계약 문자열 상수 분리; 용도별 통합 상수 참조; 제어문 본문 구분
      */
     public ModelFactory factory(ProviderHttp http, int inputLimit, int outputLimit) {
+        return factory(http, inputLimit, outputLimit, AiConfigConstants.OpenAi.SERVICE_DEFAULT);
+    }
+
+    /**
+     * 별도 비용 상한을 확보한 비교 실행에만 요청 단위 Fast 등급을 전달한다.
+     * @created 2026-11-04
+     * @usedBy GammaLocalConfig.gammaRuntime, LlmSettings.factory
+     */
+    public ModelFactory factory(
+        ProviderHttp http,
+        int inputLimit,
+        int outputLimit,
+        String serviceTier
+    ) {
+        return factory(http, inputLimit, outputLimit, serviceTier, null);
+    }
+
+    /**
+     * 명시 비교의 응답 길이만 전달한다. 미지정 요청의 공급자 기본 동작은 유지한다.
+     * @created 2026-11-04
+     * @usedBy GammaLocalConfig.gammaRuntime, LlmSettings.factory
+     */
+    public ModelFactory factory(
+        ProviderHttp http,
+        int inputLimit,
+        int outputLimit,
+        String serviceTier,
+        String verbosity
+    ) {
         if (!enabled) {
             throw new IllegalStateException(AiMessageConstants.Llm.DISABLED_PROVIDER);
         }
@@ -239,7 +273,9 @@ public final class LlmSettings {
             effort,
             schema,
             inputLimit,
-            outputLimit
+            outputLimit,
+            serviceTier,
+            verbosity
         );
     }
 

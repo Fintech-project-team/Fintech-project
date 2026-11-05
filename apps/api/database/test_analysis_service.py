@@ -22,6 +22,7 @@ BASE_MIGRATIONS = (
     '003_auth_access.sql',
     '004_auth_sessions.sql',
     '007_financial_access.sql',
+    '013_recurring_access.sql',
 )
 
 

@@ -98,6 +98,13 @@ public final class AiMessageConstants {
      * @usedBy OpenAiGateway
      */
     public static final class OpenAi {
+        public static final String FAST_CONFIRMED = "OPENAI_FAST_CONFIRMED";
+        public static final String FAST_NOT_CONFIRMED = "OPENAI_FAST_NOT_CONFIRMED";
+        public static final String COMMENTARY_IGNORED = "OPENAI_COMMENTARY_IGNORED";
+        public static final String INCOMPLETE_DIAGNOSTIC =
+            "OpenAI incomplete: limit={0}, reasoning={1}, characters={2}, messages={3}";
+        public static final String ENVELOPE_REJECTED =
+            "OpenAI envelope rejected: messages={0}, textParts={1}";
         public static final String HTTP_PARAMETER = "http";
         public static final String CREDENTIALS_PARAMETER = "credentials";
         public static final String INVALID_PROFILE =

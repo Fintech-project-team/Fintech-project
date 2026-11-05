@@ -238,6 +238,7 @@ class GammaLiveTest {
      * 실제 인증·허가·공급자·암호화·조회 경로를 한 번만 실행한다.
      * @created 2026-11-04
      * @usedBy verifiesLiveAnalysisAndEncryptedRecovery
+     * @modified 2026-11-04 - 사전 동결한 EX-B 갱신 입력의 실행 종류를 보존
      */
     private CompletedCase executeCase(JsonNode testCase, JsonNode source, boolean evaluation) {
         ObjectNode input = ((ObjectNode) testCase.path(AnalysisFields.INPUT)).deepCopy();
@@ -256,7 +257,11 @@ class GammaLiveTest {
         long started = System.nanoTime();
         String resultId = null;
         try {
-            String job = submit(input);
+            String trigger = testCase.path(AnalysisFields.TRIGGER_KIND)
+                .asString(GammaLocal.TRIGGER_NORMAL);
+            assertTrue(java.util.Set.of("A", "B").contains(trigger));
+            outcome.put(AnalysisFields.TRIGGER_KIND, trigger);
+            String job = submit(input, trigger);
             ObjectNode status = await(job, GammaLocal.SUCCEEDED);
             outcome.put(AnalysisFields.STATE, status.path(AnalysisFields.STATE).asString());
             if (!status.path(AnalysisFields.STATE).asString().equals(GammaLocal.SUCCEEDED)) {
@@ -269,6 +274,11 @@ class GammaLiveTest {
             outcome.set(
                 AnalysisFields.RESULT_AVAILABILITY,
                 retrieved.path(AnalysisFields.RESULT_AVAILABILITY)
+            );
+            outcome.set(
+                AnalysisFields.ITEM_AVAILABILITY,
+                retrieved.path(AnalysisFields.RESULT).path(AnalysisFields.ITEM_AVAILABILITY)
+                    .deepCopy()
             );
             if (evaluation) {
                 var interpretations = outcome.putArray(GammaLocal.INTERPRETATIONS);
@@ -426,11 +436,12 @@ class GammaLiveTest {
      * 실제 descriptor→허용→입력 제출 순서를 한 번 실행하고 자동 재시도하지 않는다.
      * @created 2026-11-03
      * @usedBy verifiesLiveAnalysisAndEncryptedRecovery
+     * @modified 2026-11-04 - 최초 연결과 상시 갱신 실행 종류를 별도 시험
      */
-    private String submit(ObjectNode input) throws Exception {
+    private String submit(ObjectNode input, String trigger) throws Exception {
         String kind = input.path(AnalysisFields.SEMANTIC_TASK_KIND).asString();
         ObjectNode descriptor = AnalysisJson.JSON.createObjectNode()
-            .put(AnalysisFields.TRIGGER_KIND, GammaLocal.TRIGGER_NORMAL)
+            .put(AnalysisFields.TRIGGER_KIND, trigger)
             .put(AnalysisFields.SEMANTIC_TASK_KIND, kind)
             .put(AnalysisFields.INPUT_HASH_HINT, new AnalysisIdentity().hint(input))
             .put(AnalysisFields.IDEMPOTENCY_KEY, UUID.randomUUID().toString());
@@ -472,6 +483,7 @@ class GammaLiveTest {
      * 상태만 관찰하며 실패나 완료 불명일 때 새 공급자 요청을 만들지 않는다.
      * @created 2026-11-03
      * @usedBy submit, verifiesLiveAnalysisAndEncryptedRecovery
+     * @modified 2026-11-04 - 선택적 완료 대기 비교에서만 1초 주기 지연 생략
      */
     private ObjectNode await(String job, String expected) throws Exception {
         for (int iteration = 0; iteration < 85; iteration++) {
@@ -488,7 +500,11 @@ class GammaLiveTest {
                 || actual.equals(GammaLocal.EXPIRED) || actual.equals(GammaLocal.CANCELLED)) {
                 return state;
             }
-            Thread.sleep(1000);
+            boolean observedRunning = actual.equals("running")
+                && "approved".equals(System.getenv(GammaLocal.ENV_WAIT));
+            if (!observedRunning) {
+                Thread.sleep(1000);
+            }
         }
         throw new IllegalStateException(GammaLocal.STATE_TIMEOUT);
     }
@@ -513,6 +529,7 @@ class GammaLiveTest {
      * @created 2026-11-03
      * @usedBy login, submit, await, query
      * @modified 2026-11-04 - 병렬 요청에서 공유 보고서 쓰기 제거
+     * @modified 2026-11-04 - 명시 비교 실행의 상태 조회만 대기 헤더 추가
      */
     private ObjectNode send(String method, String path, JsonNode body, String bearer, int expected)
         throws Exception {
@@ -521,6 +538,11 @@ class GammaLiveTest {
             .header(AnalysisHttp.CONTENT_TYPE, GammaLocal.JSON_TYPE);
         if (bearer != null) {
             request.header(AnalysisHttp.AUTHORIZATION, AnalysisHttp.BEARER_PREFIX + bearer);
+        }
+        if (method.equals(AnalysisHttp.GET)
+            && path.startsWith(AnalysisPaths.ANALYSIS_JOB_PATH)
+            && "approved".equals(System.getenv(GammaLocal.ENV_WAIT))) {
+            request.header(AnalysisHttp.PREFER, AnalysisHttp.WAIT);
         }
         var publisher = body == null ? HttpRequest.BodyPublishers.noBody()
             : HttpRequest.BodyPublishers.ofString(body.toString());

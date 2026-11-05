@@ -23,19 +23,22 @@ def save(path, ledger):
     os.replace(pending, path)
 
 
-def reserve(path, run_id, calls):
+def reserve(path, run_id, calls, model_multiplier=1):
     """2026-11-04: 전송 전에 전체 실행의 최악 비용과 계수 보류액을 예약한다."""
     if type(calls) is not int or not 1 <= calls <= 200:
         raise ValueError('Invalid call bound')
+    if type(model_multiplier) is not int or model_multiplier not in (1, 2):
+        raise ValueError('Unsupported model price multiplier')
     ledger = load(path)
     if any(row['id'] == run_id for row in ledger['runs']):
         raise ValueError('Duplicate run')
     shared = ledger.get('countingPolicy') == SHARED_POLICY
-    amount = calls * (MODEL_MICROS if shared else COUNT_MICROS + MODEL_MICROS)
+    amount = calls * (MODEL_MICROS * model_multiplier + (0 if shared else COUNT_MICROS))
     occupied = occupied_usd(ledger)
     if ledger['startMicros'] - occupied - amount < ledger['floorMicros']:
         raise RuntimeError('Credit floor would be crossed')
     ledger['runs'].append({'id': run_id, 'calls': calls, 'reservedMicros': amount,
+                           'modelMultiplier': model_multiplier,
                            'state': 'reserved', 'countingRateVerified': False})
     save(path, ledger)
 
@@ -55,6 +58,7 @@ def settle(path, run_id, model_calls, count_calls, usages):
     generation = sum((int(row['inputTokens']) + 3) // 4
                      + (int(row['outputTokens']) + 1) // 2 for row in known)
     generation += (model_calls - len(known)) * MODEL_MICROS
+    generation *= entry.get('modelMultiplier', 1)
     shared = ledger.get('countingPolicy') == SHARED_POLICY
     count_reserve = 0 if shared else count_calls * COUNT_MICROS
     entry.update(reservedMicros=generation + count_reserve,

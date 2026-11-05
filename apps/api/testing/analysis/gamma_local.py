@@ -7,8 +7,10 @@ from pathlib import Path
 import argparse
 import copy
 import getpass
+import hashlib
 import json
 import os
+import re
 import secrets
 import subprocess
 import sys
@@ -123,7 +125,7 @@ def run_reservation(evaluation, requested_krw=None):
     return requested_krw * 1_000_000
 
 
-def prepare(cluster, source, opening, evaluation=False, reservation=None):
+def prepare(cluster, source, opening, evaluation=False, reservation=None, model_multiplier=1):
     """2026-11-03: 새 DB에 세 계정의 일반 금융 자료와 감마 전용 비용 정책만 준비한다."""
     create_database(cluster, API / 'database', DATABASE)
     cluster.sql(institution_sql(), DATABASE)
@@ -151,6 +153,10 @@ def prepare(cluster, source, opening, evaluation=False, reservation=None):
     pricing = {'model': 'gpt-6-luna', 'inputMicrosPerMillion': 750_000_000,
         'cachedMicrosPerMillion': 750_000_000, 'outputMicrosPerMillion': 1_500_000_000,
         'countingMicros': 100_000_000, 'kmsMicros': 0, 'inputLimit': 6000, 'outputLimit': 1200}
+    if model_multiplier not in (1, 2):
+        raise ValueError('Unsupported price multiplier')
+    for name in ('inputMicrosPerMillion', 'cachedMicrosPerMillion', 'outputMicrosPerMillion'):
+        pricing[name] *= model_multiplier
     reservation = run_reservation(evaluation) if reservation is None else reservation
     if type(reservation) is not int or not 0 < reservation <= run_reservation(evaluation):
         raise ValueError('Invalid run budget')
@@ -168,6 +174,7 @@ def main():
     """2026-11-03: 승인된 호출과 자체 소유 PostgreSQL만 관리한다.
 
     2026-11-04: 평가 전용 1..6 병렬 요청, USD 하한과 기존 KRW 장부를 함께 적용한다.
+    --concise는 별도 비교 지시만 추가하며 기본 배포 프롬프트를 변경하지 않는다.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--live', action='store_true')
@@ -180,9 +187,15 @@ def main():
     parser.add_argument('--deployment', action='store_true')
     parser.add_argument('--reasoning-effort', choices=('none', 'low'), default='none')
     parser.add_argument('--reviewer', action='store_true')
+    parser.add_argument('--concise', action='store_true')
+    parser.add_argument('--fast', action='store_true')
+    parser.add_argument('--compact', action='store_true')
+    parser.add_argument('--wait', action='store_true')
     args = parser.parse_args()
     if not args.live:
         raise ValueError('Explicit --live approval is required')
+    if args.reviewer and args.concise:
+        raise ValueError('Choose one bounded instruction comparison')
     env_file = args.env_file.resolve(strict=True)
     if env_file != ROOT / '.env.local' or args.env_file.is_symlink():
         raise ValueError('Only the previously approved env file is supported')
@@ -190,6 +203,10 @@ def main():
     if ignored.returncode:
         raise ValueError('The credential file must be Git ignored')
     dataset = args.evaluation_dir.resolve(strict=True) if args.evaluation_dir else None
+    if args.fast and not dataset:
+        raise ValueError('Fast comparison requires frozen evaluation material')
+    if args.compact and (not dataset or args.reviewer or args.concise):
+        raise ValueError('Compact comparison requires frozen material and its own instructions')
     if dataset:
         from testing.analysis.gamma_evaluation import verify_bundle, score_run
         manifest = verify_bundle(dataset)
@@ -198,7 +215,8 @@ def main():
     reservation = run_reservation(bool(dataset), args.reserve_krw)
     if not 1 <= args.parallel <= 6 or (args.parallel > 1 and not dataset):
         raise ValueError('Parallel execution requires a bounded evaluation')
-    if args.deployment and (not dataset or args.parallel != 6 or args.reasoning_effort != 'none' or args.reviewer):
+    if args.deployment and (not dataset or args.parallel != 6 or args.reasoning_effort != 'none'
+                           or args.reviewer or args.concise or args.fast or args.compact):
         raise ValueError('Deployment verification uses the fixed validated profile')
     private = ROOT / '.harness/gamma-local-private'
     private_directory(private)
@@ -220,14 +238,15 @@ def main():
         run_id = str(uuid.uuid4())
         from testing.analysis import credit_guard
         credit_path = private / 'credit-20261104.json'
-        credit_guard.reserve(credit_path, run_id, manifest['batches'] if dataset else 3)
+        multiplier = 2 if args.fast else 1
+        credit_guard.reserve(credit_path, run_id, manifest['batches'] if dataset else 3, multiplier)
         opening = reserve_run(private, run_id, reservation)
         source = json.loads((dataset / 'source.json').read_text(encoding='utf-8')) if dataset else build()[0]
         with Cluster(args.pg_bin, args.work_dir) as cluster:
             environment = {key: value for key, value in os.environ.items()
                            if not key.upper().startswith(('PAYSE_', 'SPRING_', 'PG'))}
             environment.update(prepare(cluster, source, opening, evaluation=bool(dataset),
-                                       reservation=reservation))
+                                       reservation=reservation, model_multiplier=multiplier))
             requests = cluster.work / 'synthetic-inputs.json'
             cases = json.loads((dataset / 'inputs.json').read_text(encoding='utf-8')) if dataset else inputs(source)
             requests.write_text(json.dumps(cases, ensure_ascii=False), encoding='utf-8')
@@ -237,12 +256,27 @@ def main():
                 PAYSE_GAMMA_PRICING=VERSION, PAYSE_GAMMA_SOURCE_VERSION=source['sourceVersion'],
                 PAYSE_GAMMA_INPUTS=str(requests), PAYSE_GAMMA_REPORT=str(report),
                 PYTHONIOENCODING='utf-8', PYTHONDONTWRITEBYTECODE='1')
+            if args.fast:
+                environment['PAYSE_GAMMA_FAST'] = 'approved'
+            if args.wait:
+                environment['PAYSE_GAMMA_WAIT'] = 'approved'
+            if args.compact:
+                environment['PAYSE_GAMMA_COMPACT'] = 'approved'
+                compact_rules = ROOT / 'apps/ai/src/main/resources/com/payse/ai/rules/compact-output.md'
+                cluster.report['compactInstructionsSHA256'] = hashlib.sha256(
+                    compact_rules.read_bytes()).hexdigest()
             if deployment_state:
                 private_directory(Path(deployment_state.name))
                 environment['PAYSE_GAMMA_DEPLOYMENT'] = 'approved'
                 environment['PAYSE_GAMMA_STATE'] = deployment_state.name
             if args.reviewer:
                 environment['PAYSE_GAMMA_REVIEWER'] = str(API / 'testing/analysis/reviewer.json')
+            elif args.concise:
+                environment['PAYSE_GAMMA_REVIEWER'] = str(API / 'testing/analysis/continuous-guidance.json')
+            if args.concise:
+                guidance = Path(environment['PAYSE_GAMMA_REVIEWER']).read_bytes()
+                (cluster.work / 'guidance.json').write_bytes(guidance)
+                cluster.report['guidanceSHA256'] = hashlib.sha256(guidance).hexdigest()
             if dataset:
                 environment['PAYSE_GAMMA_EVALUATION'] = 'approved'
                 environment['PAYSE_GAMMA_PARALLEL'] = str(args.parallel)
@@ -263,6 +297,10 @@ def main():
                          state='verified' if completed.returncode == 0 else 'failed')
             (private / 'ledger.json').write_text(json.dumps(ledger, indent=2), encoding='utf-8')
             cluster.report.update(passed=completed.returncode == 0, provider='openai',
+                serviceTierRequested='fast' if args.fast else 'default', concise=args.concise,
+                compact=args.compact, verbosity='low' if args.compact else None,
+                statusWait=args.wait,
+                generationOutputLimit=4000 if dataset else 1200,
                 googleKmsCalled=False, sourceTransactions=len(source['transactions']),
                 deploymentProfile=args.deployment, reasoningEffort=args.reasoning_effort,
                 reviewer=args.reviewer,
@@ -271,6 +309,18 @@ def main():
                 cluster.report['executionCompleted'] = completed.returncode == 0
                 cluster.report['passed'] = completed.returncode == 0 and json.loads(
                     report.read_text(encoding='utf-8')).get('passed', False)
+            junit = API / 'build/test-results/gammaLiveTest/TEST-com.payse.api.analysis.service.GammaLiveTest.xml'
+            if junit.exists() and junit.stat().st_mtime >= requests.stat().st_mtime:
+                logs = junit.read_text(encoding='utf-8')
+                cluster.report['providerDiagnostics'] = {
+                    'incomplete': re.findall(r'OpenAI incomplete: limit=(true|false), '
+                        r'reasoning=(-?[0-9,]+), characters=([0-9,]+), messages=([0-9,]+)', logs),
+                    'fastConfirmed': logs.count('OPENAI_FAST_CONFIRMED'),
+                    'fastNotConfirmed': logs.count('OPENAI_FAST_NOT_CONFIRMED'),
+                    'commentaryIgnored': logs.count('OPENAI_COMMENTARY_IGNORED'),
+                    'rejectionCodes': re.findall(r'Analysis output rejected: ([A-Z_]{1,80})', logs),
+                    'rejectedEnvelopeCounts': re.findall(
+                        r'OpenAI envelope rejected: messages=([0-9]+), textParts=([0-9]+)', logs)}
             cluster.report['modelCalls'] = int(cluster.sql(
                 "SELECT count(*) FROM payse.analysis_cost_calls WHERE category='model' "
                 "AND dispatched_at IS NOT NULL;", DATABASE)[0])
@@ -308,6 +358,10 @@ def main():
                 "SELECT coalesce(detail->>'reason','unspecified') || ':' || count(*) "
                 "FROM payse.analysis_attempts WHERE detail ? 'reason' GROUP BY detail->>'reason';",
                 DATABASE)
+            cluster.report['serverDurations'] = [json.loads(row) for row in cluster.sql(
+                "SELECT jsonb_build_object('state',state,'milliseconds',"
+                "extract(epoch FROM finished_at-accepted_at)*1000)::text "
+                "FROM payse.analysis_jobs ORDER BY accepted_at;", DATABASE)]
             if dataset and report.exists():
                 summary = json.loads(report.read_text(encoding='utf-8'))
                 quality = score_run(dataset, summary)
@@ -322,7 +376,8 @@ def main():
             readiness = Path(deployment_state.name) / 'ai-status.json'
             if readiness.exists():
                 (cluster.work / 'readiness-summary.json').write_bytes(readiness.read_bytes())
-        safe_report = {key: value for key, value in cluster.report.items() if key not in ('usage', 'callDurations')}
+        safe_report = {key: value for key, value in cluster.report.items()
+                       if key not in ('usage', 'callDurations', 'serverDurations')}
         print(json.dumps(safe_report, ensure_ascii=False))
         return 0 if cluster.report.get('passed') else 1
     finally:

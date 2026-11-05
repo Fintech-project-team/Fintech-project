@@ -226,6 +226,27 @@ class PromptGuideTest {
     }
 
     /**
+     * 반복 해석의 실제 조립 프롬프트에 최근 근거·수치 생성 금지·사용자 확인 경계를 포함한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void recurringGuideKeepsCalculationAndConfirmationLocal() {
+        var guide = new PromptGuide(new AnalysisContract().instructions());
+        String prompt = guide.instructions(input("recurringMeaning", "account_entry", "out"), true);
+        assertTrue(prompt.contains("최근 달력 3개월"));
+        assertTrue(prompt.contains("미해결 취소·환불"));
+        assertTrue(prompt.contains("카드 구매일은 출금일이 아니다"));
+        assertTrue(prompt.contains("사용자 승인 전에는 계획과 사용 가능 금액을 바꾸지 않는다"));
+        JsonNode properties = new AnalysisContract().outputSchema("recurringMeaning")
+            .path("properties").path("items").path("items").path("properties");
+        assertFalse(properties.has("amountKRW"));
+        assertFalse(properties.has("dueDate"));
+        assertFalse(properties.has("classification"));
+        assertTrue(properties.has("meaning"));
+    }
+
+    /**
      * 선택된 교육 묶음만 검사하며 전체 프롬프트를 로그로 남기지 않는다.
      * @created 2026-11-04
      * @usedBy 선택 테스트

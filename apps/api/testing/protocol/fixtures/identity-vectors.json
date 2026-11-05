@@ -1,0 +1,2251 @@
+{
+  "format": "PAYSE-IDENTITY-VECTORS-1",
+  "identityProfile": "PAYSE-IDENTITY-1",
+  "contractVersion": "PAYSE-ANALYSIS-1",
+  "cases": [
+    {
+      "id": "P01",
+      "name": "한글 기본 입력",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["c2801190-7d36-586d-94ad-fb621a6313f3"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa",
+            "evidenceHash": "sha256:c0517fecd37b41d0d489a0c74eb522f5f7bd8f7e662e1143742c4111e5dcc483",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:c0517fecd37b41d0d489a0c74eb522f5f7bd8f7e662e1143742c4111e5dcc483\",\"memoryKey\":\"sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:ed8c5efd00fe4eed515de71249eafbcc080be66063374998aff59b6f3cece7e4",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"c2801190-7d36-586d-94ad-fb621a6313f3\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P02",
+      "name": "객체 필드 역순",
+      "input": {
+        "candidates": [],
+        "currentClassifications": [],
+        "unavailableReferences": [],
+        "relations": [],
+        "transactions": [
+          {
+            "transactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["c2801190-7d36-586d-94ad-fb621a6313f3"]
+          }
+        ],
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "semanticTaskKind": "transactionMeaning",
+        "contractVersion": "PAYSE-ANALYSIS-1"
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa",
+            "evidenceHash": "sha256:c0517fecd37b41d0d489a0c74eb522f5f7bd8f7e662e1143742c4111e5dcc483",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:c0517fecd37b41d0d489a0c74eb522f5f7bd8f7e662e1143742c4111e5dcc483\",\"memoryKey\":\"sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:ed8c5efd00fe4eed515de71249eafbcc080be66063374998aff59b6f3cece7e4",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"c2801190-7d36-586d-94ad-fb621a6313f3\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+      },
+      "sameHintAs": "P01"
+    },
+    {
+      "id": "P03",
+      "name": "임시 itemKey 변경",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "화면-새-항목",
+            "targetTransactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["c2801190-7d36-586d-94ad-fb621a6313f3"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "화면-새-항목",
+            "memoryKey": "sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa",
+            "evidenceHash": "sha256:c0517fecd37b41d0d489a0c74eb522f5f7bd8f7e662e1143742c4111e5dcc483",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:c0517fecd37b41d0d489a0c74eb522f5f7bd8f7e662e1143742c4111e5dcc483\",\"memoryKey\":\"sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:ed8c5efd00fe4eed515de71249eafbcc080be66063374998aff59b6f3cece7e4",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"c2801190-7d36-586d-94ad-fb621a6313f3\"],\"itemKey\":\"화면-새-항목\",\"targetTransactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+      },
+      "sameHintAs": "P01"
+    },
+    {
+      "id": "P04",
+      "name": "문맥만 변경",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "9223372036854775807",
+          "sourceVersion": "source-next",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-05T03:00:00Z",
+          "inputRevision": 7,
+          "localSessionEpoch": 8,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["c2801190-7d36-586d-94ad-fb621a6313f3"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa",
+            "evidenceHash": "sha256:c0517fecd37b41d0d489a0c74eb522f5f7bd8f7e662e1143742c4111e5dcc483",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:c0517fecd37b41d0d489a0c74eb522f5f7bd8f7e662e1143742c4111e5dcc483\",\"memoryKey\":\"sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:ed8c5efd00fe4eed515de71249eafbcc080be66063374998aff59b6f3cece7e4",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-05T03:00:00Z\",\"dataVersion\":\"9223372036854775807\",\"inputRevision\":7,\"localSessionEpoch\":8,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"source-next\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"c2801190-7d36-586d-94ad-fb621a6313f3\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+      },
+      "sameHintAs": "P01"
+    },
+    {
+      "id": "P05",
+      "name": "원문 공백 보존",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["c2801190-7d36-586d-94ad-fb621a6313f3"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": " 확인용 입금 ",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa",
+            "evidenceHash": "sha256:95246fb4e0234de2177f41c7d031c7f9c0aaf9fdb151ecc0df98e6476c84d591",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\" 확인용 입금 \",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:95246fb4e0234de2177f41c7d031c7f9c0aaf9fdb151ecc0df98e6476c84d591\",\"memoryKey\":\"sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:289953777723a3354bf04c50fb4c871a704dd493d6e7edeb498cee706b6a833a",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"c2801190-7d36-586d-94ad-fb621a6313f3\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\" 확인용 입금 \",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P06",
+      "name": "빈 문자열",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["c2801190-7d36-586d-94ad-fb621a6313f3"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa",
+            "evidenceHash": "sha256:184254f290b1a79acc8783add721b4a85bb9c4fb822118d40ad00505437e20f8",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:184254f290b1a79acc8783add721b4a85bb9c4fb822118d40ad00505437e20f8\",\"memoryKey\":\"sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:f0681c7c105ff2bf73d358cae98a0b64a5795c4f2b615f1f9295ccac917812ed",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"c2801190-7d36-586d-94ad-fb621a6313f3\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P07",
+      "name": "null",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["c2801190-7d36-586d-94ad-fb621a6313f3"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": null,
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa",
+            "evidenceHash": "sha256:2bdd4acaa792468c3814a739dcfd1b9788e57c98513ace732148323dca8f9c50",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":null,\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:2bdd4acaa792468c3814a739dcfd1b9788e57c98513ace732148323dca8f9c50\",\"memoryKey\":\"sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:eaa0645d5ac87cab18fedb527a6574fdca647affbdcc0809a8ada7f8b9f17fb6",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"c2801190-7d36-586d-94ad-fb621a6313f3\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":null,\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P08",
+      "name": "따옴표·역슬래시·개행",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["c2801190-7d36-586d-94ad-fb621a6313f3"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "\"합성\"\\영수증\n둘째 줄\t탭",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa",
+            "evidenceHash": "sha256:72131acf697bb755dabe97b37600b07f7eb103e717f282d5fbe8446eaab1851a",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"\\\"합성\\\"\\\\영수증\\n둘째 줄\\t탭\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:72131acf697bb755dabe97b37600b07f7eb103e717f282d5fbe8446eaab1851a\",\"memoryKey\":\"sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:3ae0966778cb0f103d73e6997ec7874329edf886a4bb456d507336ad1c43ae8f",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"c2801190-7d36-586d-94ad-fb621a6313f3\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"\\\"합성\\\"\\\\영수증\\n둘째 줄\\t탭\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P09",
+      "name": "한글 완성형",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["c2801190-7d36-586d-94ad-fb621a6313f3"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "가",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa",
+            "evidenceHash": "sha256:d8132a03b9f81bf488cfca0295d986de6642a8b303bf8f667dc6135642aae2c1",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"가\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:d8132a03b9f81bf488cfca0295d986de6642a8b303bf8f667dc6135642aae2c1\",\"memoryKey\":\"sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:3ee09964257955293ba8584eeae97bab128dba9a0a6f7936dfd1d04aa422f4f5",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"c2801190-7d36-586d-94ad-fb621a6313f3\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"가\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P10",
+      "name": "한글 분해형",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["c2801190-7d36-586d-94ad-fb621a6313f3"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "가",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa",
+            "evidenceHash": "sha256:9c0a8ac6f148f6f7ab699f36073b259c2afb5369ce88af2b8e64afe17034982e",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"가\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:9c0a8ac6f148f6f7ab699f36073b259c2afb5369ce88af2b8e64afe17034982e\",\"memoryKey\":\"sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:f862e1f002b191a6051361c8bcbeab7a46b4253400e2b4eace91bc3a1888025c",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"c2801190-7d36-586d-94ad-fb621a6313f3\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"가\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P11",
+      "name": "보조 평면 문자·줄 구분 문자",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["c2801190-7d36-586d-94ad-fb621a6313f3"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인 😀 다음",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa",
+            "evidenceHash": "sha256:21c712b249d899c74f1505368f1dc5e2cd21324f731337ce20fedb3cc20c874c",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인 😀 다음\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:21c712b249d899c74f1505368f1dc5e2cd21324f731337ce20fedb3cc20c874c\",\"memoryKey\":\"sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:23155cee2a525f8a1515d430174a1edd731ff9f223cf27454bf5791b68959a2e",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"c2801190-7d36-586d-94ad-fb621a6313f3\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"확인 😀 다음\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P12",
+      "name": "원문 대소문자",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["c2801190-7d36-586d-94ad-fb621a6313f3"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "PaySe",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa",
+            "evidenceHash": "sha256:66835617aff6b585850e4d5dafe7a3790db886a3c2642bca2f23eff2c6cc31b9",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"PaySe\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:66835617aff6b585850e4d5dafe7a3790db886a3c2642bca2f23eff2c6cc31b9\",\"memoryKey\":\"sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:d07e7b9a2a8dc900152b20811967261b54e57eebb41b46033b57d667676c88dd",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"c2801190-7d36-586d-94ad-fb621a6313f3\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"PaySe\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P13",
+      "name": "두 독립 항목",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["c2801190-7d36-586d-94ad-fb621a6313f3"]
+          },
+          {
+            "itemKey": "item-1",
+            "targetTransactionId": "cd3aa05c-990d-52d1-9210-3d9073913ac5",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["cd3aa05c-990d-52d1-9210-3d9073913ac5"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "cd3aa05c-990d-52d1-9210-3d9073913ac5",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa",
+            "evidenceHash": "sha256:c0517fecd37b41d0d489a0c74eb522f5f7bd8f7e662e1143742c4111e5dcc483",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+          },
+          {
+            "itemKey": "item-1",
+            "memoryKey": "sha256:5de3ddf82ed2acebf9b88ac5982fcc7cbb0997dc461f4c2c8c3864200be1efd8",
+            "evidenceHash": "sha256:642d02a6a6cbd53ca2f4571133ba6e3afb7685a1e3dc04d1b00893e7a28fdb73",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"cd3aa05c-990d-52d1-9210-3d9073913ac5\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:642d02a6a6cbd53ca2f4571133ba6e3afb7685a1e3dc04d1b00893e7a28fdb73\",\"memoryKey\":\"sha256:5de3ddf82ed2acebf9b88ac5982fcc7cbb0997dc461f4c2c8c3864200be1efd8\"},{\"evidenceHash\":\"sha256:c0517fecd37b41d0d489a0c74eb522f5f7bd8f7e662e1143742c4111e5dcc483\",\"memoryKey\":\"sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:6ed48ffa129e8213afd856b72aadb4fdbd6a488a6d339734a90a002ff50f8368",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"c2801190-7d36-586d-94ad-fb621a6313f3\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"},{\"candidateKey\":null,\"evidenceTransactionIds\":[\"cd3aa05c-990d-52d1-9210-3d9073913ac5\"],\"itemKey\":\"item-1\",\"targetTransactionId\":\"cd3aa05c-990d-52d1-9210-3d9073913ac5\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"},{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"cd3aa05c-990d-52d1-9210-3d9073913ac5\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P14",
+      "name": "항목·거래 순서 반전",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-1",
+            "targetTransactionId": "cd3aa05c-990d-52d1-9210-3d9073913ac5",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["cd3aa05c-990d-52d1-9210-3d9073913ac5"]
+          },
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["c2801190-7d36-586d-94ad-fb621a6313f3"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "cd3aa05c-990d-52d1-9210-3d9073913ac5",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-1",
+            "memoryKey": "sha256:5de3ddf82ed2acebf9b88ac5982fcc7cbb0997dc461f4c2c8c3864200be1efd8",
+            "evidenceHash": "sha256:642d02a6a6cbd53ca2f4571133ba6e3afb7685a1e3dc04d1b00893e7a28fdb73",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"cd3aa05c-990d-52d1-9210-3d9073913ac5\"}],\"unavailableReferences\":[]}"
+          },
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa",
+            "evidenceHash": "sha256:c0517fecd37b41d0d489a0c74eb522f5f7bd8f7e662e1143742c4111e5dcc483",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:642d02a6a6cbd53ca2f4571133ba6e3afb7685a1e3dc04d1b00893e7a28fdb73\",\"memoryKey\":\"sha256:5de3ddf82ed2acebf9b88ac5982fcc7cbb0997dc461f4c2c8c3864200be1efd8\"},{\"evidenceHash\":\"sha256:c0517fecd37b41d0d489a0c74eb522f5f7bd8f7e662e1143742c4111e5dcc483\",\"memoryKey\":\"sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:6ed48ffa129e8213afd856b72aadb4fdbd6a488a6d339734a90a002ff50f8368",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"cd3aa05c-990d-52d1-9210-3d9073913ac5\"],\"itemKey\":\"item-1\",\"targetTransactionId\":\"cd3aa05c-990d-52d1-9210-3d9073913ac5\"},{\"candidateKey\":null,\"evidenceTransactionIds\":[\"c2801190-7d36-586d-94ad-fb621a6313f3\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"cd3aa05c-990d-52d1-9210-3d9073913ac5\"},{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+      },
+      "sameHintAs": "P13"
+    },
+    {
+      "id": "P15",
+      "name": "확인된 기존 분류",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["c2801190-7d36-586d-94ad-fb621a6313f3"]
+          },
+          {
+            "itemKey": "item-1",
+            "targetTransactionId": "cd3aa05c-990d-52d1-9210-3d9073913ac5",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["cd3aa05c-990d-52d1-9210-3d9073913ac5"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "cd3aa05c-990d-52d1-9210-3d9073913ac5",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [
+          {
+            "transactionId": "c2801190-7d36-586d-94ad-fb621a6313f3",
+            "value": "income"
+          }
+        ],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa",
+            "evidenceHash": "sha256:f3f3f4c56b723a018353ecd9c853469f1fe78187f9b248df516f117bfd9d4fa1",
+            "canonicalEvidence": "{\"currentClassifications\":[{\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\",\"value\":\"income\"}],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"}],\"unavailableReferences\":[]}"
+          },
+          {
+            "itemKey": "item-1",
+            "memoryKey": "sha256:5de3ddf82ed2acebf9b88ac5982fcc7cbb0997dc461f4c2c8c3864200be1efd8",
+            "evidenceHash": "sha256:642d02a6a6cbd53ca2f4571133ba6e3afb7685a1e3dc04d1b00893e7a28fdb73",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"cd3aa05c-990d-52d1-9210-3d9073913ac5\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:642d02a6a6cbd53ca2f4571133ba6e3afb7685a1e3dc04d1b00893e7a28fdb73\",\"memoryKey\":\"sha256:5de3ddf82ed2acebf9b88ac5982fcc7cbb0997dc461f4c2c8c3864200be1efd8\"},{\"evidenceHash\":\"sha256:f3f3f4c56b723a018353ecd9c853469f1fe78187f9b248df516f117bfd9d4fa1\",\"memoryKey\":\"sha256:ddd783ba57090e0b5222af2288b8ea52096376d1eb7795d37a0ed52fb83c78fa\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:b31e07190a2b731b660a2bfd4b2230357cc55707ec99272e6f0f2c5159ac077f",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[{\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\",\"value\":\"income\"}],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"c2801190-7d36-586d-94ad-fb621a6313f3\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"},{\"candidateKey\":null,\"evidenceTransactionIds\":[\"cd3aa05c-990d-52d1-9210-3d9073913ac5\"],\"itemKey\":\"item-1\",\"targetTransactionId\":\"cd3aa05c-990d-52d1-9210-3d9073913ac5\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c2801190-7d36-586d-94ad-fb621a6313f3\"},{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"cd3aa05c-990d-52d1-9210-3d9073913ac5\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P16",
+      "name": "본인 이체 관계의 양끝 확장",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "c732a042-b7c4-55c6-9034-7528b983db19",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["c732a042-b7c4-55c6-9034-7528b983db19"]
+          },
+          {
+            "itemKey": "item-1",
+            "targetTransactionId": "a632bb51-a8df-5c04-a480-734fdb56fce1",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["a632bb51-a8df-5c04-a480-734fdb56fce1"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "c732a042-b7c4-55c6-9034-7528b983db19",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "a632bb51-a8df-5c04-a480-734fdb56fce1",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [
+          {
+            "kind": "internal_transfer",
+            "fromId": "c732a042-b7c4-55c6-9034-7528b983db19",
+            "toId": "a632bb51-a8df-5c04-a480-734fdb56fce1"
+          }
+        ],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:aeaf49fc45bd42743077eb66ed8b163b15d6ac13c833f77a0e8b90f6455f4f1c",
+            "evidenceHash": "sha256:c1500adf7d26d7619de31caeb24c54f6a4832bfbb94d65c7022117a1aed08d8d",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[{\"fromId\":\"c732a042-b7c4-55c6-9034-7528b983db19\",\"kind\":\"internal_transfer\",\"toId\":\"a632bb51-a8df-5c04-a480-734fdb56fce1\"}],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"a632bb51-a8df-5c04-a480-734fdb56fce1\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c732a042-b7c4-55c6-9034-7528b983db19\"}],\"unavailableReferences\":[]}"
+          },
+          {
+            "itemKey": "item-1",
+            "memoryKey": "sha256:b44aa193d92c63fd69a12788ce764cafa66895cfd8eed3d3d51c8793c1dfd135",
+            "evidenceHash": "sha256:c1500adf7d26d7619de31caeb24c54f6a4832bfbb94d65c7022117a1aed08d8d",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[{\"fromId\":\"c732a042-b7c4-55c6-9034-7528b983db19\",\"kind\":\"internal_transfer\",\"toId\":\"a632bb51-a8df-5c04-a480-734fdb56fce1\"}],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"a632bb51-a8df-5c04-a480-734fdb56fce1\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c732a042-b7c4-55c6-9034-7528b983db19\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:c1500adf7d26d7619de31caeb24c54f6a4832bfbb94d65c7022117a1aed08d8d\",\"memoryKey\":\"sha256:aeaf49fc45bd42743077eb66ed8b163b15d6ac13c833f77a0e8b90f6455f4f1c\"},{\"evidenceHash\":\"sha256:c1500adf7d26d7619de31caeb24c54f6a4832bfbb94d65c7022117a1aed08d8d\",\"memoryKey\":\"sha256:b44aa193d92c63fd69a12788ce764cafa66895cfd8eed3d3d51c8793c1dfd135\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:a241e0bba191d1fef0e875b626c533f80b5f36a9040ee0a16f79c274d885186a",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"c732a042-b7c4-55c6-9034-7528b983db19\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"c732a042-b7c4-55c6-9034-7528b983db19\"},{\"candidateKey\":null,\"evidenceTransactionIds\":[\"a632bb51-a8df-5c04-a480-734fdb56fce1\"],\"itemKey\":\"item-1\",\"targetTransactionId\":\"a632bb51-a8df-5c04-a480-734fdb56fce1\"}],\"relations\":[{\"fromId\":\"c732a042-b7c4-55c6-9034-7528b983db19\",\"kind\":\"internal_transfer\",\"toId\":\"a632bb51-a8df-5c04-a480-734fdb56fce1\"}],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c732a042-b7c4-55c6-9034-7528b983db19\"},{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"a632bb51-a8df-5c04-a480-734fdb56fce1\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P17",
+      "name": "이체 원천 순서 반전",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-1",
+            "targetTransactionId": "a632bb51-a8df-5c04-a480-734fdb56fce1",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["a632bb51-a8df-5c04-a480-734fdb56fce1"]
+          },
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "c732a042-b7c4-55c6-9034-7528b983db19",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["c732a042-b7c4-55c6-9034-7528b983db19"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "a632bb51-a8df-5c04-a480-734fdb56fce1",
+            "recordKind": "account_entry",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "c732a042-b7c4-55c6-9034-7528b983db19",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [
+          {
+            "kind": "internal_transfer",
+            "fromId": "c732a042-b7c4-55c6-9034-7528b983db19",
+            "toId": "a632bb51-a8df-5c04-a480-734fdb56fce1"
+          }
+        ],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-1",
+            "memoryKey": "sha256:b44aa193d92c63fd69a12788ce764cafa66895cfd8eed3d3d51c8793c1dfd135",
+            "evidenceHash": "sha256:c1500adf7d26d7619de31caeb24c54f6a4832bfbb94d65c7022117a1aed08d8d",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[{\"fromId\":\"c732a042-b7c4-55c6-9034-7528b983db19\",\"kind\":\"internal_transfer\",\"toId\":\"a632bb51-a8df-5c04-a480-734fdb56fce1\"}],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"a632bb51-a8df-5c04-a480-734fdb56fce1\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c732a042-b7c4-55c6-9034-7528b983db19\"}],\"unavailableReferences\":[]}"
+          },
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:aeaf49fc45bd42743077eb66ed8b163b15d6ac13c833f77a0e8b90f6455f4f1c",
+            "evidenceHash": "sha256:c1500adf7d26d7619de31caeb24c54f6a4832bfbb94d65c7022117a1aed08d8d",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[{\"fromId\":\"c732a042-b7c4-55c6-9034-7528b983db19\",\"kind\":\"internal_transfer\",\"toId\":\"a632bb51-a8df-5c04-a480-734fdb56fce1\"}],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"a632bb51-a8df-5c04-a480-734fdb56fce1\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c732a042-b7c4-55c6-9034-7528b983db19\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:c1500adf7d26d7619de31caeb24c54f6a4832bfbb94d65c7022117a1aed08d8d\",\"memoryKey\":\"sha256:aeaf49fc45bd42743077eb66ed8b163b15d6ac13c833f77a0e8b90f6455f4f1c\"},{\"evidenceHash\":\"sha256:c1500adf7d26d7619de31caeb24c54f6a4832bfbb94d65c7022117a1aed08d8d\",\"memoryKey\":\"sha256:b44aa193d92c63fd69a12788ce764cafa66895cfd8eed3d3d51c8793c1dfd135\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:a241e0bba191d1fef0e875b626c533f80b5f36a9040ee0a16f79c274d885186a",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"a632bb51-a8df-5c04-a480-734fdb56fce1\"],\"itemKey\":\"item-1\",\"targetTransactionId\":\"a632bb51-a8df-5c04-a480-734fdb56fce1\"},{\"candidateKey\":null,\"evidenceTransactionIds\":[\"c732a042-b7c4-55c6-9034-7528b983db19\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"c732a042-b7c4-55c6-9034-7528b983db19\"}],\"relations\":[{\"fromId\":\"c732a042-b7c4-55c6-9034-7528b983db19\",\"kind\":\"internal_transfer\",\"toId\":\"a632bb51-a8df-5c04-a480-734fdb56fce1\"}],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"a632bb51-a8df-5c04-a480-734fdb56fce1\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"c732a042-b7c4-55c6-9034-7528b983db19\"}],\"unavailableReferences\":[]}"
+      },
+      "sameHintAs": "P16"
+    },
+    {
+      "id": "P18",
+      "name": "원구매를 포함한 환불",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "9b703b3d-0ac0-5080-b538-2f90e7890636",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["9b703b3d-0ac0-5080-b538-2f90e7890636"]
+          },
+          {
+            "itemKey": "item-1",
+            "targetTransactionId": "9c8d7e43-a181-5246-9d80-b8add2377411",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["9c8d7e43-a181-5246-9d80-b8add2377411"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "9b703b3d-0ac0-5080-b538-2f90e7890636",
+            "recordKind": "card_purchase",
+            "direction": "out",
+            "status": "approved",
+            "reflectionReason": "not_applicable",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "9c8d7e43-a181-5246-9d80-b8add2377411",
+            "recordKind": "card_refund",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "not_applicable",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": "9b703b3d-0ac0-5080-b538-2f90e7890636"
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:326abbb6d90d3b83ea2bb9362285d3302cf088c09d6b9934e50fa2630226a4e6",
+            "evidenceHash": "sha256:b235c75a3d8d037b903d7fb241d55e2bd5cc82df9d50d96af0baf2c0b57e803e",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"card_purchase\",\"reflectionReason\":\"not_applicable\",\"status\":\"approved\",\"transactionId\":\"9b703b3d-0ac0-5080-b538-2f90e7890636\"}],\"unavailableReferences\":[]}"
+          },
+          {
+            "itemKey": "item-1",
+            "memoryKey": "sha256:2f57897b343ddc5c98b671060dc26b941cf1fe1eae550f63002120088cd5249f",
+            "evidenceHash": "sha256:0294d881bd98086ca951fb267c5bcf45ed713343ba338112c428b9b76f4c4e0b",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"card_purchase\",\"reflectionReason\":\"not_applicable\",\"status\":\"approved\",\"transactionId\":\"9b703b3d-0ac0-5080-b538-2f90e7890636\"},{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":\"9b703b3d-0ac0-5080-b538-2f90e7890636\",\"recordKind\":\"card_refund\",\"reflectionReason\":\"not_applicable\",\"status\":\"posted\",\"transactionId\":\"9c8d7e43-a181-5246-9d80-b8add2377411\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:0294d881bd98086ca951fb267c5bcf45ed713343ba338112c428b9b76f4c4e0b\",\"memoryKey\":\"sha256:2f57897b343ddc5c98b671060dc26b941cf1fe1eae550f63002120088cd5249f\"},{\"evidenceHash\":\"sha256:b235c75a3d8d037b903d7fb241d55e2bd5cc82df9d50d96af0baf2c0b57e803e\",\"memoryKey\":\"sha256:326abbb6d90d3b83ea2bb9362285d3302cf088c09d6b9934e50fa2630226a4e6\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:7da6922a708f787379978b34ea5a59631dcfafed96c1b9d87bf669312143cc57",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"9b703b3d-0ac0-5080-b538-2f90e7890636\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"9b703b3d-0ac0-5080-b538-2f90e7890636\"},{\"candidateKey\":null,\"evidenceTransactionIds\":[\"9c8d7e43-a181-5246-9d80-b8add2377411\"],\"itemKey\":\"item-1\",\"targetTransactionId\":\"9c8d7e43-a181-5246-9d80-b8add2377411\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"card_purchase\",\"reflectionReason\":\"not_applicable\",\"status\":\"approved\",\"transactionId\":\"9b703b3d-0ac0-5080-b538-2f90e7890636\"},{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":\"9b703b3d-0ac0-5080-b538-2f90e7890636\",\"recordKind\":\"card_refund\",\"reflectionReason\":\"not_applicable\",\"status\":\"posted\",\"transactionId\":\"9c8d7e43-a181-5246-9d80-b8add2377411\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P19",
+      "name": "원구매를 포함한 취소",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "9b703b3d-0ac0-5080-b538-2f90e7890636",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["9b703b3d-0ac0-5080-b538-2f90e7890636"]
+          },
+          {
+            "itemKey": "item-1",
+            "targetTransactionId": "9c8d7e43-a181-5246-9d80-b8add2377411",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["9c8d7e43-a181-5246-9d80-b8add2377411"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "9b703b3d-0ac0-5080-b538-2f90e7890636",
+            "recordKind": "card_purchase",
+            "direction": "out",
+            "status": "approved",
+            "reflectionReason": "not_applicable",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "9c8d7e43-a181-5246-9d80-b8add2377411",
+            "recordKind": "card_cancellation",
+            "direction": "in",
+            "status": "cancelled",
+            "reflectionReason": "not_applicable",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": "9b703b3d-0ac0-5080-b538-2f90e7890636"
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:326abbb6d90d3b83ea2bb9362285d3302cf088c09d6b9934e50fa2630226a4e6",
+            "evidenceHash": "sha256:b235c75a3d8d037b903d7fb241d55e2bd5cc82df9d50d96af0baf2c0b57e803e",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"card_purchase\",\"reflectionReason\":\"not_applicable\",\"status\":\"approved\",\"transactionId\":\"9b703b3d-0ac0-5080-b538-2f90e7890636\"}],\"unavailableReferences\":[]}"
+          },
+          {
+            "itemKey": "item-1",
+            "memoryKey": "sha256:2f57897b343ddc5c98b671060dc26b941cf1fe1eae550f63002120088cd5249f",
+            "evidenceHash": "sha256:9912bfa78cb7fda22b4f8a0f9557a67e32166cfb2b30fe958ae1d9ea16dd410e",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"card_purchase\",\"reflectionReason\":\"not_applicable\",\"status\":\"approved\",\"transactionId\":\"9b703b3d-0ac0-5080-b538-2f90e7890636\"},{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":\"9b703b3d-0ac0-5080-b538-2f90e7890636\",\"recordKind\":\"card_cancellation\",\"reflectionReason\":\"not_applicable\",\"status\":\"cancelled\",\"transactionId\":\"9c8d7e43-a181-5246-9d80-b8add2377411\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:9912bfa78cb7fda22b4f8a0f9557a67e32166cfb2b30fe958ae1d9ea16dd410e\",\"memoryKey\":\"sha256:2f57897b343ddc5c98b671060dc26b941cf1fe1eae550f63002120088cd5249f\"},{\"evidenceHash\":\"sha256:b235c75a3d8d037b903d7fb241d55e2bd5cc82df9d50d96af0baf2c0b57e803e\",\"memoryKey\":\"sha256:326abbb6d90d3b83ea2bb9362285d3302cf088c09d6b9934e50fa2630226a4e6\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:a5dc193ed681dad18bf5ec2fa5dbf6b110f33e9c098bb70cb5bbdc27dd645550",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"9b703b3d-0ac0-5080-b538-2f90e7890636\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"9b703b3d-0ac0-5080-b538-2f90e7890636\"},{\"candidateKey\":null,\"evidenceTransactionIds\":[\"9c8d7e43-a181-5246-9d80-b8add2377411\"],\"itemKey\":\"item-1\",\"targetTransactionId\":\"9c8d7e43-a181-5246-9d80-b8add2377411\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"card_purchase\",\"reflectionReason\":\"not_applicable\",\"status\":\"approved\",\"transactionId\":\"9b703b3d-0ac0-5080-b538-2f90e7890636\"},{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":\"9b703b3d-0ac0-5080-b538-2f90e7890636\",\"recordKind\":\"card_cancellation\",\"reflectionReason\":\"not_applicable\",\"status\":\"cancelled\",\"transactionId\":\"9c8d7e43-a181-5246-9d80-b8add2377411\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P20",
+      "name": "미확보 원구매와 보존기간 사유",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "b3f7028e-6009-5967-836a-95e249774273",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["b3f7028e-6009-5967-836a-95e249774273"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "b3f7028e-6009-5967-836a-95e249774273",
+            "recordKind": "card_refund",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "not_applicable",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": "9e329b83-822d-5bf0-afcd-2c43700ab78a"
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [
+          {
+            "transactionId": "9e329b83-822d-5bf0-afcd-2c43700ab78a",
+            "reason": "outside_retention"
+          }
+        ],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:c3e338fb4b8a6f07ec8a025a35136199d50805ff81d3964312596572811ba1e0",
+            "evidenceHash": "sha256:5afd09700ab7a5ae48f52f4474da3b1a98fa93c22be065483a2ef904f1090c32",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":\"9e329b83-822d-5bf0-afcd-2c43700ab78a\",\"recordKind\":\"card_refund\",\"reflectionReason\":\"not_applicable\",\"status\":\"posted\",\"transactionId\":\"b3f7028e-6009-5967-836a-95e249774273\"}],\"unavailableReferences\":[{\"reason\":\"outside_retention\",\"transactionId\":\"9e329b83-822d-5bf0-afcd-2c43700ab78a\"}]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:5afd09700ab7a5ae48f52f4474da3b1a98fa93c22be065483a2ef904f1090c32\",\"memoryKey\":\"sha256:c3e338fb4b8a6f07ec8a025a35136199d50805ff81d3964312596572811ba1e0\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:016490b1dd6d4002ae484cbcb9ffcb79f81bfdf4b5aecb95512e857d9365e4de",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"b3f7028e-6009-5967-836a-95e249774273\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"b3f7028e-6009-5967-836a-95e249774273\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":\"9e329b83-822d-5bf0-afcd-2c43700ab78a\",\"recordKind\":\"card_refund\",\"reflectionReason\":\"not_applicable\",\"status\":\"posted\",\"transactionId\":\"b3f7028e-6009-5967-836a-95e249774273\"}],\"unavailableReferences\":[{\"reason\":\"outside_retention\",\"transactionId\":\"9e329b83-822d-5bf0-afcd-2c43700ab78a\"}]}"
+      }
+    },
+    {
+      "id": "P21",
+      "name": "미확보 사유 변경",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "transactionMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "item-0",
+            "targetTransactionId": "b3f7028e-6009-5967-836a-95e249774273",
+            "candidateKey": null,
+            "evidenceTransactionIds": ["b3f7028e-6009-5967-836a-95e249774273"]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "b3f7028e-6009-5967-836a-95e249774273",
+            "recordKind": "card_refund",
+            "direction": "in",
+            "status": "posted",
+            "reflectionReason": "not_applicable",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": "9e329b83-822d-5bf0-afcd-2c43700ab78a"
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [
+          {
+            "transactionId": "9e329b83-822d-5bf0-afcd-2c43700ab78a",
+            "reason": "not_provided"
+          }
+        ],
+        "currentClassifications": [],
+        "candidates": []
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "item-0",
+            "memoryKey": "sha256:c3e338fb4b8a6f07ec8a025a35136199d50805ff81d3964312596572811ba1e0",
+            "evidenceHash": "sha256:e9c1b7de0b026b22a9bf6cb1981802f81e5f7006b015dafd31bffa79d36f5ac3",
+            "canonicalEvidence": "{\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":\"9e329b83-822d-5bf0-afcd-2c43700ab78a\",\"recordKind\":\"card_refund\",\"reflectionReason\":\"not_applicable\",\"status\":\"posted\",\"transactionId\":\"b3f7028e-6009-5967-836a-95e249774273\"}],\"unavailableReferences\":[{\"reason\":\"not_provided\",\"transactionId\":\"9e329b83-822d-5bf0-afcd-2c43700ab78a\"}]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:e9c1b7de0b026b22a9bf6cb1981802f81e5f7006b015dafd31bffa79d36f5ac3\",\"memoryKey\":\"sha256:c3e338fb4b8a6f07ec8a025a35136199d50805ff81d3964312596572811ba1e0\"}],\"semanticTaskKind\":\"transactionMeaning\"}",
+        "inputHashHint": "sha256:859b7d6cc1d7b1bfdd45f4382740ffa7aefc70cd6cfbf7371f86ae8b3bbd6fee",
+        "canonicalInput": "{\"candidates\":[],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":null,\"evidenceTransactionIds\":[\"b3f7028e-6009-5967-836a-95e249774273\"],\"itemKey\":\"item-0\",\"targetTransactionId\":\"b3f7028e-6009-5967-836a-95e249774273\"}],\"relations\":[],\"semanticTaskKind\":\"transactionMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"in\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":\"9e329b83-822d-5bf0-afcd-2c43700ab78a\",\"recordKind\":\"card_refund\",\"reflectionReason\":\"not_applicable\",\"status\":\"posted\",\"transactionId\":\"b3f7028e-6009-5967-836a-95e249774273\"}],\"unavailableReferences\":[{\"reason\":\"not_provided\",\"transactionId\":\"9e329b83-822d-5bf0-afcd-2c43700ab78a\"}]}"
+      }
+    },
+    {
+      "id": "P22",
+      "name": "최근 세 달 반복 입력",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "recurringMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "recurring-item",
+            "targetTransactionId": null,
+            "candidateKey": "candidate-1",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "71e9d50d-642d-54d3-b112-20a5745d249c",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "1a9312bd-0976-53ad-9a38-6db950697904",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": [
+          {
+            "candidateKey": "candidate-1",
+            "ruleVersion": "PAYSE-CALC-1",
+            "sourceVersion": "public-protocol-source-1",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ],
+            "normalizedName": "합성 통신요금",
+            "suggestedAmountKRW": 50000,
+            "suggestedDay": 20,
+            "features": {
+              "occurrenceCount": 3,
+              "observedMonths": ["2026-08", "2026-09", "2026-10"],
+              "dayWithinRule": true,
+              "amountWithinRule": true,
+              "hasUnresolvedReversal": false
+            }
+          }
+        ]
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "recurring-item",
+            "memoryKey": "sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65",
+            "evidenceHash": "sha256:aef2a63cf569baec0252defa027108107bdac4883e8255725845466bb5fb5181",
+            "canonicalEvidence": "{\"candidate\":{\"evidenceTransactionIds\":[\"1a9312bd-0976-53ad-9a38-6db950697904\",\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-08\",\"2026-09\",\"2026-10\"],\"occurrenceCount\":3},\"normalizedName\":\"합성 통신요금\",\"suggestedAmountKRW\":50000,\"suggestedDay\":20},\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:aef2a63cf569baec0252defa027108107bdac4883e8255725845466bb5fb5181\",\"memoryKey\":\"sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65\"}],\"semanticTaskKind\":\"recurringMeaning\"}",
+        "inputHashHint": "sha256:ce58d1045045d3b0f5800f676a4a5d48f2c7ed21a8209fc933d3f41129531d12",
+        "canonicalInput": "{\"candidates\":[{\"candidateKey\":\"candidate-1\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-08\",\"2026-09\",\"2026-10\"],\"occurrenceCount\":3},\"normalizedName\":\"합성 통신요금\",\"ruleVersion\":\"PAYSE-CALC-1\",\"sourceVersion\":\"public-protocol-source-1\",\"suggestedAmountKRW\":50000,\"suggestedDay\":20}],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":\"candidate-1\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"itemKey\":\"recurring-item\",\"targetTransactionId\":null}],\"relations\":[],\"semanticTaskKind\":\"recurringMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P23",
+      "name": "반복 임시 식별자 변경",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "recurringMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "new-item",
+            "targetTransactionId": null,
+            "candidateKey": "new-key",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "71e9d50d-642d-54d3-b112-20a5745d249c",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "1a9312bd-0976-53ad-9a38-6db950697904",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": [
+          {
+            "candidateKey": "new-key",
+            "ruleVersion": "PAYSE-CALC-1",
+            "sourceVersion": "public-protocol-source-1",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ],
+            "normalizedName": "합성 통신요금",
+            "suggestedAmountKRW": 50000,
+            "suggestedDay": 20,
+            "features": {
+              "occurrenceCount": 3,
+              "observedMonths": ["2026-08", "2026-09", "2026-10"],
+              "dayWithinRule": true,
+              "amountWithinRule": true,
+              "hasUnresolvedReversal": false
+            }
+          }
+        ]
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "new-item",
+            "memoryKey": "sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65",
+            "evidenceHash": "sha256:aef2a63cf569baec0252defa027108107bdac4883e8255725845466bb5fb5181",
+            "canonicalEvidence": "{\"candidate\":{\"evidenceTransactionIds\":[\"1a9312bd-0976-53ad-9a38-6db950697904\",\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-08\",\"2026-09\",\"2026-10\"],\"occurrenceCount\":3},\"normalizedName\":\"합성 통신요금\",\"suggestedAmountKRW\":50000,\"suggestedDay\":20},\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:aef2a63cf569baec0252defa027108107bdac4883e8255725845466bb5fb5181\",\"memoryKey\":\"sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65\"}],\"semanticTaskKind\":\"recurringMeaning\"}",
+        "inputHashHint": "sha256:ce58d1045045d3b0f5800f676a4a5d48f2c7ed21a8209fc933d3f41129531d12",
+        "canonicalInput": "{\"candidates\":[{\"candidateKey\":\"new-key\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-08\",\"2026-09\",\"2026-10\"],\"occurrenceCount\":3},\"normalizedName\":\"합성 통신요금\",\"ruleVersion\":\"PAYSE-CALC-1\",\"sourceVersion\":\"public-protocol-source-1\",\"suggestedAmountKRW\":50000,\"suggestedDay\":20}],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":\"new-key\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"itemKey\":\"new-item\",\"targetTransactionId\":null}],\"relations\":[],\"semanticTaskKind\":\"recurringMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"}],\"unavailableReferences\":[]}"
+      },
+      "sameHintAs": "P22"
+    },
+    {
+      "id": "P24",
+      "name": "반복 근거·관찰 월 순서 반전",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "recurringMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "recurring-item",
+            "targetTransactionId": null,
+            "candidateKey": "candidate-1",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "1a9312bd-0976-53ad-9a38-6db950697904",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "71e9d50d-642d-54d3-b112-20a5745d249c",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": [
+          {
+            "candidateKey": "candidate-1",
+            "ruleVersion": "PAYSE-CALC-1",
+            "sourceVersion": "public-protocol-source-1",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ],
+            "normalizedName": "합성 통신요금",
+            "suggestedAmountKRW": 50000,
+            "suggestedDay": 20,
+            "features": {
+              "occurrenceCount": 3,
+              "observedMonths": ["2026-10", "2026-09", "2026-08"],
+              "dayWithinRule": true,
+              "amountWithinRule": true,
+              "hasUnresolvedReversal": false
+            }
+          }
+        ]
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "recurring-item",
+            "memoryKey": "sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65",
+            "evidenceHash": "sha256:aef2a63cf569baec0252defa027108107bdac4883e8255725845466bb5fb5181",
+            "canonicalEvidence": "{\"candidate\":{\"evidenceTransactionIds\":[\"1a9312bd-0976-53ad-9a38-6db950697904\",\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-08\",\"2026-09\",\"2026-10\"],\"occurrenceCount\":3},\"normalizedName\":\"합성 통신요금\",\"suggestedAmountKRW\":50000,\"suggestedDay\":20},\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:aef2a63cf569baec0252defa027108107bdac4883e8255725845466bb5fb5181\",\"memoryKey\":\"sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65\"}],\"semanticTaskKind\":\"recurringMeaning\"}",
+        "inputHashHint": "sha256:ce58d1045045d3b0f5800f676a4a5d48f2c7ed21a8209fc933d3f41129531d12",
+        "canonicalInput": "{\"candidates\":[{\"candidateKey\":\"candidate-1\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-10\",\"2026-09\",\"2026-08\"],\"occurrenceCount\":3},\"normalizedName\":\"합성 통신요금\",\"ruleVersion\":\"PAYSE-CALC-1\",\"sourceVersion\":\"public-protocol-source-1\",\"suggestedAmountKRW\":50000,\"suggestedDay\":20}],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":\"candidate-1\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"itemKey\":\"recurring-item\",\"targetTransactionId\":null}],\"relations\":[],\"semanticTaskKind\":\"recurringMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"}],\"unavailableReferences\":[]}"
+      },
+      "sameHintAs": "P22"
+    },
+    {
+      "id": "P25",
+      "name": "정규화명 변경",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "recurringMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "recurring-item",
+            "targetTransactionId": null,
+            "candidateKey": "candidate-1",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "71e9d50d-642d-54d3-b112-20a5745d249c",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "1a9312bd-0976-53ad-9a38-6db950697904",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": [
+          {
+            "candidateKey": "candidate-1",
+            "ruleVersion": "PAYSE-CALC-1",
+            "sourceVersion": "public-protocol-source-1",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ],
+            "normalizedName": "합성 보험료",
+            "suggestedAmountKRW": 50000,
+            "suggestedDay": 20,
+            "features": {
+              "occurrenceCount": 3,
+              "observedMonths": ["2026-08", "2026-09", "2026-10"],
+              "dayWithinRule": true,
+              "amountWithinRule": true,
+              "hasUnresolvedReversal": false
+            }
+          }
+        ]
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "recurring-item",
+            "memoryKey": "sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65",
+            "evidenceHash": "sha256:ea0e46d1d89ffc0561694f390abf078a5c7bf154d8fe6105fcba1e6d0b5577a1",
+            "canonicalEvidence": "{\"candidate\":{\"evidenceTransactionIds\":[\"1a9312bd-0976-53ad-9a38-6db950697904\",\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-08\",\"2026-09\",\"2026-10\"],\"occurrenceCount\":3},\"normalizedName\":\"합성 보험료\",\"suggestedAmountKRW\":50000,\"suggestedDay\":20},\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:ea0e46d1d89ffc0561694f390abf078a5c7bf154d8fe6105fcba1e6d0b5577a1\",\"memoryKey\":\"sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65\"}],\"semanticTaskKind\":\"recurringMeaning\"}",
+        "inputHashHint": "sha256:183cd145687efa2dc246d28c060ec0a50637ac342c4df51ecbca074fedb4d10c",
+        "canonicalInput": "{\"candidates\":[{\"candidateKey\":\"candidate-1\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-08\",\"2026-09\",\"2026-10\"],\"occurrenceCount\":3},\"normalizedName\":\"합성 보험료\",\"ruleVersion\":\"PAYSE-CALC-1\",\"sourceVersion\":\"public-protocol-source-1\",\"suggestedAmountKRW\":50000,\"suggestedDay\":20}],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":\"candidate-1\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"itemKey\":\"recurring-item\",\"targetTransactionId\":null}],\"relations\":[],\"semanticTaskKind\":\"recurringMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P26",
+      "name": "로컬 마지막 확인 금액 변경",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "recurringMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "recurring-item",
+            "targetTransactionId": null,
+            "candidateKey": "candidate-1",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "71e9d50d-642d-54d3-b112-20a5745d249c",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "1a9312bd-0976-53ad-9a38-6db950697904",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": [
+          {
+            "candidateKey": "candidate-1",
+            "ruleVersion": "PAYSE-CALC-1",
+            "sourceVersion": "public-protocol-source-1",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ],
+            "normalizedName": "합성 통신요금",
+            "suggestedAmountKRW": 9000000000000,
+            "suggestedDay": 20,
+            "features": {
+              "occurrenceCount": 3,
+              "observedMonths": ["2026-08", "2026-09", "2026-10"],
+              "dayWithinRule": true,
+              "amountWithinRule": true,
+              "hasUnresolvedReversal": false
+            }
+          }
+        ]
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "recurring-item",
+            "memoryKey": "sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65",
+            "evidenceHash": "sha256:1691044621fa46b9bd7dca9ea21eeb4e7d4b718a931c940b6de169ea645929ff",
+            "canonicalEvidence": "{\"candidate\":{\"evidenceTransactionIds\":[\"1a9312bd-0976-53ad-9a38-6db950697904\",\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-08\",\"2026-09\",\"2026-10\"],\"occurrenceCount\":3},\"normalizedName\":\"합성 통신요금\",\"suggestedAmountKRW\":9000000000000,\"suggestedDay\":20},\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:1691044621fa46b9bd7dca9ea21eeb4e7d4b718a931c940b6de169ea645929ff\",\"memoryKey\":\"sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65\"}],\"semanticTaskKind\":\"recurringMeaning\"}",
+        "inputHashHint": "sha256:9cb57809642be2294a7679d38e44c0384883c295872040ac809ad087e8630597",
+        "canonicalInput": "{\"candidates\":[{\"candidateKey\":\"candidate-1\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-08\",\"2026-09\",\"2026-10\"],\"occurrenceCount\":3},\"normalizedName\":\"합성 통신요금\",\"ruleVersion\":\"PAYSE-CALC-1\",\"sourceVersion\":\"public-protocol-source-1\",\"suggestedAmountKRW\":9000000000000,\"suggestedDay\":20}],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":\"candidate-1\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"itemKey\":\"recurring-item\",\"targetTransactionId\":null}],\"relations\":[],\"semanticTaskKind\":\"recurringMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P27",
+      "name": "로컬 예정일 미확인",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "recurringMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "recurring-item",
+            "targetTransactionId": null,
+            "candidateKey": "candidate-1",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "71e9d50d-642d-54d3-b112-20a5745d249c",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "1a9312bd-0976-53ad-9a38-6db950697904",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": [
+          {
+            "candidateKey": "candidate-1",
+            "ruleVersion": "PAYSE-CALC-1",
+            "sourceVersion": "public-protocol-source-1",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ],
+            "normalizedName": "합성 통신요금",
+            "suggestedAmountKRW": 50000,
+            "suggestedDay": null,
+            "features": {
+              "occurrenceCount": 3,
+              "observedMonths": ["2026-08", "2026-09", "2026-10"],
+              "dayWithinRule": true,
+              "amountWithinRule": true,
+              "hasUnresolvedReversal": false
+            }
+          }
+        ]
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "recurring-item",
+            "memoryKey": "sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65",
+            "evidenceHash": "sha256:21d22d0605ea2fcb9e0e0ba955c1684486a79c46e0fb75e27d7fa280a60c0086",
+            "canonicalEvidence": "{\"candidate\":{\"evidenceTransactionIds\":[\"1a9312bd-0976-53ad-9a38-6db950697904\",\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-08\",\"2026-09\",\"2026-10\"],\"occurrenceCount\":3},\"normalizedName\":\"합성 통신요금\",\"suggestedAmountKRW\":50000,\"suggestedDay\":null},\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:21d22d0605ea2fcb9e0e0ba955c1684486a79c46e0fb75e27d7fa280a60c0086\",\"memoryKey\":\"sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65\"}],\"semanticTaskKind\":\"recurringMeaning\"}",
+        "inputHashHint": "sha256:bf8807b6d8d5e8253e57eb42b0202a263ee9347ec39345a48fe9813e3a09c508",
+        "canonicalInput": "{\"candidates\":[{\"candidateKey\":\"candidate-1\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-08\",\"2026-09\",\"2026-10\"],\"occurrenceCount\":3},\"normalizedName\":\"합성 통신요금\",\"ruleVersion\":\"PAYSE-CALC-1\",\"sourceVersion\":\"public-protocol-source-1\",\"suggestedAmountKRW\":50000,\"suggestedDay\":null}],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":\"candidate-1\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"itemKey\":\"recurring-item\",\"targetTransactionId\":null}],\"relations\":[],\"semanticTaskKind\":\"recurringMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P28",
+      "name": "로컬 횟수 변경",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "recurringMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "recurring-item",
+            "targetTransactionId": null,
+            "candidateKey": "candidate-1",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "71e9d50d-642d-54d3-b112-20a5745d249c",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "1a9312bd-0976-53ad-9a38-6db950697904",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": [
+          {
+            "candidateKey": "candidate-1",
+            "ruleVersion": "PAYSE-CALC-1",
+            "sourceVersion": "public-protocol-source-1",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ],
+            "normalizedName": "합성 통신요금",
+            "suggestedAmountKRW": 50000,
+            "suggestedDay": 20,
+            "features": {
+              "occurrenceCount": 4,
+              "observedMonths": ["2026-08", "2026-09", "2026-10"],
+              "dayWithinRule": true,
+              "amountWithinRule": true,
+              "hasUnresolvedReversal": false
+            }
+          }
+        ]
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "recurring-item",
+            "memoryKey": "sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65",
+            "evidenceHash": "sha256:fd1f5f2062f936d538da9024d57d6acd61adb181c301341f6948cc5d8cf5f428",
+            "canonicalEvidence": "{\"candidate\":{\"evidenceTransactionIds\":[\"1a9312bd-0976-53ad-9a38-6db950697904\",\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-08\",\"2026-09\",\"2026-10\"],\"occurrenceCount\":4},\"normalizedName\":\"합성 통신요금\",\"suggestedAmountKRW\":50000,\"suggestedDay\":20},\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:fd1f5f2062f936d538da9024d57d6acd61adb181c301341f6948cc5d8cf5f428\",\"memoryKey\":\"sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65\"}],\"semanticTaskKind\":\"recurringMeaning\"}",
+        "inputHashHint": "sha256:724f8636416a09b9aac61dc31736efdfef6e770cc9de398f57013e5102f5d5e4",
+        "canonicalInput": "{\"candidates\":[{\"candidateKey\":\"candidate-1\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-08\",\"2026-09\",\"2026-10\"],\"occurrenceCount\":4},\"normalizedName\":\"합성 통신요금\",\"ruleVersion\":\"PAYSE-CALC-1\",\"sourceVersion\":\"public-protocol-source-1\",\"suggestedAmountKRW\":50000,\"suggestedDay\":20}],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":\"candidate-1\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"itemKey\":\"recurring-item\",\"targetTransactionId\":null}],\"relations\":[],\"semanticTaskKind\":\"recurringMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P29",
+      "name": "관찰 월 집합 변경",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "recurringMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "public-protocol-source-1",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "recurring-item",
+            "targetTransactionId": null,
+            "candidateKey": "candidate-1",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "71e9d50d-642d-54d3-b112-20a5745d249c",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "1a9312bd-0976-53ad-9a38-6db950697904",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": [
+          {
+            "candidateKey": "candidate-1",
+            "ruleVersion": "PAYSE-CALC-1",
+            "sourceVersion": "public-protocol-source-1",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ],
+            "normalizedName": "합성 통신요금",
+            "suggestedAmountKRW": 50000,
+            "suggestedDay": 20,
+            "features": {
+              "occurrenceCount": 3,
+              "observedMonths": ["2026-07", "2026-08", "2026-09"],
+              "dayWithinRule": true,
+              "amountWithinRule": true,
+              "hasUnresolvedReversal": false
+            }
+          }
+        ]
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "recurring-item",
+            "memoryKey": "sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65",
+            "evidenceHash": "sha256:b8a14d04ee80e7b148e496c6e722a44cbf99898b2c5a9463dbbec0f6227b96c7",
+            "canonicalEvidence": "{\"candidate\":{\"evidenceTransactionIds\":[\"1a9312bd-0976-53ad-9a38-6db950697904\",\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-07\",\"2026-08\",\"2026-09\"],\"occurrenceCount\":3},\"normalizedName\":\"합성 통신요금\",\"suggestedAmountKRW\":50000,\"suggestedDay\":20},\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:b8a14d04ee80e7b148e496c6e722a44cbf99898b2c5a9463dbbec0f6227b96c7\",\"memoryKey\":\"sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65\"}],\"semanticTaskKind\":\"recurringMeaning\"}",
+        "inputHashHint": "sha256:caee5a7a6f633ba34a24822ca6634f77691932cd46c26fb120e10b30dcd1eb50",
+        "canonicalInput": "{\"candidates\":[{\"candidateKey\":\"candidate-1\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-07\",\"2026-08\",\"2026-09\"],\"occurrenceCount\":3},\"normalizedName\":\"합성 통신요금\",\"ruleVersion\":\"PAYSE-CALC-1\",\"sourceVersion\":\"public-protocol-source-1\",\"suggestedAmountKRW\":50000,\"suggestedDay\":20}],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"public-protocol-source-1\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":\"candidate-1\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"itemKey\":\"recurring-item\",\"targetTransactionId\":null}],\"relations\":[],\"semanticTaskKind\":\"recurringMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"}],\"unavailableReferences\":[]}"
+      }
+    },
+    {
+      "id": "P30",
+      "name": "반복 원천 버전 메타만 변경",
+      "input": {
+        "contractVersion": "PAYSE-ANALYSIS-1",
+        "semanticTaskKind": "recurringMeaning",
+        "context": {
+          "schemaVersion": "PAYSE-API-0.6-4",
+          "dataVersion": "1",
+          "sourceVersion": "new-source",
+          "ruleVersion": "PAYSE-CALC-1",
+          "asOf": "2026-11-04T12:00:00+09:00",
+          "inputRevision": 0,
+          "localSessionEpoch": 1,
+          "selectedAccountIds": []
+        },
+        "items": [
+          {
+            "itemKey": "recurring-item",
+            "targetTransactionId": null,
+            "candidateKey": "candidate-1",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ]
+          }
+        ],
+        "transactions": [
+          {
+            "transactionId": "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "71e9d50d-642d-54d3-b112-20a5745d249c",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          },
+          {
+            "transactionId": "1a9312bd-0976-53ad-9a38-6db950697904",
+            "recordKind": "account_entry",
+            "direction": "out",
+            "status": "posted",
+            "reflectionReason": "reflected",
+            "merchantName": "합성 거래처",
+            "description": "확인용 입금",
+            "originalTransactionId": null
+          }
+        ],
+        "relations": [],
+        "unavailableReferences": [],
+        "currentClassifications": [],
+        "candidates": [
+          {
+            "candidateKey": "candidate-1",
+            "ruleVersion": "PAYSE-CALC-1",
+            "sourceVersion": "new-source",
+            "evidenceTransactionIds": [
+              "62fb8f2e-1f06-5418-af4d-d56fe3535955",
+              "71e9d50d-642d-54d3-b112-20a5745d249c",
+              "1a9312bd-0976-53ad-9a38-6db950697904"
+            ],
+            "normalizedName": "합성 통신요금",
+            "suggestedAmountKRW": 50000,
+            "suggestedDay": 20,
+            "features": {
+              "occurrenceCount": 3,
+              "observedMonths": ["2026-08", "2026-09", "2026-10"],
+              "dayWithinRule": true,
+              "amountWithinRule": true,
+              "hasUnresolvedReversal": false
+            }
+          }
+        ]
+      },
+      "expected": {
+        "items": [
+          {
+            "itemKey": "recurring-item",
+            "memoryKey": "sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65",
+            "evidenceHash": "sha256:aef2a63cf569baec0252defa027108107bdac4883e8255725845466bb5fb5181",
+            "canonicalEvidence": "{\"candidate\":{\"evidenceTransactionIds\":[\"1a9312bd-0976-53ad-9a38-6db950697904\",\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-08\",\"2026-09\",\"2026-10\"],\"occurrenceCount\":3},\"normalizedName\":\"합성 통신요금\",\"suggestedAmountKRW\":50000,\"suggestedDay\":20},\"currentClassifications\":[],\"relations\":[],\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"}],\"unavailableReferences\":[]}"
+          }
+        ],
+        "canonicalHint": "{\"items\":[{\"evidenceHash\":\"sha256:aef2a63cf569baec0252defa027108107bdac4883e8255725845466bb5fb5181\",\"memoryKey\":\"sha256:6e6bd0fa5d3420b3137cd9de353ddccd6f39c20881c40c4b54d6274e6fb31e65\"}],\"semanticTaskKind\":\"recurringMeaning\"}",
+        "inputHashHint": "sha256:ce58d1045045d3b0f5800f676a4a5d48f2c7ed21a8209fc933d3f41129531d12",
+        "canonicalInput": "{\"candidates\":[{\"candidateKey\":\"candidate-1\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"features\":{\"amountWithinRule\":true,\"dayWithinRule\":true,\"hasUnresolvedReversal\":false,\"observedMonths\":[\"2026-08\",\"2026-09\",\"2026-10\"],\"occurrenceCount\":3},\"normalizedName\":\"합성 통신요금\",\"ruleVersion\":\"PAYSE-CALC-1\",\"sourceVersion\":\"new-source\",\"suggestedAmountKRW\":50000,\"suggestedDay\":20}],\"context\":{\"asOf\":\"2026-11-04T12:00:00+09:00\",\"dataVersion\":\"1\",\"inputRevision\":0,\"localSessionEpoch\":1,\"ruleVersion\":\"PAYSE-CALC-1\",\"schemaVersion\":\"PAYSE-API-0.6-4\",\"selectedAccountIds\":[],\"sourceVersion\":\"new-source\"},\"contractVersion\":\"PAYSE-ANALYSIS-1\",\"currentClassifications\":[],\"items\":[{\"candidateKey\":\"candidate-1\",\"evidenceTransactionIds\":[\"62fb8f2e-1f06-5418-af4d-d56fe3535955\",\"71e9d50d-642d-54d3-b112-20a5745d249c\",\"1a9312bd-0976-53ad-9a38-6db950697904\"],\"itemKey\":\"recurring-item\",\"targetTransactionId\":null}],\"relations\":[],\"semanticTaskKind\":\"recurringMeaning\",\"transactions\":[{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"62fb8f2e-1f06-5418-af4d-d56fe3535955\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"71e9d50d-642d-54d3-b112-20a5745d249c\"},{\"description\":\"확인용 입금\",\"direction\":\"out\",\"merchantName\":\"합성 거래처\",\"originalTransactionId\":null,\"recordKind\":\"account_entry\",\"reflectionReason\":\"reflected\",\"status\":\"posted\",\"transactionId\":\"1a9312bd-0976-53ad-9a38-6db950697904\"}],\"unavailableReferences\":[]}"
+      },
+      "sameHintAs": "P22"
+    }
+  ]
+}

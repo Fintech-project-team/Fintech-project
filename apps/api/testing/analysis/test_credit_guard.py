@@ -9,6 +9,22 @@ from testing.analysis import credit_guard
 class CreditGuardTest(unittest.TestCase):
     """2026-11-04: 비용 승인 범위 우회를 거절한다. 사용: unittest."""
 
+    def test_fast_prices_reserve_and_settle_double_generation(self):
+        """2026-11-04: Fast의 확인/미확인 생성 모두2배 예약하며 계수 예비비를 보존한다."""
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'credit.json'
+            credit_guard.initialize(path, '35', '20')
+            credit_guard.reserve(path, 'fast', 2, 2)
+            entry = credit_guard.load(path)['runs'][0]
+            self.assertEqual(220000, entry['reservedMicros'])
+            result = credit_guard.settle(path, 'fast', 2, 2,
+                [{'known': True, 'inputTokens': 12000, 'outputTokens': 4000}])
+            self.assertEqual(.02, result['generationUpperUSD'])
+            self.assertEqual(.2, result['unverifiedCountingReserveUSD'])
+            for invalid in (0, 3, True, 1.5):
+                with self.assertRaises(ValueError):
+                    credit_guard.reserve(path, 'invalid', 1, invalid)
+
     def test_floor_survives_restart_and_unknown_usage(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'credit.json'

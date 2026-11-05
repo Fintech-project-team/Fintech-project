@@ -31,6 +31,156 @@ class OpenAiGatewayTest {
         + "\"input_tokens_details\":{\"cached_tokens\":5}}";
 
     /**
+     * 계수·생성에 같은 응답 길이 정책을 보내고 미지정 요청과 잘못된 설정을 구분한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void boundsVerbosityWithoutChangingValidation() throws Exception {
+        try (var provider = new ProviderStub()) {
+            provider.sequence(
+                "{\"object\":\"response.input_tokens\",\"input_tokens\":21}",
+                completed("{}", USAGE)
+            );
+            var gateway = new OpenAiGateway(
+                provider.http(),
+                () -> OpenAiValues.CREDENTIAL,
+                "approved-test-model",
+                "Return JSON",
+                OpenAiValues.EFFORT_LOW,
+                schema(),
+                100,
+                40,
+                provider.endpoint(),
+                "default",
+                "low"
+            );
+            assertEquals(21, gateway.countInput(input()));
+            assertNull(gateway.generate(input()).failure());
+            for (var request : provider.requests()) {
+                assertEquals("low", request.body().path(OpenAiFields.TEXT)
+                    .path(OpenAiFields.VERBOSITY).asString());
+            }
+            assertEquals(2, provider.requests().size());
+            assertThrows(IllegalArgumentException.class, () -> new OpenAiGateway(
+                provider.http(),
+                () -> OpenAiValues.CREDENTIAL,
+                "approved-test-model",
+                "Return JSON",
+                OpenAiValues.EFFORT_LOW,
+                schema(),
+                100,
+                40,
+                provider.endpoint(),
+                "default",
+                "invalid"
+            ));
+            provider.reply(200, completed("{}", USAGE));
+            assertNull(gateway(provider).generate(input()).failure());
+            assertFalse(provider.requests().get(2).body().path(OpenAiFields.TEXT)
+                .has(OpenAiFields.VERBOSITY));
+        }
+    }
+
+    /**
+     * 중간 진행문을 JSON으로 읽지 않고 한 최종 응답만 허용하며 실패·사용량을 보존한다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void distinguishesCommentaryFromFinalAnswer() throws Exception {
+        try (var provider = new ProviderStub()) {
+            var gateway = gateway(provider);
+            ObjectNode response = (ObjectNode) JSON.readTree(completed("{}", USAGE));
+            ObjectNode finalMessage = (ObjectNode) response.get(OpenAiFields.OUTPUT).get(0);
+            finalMessage.put(OpenAiFields.PHASE, "final_answer");
+            ObjectNode progress = finalMessage.deepCopy().put(OpenAiFields.PHASE, "commentary");
+            ((ObjectNode) progress.get(OpenAiFields.CONTENT).get(0))
+                .put(OpenAiFields.TEXT, "private-progress-sentinel, not JSON");
+            response.putArray(OpenAiFields.OUTPUT)
+                .add(progress)
+                .add(finalMessage);
+            provider.reply(200, response.toString());
+            var reply = gateway.generate(input());
+            assertNull(reply.failure());
+            assertEquals(JSON.createObjectNode(), reply.output());
+            assertEquals(new TokenUsage(21, 5L, 7), reply.usage());
+
+            response.putArray(OpenAiFields.OUTPUT).add(progress);
+            provider.reply(200, response.toString());
+            assertEquals(ProviderCodes.INVALID_PROVIDER_RESPONSE,
+                gateway.generate(input()).failure());
+            response.putArray(OpenAiFields.OUTPUT)
+                .add(finalMessage)
+                .add(finalMessage.deepCopy());
+            provider.reply(200, response.toString());
+            assertEquals(ProviderCodes.INVALID_PROVIDER_RESPONSE,
+                gateway.generate(input()).failure());
+            finalMessage.put(OpenAiFields.PHASE, "unrecognized");
+            response.putArray(OpenAiFields.OUTPUT).add(finalMessage);
+            provider.reply(200, response.toString());
+            assertEquals(ProviderCodes.INVALID_PROVIDER_RESPONSE,
+                gateway.generate(input()).failure());
+            finalMessage.putNull(OpenAiFields.PHASE);
+            provider.reply(200, response.toString());
+            assertNull(gateway.generate(input()).failure());
+            progress.put(OpenAiFields.STATUS, "incomplete");
+            response.putArray(OpenAiFields.OUTPUT)
+                .add(progress)
+                .add(finalMessage);
+            provider.reply(200, response.toString());
+            assertEquals(ProviderCodes.INCOMPLETE_RESPONSE, gateway.generate(input()).failure());
+            progress.put(OpenAiFields.STATUS, "completed");
+            ((ObjectNode) progress.get(OpenAiFields.CONTENT).get(0))
+                .put(OpenAiFields.TYPE_KEY, "refusal");
+            provider.reply(200, response.toString());
+            assertEquals(ProviderCodes.MODEL_REFUSAL, gateway.generate(input()).failure());
+            assertEquals(7, provider.requests().size());
+        }
+    }
+
+    /**
+     * 표준·Fast 생성 선택을 명시하고 계수 요청이나 자동 재시도로 확대하지 않는다.
+     * @created 2026-11-04
+     * @usedBy JUnit
+     */
+    @Test
+    void serviceTiersAreExplicit() throws Exception {
+        for (String tier : new String[] {"default", "fast"}) {
+            try (var provider = new ProviderStub()) {
+                ObjectNode reply = (ObjectNode) JSON.readTree(completed("{}", USAGE));
+                reply.put(OpenAiFields.SERVICE_TIER, tier);
+                provider.sequence("{\"object\":\"response.input_tokens\",\"input_tokens\":21}",
+                    reply.toString());
+                var gateway = new OpenAiGateway(
+                    provider.http(),
+                    () -> OpenAiValues.CREDENTIAL,
+                    "approved-test-model",
+                    "Return JSON",
+                    OpenAiValues.EFFORT_LOW,
+                    schema(),
+                    100,
+                    40,
+                    provider.endpoint(),
+                    tier
+                );
+                assertEquals(21, gateway.countInput(input()));
+                assertNull(gateway.generate(input()).failure());
+                assertEquals(2, provider.requests().size());
+                var countRequest = provider.requests().get(0).body();
+                var generationRequest = provider.requests().get(1).body();
+                assertFalse(countRequest.has(OpenAiFields.SERVICE_TIER));
+                assertEquals(tier, generationRequest.path(OpenAiFields.SERVICE_TIER).asString());
+                assertThrows(IllegalArgumentException.class, () -> new OpenAiGateway(
+                    provider.http(), () -> OpenAiValues.CREDENTIAL, "approved-test-model",
+                    "Return JSON", OpenAiValues.EFFORT_LOW, schema(), 100, 40,
+                    provider.endpoint(), "flex"));
+                assertEquals(2, provider.requests().size());
+            }
+        }
+    }
+
+    /**
      * 실제 서비스에서 실제 HTTP 어댑터를 호출하되 네트워크 대상만 로컬 대역으로 고정한다.
      * @created 2026-11-01
      * @usedBy JUnit
