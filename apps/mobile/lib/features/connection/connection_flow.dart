@@ -2,11 +2,13 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../../data/analysis/analysis_wait_session.dart';
 import '../../data/connection/financial_api.dart';
 import '../../data/connection/user_snapshot_repository.dart';
 import '../../data/financial_snapshot.dart';
 import '../../data/financial_snapshot_repository.dart';
 import '../overview/home_calculation.dart';
+import 'analysis_wait_screen.dart';
 import 'connection_flow_controller.dart';
 import 'connection_presentation_policy.dart';
 import 'connection_screens.dart';
@@ -22,6 +24,8 @@ class ConnectionFlow extends StatefulWidget {
   /// 2026-10-23: [devEntry]는 12-1·01-1 목록 끝에 붙는 개발 설정 진입이며 릴리스에서는 null이다.
   /// [userName]은 진입 로딩 제목에 쓰는 사용자 이름(없으면 이름 없이)이다.
   /// 2026-10-27: [onFinished]는 01-2가 보여 준 스냅샷과 '나중에 확인하고 홈으로'를 골랐는지(deferred)를 받는다.
+  /// 2026-11-04: [startAnalysis]가 있으면 01-2 '계산하기' 뒤 첫 분석 대기 화면을 거쳐 [onFinished]로 간다.
+  /// 없으면 바로 [onFinished]다.
   const ConnectionFlow({
     super.key,
     required this.repository,
@@ -32,6 +36,7 @@ class ConnectionFlow extends StatefulWidget {
     this.random,
     this.devEntry,
     this.userName,
+    this.startAnalysis,
   });
 
   final UserFinancialRepository repository;
@@ -43,6 +48,7 @@ class ConnectionFlow extends StatefulWidget {
   final Random? random;
   final Widget? devEntry;
   final String? userName;
+  final AnalysisWaitStarter? startAnalysis;
 
   /// 2026-10-22: 흐름 상태 객체를 반환한다.
   @override
@@ -158,6 +164,8 @@ class _ConnectionFlowState extends State<ConnectionFlow> {
     onFinished: widget.onFinished,
     onSessionInvalid: widget.onSessionInvalid,
     onSnapshot: _controller.adoptSnapshot,
+    startAnalysis: widget.startAnalysis,
+    userName: widget.userName,
   );
 
   /// 2026-10-22: 시스템 뒤로 가기를 흐름 Navigator로 넘기는 흐름 화면을 반환한다.
@@ -184,6 +192,7 @@ class _ReviewHost extends StatefulWidget {
   /// 2026-10-27: 세션 저장소 [repository], 처음 보일 [snapshot], 뒤로 [onBack], 끝 [onFinished],
   /// 세션 무효 [onSessionInvalid]로 만든다.
   /// 2026-10-28: 월급 설정에서 새 Snapshot을 받으면 [onSnapshot]으로 알린다. [random]은 작업 키 난수다.
+  /// 2026-11-04: [startAnalysis]가 있으면 '계산하기' 뒤 분석 대기 화면을 연다. [userName]은 그 제목의 이름이다.
   const _ReviewHost({
     required this.repository,
     required this.snapshot,
@@ -192,6 +201,8 @@ class _ReviewHost extends StatefulWidget {
     required this.onSessionInvalid,
     required this.onSnapshot,
     this.random,
+    this.startAnalysis,
+    this.userName,
   });
 
   final UserFinancialRepository repository;
@@ -202,6 +213,8 @@ class _ReviewHost extends StatefulWidget {
   final VoidCallback onSessionInvalid;
   final ValueChanged<FinancialSnapshot> onSnapshot;
   final Random? random;
+  final AnalysisWaitStarter? startAnalysis;
+  final String? userName;
 
   /// 2026-10-27: 01-2 상태 객체를 반환한다.
   @override
@@ -278,6 +291,26 @@ class _ReviewHostState extends State<_ReviewHost> {
         .whenComplete(controller.dispose);
   }
 
+  /// 2026-11-04: 01-2 '계산하기'. 분석 추적이 있으면 지금 스냅샷으로 분석 대기 화면을 열고, 그 화면의 '다음'에서
+  /// 01-3으로 간다. 대기 화면에서 뒤로 가면 01-2로 돌아오며 추적은 폐기한다.
+  void _calculate() {
+    final start = widget.startAnalysis;
+    final snapshot = _snapshot;
+    if (start == null) {
+      widget.onFinished(snapshot, deferred: false);
+      return;
+    }
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => AnalysisWaitHost(
+          session: () => start(snapshot),
+          userName: widget.userName,
+          onNext: () => widget.onFinished(snapshot, deferred: false),
+        ),
+      ),
+    );
+  }
+
   /// 2026-10-27: 01-2 화면을 반환한다.
   @override
   Widget build(BuildContext context) {
@@ -288,7 +321,7 @@ class _ReviewHostState extends State<_ReviewHost> {
       onBack: widget.onBack,
       onReload: _reloadSnapshot,
       onEditSalary: _editSalary,
-      onCalculate: () => widget.onFinished(_snapshot, deferred: false),
+      onCalculate: _calculate,
       onDefer: () => widget.onFinished(
         _snapshot,
         deferred: _calculation is HomeCalculationReady,

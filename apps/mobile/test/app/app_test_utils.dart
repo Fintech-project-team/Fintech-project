@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:payse/features/connection/analysis_wait_screen.dart';
 import 'package:payse/shared/design/primary_button.dart';
 import 'package:payse/app/dev/dev_demo_accounts.dart';
 import 'package:payse/data/auth/auth_repository.dart';
@@ -122,11 +123,29 @@ Future<void> finishReview(WidgetTester tester) async {
   );
   if (calculate.onPressed != null) {
     await tester.tap(find.byKey(const ValueKey('review-calculate')));
+    await passAnalysisWait(tester);
   } else {
     await tester.tap(find.byKey(const ValueKey('review-defer')));
   }
   await tester.pumpAndSettle();
   await skipFirstCalc(tester);
+}
+
+/// 2026-11-05: 분석 대기 화면이 뜨면 가짜 분석 서버가 끝낼 때까지 앱 시계를 1초씩 보낸 뒤 '다음'을 누른다.
+/// 기다리는 그림이 계속 움직여 pumpAndSettle을 쓸 수 없다. 화면이 없으면 아무것도 하지 않는다.
+Future<void> passAnalysisWait(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 600));
+  if (find.byType(AnalysisWaitScreen).evaluate().isEmpty) return;
+  final next = find.byKey(const ValueKey('analysis-next'));
+  for (var i = 0; i < 120; i++) {
+    final gate = find.ancestor(of: next, matching: find.byType(IgnorePointer));
+    if (!tester.widget<IgnorePointer>(gate.first).ignoring) break;
+    await tester.pump(const Duration(seconds: 1));
+  }
+  await tester.tap(next);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 600));
 }
 
 /// 2026-10-27: 01-3이 떠 있으면 '홈으로 가기'로 건너뛴다(설명 건너뜀 기록).

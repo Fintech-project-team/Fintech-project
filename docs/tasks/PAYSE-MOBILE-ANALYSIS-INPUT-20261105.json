@@ -1,0 +1,43 @@
+{
+  "id": "PAYSE-MOBILE-ANALYSIS-INPUT-20261105",
+  "role": "integration",
+  "baseCommit": "458475753aac909cec1372aeac3adabbd64b4962",
+  "branch": "feat/integration/analysis-input",
+  "allowedPaths": [
+    "docs/tasks/PAYSE-MOBILE-ANALYSIS-INPUT-20261105.json",
+    "apps/mobile/lib/data/analysis/",
+    "apps/mobile/test/data/analysis/",
+    "apps/mobile/docs/analysis-input.md",
+    "apps/mobile/pubspec.yaml",
+    "apps/mobile/pubspec.lock"
+  ],
+  "acceptance": [
+    "목적: 분석 연동 4단계 중 2단계(분석 입력·입력 지문)와 1단계의 앱 연결(스냅샷 → 공유 반복 계산 입력)을 만든다. 3단계 작업 추적이 이 결과로 POST /analysis-jobs 접수, /input 제출, /analysis-results/query 조회 본문을 채운다. 기준은 docs/analysis-protocol.md §1·§2·§4, apps/api/contracts/analysis-http.schema.json의 acceptRequest·recurringInput, packages/payse_calculation/docs/recurring.md다. baseCommit은 hyeyeon-dev 4584757(#225)이다",
+    "반복 후보 입력: 01-2에서 확정한 FinancialSnapshot과 전체 페이지를 받은 거래·조회 범위로 packages/payse_calculation의 RecurringInput을 만든다. 같은 스냅샷의 CalculationContext, 연결 계좌·카드 ID 전체(홈 합산 제외 계좌 포함), 거래별 RecurringEntry(계좌 출금=출금일, 카드 구매=확인된 이용일, 취소·환불=reversal과 originalId, 모르는 날짜는 null), 조회 범위 RecurringCoverage, 기존 승인·제외 candidateKey를 넘긴다. 명시된 본인 이체·카드대금 납부 관계만 RecurringExclusion으로 넣고 금액·날짜가 같다는 이유로 제외하지 않는다. 반복 판정·금액·일자 계산은 공유 detectRecurring을 호출하며 앱에 같은 규칙을 다시 구현하지 않는다",
+    "분석 입력: detectRecurring 후보로 recurringMeaning 입력(contractVersion PAYSE-ANALYSIS-1, context, items, transactions, relations, unavailableReferences, currentClassifications, candidates)을 만든다. 필드 이름·필수 여부·타입을 스키마와 똑같이 맞추고 필수 nullable은 null로 보낸다. dataVersion은 10진 문자열, 원화·횟수·일자는 정수, asOf는 서버 스냅샷 값을 그대로 쓴다. itemKey와 candidateKey의 대응을 명시적으로 보존한다. 넓힌 근거(원거래·관계 양끝)가 하나라도 겹치는 후보는 연쇄로 한 그룹이다(a–b, b–c면 a·b·c). 그룹은 쪼개지 않고 한 작업에 넣으며, 그룹을 첫 후보의 candidateKey 순으로 한 입력에 후보 20개·거래 60개(중복 제거) 이하가 되게 채운다. 같은 입력은 항상 같은 그룹·묶음 순서를 만든다. 그룹 전체가 한도를 넘으면 전부 groupTooLarge로 미분석 처리한다. 근거를 보낼 수 없으면 이유를 transactionNotReceived(이번 조회에서 거래 미수신, 일시적), originalUnavailable(서버 referenceResolutions가 원거래를 unavailable로 명시, 서버 사유 원문 보존), sourceFieldMissing(필수 원천 필드 누락)로 나누고 같은 그룹의 다른 후보는 groupMemberHeld로 함께 보류한다. 미분석 사유는 이번 준비 결과에만 담고 영구 제외로 저장하지 않는다. 후보가 0개이면 입력을 만들지 않고 정상 0개로 돌려준다(빈 분석을 접수하지 않음)",
+    "입력 지문: Java AnalysisIdentity.hint()와 같은 inputHashHint를 PAYSE-IDENTITY-1 규칙(객체 키 UTF-16 정렬·공백 없는 JSON, 문자열 원문 보존, memoryKey·evidenceHash·근거 확장, sha256: + 소문자 64자리)으로 만든다. 서버 analysisInputHash와 같게 만들지 않으며 권한·결과 재사용 판단에 쓰지 않는다. 접수 본문(context, triggerKind, semanticTaskKind, items[itemKey·evidenceTransactionIds·candidateIds], inputHashHint, reasonCodes=[])에서 멱등 키·previousJobId를 뺀 부분까지 만든다. 멱등 키·HTTP 호출·기기 저장은 3단계다",
+    "대조: apps/api/testing/protocol/fixtures/identity-vectors.json 30개 사례를 제품 지문 함수에 넣어 canonicalEvidence·memoryKey·evidenceHash·canonicalHint·inputHashHint 중간값을 모두 비교하고 sameHintAs 쌍의 동일성도 확인한다. transactionMeaning 사례(P01–P21)도 같은 지문 함수로 대조한다. fixture 기대값은 수정하지 않으며 다르면 첫 번째로 다른 중간값부터 원인을 찾는다. http-examples.json의 반복 입력 예제는 만든 입력이 스키마 필드와 맞는지 대조하는 데 쓴다",
+    "의존성: SHA-256에 Dart 팀 crypto 패키지를 apps/mobile/pubspec.yaml 직접 의존성으로 추가하고 pubspec.lock을 갱신한다(A의 참조 검사 apps/api/testing/protocol/dart와 같은 패키지). 혜연 승인 후에만 추가하며 다른 패키지는 바꾸지 않는다",
+    "문서: apps/mobile/docs/analysis-input.md에 스냅샷 → 반복 후보 입력 → 분석 입력·지문의 대응, 나누기 규칙, 0개·분석하지 못한 후보 처리, 3단계에 넘기는 값을 적는다. 공통 계약 문서는 바꾸지 않는다",
+    "확정 기준(2026-11-05 혜연 확인, 저장소 계약·서버 코드·테스트 대조): 최초 연결 저장 뒤 처음 공개된 범위의 분석은 triggerKind A(EX-A)다. 같은 연결·근거는 EX-R로 결과 조회만 하고, 홈 합산 계좌 선택 변경은 EX-AC라 새 접수·AI 호출이 0회다(홈 선택과 전체 연결 분석 범위는 독립). 새 연결로 공개 범위가 늘어날 때만 늘어난 범위를 접수한다. 한 작업은 후보 20개·거래 60개이고 후보와 필수 근거를 쪼개지 않으며 독립 근거 그룹만 별도 작업으로 접수한다(apps/api/docs/llm-execution.md ai.shard.*, analysis-api.md §3). ai.job.maxShards는 미확정 제안이라 적용하지 않는다. 3단계 참고(이번 범위에서 구현하지 않음): 제출 허가 60초가 지나도 180초 실행창 안이면 상태 재조회가 새 허가를 준다. 실행창이 제출 전에 끝나면 failed·action retry이며 사용자가 다시 시도할 때 새 멱등 키로 /retry를 보내 새 180초 창을 연다(G 화면). 3개월 작업 식별 기한이 지난 expired·refreshInput만 triggerKind recovery·previousJobId 접수이며 기한 전 recovery는 409다(AnalysisJobs.effectiveState·status, AnalysisHttpTest.expiresPermitAndExecutionWindow). 같은 요청의 전송 재확인은 같은 멱등 키, 사용자의 새 재시도는 새 키다",
+    "검증 계획: Dart 단위 테스트(지문 사례 30개 중간값 전부, 반복 입력 매핑의 날짜·종류·제외·취소·조회 범위, 후보 0개, 20개·60개 나누기, 근거 공유 후보 한 작업(재현 사례: 계좌 출금 하나가 두 후보의 카드 구매와 각각 짝지어지고 그 사이 순서에 후보 19개), 연쇄 그룹, 그룹 한도 초과 전체 보류·중복 제거 계산, 미확보 사유 세 가지와 그룹 동반 보류, 같은 입력 같은 묶음, 필수 nullable·정수·문자열 형식, v4 더미 전체 스키마 검사). 공식 검증은 npm run verify -- --task <이 명세>(mobile:check 포함)",
+    "범위 밖: API 클라이언트·작업 추적·멱등 키·기기 저장·앱 복귀 처리(3단계), 분석 대기 화면과 앱 기본 구성 연결, 거래 의미(transactionMeaning) 입력 만들기, 승인 화면·/recurring-decisions, expandRecurring·홈 계산 연결, 서버·DB·API 계약·공유 계산 패키지 수정. 커밋·PR·merge는 혜연 요청 전 실행하지 않는다"
+  ],
+  "readBefore": [
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/harness/FLUTTER_TRANSITION.md",
+    "docs/app-architecture.md",
+    "docs/calculation-rules.md",
+    "docs/data-contracts.md",
+    "docs/analysis-protocol.md",
+    "apps/api/docs/analysis-api.md",
+    "apps/api/contracts/analysis-http.schema.json",
+    "packages/payse_calculation/docs/recurring.md",
+    "docs/harness/AGENT_REVIEW.md",
+    "docs/payse-execution-contract.md",
+    "apps/api/docs/llm-execution.md"
+  ]
+}

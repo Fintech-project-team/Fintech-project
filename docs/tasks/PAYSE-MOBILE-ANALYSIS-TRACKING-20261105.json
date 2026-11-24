@@ -1,0 +1,53 @@
+{
+  "id": "PAYSE-MOBILE-ANALYSIS-TRACKING-20261105",
+  "role": "integration",
+  "baseCommit": "b5dd6d85c5f60b5879ec3cf24a961904f1bcc3a7",
+  "branch": "feat/integration/analysis-tracking",
+  "allowedPaths": [
+    "docs/tasks/PAYSE-MOBILE-ANALYSIS-TRACKING-20261105.json",
+    "docs/v0.6-screen-rules.md",
+    "apps/mobile/docs/analysis-input.md",
+    "apps/mobile/docs/analysis-tracking.md",
+    "apps/mobile/lib/data/analysis/",
+    "apps/mobile/lib/features/connection/analysis_wait_screen.dart",
+    "apps/mobile/lib/features/connection/connection_flow.dart",
+    "apps/mobile/lib/app/main_entry.dart",
+    "apps/mobile/lib/app/payse_app.dart",
+    "apps/mobile/test/data/analysis/",
+    "apps/mobile/test/features/connection/",
+    "apps/mobile/test/app/"
+  ],
+  "acceptance": [
+    "목적: 분석 연동 4단계 중 3단계(앱 분석 작업 추적)를 만든다. 2단계(#228)의 반복 분석 묶음으로 서버 분석 작업을 접수·제출·조회하고, 그 상태를 분석 대기 화면(#221)에 알려 01-2 → 분석 대기 → 01-3을 앱 기본 구성에서 켠다. 기준은 docs/analysis-protocol.md §3, apps/api/docs/analysis-api.md §3·§4, apps/api/docs/analysis-recovery.md, apps/mobile/docs/analysis-input.md §6·§7이다. baseCommit은 hyeyeon-dev b5dd6d8(#232)이다",
+    "API 연결: 기존 ApiTransport·인증 세션으로 POST /analysis-jobs, GET /analysis-jobs/{jobId}, POST /analysis-jobs/{jobId}/input, POST /analysis-jobs/{jobId}/retry, POST /analysis-results/query를 호출한다. 응답은 apps/api/contracts/analysis-http.schema.json 형식으로 읽고 모르는 state·action·resultAvailability는 형식 오류로 처리한다. 서버가 반환한 대표 jobId로 이후 관찰 대상을 갱신한다. 서버·스키마·공통 계약은 바꾸지 않는다",
+    "작업 흐름: 01-2 확정 스냅샷으로 2단계 묶음을 만든다. 후보 0개(정상)면 접수하지 않는다. 접수 전 현재 입력으로 /analysis-results/query를 먼저 해 유효 결과가 있으면 재사용한다(EX-R). 연결 저장 뒤 처음 공개된 범위는 triggerKind A로 접수하고, 상태 응답 action=submitInput이면 받은 permit으로 /input을 한 번 제출한다. 같은 요청의 전송 재확인은 같은 멱등 키, 사용자의 새 재시도는 새 키다. 홈 합산 계좌 선택 변경(EX-AC)으로는 새 접수를 하지 않는다",
+    "반복 조회: queued는 약 3초, running은 Prefer: wait=5(지원하지 않으면 약 1초) 간격으로 작업당 한 요청만 둔다. 서버의 재요청 안내를 따른다. succeeded만으로 결과 본문을 쓰지 않고 /analysis-results/query의 현재 자격(available·partial·missing·stale 등)을 확인한다. 백그라운드로 가거나 화면을 떠나면 반복 조회를 멈추며 서버 작업 취소가 아니다. 공급자 자동 재호출은 0회다",
+    "만료: 제출 허가 60초가 지나면 실행창 안에서 상태를 다시 조회해 새 허가로 제출한다(사용자 조작 없음). 180초 실행창이 제출 전에 끝나 failed·retry가 되면 G(분석 실패, 다시 시도)를 보이고 다시 시도는 새 키로 /retry를 보낸다. outcomeUnknown 재시도는 사용자 동의 뒤 acknowledgeDuplicateRisk=true로만 보낸다. 3개월 식별 기한이 지난 expired·refreshInput만 triggerKind recovery·previousJobId로 접수한다",
+    "기기 저장·복귀: jobId·멱등 키·입력 문맥(context·inputHashHint·itemKey 대응)만 기기에 저장하고 분석 본문·거래 원문·permit·토큰은 저장하지 않는다. 앱 복귀·재실행 시 현재 인증·스냅샷으로 입력을 다시 만들어 결과 조회부터 하고 진행 중 작업은 상태를 조회한다. 저장 당시와 사용자·dataVersion·localSessionEpoch가 다르면 옛 응답을 채택하지 않는다. '다음'·로그아웃·다른 사용자 로그인 때 저장 정보를 지운다",
+    "화면 상태(혜연·A 2026-11-05 확정, 시안 design-explore/analysis-loading-v3.html): 서버 입력 수신 확인 전(접수 성공·입력 전송 중·입력 제출 응답 유실 포함)은 '분석을 준비하고 있어요.\\n잠시만 기다려 주세요.'다. 서버 응답(/input 또는 상태 조회)이 running을 알려준 뒤에만 '보통 3~5분 걸려요.\\n앱을 나가도 분석은 계속돼요.\\n나중에 돌아와 결과를 확인할 수 있어요.'로 바꾼다. 요청을 보냈다는 사실이나 접수 성공만으로 두 번째 문구를 보이지 않는다. 설명 높이는 3줄로 고정해 단계가 바뀌어도 그림이 움직이지 않게 한다. 5분 넘음 문구는 두 번째 단계에서만 쓴다. 끝난 뒤는 E·F, G(failed·cancelled, '내용 분석은 마치지 못했어요.' + 다시 시도), G-1(outcomeUnknown, '분석 결과를 확인하지 못했어요.' + 다시 시도), G-1a(다시 시도 확인 창: 제목 '다시 분석할까요?', 설명 '이전 분석이 이미 진행됐을 수 있어요.\\n다시 시도하면 같은 분석이 중복 실행될 수 있어요.', 버튼 '다시 분석하기'·'취소'. '다시 분석하기'를 눌러야만 acknowledgeDuplicateRisk=true로 보낸다. 비용은 사용자 청구 비용이 아니므로 언급하지 않는다), G-2(expired, '이전 요청이 만료됐어요.' + 다시 분석)로 나눈다. G-2는 현재 입력으로 유효 결과를 먼저 조회해 재사용할 결과가 없을 때만 보이고, 다시 분석을 누르면 준비 단계 화면에 '현재 거래 내역으로 다시 분석해요.'를 한 번 짧게 알린다",
+    "화면 수치: 거래 수·반복 후보 수는 Flutter가 센 값(2단계 탐지 결과)을 쓰고, 내용 분석 완료 여부는 서버 결과 자격으로 정한다. 보내지 못한 후보(notAnalyzed)·일부 결과(partial)를 성공이나 0개로 바꾸지 않는다. E-1(일부 확인 필요) 표시는 이번 범위가 아니다",
+    "앱 기본 구성: 실제 서버 모드(PayseApp.server 있음)에서는 HTTP 작업 추적을 넘겨 분석 대기 화면을 켠다. 가짜 서버 모드는 계약 응답을 흉내 내는 앱 내부 가짜 분석 서버로 같은 흐름을 보인다. 개발용 HTTP 허용·접속 주소는 성현님이 로컬 서버를 켤 때 맞추며, 기존 ApiConfig(https만 허용)를 바꿔야 하면 범위를 먼저 조정한다",
+    "검증 계획: 단위 테스트(응답 파서, 상태 → 화면 상태, 멱등 키 재사용·새 키, 대표 jobId 갱신, 허가 재발급, 180초 뒤 failed, outcomeUnknown 동의, 결과 재사용, 늦은 응답·사용자 변경 폐기, 저장·삭제), 위젯·흐름 테스트(준비 → 분석 중 문구 전환 조건, 입력 응답 유실 시 준비 문구 유지, G·G-1·G-2, 다음·로그아웃 삭제). 성현님 로컬 모의 서버(success·unknown·invalid_once·timeout_once)로 실제 HTTP 확인. 실기기(또는 에뮬레이터)에서 분석 중 홈으로 나갔다 오기, 강제 종료 후 다시 켜기가 결과까지 이어지는지 확인. 공식 검증은 npm run verify -- --task <이 명세>(mobile:check 포함)",
+    "범위 밖: 서버·DB·API 계약·공유 계산 패키지 수정, 거래 의미(transactionMeaning) 분석, 반복 후보 승인 화면·/recurring-decisions, E-1 표시, 홈 후보 안내, 끝났을 때 알림, 운영 서버 배포. 커밋·PR·merge는 혜연 요청 전 실행하지 않는다"
+  ],
+  "readBefore": [
+    "docs/mvp-scope.md",
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/harness/FLUTTER_TRANSITION.md",
+    "docs/app-architecture.md",
+    "docs/v0.6-screen-rules.md",
+    "docs/data-contracts.md",
+    "docs/payse-execution-contract.md",
+    "docs/analysis-protocol.md",
+    "apps/api/docs/analysis-api.md",
+    "apps/api/docs/analysis-recovery.md",
+    "apps/api/docs/analysis-mock.md",
+    "apps/api/docs/llm-execution.md",
+    "apps/api/contracts/analysis-http.schema.json",
+    "apps/mobile/docs/analysis-input.md",
+    "docs/harness/AGENT_REVIEW.md"
+  ]
+}
