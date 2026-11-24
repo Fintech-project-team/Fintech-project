@@ -1,0 +1,22 @@
+{
+  "id": "PAYSE-UX-WRITING-GUIDE-20261124",
+  "role": "integration",
+  "baseCommit": "c16bb75e7a22144dce037422cab1525c191a7e8e",
+  "branch": "docs/integration/ux-writing-guide",
+  "allowedPaths": ["docs/tasks/PAYSE-UX-WRITING-GUIDE-20261124.json", "docs/ux-writing.md"],
+  "acceptance": [
+    "목적: 혜연이 2026-11-24 작성한 PAYSE UX 라이팅 가이드(로컬 초안 PAYSE_UX_WRITING_v0.1.md)를 같은 날 혜연 결정으로 팀 기준으로 확정해 공통 문서 docs/ux-writing.md로 둔다. #236 점검 체크리스트 G절(UX 라이팅)의 판정 기준이다",
+    "내용: 초안의 규칙·용어표·판정 기준은 바꾸지 않는다. 확정 상태·날짜, 채택 문장, 버전 기록만 고치고 저장소 밖 개인 경로 링크(로컬 점검 사본, 개인 참고 문서)는 저장소 안 경로나 설명으로 바꾼다. 남은 결정(A-25 로그아웃 문구 등)은 그대로 남긴다",
+    "검증: 일반 문서 작업이다. npm run verify -- --task <이 명세>로 공통 검사를 실행하고 제품 코드가 없으므로 제품 검사는 NOT_APPLICABLE로 본다",
+    "범위 밖: 앱 문구 수정, 화면 규칙·디자인 문서·체크리스트 수정, A-25 재결정. 커밋·PR·merge는 혜연 요청 전 실행하지 않는다"
+  ],
+  "readBefore": [
+    "docs/ownership.md",
+    "docs/harness/GATE_MATRIX.md",
+    "docs/harness/CODE_SPEC.md",
+    "docs/EXTENSION_POINTS.md",
+    "docs/design.md",
+    "docs/v0.6-screen-rules.md",
+    "apps/mobile/docs/qa-v0.6-checklist.md"
+  ]
+}
